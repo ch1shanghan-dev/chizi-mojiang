@@ -1,8 +1,10 @@
-import { lib, game, ui, get, ai, _status } from "../../noname.js";
+import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 /* package.skill 区块：2026-10-04 由 extension.js 原样拆出（零内容改动）。
    ★ 本文件必须自带 noname 绑定 import —— 当年的拆分事故就是丢了这一行，
      ~3700 处 lib./game./get. 裸引用在运行时抛 ReferenceError（详见 extension.js 顶部注）。
-     改完务必跑 tools/check.js：自由变量扫描会拦住漏 import 的裸引用。 */
+   ★ 路径是 ../../../（三层）：本文件在 skills/ 子目录，比 extension.js 深一层。
+     曾错写成 ../../ 导致「Failed to fetch dynamically imported module」（2026-10-04 修复）。
+     改完务必跑 tools/check.js：自由变量扫描拦裸引用，import 路径校验拦失效路径。 */
 
 const cshSkillPack = {
         skill: {

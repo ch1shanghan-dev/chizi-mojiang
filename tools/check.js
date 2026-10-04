@@ -392,6 +392,56 @@ function runFreeVars() {
 }
 
 /* ------------------------------------------------------------------ *
+ * import 路径完整性（2026-10-04 新增）
+ *
+ * 背景：skills/index.js 拆分后比 extension.js 深一层目录，noname 导入却沿用了
+ * ../../noname.js → 指向不存在的 extension/noname.js。node --check 只查语法、
+ * 自由变量扫描只查绑定名，双双放过；浏览器里报
+ * "Failed to fetch dynamically imported module"，扩展整体加载失败（用户可见的
+ * 「扩展加载失败」弹窗）。本检查把「相对导入必须解析到实体文件」变成门禁项。
+ * ------------------------------------------------------------------ */
+function stripComments(src) {
+	// 极简剥离块注释与整行注释（校验器用途够用；不动字符串内如 URL 的 //）
+	return src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^[ \t]*\/\/.*$/gm, "");
+}
+
+function importSpecsOf(file) {
+	let src;
+	try { src = stripComments(fs.readFileSync(file, "utf8")); } catch { return []; }
+	const specs = new Set();
+	const patterns = [
+		/\b(?:import|export)\s[^;]*?\bfrom\s*["']([^"']+)["']/g,
+		/\bimport\s*["']([^"']+)["']/g,
+		/\bimport\s*\(\s*["']([^"']+)["']\s*\)/g,
+	];
+	for (const re of patterns) {
+		let m;
+		while ((m = re.exec(src))) specs.add(m[1]);
+	}
+	return [...specs];
+}
+
+function runImports() {
+	log("== import 路径完整性（相对导入必须解析到实体文件）==");
+	const files = targets().filter((f) => f.endsWith(".js"));
+	let bad = 0;
+	for (const f of files) {
+		const rel = path.relative(ROOT, f).replace(/\\/g, "/");
+		for (const spec of importSpecsOf(f)) {
+			if (!spec.startsWith(".")) continue; // 裸说明符（如 "noname"）由宿主解析
+			const target = path.resolve(path.dirname(f), spec);
+			if (!fs.existsSync(target)) {
+				bad++;
+				fail(rel + ' import 路径失效："' + spec + '" → 解析为 ' + target + "（不存在）" +
+					"\n         → 浏览器会报 Failed to fetch dynamically imported module，扩展整体加载失败。");
+			}
+		}
+	}
+	if (!bad) ok(files.length + " 个文件的相对 import 均可解析到实体文件");
+	log("");
+}
+
+/* ------------------------------------------------------------------ *
  * 二、版本号三处一致（README 第一章红线）
  * ------------------------------------------------------------------ */
 function readVersion(file, pattern) {
@@ -473,7 +523,7 @@ log("池子魔将 · 改动门禁");
 log("项目根：" + ROOT);
 log("");
 
-if (!ONLY_VERSIONS) { runSyntax(); runFreeVars(); }
+if (!ONLY_VERSIONS) { runSyntax(); runFreeVars(); runImports(); }
 if (!ONLY_SYNTAX) runVersions();
 
 log("----------------------------------------");
