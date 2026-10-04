@@ -437,6 +437,32 @@ function runVersions() {
 		}
 	}
 	log("");
+
+	/* 附加：package.js 的 size 声明与 files 清单实际体积核对（偏差 >5% 提醒同步） */
+	const sm = pkgSrc.match(/size\s*:\s*"([\d.]+)\s*(KB|MB|GB)\s*"/i);
+	if (!sm) {
+		warn("package.js 未声明 size（可运行 node tools/sync_size.js 自动写入）");
+	} else if (fm) {
+		const items2 = [...fm[1].matchAll(/"([^"]+)"/g)].map((m) => m[1]);
+		let total = 0;
+		const addSize = (p) => {
+			if (!fs.existsSync(p)) return;
+			const st = fs.statSync(p);
+			if (st.isDirectory()) {
+				for (const e of fs.readdirSync(p)) {
+					if (!e.startsWith(".")) addSize(path.join(p, e));
+				}
+			} else total += st.size;
+		};
+		items2.forEach((d) => addSize(path.join(ROOT, d)));
+		const mb = total / 1024 / 1024;
+		const unitMB = { KB: 1 / 1024, MB: 1, GB: 1024 }[sm[2].toUpperCase()];
+		const declaredMB = parseFloat(sm[1]) * unitMB;
+		if (Math.abs(mb - declaredMB) / Math.max(mb, 0.01) > 0.05) {
+			warn("size 声明 \"" + sm[1] + sm[2] + "\" 与 files 清单实际 " + mb.toFixed(1) + "MB 偏差超 5% —— 运行 node tools/sync_size.js 同步");
+		} else ok("size 声明与实际体积一致（约 " + mb.toFixed(1) + "MB）");
+	}
+	log("");
 }
 
 /* ------------------------------------------------------------------ *

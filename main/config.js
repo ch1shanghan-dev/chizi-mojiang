@@ -19,6 +19,7 @@ export const cshConfig = {
             /* ===== 功能开关 ===== */
             "csh_effect_announce":{"name":"伤害/击杀/回复播报","intro":"默认关闭。开启后播放伤害/连杀/回复播报（手游位图特效 + 手游原声）。逆流/却敌/归来仍为毛笔字特效。与其他扩展effect冲突时请关闭。","init":false},
             "csh_debug_menu":{"name":"启用池子调试（悬浮球）","intro":"默认开启。联机一律禁用。单机对局显示悬浮球，短按打开调试面板，F1 同效。","init":true},
+            "csh_dev_log":{"name":"开发者日志（console）","intro":"开启后控制台输出启动/就绪等诊断日志，普通玩家无需开启。","init":false},
             /* ===== 武将相关 ===== */
             "csh_enable_pingxing":{"name":"启用平行时空武将","intro":"默认关闭。开启后注册平行时空·上/下/阴间镜像武将。","init":false},
             "disEnableCharacter":{"name":"禁选其他扩展武将","intro":"开启后，禁止AI选择其他扩展的武将。","init":false},

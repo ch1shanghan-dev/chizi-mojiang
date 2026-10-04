@@ -1,0 +1,26 @@
+#!/bin/sh
+# 池子魔将 · pre-commit 门禁
+# 提交前自动运行 tools/check.js（语法 + 自由变量 + 版本一致 + files/size 核对）。
+# 背景见 extension.js 顶部注释：node --check 查不出的"未 import 裸引用"曾让全部技能
+# 在运行时抛 ReferenceError，这类问题靠本钩子在提交时拦截。
+#
+# 运行方式：
+#   1) 优先用系统 node；
+#   2) 否则退回无名杀自带的 Electron 运行时（ELECTRON_RUN_AS_NODE=1，同一引擎）；
+#   3) 都没有则跳过并提示（不阻断提交，但建议配好 node）。
+# 启用方式（仓库内执行一次）：git config core.hooksPath hooks
+cd "$(git rev-parse --show-toplevel)" || exit 1
+
+if command -v node >/dev/null 2>&1; then
+	exec node tools/check.js
+fi
+
+for exe in "../../../noname.exe" "../noname.exe" "../../../无名杀.exe"; do
+	if [ -f "$exe" ]; then
+		echo "[池子魔将] 未找到 node，使用 Electron 运行时：$exe"
+		ELECTRON_RUN_AS_NODE=1 exec "$exe" tools/check.js
+	fi
+done
+
+echo "[池子魔将] pre-commit 跳过：未找到 node 或 Electron 运行时（不阻断本次提交）" >&2
+exit 0

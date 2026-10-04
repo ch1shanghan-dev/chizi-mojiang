@@ -129,6 +129,9 @@ export function cshPrecontent() {
     // 入口挂载在 csh_debug.js 内部（arenaReady + 浮动按钮 + F1）。
     // 此处仅做存活检测与提示，避免“完全无反应”时无法判断是否加载成功。
     (function () {
+        // 就绪检测日志仅开发者开关打开时输出（普通玩家控制台保持干净）；
+        // lib.cshDebugMenu 由 csh_debug.js 在启动时挂载，缺失时经 arenaReady 兜底，不影响功能。
+        try { if (!lib.config.extension_池子魔将_csh_dev_log) return; } catch (eDevLog) { return; }
         [500, 2000, 5000].forEach(function (ms) {
             setTimeout(function () {
                 try {
