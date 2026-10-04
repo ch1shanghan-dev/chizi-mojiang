@@ -2602,6 +2602,102 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                     }
                 }
             } catch (ePk) {}
+
+            /* ===== 关系补全（2026-10-04 修复：衍生/组合/子技/继承技能恒显「未收录 / 未知」）=====
+               一批技能不直接登记在武将技能表里，反查恒为空：
+                 · 衍生技 derivation：主技完成后附赠（如使命技「道觉」→「清正」）
+                 · 组合技 group：子技以「主技_子键」命名（如 yjdaojue_effect）
+                 · 子技   subSkill：键名即子技后缀（与 group 同源，group 未声明时兜底）
+                 · 继承技 inherit：本技是基础技的变体（如离线「清正」继承手杀「清正」）
+               做法：把已确定来源的主技（武将/包）传播给它的关联技能；inherit 双向补全。
+               细节约束：
+                 · 传播只写 prop（候选表），绝不覆盖已有直接来源的条目——避免把主技的
+                   武将错误并进一个本就自有出处的技能；最终仅把候选并入仍无来源的键。
+                 · 候选条目一律新建独立数组，不共享主技数组引用（后续写入不会串改主技）。
+                 · 关系可成链（继承 → 衍生 → …），按轮循环至收敛，上限 3 轮防环。 */
+            var prop = {};
+            function mergeMeta(dst, src) {
+                if (!dst || !src) return;
+                for (var i = 0; i < src.chars.length; i++) {
+                    if (dst.chars.indexOf(src.chars[i]) === -1) dst.chars.push(src.chars[i]);
+                }
+                for (var j = 0; j < src.packs.length; j++) {
+                    if (dst.packs.indexOf(src.packs[j]) === -1) dst.packs.push(src.packs[j]);
+                }
+            }
+            function addMeta(key, src) {
+                if (!key || typeof key !== "string" || !src) return false;
+                var e = prop[key];
+                if (!e) e = prop[key] = { chars: [], packs: [] };
+                var before = e.chars.length + e.packs.length;
+                mergeMeta(e, src);
+                return e.chars.length + e.packs.length !== before;
+            }
+            /** 字符串或数组形态的关系字段 → 技能 id 列表（数组项兼容 {skill:"id"} 对象） */
+            function idList(v) {
+                var out = [];
+                if (!v) return out;
+                if (typeof v === "string") { out.push(v); return out; }
+                if (Object.prototype.toString.call(v) !== "[object Array]") return out;
+                for (var i = 0; i < v.length; i++) {
+                    var it = v[i];
+                    if (typeof it === "string") out.push(it);
+                    else if (it && typeof it === "object" && typeof it.skill === "string") out.push(it.skill);
+                }
+                return out;
+            }
+            function resolveRelations() {
+                var skills = lib.skill || {};
+                for (var round = 0; round < 3; round++) {
+                    var changed = false;
+                    var sid, info;
+                    /* ① 衍生 / 组合 / 子技：主技来源 → 关联技能 */
+                    for (sid in skills) {
+                        if (!Object.prototype.hasOwnProperty.call(skills, sid)) continue;
+                        var src = map[sid] || prop[sid];
+                        if (!src || !src.chars.length) continue;
+                        info = skills[sid];
+                        if (!info || typeof info !== "object") continue;
+                        var lists = [idList(info.derivation), idList(info.group)];
+                        if (info.subSkill && typeof info.subSkill === "object") {
+                            var subKeys = Object.getOwnPropertyNames(info.subSkill);
+                            for (var s = 0; s < subKeys.length; s++) lists.push([sid + "_" + subKeys[s]]);
+                        }
+                        for (var L = 0; L < lists.length; L++) {
+                            for (var m = 0; m < lists[L].length; m++) {
+                                var t = lists[L][m];
+                                if (!t || t === sid || !skills[t]) continue;
+                                if (map[t]) continue; /* 自有出处：不覆盖、不污染 */
+                                if (addMeta(t, src)) changed = true;
+                            }
+                        }
+                    }
+                    /* ② 继承技：本技与基础技双向补全（两侧都未知时靠 ① 的链继续传播） */
+                    for (sid in skills) {
+                        if (!Object.prototype.hasOwnProperty.call(skills, sid)) continue;
+                        info = skills[sid];
+                        if (!info || typeof info !== "object") continue;
+                        var bases = idList(info.inherit);
+                        for (var b = 0; b < bases.length; b++) {
+                            var base = bases[b];
+                            if (!base || base === sid || !skills[base]) continue;
+                            var a = map[sid] || prop[sid];
+                            var c = map[base] || prop[base];
+                            if (a && addMeta(base, a)) changed = true;
+                            if (c && addMeta(sid, c)) changed = true;
+                        }
+                    }
+                    if (!changed) break;
+                }
+            }
+            resolveRelations();
+            /* 合并：候选并入仍无直接来源的键；两侧都有时（自有出处 + 继承补充）取并集 */
+            for (var pk2 in prop) {
+                if (!Object.prototype.hasOwnProperty.call(prop, pk2)) continue;
+                if (!map[pk2]) map[pk2] = prop[pk2];
+                else mergeMeta(map[pk2], prop[pk2]);
+            }
+
             _skillMetaCache = map;
             return map;
         }
