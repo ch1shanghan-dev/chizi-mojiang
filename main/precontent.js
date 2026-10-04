@@ -124,21 +124,21 @@ export function cshPrecontent() {
             try { console.log("[池子魔将] 十周年UI接入异常", eDui); } catch (e2) {}
         }
     })();
-    // —— 拆包加载：胜负统计 / 池子调试（减小 extension.js）——
-    // csh_winrate / csh_debug 已改为 ES Module，由顶部 import 加载。
-    // 入口挂载在 csh_debug.js 内部（arenaReady + 浮动按钮 + F1）。
-    // 此处仅做存活检测与提示，避免“完全无反应”时无法判断是否加载成功。
+    // —— 拆包加载：胜负统计 / 池子调试 ——
+    // csh_winrate / csh_debug 已改为 ES Module + arenaReady 懒加载（见 main/bootstrap.js），
+    // 入口挂载仍在 csh_debug.js 内部（arenaReady + 浮动按钮 + F1），主菜单经懒加载桩唤起。
+    // 此处仅做「懒加载桩存活」检测与提示（开发者日志开关打开时才输出）。
     (function () {
         // 就绪检测日志仅开发者开关打开时输出（普通玩家控制台保持干净）；
-        // lib.cshDebugMenu 由 csh_debug.js 在启动时挂载，缺失时经 arenaReady 兜底，不影响功能。
+        // 模块本体 arenaReady 时才加载，这里只验证 bootstrap.js 留下的加载桩。
         try { if (!lib.config.extension_池子魔将_csh_dev_log) return; } catch (eDevLog) { return; }
         [500, 2000, 5000].forEach(function (ms) {
             setTimeout(function () {
                 try {
-                    if (lib.cshDebugMenu && typeof lib.cshDebugMenu.open === "function") {
-                        console.log("[池子魔将] 池子调试模块已就绪 t=" + ms);
+                    if (typeof lib.__cshLoadDebug === "function") {
+                        console.log("[池子魔将] 池子调试懒加载桩已就绪 t=" + ms + "（模块于进局时加载）");
                     } else {
-                        console.warn("[池子魔将] 池子调试模块未就绪 t=" + ms + "（检查 csh_debug.js 是否加载失败）");
+                        console.warn("[池子魔将] 池子调试懒加载桩未就绪 t=" + ms + "（检查 bootstrap.js 是否执行）");
                     }
                 } catch (e) {
                     console.error("[池子魔将] 调试模块检测异常", e);

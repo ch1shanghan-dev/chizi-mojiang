@@ -9,12 +9,30 @@ export const cshConfig = {
              * AI 互动的三个开关（总开关 / 频率 / 台词）已收进卡片面板，
              * 键名仍是 extension_池子魔将_csh_interact / _rate / _chat，老配置值继续生效。
              * 排版约定：不用 ◆ 之类的装饰符，也不加副标题，就一行金色按钮。 */
-            "winrateStats":{"name":"<span class=\"csh-cfg-btn\">胜负统计</span>","intro":"打开胜负统计面板：身份场 / 对决 / 斗地主 / 国战 的武将、阵营与个人战绩。","clear":true,"onclick":function(){ if(!lib.csh_winrate){ alert("胜负统计未初始化：请确认 csh_winrate.js 已随扩展加载，然后重启游戏"); return false; } lib.csh_winrate.open(); return false; }},
+            "winrateStats":{"name":"<span class=\"csh-cfg-btn\">胜负统计</span>","intro":"打开胜负统计面板：身份场 / 对决 / 斗地主 / 国战 的武将、阵营与个人战绩。","clear":true,"onclick":function(){
+                /* csh_winrate 已懒加载（arenaReady 时自动拉起，先于任何终局安装统计钩子）。
+                   主菜单点按钮时若尚未加载，这里现场拉起再打开；失败才回落到提示。 */
+                if(lib.csh_winrate && typeof lib.csh_winrate.open==="function"){ lib.csh_winrate.open(); return false; }
+                if(typeof lib.__cshLoadWinrate==="function"){
+                    lib.__cshLoadWinrate().then(function(){ try{ lib.csh_winrate.open(); }catch(e){ alert("胜负统计打开失败："+((e&&e.message)||e)); } }).catch(function(e){ alert("胜负统计未初始化：csh_winrate.js 加载失败 "+((e&&e.message)||e)); });
+                    return false;
+                }
+                alert("胜负统计未初始化：请确认 csh_winrate.js 已随扩展加载，然后重启游戏"); return false;
+            }},
             /* 【2026-10-02】玩家侧休闲入口。此前 5 个小游戏**只能**从调试面板的
                「池子休闲」页签进入，而那是开发者工具、入口又在横滚页签条第 11 枚，
                360px 宽的安卓机首屏根本看不到 —— 玩家找不到游戏。
                这里给出与「胜负统计 / 局内互动」同级的一步入口。 */
-            "csh_lobby":{"name":"<span class=\"csh-cfg-btn\">池子休闲</span>","intro":"打开小游戏列表：德州扑克 / 斗地主 / 廿一点 / UNO。与 AI 世界同桌，赢取池子币（CBY）。","clear":true,"onclick":function(){ if(!lib.cshDebug||typeof lib.cshDebug.openLobby!=="function"){ alert("池子休闲未初始化：请确认 csh_debug.js 已随扩展加载，然后重启游戏"); return false; } lib.cshDebug.openLobby(); return false; }},
+            "csh_lobby":{"name":"<span class=\"csh-cfg-btn\">池子休闲</span>","intro":"打开小游戏列表：德州扑克 / 斗地主 / 廿一点 / UNO。与 AI 世界同桌，赢取池子币（CBY）。","clear":true,"onclick":function(){
+                /* csh_debug 已懒加载：主菜单点按钮时现场拉起模块再落「池子休闲」页签；
+                   注意先查 openLobby（懒加载桩阶段 lib.cshDebug 只有诊断转发桩）。 */
+                if(lib.cshDebug && typeof lib.cshDebug.openLobby==="function"){ lib.cshDebug.openLobby(); return false; }
+                if(typeof lib.__cshLoadDebug==="function"){
+                    lib.__cshLoadDebug().then(function(){ try{ lib.cshDebug.openLobby(); }catch(e){ alert("池子休闲打开失败："+((e&&e.message)||e)); } }).catch(function(e){ alert("池子休闲未初始化：csh_debug.js 加载失败 "+((e&&e.message)||e)); });
+                    return false;
+                }
+                alert("池子休闲未初始化：请确认 csh_debug.js 已随扩展加载，然后重启游戏"); return false;
+            }},
             "csh_interact_panel":{"name":"<span class=\"csh-cfg-btn\">局内互动</span>","intro":"打开互动设置卡片：总开关 / 互动频率 / 附带台词。联机一律禁用。","clear":true,"onclick":function(){ if(!lib.cshInteract||typeof lib.cshInteract.openPanel!=="function"){ alert("AI 互动未初始化：请确认 csh_interact.js 已随扩展加载，然后重启游戏"); return false; } lib.cshInteract.openPanel(); return false; }},
             /* ===== 功能开关 ===== */
             "csh_effect_announce":{"name":"伤害/击杀/回复播报","intro":"默认关闭。开启后播放伤害/连杀/回复播报（手游位图特效 + 手游原声）。逆流/却敌/归来仍为毛笔字特效。与其他扩展effect冲突时请关闭。","init":false},

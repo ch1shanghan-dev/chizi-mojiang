@@ -14,14 +14,15 @@ export function cshContent(config, pack) { try {
 
 
     try {
-        /* 启动诊断日志统一走开发者开关：普通玩家控制台保持干净，
-           排查问题时在扩展设置里开「开发者日志（console）」即可。 */
+        /* 启动诊断日志统一走开发者开关：普通玩家控制台保持干净。
+           【2026-10-04】csh_debug / csh_winrate 已改为 arenaReady 懒加载，
+           content 时点 cshDebugMenu 尚未挂载属预期，改查懒加载桩是否就位。 */
         if (lib.config.extension_池子魔将_csh_dev_log) {
-            console.log("[池子魔将] content 执行, cshDebugMenu=", typeof lib.cshDebugMenu, "csh_winrate=", typeof lib.csh_winrate);
-            if (lib.cshDebugMenu && typeof lib.cshDebugMenu.open === "function") {
-                console.log("[池子魔将] 池子调试可用：对局右下角「池子调试」或按 F1");
+            console.log("[池子魔将] content 执行, 懒加载桩=", typeof lib.__cshLoadDebug, typeof lib.__cshLoadWinrate);
+            if (typeof lib.__cshLoadDebug === "function") {
+                console.log("[池子魔将] 池子调试/胜负统计为进局时懒加载：主菜单可按 F1 或用设置页按钮唤起");
             } else {
-                console.warn("[池子魔将] 池子调试未挂到 lib，请确认 import \"./core/csh_debug.js\" 成功");
+                console.warn("[池子魔将] 懒加载桩缺失：bootstrap.js 未正确执行");
             }
         }
     } catch (eCshLog) {}
