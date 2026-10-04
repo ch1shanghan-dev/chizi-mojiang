@@ -56,7 +56,7 @@ export default {
                 maxHp: 3,
                 hujia: 1,
                 skills: ["csh_manyi", "csh_xiangzhen", "csh_xizhan"],
-                img: "extension/池子魔将/image/csh_huaman.gif",
+                img: "extension/池子魔将/image/csh_huaman.webp",
             },
             "csh_yuangubafei": {
                 sex: "male",
@@ -106,7 +106,7 @@ export default {
                 hp: 5,
                 maxHp: 5,
                 skills: ["csh_kurou","csh_zhaxiang"],
-                img: "extension/池子魔将/image/csh_jzh.gif",
+                img: "extension/池子魔将/image/csh_jzh.webp",
                 dieAudios: ["ext:池子魔将/audio/die/csh_jzh.mp3"],
                 hujia: 1,
             },
@@ -117,7 +117,7 @@ export default {
                 maxHp: 3,
                 hujia: 1,
                 skills: ["csh_wuzhen","csh_qiai","csh_sbweimu"],
-                img: "extension/池子魔将/image/csh_qw.gif",
+                img: "extension/池子魔将/image/csh_qw.webp",
                 dieAudios: ["ext:池子魔将/audio/die/csh_qw.mp3"],
                 isZhugong: true,
             },
@@ -138,7 +138,7 @@ export default {
                 maxHp: 4,
                 hujia: 1,
                 skills: ["csh_liegong"],
-                img: "extension/池子魔将/image/csh_mmhz.gif",
+                img: "extension/池子魔将/image/csh_mmhz.webp",
                 dieAudios: ["shen_huangzhong"],
             },
             "csh_wlk": {
@@ -158,7 +158,7 @@ export default {
                 maxHp: 4,
                 hujia: 1,
                 skills: ["csh_xiongluan","csh_junchi","csh_zhansong"],
-                img: "extension/池子魔将/image/csh_sx.gif",
+                img: "extension/池子魔将/image/csh_sx.webp",
                 dieAudios: ["ext:池子魔将/audio/die/csh_sx.mp3"],
             },
             "csh_gdsn": {
@@ -188,7 +188,7 @@ export default {
                 maxHp: 3,
                 hujia: 1,
                 skills: ["csh_fangjian123"],
-                img: "extension/池子魔将/image/csh_gy.gif",
+                img: "extension/池子魔将/image/csh_gy.webp",
                 dieAudios: ["ext:池子魔将/audio/die/csh_gy.mp3"],
             },
             "csh_bfsm": {
@@ -209,7 +209,7 @@ export default {
                 maxHp: 3,
                 hujia: 1,
                 skills: ["csh_jiaomeng","csh_jiejian","csh_jiangxian"],
-                img: "extension/池子魔将/image/csh_ls.gif",
+                img: "extension/池子魔将/image/csh_ls.webp",
                 dieAudios: ["ext:池子魔将/audio/die/csh_ls.mp3"],
             },
             "csh_sj": {
@@ -230,7 +230,7 @@ export default {
                 maxHp: 4,
                 hujia: 1,
                 skills: ["csh_zhiheng","csh_hsshezuo","csh_jianwu","csh_xishou"],
-                img: "extension/池子魔将/image/csh_sq.gif",
+                img: "extension/池子魔将/image/csh_sq.webp",
                 dieAudios: ["ext:池子魔将/audio/die/csh_sq.mp3"],
                 isZhugong: true,
             },
@@ -241,7 +241,7 @@ export default {
                 maxHp: 2,
                 hujia: 1,
                 skills: ["csh_liangge","csh_guimou"],
-                img: "extension/池子魔将/image/csh_vxs.gif",
+                img: "extension/池子魔将/image/csh_vxs.webp",
                 dieAudios: ["ext:池子魔将/audio/die/csh_vxs.mp3"],
             },
             "csh_msmy": {
@@ -251,7 +251,7 @@ export default {
                 maxHp: 4,
                 hujia: 1,
                 skills: ["csh_sbaiyin","csh_pt","csh_renshen","csh_jikui"],
-                img: "extension/池子魔将/image/csh_msmy.gif",
+                img: "extension/池子魔将/image/csh_msmy.webp",
                 dieAudios: ["ext:池子魔将/audio/die/csh_msmy.mp3"],
             },
             "csh_mlb": {
@@ -261,7 +261,7 @@ export default {
                 maxHp: 5,
                 hujia: 1,
                 skills: ["csh_lvbu_baonu","csh_sbwushuang","csh_chitu"],
-                img: "extension/池子魔将/image/csh_mlb.gif",
+                img: "extension/池子魔将/image/csh_mlb.webp",
                 dieAudios: ["ext:池子魔将/audio/die/csh_mlb.mp3"],
                 isZhugong: true,
             },
@@ -272,7 +272,7 @@ export default {
                 maxHp: 3,
                 hujia: 1,
                 skills: ["csh_fengyan","csh_renfa23","csh_yaoji"],
-                img: "extension/池子魔将/image/csh_yy.gif",
+                img: "extension/池子魔将/image/csh_yy.webp",
                 dieAudios: ["ext:池子魔将/audio/die/csh_yy.mp3"],
             },
             "csh_bzt": {
@@ -333,7 +333,7 @@ export default {
                 maxHp: 8,
                 hujia: 1,
                 skills: ["csh_ss","csh_yn"],
-                img: "extension/池子魔将/image/csh_ae.gif",
+                img: "extension/池子魔将/image/csh_ae.webp",
                 dieAudios: ["ext:池子魔将/audio/die/csh_ae.mp3"],
             },
             "csh_mzj": {
@@ -343,7 +343,7 @@ export default {
                 maxHp: 3,
                 hujia: 1,
                 skills: ["csh_reqiuyuan","csh_guidao129","csh_reluoshen"],
-                img: "extension/池子魔将/image/csh_mzj.gif",
+                img: "extension/池子魔将/image/csh_mzj.webp",
                 dieAudios: ["zhenji"],
             },
             "csh_chengpu": {
@@ -353,7 +353,7 @@ export default {
                 maxHp: 3,
                 hujia: 1,
                 skills: ["csh_lihuo","csh_wutui","csh_rechunlao","csh_jishe"],
-                img: "extension/池子魔将/image/csh_chengpu.gif",
+                img: "extension/池子魔将/image/csh_chengpu.webp",
                 dieAudios: ["ext:池子魔将/audio/die/csh_chengpu.mp3"],
             },
             "csh_zhangbao": {
@@ -394,7 +394,7 @@ export default {
                 maxHp: 4,
                 hujia: 1,
                 skills: ["csh_qianxin","csh_rezhuhai","csh_zhichi"],
-                img: "extension/池子魔将/image/csh_xushu.gif",
+                img: "extension/池子魔将/image/csh_xushu.webp",
                 dieAudios: ["ext:池子魔将/audio/die/csh_xushu.mp3"],
             },
             "csh_zhonghui": {
@@ -404,7 +404,7 @@ export default {
                 maxHp: 4,
                 hujia: 1,
                 skills: ["csh_zhonghui_tiaoxin","csh_tongji","csh_quanji","csh_zili"],
-                img: "extension/池子魔将/image/csh_zhonghui.gif",
+                img: "extension/池子魔将/image/csh_zhonghui.webp",
                 dieAudios: ["ext:池子魔将/audio/die/csh_zhonghui.mp3"],
             },
             "csh_xuchu": {
@@ -444,7 +444,7 @@ export default {
                 maxHp: 3,
                 hujia: 1,
                 skills: ["csh_tianjing","csh_yuli","csh_zidian"],
-                img: "extension/池子魔将/image/csh_ngwt.gif",
+                img: "extension/池子魔将/image/csh_ngwt.webp",
                 dieAudios: ["ext:池子魔将/audio/die/csh_ngwt.mp3"],
             },
             "csh_misida": {
@@ -494,7 +494,7 @@ export default {
                 maxHp: 3,
                 hujia: 1,
                 skills: ["csh_gongao","csh_zhugefuhun","csh_weizhong"],
-                img: "extension/池子魔将/image/csh_guansuo.gif",
+                img: "extension/池子魔将/image/csh_guansuo.webp",
                 dieAudios: ["ext:池子魔将/audio/die/csh_guansuo.mp3"],
             },
             "csh_zhaoxiang": {
@@ -544,7 +544,7 @@ export default {
                 maxHp: 3,
                 hujia: 1,
                 skills: ["csh_yusuo","csh_qiege"],
-                img: "extension/池子魔将/image/csh_caiyan.gif",
+                img: "extension/池子魔将/image/csh_caiyan.webp",
                 dieAudios: ["ext:池子魔将/audio/die/csh_caiyan.mp3"],
             },
             "csh_simahui": {
@@ -554,7 +554,7 @@ export default {
                 maxHp: 3,
                 hujia: 1,
                 skills: ["csh_shuijing","csh_zhiyin","csh_jingfu"],
-                img: "extension/池子魔将/image/csh_simahui.gif",
+                img: "extension/池子魔将/image/csh_simahui.webp",
                 dieAudios: ["ext:池子魔将/audio/die/csh_simahui.mp3"],
             },
             "csh_wenyang": {
@@ -564,7 +564,7 @@ export default {
                 maxHp: 4,
                 hujia: 1,
                 skills: ["csh_poyin","csh_chuanfa"],
-                img: "extension/池子魔将/image/csh_wenyang.gif",
+                img: "extension/池子魔将/image/csh_wenyang.webp",
                 dieAudios: ["ext:池子魔将/audio/die/csh_wenyang.mp3"],
             },
             "csh_dengai": {
@@ -573,7 +573,7 @@ export default {
                 hp: 3,
                 maxHp: 4,
                 skills: ["csh_zishu","csh_retuntian","csh_zaoxian"],
-                img: "extension/池子魔将/image/csh_dengai.gif",
+                img: "extension/池子魔将/image/csh_dengai.webp",
                 dieAudios: ["ext:池子魔将/audio/die/csh_dengai.mp3"],
                 hujia: 1,
             },
@@ -584,7 +584,7 @@ export default {
                 maxHp: 3,
                 hujia: 1,
                 skills: ["csh_juguan","csh_manyujinsuwu"],
-                img: "extension/池子魔将/image/csh_gaogan.gif",
+                img: "extension/池子魔将/image/csh_gaogan.webp",
                 dieAudios: ["ext:池子魔将/audio/die/csh_gaogan.mp3"],
                 isZhugong: true,
             },
@@ -605,7 +605,7 @@ export default {
                 maxHp: 3,
                 hujia: 1,
                 skills: ["csh_xinshanjia"],
-                img: "extension/池子魔将/image/csh_caochun.gif",
+                img: "extension/池子魔将/image/csh_caochun.webp",
                 dieAudios: ["ext:池子魔将/audio/die/csh_caochun.mp3"],
             },
             "csh_shamoke": {
@@ -615,7 +615,7 @@ export default {
                 maxHp: 4,
                 hujia: 1,
                 skills: ["csh_gzjili","csh_xianxiamanyong"],
-                img: "extension/池子魔将/image/csh_shamoke.gif",
+                img: "extension/池子魔将/image/csh_shamoke.webp",
                 dieAudios: ["ext:池子魔将/audio/die/csh_shamoke.mp3"],
             },
             "csh_zhangning": {
@@ -625,7 +625,7 @@ export default {
                 maxHp: 3,
                 hujia: 1,
                 skills: ["csh_huangtian1","csh_difa12"],
-                img: "extension/池子魔将/image/csh_zhangning.gif",
+                img: "extension/池子魔将/image/csh_zhangning.webp",
                 dieAudios: ["ext:池子魔将/audio/die/csh_zhangning.mp3"],
             },
             "csh_lidian": {
@@ -635,7 +635,7 @@ export default {
                 maxHp: 4,
                 hujia: 1,
                 skills: ["csh_xunxun","csh_xinwangxi"],
-                img: "extension/池子魔将/image/csh_lidian.gif",
+                img: "extension/池子魔将/image/csh_lidian.webp",
                 dieAudios: ["ext:池子魔将/audio/die/csh_lidian.mp3"],
             },
             "csh_lvlingqi": {
@@ -645,7 +645,7 @@ export default {
                 maxHp: 4,
                 hujia: 1,
                 skills: ["csh_yannv1","csh_zhuangrong12"],
-                img: "extension/池子魔将/image/csh_lvlingqi.gif",
+                img: "extension/池子魔将/image/csh_lvlingqi.webp",
                 dieAudios: ["ext:池子魔将/audio/die/csh_lvlingqi.mp3"],
             },
             "csh_wolongzhuge": {
@@ -664,7 +664,7 @@ export default {
                 hp: 14,
                 maxHp: 29,
                 skills: ["csh_bianduan","csh_benghuai","csh_baowei"],
-                img: "extension/池子魔将/image/csh_dongzhuo.gif",
+                img: "extension/池子魔将/image/csh_dongzhuo.webp",
                 dieAudios: ["ext:池子魔将/audio/die/csh_dongzhuo.mp3"],
                 isZhugong: true,
             },
@@ -685,7 +685,7 @@ export default {
                 maxHp: 4,
                 hujia: 1,
                 skills: ["csh_kangli","csh_stargangyi"],
-                img: "extension/池子魔将/image/csh_lukang.gif",
+                img: "extension/池子魔将/image/csh_lukang.webp",
                 dieAudios: ["ext:池子魔将/audio/die/csh_lukang.mp3"],
             },
             "csh_xurong": {
@@ -695,7 +695,7 @@ export default {
                 maxHp: 4,
                 hujia: 1,
                 skills: ["csh_xionghuo","csh_sxrmzhaduo"],
-                img: "extension/池子魔将/image/csh_xurong.gif",
+                img: "extension/池子魔将/image/csh_xurong.webp",
                 dieAudios: ["ext:池子魔将/audio/die/csh_xurong.mp3"],
             },
             "csh_doudou": {
@@ -736,7 +736,7 @@ export default {
                 maxHp: 3,
                 hujia: 1,
                 skills: ["csh_shefu666","csh_benyu"],
-                img: "extension/池子魔将/image/csh_chengyu.gif",
+                img: "extension/池子魔将/image/csh_chengyu.webp",
                 dieAudios: ["ext:池子魔将/audio/die/csh_chengyu.mp3"],
             },
             "csh_shanyuezhiyin": {
@@ -768,7 +768,7 @@ export default {
                 hujia: 1,
                 skills: ["csh_fanghaoqibing","csh_sbhunzi"],
                 dieAudios: ["ext:池子魔将/audio/die/csh_realityfanghao.mp3"],
-                img: "extension/池子魔将/image/csh_realityfanghao.gif",
+                img: "extension/池子魔将/image/csh_realityfanghao.webp",
                 isZhugong: true,
             },
             "csh_feibijiubi": {
@@ -821,7 +821,7 @@ export default {
                 hujia: 1,
                 skills: ["csh_zhangxingcai_qiangwu","csh_zhangxingcai_shenxian"],
                 dieAudios: ["zhangxingcai"],
-                img: "extension/池子魔将/image/csh_zhangxingcai.gif",
+                img: "extension/池子魔将/image/csh_zhangxingcai.webp",
             },
             "csh_jieluji": {
                 sex: "male",
@@ -831,7 +831,7 @@ export default {
                 hujia: 1,
                 skills: ["csh_jieluji_gailan","csh_jieluji_fennu"],
                 dieAudios: ["luji"],
-                img: "extension/池子魔将/image/csh_jieluji.gif",
+                img: "extension/池子魔将/image/csh_jieluji.webp",
             },
             "csh_youhabahe": {
                 sex: "male",
@@ -968,7 +968,7 @@ export default {
                 maxHp: 3,
                 hujia: 1,
                 skills: ["csh_yunming", "csh_ziyan"],
-                img: "extension/池子魔将/image/csh_diaochan.gif",
+                img: "extension/池子魔将/image/csh_diaochan.webp",
                 dieAudios: ["diaochan"],
             },
             "csh_zywoo": {

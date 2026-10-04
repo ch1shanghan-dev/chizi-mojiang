@@ -43,10 +43,10 @@ export default function(){
             ["csh_zuozhu_xuzuo", ["img:extension/池子魔将/image/csh_zuozhu_xuzuo.jpg"]],
         ],
         "csh_zhonghui": [
-            ["csh_zhonghui_2", ["img:extension/池子魔将/image/csh_zhonghui_2.gif", "die:ext:池子魔将/audio/die/csh_zhonghui.mp3"]],
+            ["csh_zhonghui_2", ["img:extension/池子魔将/image/csh_zhonghui_2.webp", "die:ext:池子魔将/audio/die/csh_zhonghui.mp3"]],
         ],
         "csh_mlm": [
-            ["csh_mlm_2", ["img:extension/池子魔将/image/csh_mlm_2.gif", "die:ext:池子魔将/audio/die/csh_mlm.mp3"]],
+            ["csh_mlm_2", ["img:extension/池子魔将/image/csh_mlm_2.webp", "die:ext:池子魔将/audio/die/csh_mlm.mp3"]],
         ],
         "csh_maochao": [
             ["csh_maochao_shen", ["img:extension/池子魔将/image/csh_maochao_shen.jpg", "die:ext:池子魔将/audio/die/csh_maochao.mp3"]],
