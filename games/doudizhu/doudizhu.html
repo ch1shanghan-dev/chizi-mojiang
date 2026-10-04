@@ -1,0 +1,2314 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>斗地主</title>
+<!-- 统一音效总线（§4.7.1）：唯一一份 Web Audio 合成实现，与主页面/其余 4 款游戏共用。
+     经典脚本同步加载 → 页面内联脚本执行时 window.CSH_SFX 必已就绪（或加载失败）。
+     加载失败也不要紧：SFX 退化成 no-op，游戏照常运行，只是没声音。 -->
+<script src="../../core/csh_sfx.js" data-game="doudizhu"></script>
+<!-- BGM（2026-09-30）：本游戏主题曲，Web Audio 实时合成，零资源体积。 -->
+<script src="../../core/csh_bgm.js" data-game="doudizhu"></script>
+<!-- 纸牌共用视觉层（§4.7.2 ①牌面高光 ②动效曲线 ③底池滚动 ④层级梯 ⑤AI 头像）：
+     零 import，一加载即注入统一样式表；主页面那份由 core/csh_cards.js 提供，这里只服务 iframe。 -->
+<script src="../../core/csh_cards.js"></script>
+<!-- AI 头像生成器（§I.4）：与主页面 csh_badge.js 共用同一份实现，源码只有 core/csh_svggen.js 一份。 -->
+<script src="../../core/csh_svggen.js"></script>
+<!-- 隐藏自检 ?selftest=1（§12#1 不溢出 / #3 触摸目标 / #4 对比度）：
+     data-csh-selftest="auto" 表示「本页是独立文档，DOM 就绪后自动扫 document.body」。 -->
+<script src="../../core/csh_selftest.js" data-csh-selftest="auto"></script>
+<script src="../../core/csh_page.js"></script>
+<!-- 统一布局系统（《UI 布局重构规范 v2.0》§18/§19/§20）：骨架 / 安全区 / 响应式 / Dock / 结算层。
+     放在本页 <style> 之前，本页只写"这游戏长什么样"，不再各自声明尺寸体系。
+     注意本页样式会覆盖骨架的 .view{display:flex} —— 见下方 #view-game 的说明。 -->
+<link rel="stylesheet" href="../../core/csh_layout.css">
+<style>
+  /* ============================================================
+     深色墨底 + 描金 · 单机斗地主（3 人：玩家 + 2 人机）
+     与 uno/uno.html 同一套色值与写法：
+       - 尺寸全部走 clamp(vh)，1280×720 ~ 2560×1440 自适应
+       - 不使用 vw / vh 视口单位（父页面 body 被 transform: scale 缩放，
+         视口单位不受祖先 transform 影响，缩放不为 1 时会溢出）
+       - 扑克牌为 DOM + CSS 绘制，无任何外部资源
+     ============================================================ */
+  :root {
+    --ink-0: #0b0a08;
+    --ink-1: #15110c;
+    --ink-2: #1e1811;
+    --gold: #d8b46a;
+    --gold-hi: #f4dfa8;
+    --gold-soft: rgba(216, 180, 106, .55);
+    --gold-line: rgba(216, 180, 106, .28);
+    --gold-fill: rgba(216, 180, 106, .07);
+    --text: #ece5d6;
+    --text-dim: #a49a86;
+    --danger: #d66e7c;
+    --ok: #7fd8c4;
+    --cw: clamp(54px, 8.4vh, 112px);     /* 手牌宽（尽量吃满画幅） */
+    --fs-xs: clamp(11px, 1.3vh, 15px);
+    --fs-sm: clamp(12px, 1.5vh, 17px);
+    --fs-md: clamp(14px, 1.75vh, 20px);
+    --fs-lg: clamp(18px, 2.4vh, 32px);
+    --radius: 12px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+  html, body { height: 100%; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+    background: radial-gradient(ellipse at 50% 22%, var(--ink-2) 0%, var(--ink-1) 58%, var(--ink-0) 100%);
+    color: var(--text);
+    overflow: hidden;
+    font-size: var(--fs-sm);
+    user-select: none; -webkit-user-select: none;
+  }
+  .hidden { display: none !important; }
+  button { font-family: inherit; cursor: pointer; border: none; outline: none; color: inherit; }
+  input { font-family: inherit; outline: none; }
+  .dim { color: var(--text-dim); }
+
+  /* ---------- 通用 ---------- */
+  .view { position: absolute; inset: 0; display: flex; flex-direction: column; overflow: hidden; }
+  .btn {
+    padding: clamp(7px, 1.1vh, 13px) clamp(16px, 2.2vh, 28px);
+    border-radius: var(--radius); font-size: var(--fs-md); font-weight: 700; letter-spacing: .5px;
+    background: linear-gradient(180deg, #e8cd8c, #c9a457); color: #241c10;
+    box-shadow: 0 3px 0 #6d5a30; transition: transform .08s;
+  }
+  .btn:active { transform: translateY(2px); box-shadow: 0 1px 0 #6d5a30; }
+  .btn:disabled { background: #3a3428; color: #7d7360; box-shadow: none; cursor: default; }
+  .btn.ghost { background: var(--gold-fill); color: var(--gold); border: 1px solid var(--gold-line); box-shadow: none; }
+  .btn.ghost:hover { border-color: var(--gold); color: #f0dfae; }
+  .btn.ghost:disabled { color: #6d6455; border-color: rgba(216, 180, 106, .14); }
+  .btn.small { padding: clamp(5px, .8vh, 9px) clamp(12px, 1.6vh, 18px); font-size: var(--fs-sm); }
+  .btn.on {
+    background: linear-gradient(180deg, #f6e6b4, #dcb96c); color: #241c10;
+    border-color: var(--gold-hi); box-shadow: 0 0 0 1px var(--gold-soft), 0 0 14px rgba(216, 180, 106, .45);
+  }
+
+  /* ---------- 开局视图 ---------- */
+  #view-start { align-items: center; justify-content: center; padding: 4vh 20px; }
+  .start-card {
+    width: min(460px, 92%); display: flex; flex-direction: column; gap: clamp(12px, 2vh, 24px);
+    background: linear-gradient(180deg, rgba(216, 180, 106, .08), rgba(216, 180, 106, .02));
+    border: 1px solid var(--gold-line); border-radius: 20px;
+    padding: clamp(20px, 3.4vh, 40px) clamp(20px, 3vh, 36px);
+    box-shadow: 0 24px 60px rgba(0, 0, 0, .6), inset 0 1px 0 rgba(216, 180, 106, .16);
+  }
+  .title {
+    font-size: var(--fs-lg); font-weight: 900; letter-spacing: 3px; text-align: center;
+    color: var(--gold); text-shadow: 0 2px 12px rgba(216, 180, 106, .28);
+  }
+  .subtitle { text-align: center; font-size: var(--fs-sm); color: var(--text-dim); margin-top: calc(-1 * clamp(6px, 1vh, 14px)); }
+  .field { display: flex; flex-direction: column; gap: clamp(6px, .9vh, 10px); }
+  .field label { font-size: var(--fs-xs); color: var(--text-dim); letter-spacing: 1px; }
+  .field input {
+    background: rgba(0, 0, 0, .42); border: 1px solid var(--gold-line); border-radius: 10px;
+    color: var(--text); font-size: var(--fs-md); padding: clamp(9px, 1.2vh, 14px) clamp(12px, 1.5vh, 16px);
+    width: 100%;
+  }
+  .field input:focus { border-color: var(--gold); box-shadow: 0 0 0 2px rgba(216, 180, 106, .16); }
+  .tip { font-size: var(--fs-xs); color: var(--text-dim); text-align: center; line-height: 1.8; }
+
+  /* ---------- 好牌模式开关 ---------- */
+  .switch-row {
+    display: flex; align-items: center; gap: clamp(9px, 1.3vh, 15px); cursor: pointer;
+    background: rgba(0, 0, 0, .3); border: 1px solid var(--gold-line); border-radius: 12px;
+    padding: clamp(9px, 1.3vh, 15px) clamp(12px, 1.6vh, 18px);
+    transition: border-color .16s, background .16s;
+  }
+  .switch-row:hover { border-color: var(--gold-soft); background: rgba(216, 180, 106, .07); }
+  .switch-row.on { border-color: var(--gold-soft); background: rgba(216, 180, 106, .11); }
+  .switch-row input { position: absolute; width: 0; height: 0; opacity: 0; pointer-events: none; }
+  .switch-box {
+    position: relative; flex-shrink: 0; width: clamp(40px, 4.8vh, 54px); height: clamp(22px, 2.7vh, 30px);
+    border-radius: 999px; background: rgba(0, 0, 0, .55); border: 1px solid var(--gold-line);
+    transition: background .18s, border-color .18s;
+  }
+  .switch-box::after {
+    content: ''; position: absolute; top: 50%; left: 2px; transform: translateY(-50%);
+    width: calc(100% / 2.35); height: calc(100% / 2.35); border-radius: 50%;
+    background: #6f6653; transition: left .18s, transform .18s, background .18s;
+  }
+  .switch-row.on .switch-box { background: linear-gradient(180deg, #e8cd8c, #c9a457); border-color: var(--gold-hi); }
+  .switch-row.on .switch-box::after { left: calc(100% - 2px); transform: translate(-100%, -50%); background: #241c10; }
+  .switch-row input:focus-visible + .switch-box { box-shadow: 0 0 0 2px rgba(216, 180, 106, .32); }
+  .switch-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+  .switch-text b { font-size: var(--fs-sm); font-weight: 700; color: var(--text); }
+  .switch-row.on .switch-text b { color: var(--gold-hi); }
+  .switch-text em { font-style: normal; font-size: var(--fs-xs); color: var(--text-dim); line-height: 1.5; }
+
+  /* ============================================================
+     对局页 · 骨架内的斗地主专属样式（2026-10-03 重构）
+     ------------------------------------------------------------
+     骨架（topbar / stage / hudrow / board / player / dock）全部来自
+     core/csh_layout.css；这里**只写斗地主自己的东西**：
+       · 牌毡 + 左右两张座位卡（座位卡里带"上次出牌"的小牌组）
+       · 中心公共区（底牌 / 上一手出牌 / 回合提示）
+       · 手牌扇（单行绝不换行，牌多时先缩牌宽、再加重叠）
+       · Dock 里的叫分 / 出牌按钮组
+     原 .top-bar / .bottom-row / .mid / .center / .bottom-bar 五段式纵向布局已删除：
+     它们各自用 flex 抢高度，手牌一多就把底部的「叫地主 / 出牌」顶出 iframe 下缘
+     —— 正是规范 §9 点名要修的问题。
+     ============================================================ */
+
+  /* ⚠ 覆盖顺序陷阱：本页 <style> 在 csh_layout.css **之后**加载，同权重时本页胜出，
+     而 .view（本页）写着 display:flex，会把骨架 .csh-game 的 display:grid 压掉 ——
+     三段行高（topbar / stage / dock）会全部失效。这里用 ID 选择器显式声明 grid，
+     行高仍由 .csh-game 的 grid-template-rows 提供。 */
+  #view-game { display: grid; overflow: hidden; }
+
+  /* ---------- 台面角标（2026-10-03 · 顶部清零后） ----------
+     倍数徽章 + 最新事件，绝对定位在牌毡左上角 —— 属于"牌桌印刷区"，
+     不是屏幕顶部的菜单行。徽章保留金色（它是本局池权重，唯一值得强调的数字）；
+     事件小字刻意低调（muted、省略号），只回答"刚才发生了什么"。 */
+  .felt-corner {
+    position: absolute; left: clamp(10px, 2.2vw, 26px); top: clamp(8px, 1.8vh, 18px);
+    display: flex; flex-direction: column; align-items: flex-start; gap: 4px;
+    max-width: 44%; pointer-events: none; z-index: 3;
+  }
+  .mult-badge {
+    display: inline-block;
+    font-size: var(--fs-sm); font-weight: 800; letter-spacing: .5px;
+    color: #140d07; background: linear-gradient(160deg, var(--gold-hi, #f0dfae), var(--gold, #c9a84c));
+    border: 1px solid rgba(0, 0, 0, .25); border-radius: 6px;
+    padding: 1px 8px; min-width: 30px; text-align: center;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, .4);
+  }
+  .mult-badge.bump { animation: multBump .38s cubic-bezier(.2, 1.5, .4, 1); }
+  @keyframes multBump {
+    0% { transform: scale(1); }
+    40% { transform: scale(1.4); background: #fff3d0; }
+    100% { transform: scale(1); }
+  }
+  .felt-log {
+    display: block; max-width: 100%;
+    font-size: var(--fs-xs); color: var(--text-dim); letter-spacing: .3px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, .5);
+  }
+
+  /* ---------- 牌毡（浮层装饰；规范 §1.1 允许的绝对定位用途） ---------- */
+  .felt {
+    position: absolute; inset: clamp(3px, .6vh, 8px) clamp(5px, 1vw, 14px);
+    border-radius: 46% / 42%;
+    background: radial-gradient(ellipse at 50% 46%, var(--felt-0) 0%, var(--felt-1) 56%, var(--felt-2) 100%);
+    border: 2px solid var(--gold-line);
+    box-shadow: inset 0 0 0 1px rgba(216, 180, 106, .10), inset 0 0 70px rgba(0, 0, 0, .6);
+  }
+
+  /* ---------- 座位：贴主战区左右边缘（规范 §4.1 / §5.1） ----------
+     §9.3：上家 / 下家的出牌直接作为**小牌组**贴在座位卡里，
+     不再给每家发一块纵向大卡片（旧 .seat 是 122~198px 宽、~150px 高的整列，
+     手机横屏一进来就把中间挤成一条缝，中间出牌区只能往下钳制）。 */
+  .seat { position: absolute; top: 50%; transform: translateY(-50%); }
+  .seat-left { left: clamp(3px, .6vw, 10px); }
+  .seat-right { right: clamp(3px, .6vw, 10px); }
+  .seat-box {
+    display: flex; align-items: center; gap: clamp(4px, .6vh, 8px);
+    padding: clamp(4px, .6vh, 7px) clamp(6px, .8vw, 11px);
+    background: rgba(11, 10, 8, .74); border: 1px solid var(--gold-line); border-radius: 11px;
+    max-width: min(26vw, 200px);
+    transition: border-color .18s, opacity .3s;
+  }
+  .seat.turn .seat-box {
+    border-color: var(--gold);
+    box-shadow: 0 0 0 1px var(--gold-soft), 0 0 18px rgba(216, 180, 106, .28);
+    animation: breathe 1.3s ease-in-out infinite;
+  }
+  @keyframes breathe { 50% { box-shadow: 0 0 0 1px var(--gold-soft), 0 0 26px rgba(216, 180, 106, .55); } }
+  .seat-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .seat-line { display: flex; align-items: center; gap: 5px; min-width: 0; white-space: nowrap; }
+  .avatar {
+    flex: 0 0 auto;
+    width: clamp(24px, 3.4vh, 36px); height: clamp(24px, 3.4vh, 36px); border-radius: 50%;
+    overflow: hidden; display: flex; align-items: center; justify-content: center;
+    font-weight: 900; font-size: var(--fs-md); color: #f0e6d0;
+    background: radial-gradient(circle at 35% 30%, #4a4132, #241e15);
+    border: 1px solid var(--gold-line);
+  }
+  .avatar.lord { border-color: var(--gold); color: #ffeec2; background: radial-gradient(circle at 35% 30%, #6b5426, #2c2213); }
+  .avatar svg { width: 100%; height: 100%; display: block; }
+  .sname { font-size: var(--fs-sm); font-weight: 700; overflow: hidden; text-overflow: ellipsis; }
+  .badge {
+    flex: 0 0 auto; font-size: var(--fs-xs); line-height: 1.5; color: var(--text-dim);
+    border: 1px solid var(--gold-line); border-radius: 8px; padding: 0 5px;
+  }
+  .badge.lord { color: #2a2110; background: linear-gradient(180deg, #e8cd8c, #c9a457); border-color: #c9a457; font-weight: 700; }
+  .scount { font-size: var(--fs-xs); color: var(--text-dim); }
+  .scount b { color: var(--gold); font-size: var(--fs-sm); }
+  /* 上次出牌 / 不出（小牌组，规范 §9.3） */
+  .act-tag { font-size: var(--fs-xs); color: var(--danger); border: 1px dashed rgba(214, 110, 124, .5); border-radius: 8px; padding: 0 7px; }
+  .cards-row { display: flex; align-items: center; min-width: 0; }
+  .cards-row > .pcard + .pcard { margin-left: calc(var(--cw) * -.34); }
+
+  /* ---------- 中心公共区（规范 §9.1 的"公共区域"） ----------
+     底牌 + 上一手出牌 + 回合提示。位置由骨架 .csh-center 给出（主战区正中），
+     不再自己 top:% 找位置 —— 那是"中心区被挤到压住座位卡"的根源（规范 §6.2）。 */
+  .csh-center { gap: clamp(4px, .9vh, 10px); }
+  .dz-bottom { display: flex; align-items: center; gap: clamp(4px, .6vh, 8px); }
+  .dz-cap { font-size: var(--fs-xs); color: var(--text-dim); letter-spacing: 1px; }
+  .dz-bottom .pcard { --cw: clamp(26px, 4.6vh, 46px); }
+  .play-head {
+    font-size: var(--fs-xs); color: var(--text-dim); letter-spacing: .5px;
+    max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  /* 固定出牌区（§9.3）：有人出牌 / 无人跟清空，高度都不跳。
+     牌面尺寸跟手牌同级（主战区是视觉重心，§17）；出得多了靠重叠收窄，
+     宽度上限保证即使左右座位卡取到最大宽度也不会与它相交。 */
+  .play-zone {
+    display: flex; align-items: center; justify-content: center;
+    min-height: clamp(52px, 11vh, 96px);
+    max-width: min(44vw, 520px); overflow: hidden;
+  }
+  .play-zone .pcard { --cw: clamp(36px, 7.6vh, 68px); }
+  .play-zone .cards-row { flex-wrap: nowrap; }
+  .play-zone .pcard { animation: cardFly .24s ease-out both; }
+  @keyframes cardFly { from { transform: translateY(-18px) scale(.88); opacity: 0; } }
+  .center-note { font-size: var(--fs-2); color: var(--text-dim); }
+  .turn-hint { font-size: var(--fs-2); color: var(--text-dim); white-space: nowrap; }
+  .turn-hint.mine { color: var(--gold-hi); font-weight: 700; }
+
+  /* ---------- 扑克牌（纯 DOM + CSS，无图片） ---------- */
+  .pcard {
+    width: var(--cw); height: calc(var(--cw) * 1.4); border-radius: calc(var(--cw) * .12);
+    position: relative; flex-shrink: 0; overflow: hidden;
+    background: linear-gradient(160deg, #fdf8ee, #e6dcc8);
+    border: 1px solid #b6a98d; color: #1c1712;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, .5);
+    transition: transform .12s ease-out, box-shadow .12s ease-out;
+  }
+  .pcard .r { position: absolute; top: calc(var(--cw) * .04); left: calc(var(--cw) * .09); font-size: calc(var(--cw) * .32); font-weight: 900; line-height: 1; }
+  .pcard .r.ten { font-size: calc(var(--cw) * .26); letter-spacing: -1px; }
+  .pcard .mid { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: calc(var(--cw) * .46); line-height: 1; }
+  .pcard .s { position: absolute; right: calc(var(--cw) * .09); bottom: calc(var(--cw) * .03); font-size: calc(var(--cw) * .28); line-height: 1; }
+  .pcard.red { color: #c0392b; }
+  .pcard.joker .mid { font-size: calc(var(--cw) * .36); font-weight: 900; }
+  .pcard.joker.black { color: #1c1712; }
+  .pcard.joker.red { color: #c0392b; }
+  .pcard.back {
+    background:
+      repeating-linear-gradient(45deg, rgba(216, 180, 106, .16) 0 4px, rgba(0, 0, 0, 0) 4px 8px),
+      linear-gradient(160deg, #2b2317, #16110b);
+    border: 1px solid var(--gold-line);
+  }
+  .pcard.back::after {
+    content: ""; position: absolute; inset: 14%; border: 1px solid rgba(216, 180, 106, .22);
+    border-radius: calc(var(--cw) * .08);
+  }
+  .pcard.sm { --cw: clamp(34px, 4.6vh, 56px); }
+  .pcard.xs { --cw: clamp(22px, 3.1vh, 38px); }
+
+  .my-hand .pcard { cursor: pointer; }
+  .my-hand .pcard:hover { transform: translateY(calc(var(--cw) * -.1)); }
+  .my-hand .pcard.sel { transform: translateY(calc(var(--cw) * -.26)); box-shadow: 0 8px 18px rgba(216, 180, 106, .45), 0 0 0 2px var(--gold); }
+  .my-hand .pcard.in { animation: cardIn .22s ease-out both; }
+  @keyframes cardIn { from { transform: translateY(26px) scale(.9); opacity: 0; } }
+
+  /* ---------- 玩家区：我的手牌扇 + 我的状态（规范 §8.2 / §9.2） ---------- */
+  /* §9.2 手牌单行绝不换行：flex-wrap:nowrap + overflow:hidden；
+     牌多时**先缩牌宽**（--cw 按高度走），仍放不下才由 fitHand() 加重叠（--ov），
+     既没有第二行，也不会出现横向滚动条（§16）。 */
+  .my-hand {
+    display: flex; align-items: flex-end; justify-content: center;
+    flex: 1 1 auto; min-width: 0;
+    flex-wrap: nowrap; overflow: hidden;
+    padding: calc(var(--cw) * .26) 2px 2px;   /* 上方的空间留给"选中抬起" */
+  }
+  .my-hand > .pcard + .pcard { margin-left: var(--ov, calc(var(--cw) * -.4)); }
+  .csh-player .pl-brief { max-width: min(30%, 300px); }
+  .pl-line .num { font-variant-numeric: tabular-nums; }
+  .sel-info {
+    display: flex; align-items: baseline; gap: 6px; min-width: 0;
+    font-size: var(--fs-xs); color: var(--text-dim);
+  }
+  .sel-info #sel-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sel-info.ok #sel-text { color: var(--ok); }
+  .sel-info.bad #sel-text { color: var(--danger); }
+
+  /* ---------- Dock：只放当前合法的操作（规范 §21） ---------- */
+  .csh-dock .act-group { display: flex; align-items: center; gap: var(--gap-sm); }
+  .dock-wait { font-size: var(--fs-3); color: var(--csh-text-dim); white-space: nowrap; }
+  #btn-auto { min-width: clamp(64px, 9vh, 96px); letter-spacing: 2px; }
+
+
+  /* ---------- 结算层（骨架 .csh-result / .rs-panel，规范 §13） ----------
+     结构：半透明遮罩（只压暗、不遮死，背后仍能看到牌桌）+ 居中紧凑面板 + 底部按钮。
+     旧 .banner-mask 是 rgba(6,5,4,.74) 的全屏遮罩 + 0.34s 淡入停在半透明：
+     既把牌桌盖死（玩家看不到"谁剩几张、靠什么走完"），又像"界面穿透"。
+     现在外观全部由 core/csh_layout.css 提供：180/200ms、**结束时不透明**。 */
+  .csh-result .rs-title { font-size: clamp(15px, 4.2vh, 22px); text-shadow: 0 2px 14px rgba(216, 180, 106, .3); }
+  .csh-result .rs-cards .pcard { --cw: clamp(22px, 3.6vh, 36px); }
+  .csh-result .rs-sub b { color: var(--gold-hi); }
+  .csh-result .rs-cap { margin-top: 2px; }
+  /* 矮屏（手机横屏）：面板要连按钮一起落在首屏内（§23「CTA 可见且可点击」）。
+     省掉两行小标题（地主是谁在各行的角标里已有、倍数链在下方经济行里也有），
+     再把 max-height 放宽一档 —— 否则内容比 88% 高，面板内部会出现滚动、
+     「再来一局 / 收工结算」被挤到折叠线以下。 */
+  @media (orientation: landscape) and (max-height: 430px) {
+    .csh-result .rs-cap { display: none; }
+    .csh-result .rs-panel { max-height: 96%; padding: 8px 10px; gap: 5px; }
+    .csh-result .rs-row { padding: 3px 8px; }
+  }
+
+  /* ---------- toast ---------- */
+  /* 【2026-10-03 重构】改挂主战区右上角：原先是"底部锚定在 .bottom-bar 上方"，
+     那套坐标依赖旧的五段式布局（.bottom-bar 高约 139px）。新骨架里 .csh-dock(52) +
+     玩家区(手牌) 已经占满底部，再按旧数值锚定会压住手牌扇。
+     改成右上角固定：既不压中心公共区（底牌 / 上一手），也不压手牌与 Dock。 */
+  #toasts {
+    position: fixed; top: calc(var(--game-topbar-h) + 6px); right: 8px; left: auto; transform: none;
+    z-index: 90;
+    display: flex; flex-direction: column; gap: 6px; align-items: flex-end; pointer-events: none;
+    width: max-content; max-width: 46%;
+  }
+  .toast {
+    background: rgba(21, 17, 12, .94); border: 1px solid var(--gold-line); color: #f0dfae;
+    padding: clamp(6px, .9vh, 11px) clamp(14px, 2vh, 22px); border-radius: 20px;
+    font-size: var(--fs-sm); animation: toastIn .25s; box-shadow: 0 6px 18px rgba(0, 0, 0, .55);
+    max-width: 100%; text-align: center;
+  }
+  .toast.fade { opacity: 0; transition: opacity .4s; }
+  @keyframes toastIn { from { transform: translateY(-12px); opacity: 0; } }
+
+  /* ---------- 响应式：方向 + 可用高度（规范 §19） ----------
+     断点体系改为「横屏 + 高度」，不再用「width < X = 手机」：
+     PC 与安卓从此是同一套布局，只有尺寸变量与信息折叠程度不同（§1.3）。
+     原先那一串 max-width:900/620/480/430/390/360/330 的档位全部删除 ——
+     它们按宽度断"手机"，在 915×412 的横屏手机上一条都不命中，
+     手牌只能用 overflow-x 横滑（§9.2 明确禁止）。 */
+
+  /* L-SHORT：手机横屏主场景（915×412 档）—— 牌与按钮的尺寸下限重新标定 */
+  @media (orientation: landscape) and (max-height: 430px) {
+    :root { --cw: clamp(38px, 8vh, 52px); }
+    .btn { min-height: 44px; padding: 5px 14px; }       /* 触摸红线 44px（叫分/出牌是主路径） */
+    .btn.small { min-height: 40px; padding: 4px 10px; }
+  }
+
+  /* L-TINY：极矮屏 —— 只砍装饰，操作与主内容不动 */
+  @media (orientation: landscape) and (max-height: 350px) {
+    .avatar { width: 24px; height: 24px; font-size: var(--fs-sm); }
+    .seat-box { padding: 3px 6px; gap: 4px; }
+    .dz-cap { display: none; }        /* 「底牌」标签收起，牌面本身保留 */
+  }
+
+  /* 竖屏：小游戏要求横屏（壳有旋转引导），这里只保证不出现滚动条 */
+  @media (orientation: portrait) {
+    #view-game { overflow: hidden; }
+  }
+
+  /* 无障碍：系统开启「减少动态效果」时关掉装饰性动效。
+     与德州/廿一点口径一致（§4.7.2 ② 引入统一动效后必须成对提供降级；
+     core/csh_cards.js 注入的动效本身已包在 no-preference 里，这里管的是页面自带动效）。 */
+  @media (prefers-reduced-motion: reduce) {
+    .my-hand .pcard.in, .play-zone .pcard, .mult-badge.bump,
+    .seat.turn .seat-box, .seat.turn .seat-box::after { animation: none !important; }
+  }
+
+  /* ---------- 开局页：横屏收紧（2026-10-03） ----------
+     主场景是手机横屏（915×412 只有 412px 高），开局卡按竖屏调的内距会把
+     「开始游戏」推出首屏。这里按方向 + 高度收紧间距，不改任何交互。 */
+  @media (orientation: landscape) and (max-height: 430px) {
+    #view-start { padding: 6px 14px; }
+    .start-card { gap: 8px; padding: 10px 14px; border-radius: 14px; }
+    .start-card > .title { font-size: clamp(16px, 4.4vh, 22px); letter-spacing: 2px; }
+    .start-card > .subtitle { font-size: 10.5px; margin-top: 0; }
+    .field { gap: 3px; }
+    .field label { font-size: 10.5px; }
+    .field input { padding: 6px 10px; min-height: 40px; }
+    .switch-row { padding: 6px 10px; gap: 8px; }
+    .switch-text b { font-size: 11.5px; }
+    .switch-text em { font-size: 10px; line-height: 1.35; }
+    .switch-box { width: 38px; height: 21px; }
+    #btn-start-game { min-height: 44px; }
+    .start-card > .tip { font-size: 10px; line-height: 1.4; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ★ 2026-09-29：移除页面自带浮动「关闭」—— 壳顶带已有关闭，双按钮冗余（同德州轮修复） -->
+
+<!-- ============ 开局页 ============ -->
+<div id="view-start" class="view">
+  <div class="start-card">
+    <div class="title">斗地主</div>
+    <div class="subtitle">池子魔将 · 调试面板彩蛋</div>
+    <div class="field">
+      <label for="inp-name">你的昵称</label>
+      <input id="inp-name" maxlength="12" placeholder="池子">
+    </div>
+
+    <label class="switch-row" id="good-row" for="chk-good">
+      <input id="chk-good" type="checkbox">
+      <span class="switch-box" aria-hidden="true"></span>
+      <span class="switch-text">
+        <b>好牌模式</b>
+        <em>开局保底大小王 + 四个 2 · 练习局不计输赢</em>
+      </span>
+    </label>
+
+    <button class="btn" id="btn-start-game" type="button">开始游戏</button>
+    <div class="tip" id="econ-tip" style="display:none"></div>
+    <!-- 【2026-10-03 精简】原为三行规则（牌数 / 叫分 / 选牌方式）。牌数属于背景资料，
+         叫分与选牌在局内都有明确提示（选中的牌会浮起、按钮上写着"叫 3 分"），
+         开局页只留一行"点牌选中 / 再点取消"这个真正需要先知道的手势。 -->
+    <div class="tip">点牌选中 · 再点取消　|　「提示」循环给建议</div>
+  </div>
+</div>
+
+<!-- ============ 对局页（2026-10-03 · 顶部清零） ============
+     骨架 = csh_layout.css 的 .csh-game（no-topbar 两行变体）：[ stage | dock ]
+       stage   主战区 + 玩家区（中心公共区与玩家手牌区是 grid 的两行，几何上不可能重叠）；
+               左右座位只贴主战区边缘。
+       dock    操作控制台，固定高度，只放**当前合法**的操作（规范 §21）
+     【2026-10-03 用户决定 · 顶部清零】原 topbar（倍数 / 地主）与 HUD 槽（战况）整行删除：
+       · 地主身份**早有替身**：座位卡有「地主」徽标、自己的身份在下方状态行 —— 纯重复，直接删；
+       · 倍数是"本局池权重"（决策必需、无替身）→ 移到台面左上角标（牌桌印刷区，非菜单行）；
+       · 战况日志里有中央区覆盖不到的事件（叫分结果 / 不出 / 重发计数）→ 保留功能，
+         降为台面左上角的"最新事件"小字（一行、省略、极低调）。
+       信息各归其位：屏幕顶端不再有常驻菜单行（与德州样板同一条原则）。
+     原五段式（top-bar / mid / bottom-bar）已删除：中间那一大块是"手牌溢出即顶飞
+     底部按钮"的根源（规范 §9 点名的问题）。 -->
+<div id="view-game" class="view hidden csh-game no-topbar">
+
+  <div class="csh-stage">
+
+    <!-- ① 主战区：左右座位（含"上次出牌"小牌组）+ 中心公共区 -->
+    <div class="csh-board">
+      <div class="felt">
+        <!-- 台面角标（左上 · 牌桌印刷区）：倍数徽章 + 最新事件。
+             沿用 #mult-badge / #status-line 两个 id —— bumpMult / logLine 零改动。 -->
+        <div class="felt-corner">
+          <span class="mult-badge" id="mult-badge" title="倍数链：炸弹 / 春天 / 明牌 / 抢地主 各 ×2">×1</span>
+          <span class="felt-log" id="status-line"></span>
+        </div>
+        <div class="csh-seats">
+          <div class="seat seat-left" id="seat-2"></div>
+          <div class="seat seat-right" id="seat-1"></div>
+        </div>
+        <div class="csh-center">
+          <div class="dz-bottom">
+            <span class="dz-cap" id="bottom-label">底牌</span>
+            <div class="cards-row" id="bottom-cards"></div>
+          </div>
+          <div class="play-head" id="center-title">自由出牌</div>
+          <div class="play-zone" id="play-zone"></div>
+          <div class="turn-hint" id="turn-hint"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ④ 玩家区：我的手牌扇 + 我的状态（规范 §8.2：压成两行） -->
+    <div class="csh-player">
+      <div class="hand my-hand" id="hand"></div>
+      <div class="pl-brief">
+        <div class="pl-line" id="my-line1">
+          <b id="my-role">身份待定</b><em>·</em><em>剩</em><b class="num" id="my-count">0</b><em>张</em>
+        </div>
+        <div class="sel-info" id="sel-info"><span id="sel-text">点牌选中 · 再点取消</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ⑤ Dock：操作控制台（只显示当前合法操作；等待时只显示一行状态文字） -->
+  <div class="csh-dock">
+    <span class="dock-wait tb-item hidden" id="dock-wait"><span class="tb-k" id="dock-wait-t"></span></span>
+    <div class="act-group hidden" id="bid-actions">
+      <button class="btn ghost" type="button" data-v="0">不叫</button>
+      <button class="btn small" type="button" data-v="1">叫地主 1 分</button>
+      <button class="btn small" type="button" data-v="2">叫地主 2 分</button>
+      <button class="btn small" type="button" data-v="3">叫地主 3 分</button>
+    </div>
+    <div class="act-group hidden" id="play-actions">
+      <button class="btn ghost" id="btn-pass" type="button">不出</button>
+      <button class="btn ghost" id="btn-hint" type="button">提示</button>
+      <button class="btn" id="btn-play" type="button">出牌</button>
+    </div>
+    <div class="act-group hidden" id="over-actions">
+      <button class="btn" id="btn-again-bar" type="button">再来一局</button>
+    </div>
+    <div class="act-group" id="auto-group">
+      <button class="btn ghost" id="btn-auto" type="button" title="托管：自动帮你叫分与出牌">托管</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 结算层（骨架 .csh-result，规范 §13） ============
+     结构：半透明遮罩（只压暗、不遮死）+ 居中紧凑面板 + 底部按钮，背后仍能看到牌桌。
+     面板里给出**对照信息**：三家各剩几张、赢家靠什么牌型走完、倍数从哪来 ——
+     结算依据本身必须可见，否则玩家只能看到一句"你赢了"（原来的问题）。 -->
+<div class="csh-result hidden" id="banner">
+  <div class="rs-panel">
+    <div class="rs-title" id="banner-title"></div>
+    <div class="rs-sub" id="banner-sub"></div>
+    <div class="rs-rows" id="banner-rows"></div>
+    <div class="rs-sub" id="banner-econ"></div>
+    <div class="rs-acts">
+      <button class="btn" id="btn-again" type="button">再来一局</button>
+      <button class="btn ghost" id="btn-back-start" type="button">返回开局</button>
+    </div>
+  </div>
+</div>
+
+<div id="toasts"></div>
+
+<script>
+'use strict';
+
+/* ============================================================
+   -1. 统一钱包桥（§4.1.1 · §G.6.3 · §H.4）
+   本页跑在 Game Shell 的 iframe 内时：
+     · 门票 300（门票即带入）已在收费屏扣除，宿主回传 buyIn
+     · 同桌两个 AI 从「AI 角色世界」抽取（§I），各带 min(600, 资金×0.3)
+     · 每局结束向宿主上报功勋（play / win / bigwin）
+     · 结算交回 {buyIn, chips}，回收 90%、净赢上限 = 两 AI 带入之和（§H.4）
+   不在 shell 内（独立打开调试）时自动降级：无经济、纯娱乐。
+   ============================================================ */
+var Bridge = (function () {
+  /* 传输核心来自 core/csh_page.js（唯一实现） */
+  var T = CSHPage.transport({ closeName: 'doudizhu-close' });
+  /* ★ 2026-09-30：壳「关闭」委托给本页 closePage 收尾（离开即自动结算，先回账再关窗）。
+     注册点必须在 Bridge 内 —— T 是本闭包私有变量，注册在外层会 ReferenceError。 */
+  T.onCloseSelf(function () { closePage(); });
+  var call = T.call;
+  var ready = false, buyIn = 0, lastSnap = null;
+  var opponents = [];   /* [{id,name,persona,stake,fund}] 两名同桌 AI */
+  var worldApi = null;  /* 宿主注入的 CSH.world（若可用） */
+
+  return {
+    active: T.active,
+    call: call,
+    /* 拉钱包快照 + 抽取同桌 AI（AI 带入 = min(600, 资金×0.3)） */
+    pull: function (cb) {
+      call('shell-wallet', null, function (ok, data) {
+        if (ok && data) {
+          lastSnap = data;
+          buyIn = Math.max(0, Math.floor(data.buyIn || data.ticket || 300));
+          ready = true;
+        }
+        /* AI 抽取走 shell-world（宿主侧 cshWorld.seat）
+           ★ 2026-09-29：带入改为**跟随玩家实际带入**（此前硬编码 600）。
+           否则玩家选 20,000 档时同桌 AI 仍只带 600，两 AI 带入之和（自然封顶）
+           恒为 1,200 —— 桌面经济与玩家下注量脱钩，逻辑不自洽。 */
+        call('shell-seat', { n: 2, buyIn: Math.max(200, buyIn) }, function (ok2, d2) {
+          if (ok2 && d2 && d2.seats) opponents = d2.seats;
+          if (cb) cb(ready, data);
+        });
+      });
+    },
+    buyIn: function () { return buyIn; },
+    opponents: function () { return opponents.slice(); },
+    snapshot: function () { return lastSnap; },
+    isReady: function () { return ready; },
+    merit: function (n, reason, cb) { call('shell-merit', { n: n, reason: reason }, cb); },
+    /* ★ 2026-09-29：AI 资金变动不再由本页逐笔上报，统一并入 settleSession
+       （宿主侧双向记账，玩家赢→扣 AI；玩家输→记入 AI），避免两条账本互相覆盖。 */
+    /* 结算回账（§H.4）：★ 2026-09-29 统一到 shell-settle-session ——
+       一次调用完成「玩家入账」+「AI 世界双向记账」（玩家赢 → 两 AI 按带入比例真实扣款；
+       玩家输 → 按比例真实记入两 AI 资金）。此前只做单向扣款，世界只减不增、长期枯竭。
+       aiStakeTotal = 两 AI 带入之和，即本局净赢的自然封顶（§H.4）。 */
+    settleSession: function (payload, cb) {
+      /* 走 CSHPage 的结算通道（T.settle）：**成功应答才置"已结算"**，失败自动释放认领，
+         于是 closePage 里"若已结束但尚未结算就补一次"的兜底真正可达。
+         壳侧对同一会话的重复结算请求幂等（GUARD 回放上次结果），重试不会重复入账。 */
+      T.settle('shell-settle-session', payload, cb, 4000);
+    },
+    /* 兼容旧入口：仅交回筹码，宿主按同桌带入自然封顶。
+       超时与主入口统一为 4000ms（安卓弱机 + 经济通道，二次复核要求同一类关键事务口径一致）。 */
+    settle: function (chips, cb) {
+      T.settle('shell-settle', { data: { buyIn: buyIn, chips: Math.max(0, Math.floor(chips)) } }, cb, 4000);
+    },
+    isSettled: T.isSettled,
+  };
+})();
+
+/* ============================================================
+   0. 基础工具 / 生命周期标志
+   ============================================================ */
+var $ = function (s) { return document.querySelector(s); };
+var $$ = function (s) { return document.querySelectorAll(s); };
+
+/* 页面存活标志：销毁后不再排任何定时器（人机回合是 later 递归） */
+var alive = true;
+var timers = [];
+
+function later(fn, ms) {
+  if (!alive) return null;
+  var id = setTimeout(function () {
+    var i = timers.indexOf(id);
+    if (i >= 0) timers.splice(i, 1);
+    if (!alive) return;
+    try { fn(); } catch (e) { console.log('[DDZ] 定时任务异常', e); }
+  }, ms);
+  timers.push(id);
+  return id;
+}
+function clearAllTimers() {
+  for (var i = 0; i < timers.length; i++) clearTimeout(timers[i]);
+  timers = [];
+}
+function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+
+/* ---------- 音效：统一 SfxBus（§4.7.1） ----------
+ * 本文件不再自带 AudioContext 合成 —— 那套实现此前在 5 款游戏里各复制了一份，
+ * 开关键还统一写成 csh_sfx（互相串味：一款关掉，五款全哑）。现在全部走 core/csh_sfx.js：
+ *   · 每游戏独立开关 csh_doudizhu_sfx（就是本页「音效」开关那一行）
+ *   · 共用音量档位 csh_sfx_volume（0/30/60/100，统一在调试面板里调，各游戏不再各设一套）
+ *   · 首次用户交互自动解锁 AudioContext（移动端必须）
+ * sfx.* 保持原有同名 API，调用点一行都不用改。 */
+var SFX = (function () {
+  var S = null;
+  try { S = (typeof window.CSH_SFX_SANDBOX === 'function') ? window.CSH_SFX_SANDBOX() : (window.CSH_SFX || null); } catch (e) { S = null; }
+  if (S) { try { S.init({ game: 'doudizhu' }); } catch (e2) {} }
+  return S;
+})();
+function sfxOn() { try { return !!(SFX && SFX.enabled()); } catch (e) { return false; } }
+function setSfxOn(b) { try { if (SFX) SFX.setEnabled(!!b); } catch (e) {} }
+function sfxPlay(name, opt) { if (SFX) { try { SFX.play(name, opt); } catch (e) {} } }
+var sfx = {
+  unlock: function () { if (SFX) { try { SFX.unlock(); } catch (e) {} } },
+  ui: function () { sfxPlay('ui.tap'); },
+  deal: function () { sfxPlay('card.deal'); },
+  play: function () { sfxPlay('card.play'); },
+  draw: function () { sfxPlay('card.draw'); },
+  pass: function () { sfxPlay('card.pass'); },
+  skip: function () { sfxPlay('card.pass'); },
+  penal: function () { sfxPlay('ui.warn'); },
+  bomb: function () { sfxPlay('bomb'); },
+  uno: function () { sfxPlay('uno'); },
+  win: function () { sfxPlay('win'); },
+  lose: function () { sfxPlay('lose'); }
+};
+
+/* 纸牌共用视觉层（§4.7.2）：
+   ① 牌面高光 / ② 动效曲线 / ④ 层级梯 —— 由 core/csh_cards.js 注入样式表；
+   本文件只用它的 JS 侧能力：③ 倍数（池）数值滚动 / ⑤ 座位 AI 头像。拿不到就静默降级。 */
+var CRD = null;
+try { CRD = (typeof window !== 'undefined' && window.CSH && window.CSH.cards) ? window.CSH.cards : null; } catch (eCrd) { CRD = null; }
+
+function esc(s) {
+  var d = document.createElement('div');
+  d.textContent = String(s);
+  return d.innerHTML;
+}
+function rndMs(a, b) { return a + Math.random() * (b - a); }
+
+/* ============================================================
+   1. 规则引擎（纯函数，无 DOM 依赖，可整块抽出做单元测试）
+      覆盖：单张/对子/三张/三带一/三带二/顺子/连对/飞机(带单/带对)/
+            四带二(两单/两对)/炸弹/王炸
+   ============================================================ */
+/* ==DDZ-ENGINE-START== */
+function rnd(n) { return Math.floor(Math.random() * n); }
+var SEQ_MAX = 14;            /* 顺子 / 连对 / 飞机最大点数 A(14)；2 与王不可入顺 */
+var JOKER_S = 16;            /* 小王 */
+var JOKER_B = 17;            /* 大王 */
+var RANK_LABEL = {
+  3: '3', 4: '4', 5: '5', 6: '6', 7: '7', 8: '8', 9: '9', 10: '10',
+  11: 'J', 12: 'Q', 13: 'K', 14: 'A', 15: '2', 16: '小王', 17: '大王'
+};
+var SUITS = ['♠', '♥', '♣', '♦'];   /* 索引 1、3 为红色 */
+var TYPE_NAME = {
+  single: '单张', pair: '对子', trio: '三张', trio1: '三带一', trio2: '三带二',
+  straight: '顺子', pairs: '连对', plane: '飞机', plane1: '飞机带单', plane2: '飞机带对',
+  four2s: '四带二', four2p: '四带两对', bomb: '炸弹', rocket: '王炸'
+};
+
+/* ---------- 牌堆 ---------- */
+function buildDeck() {
+  var deck = [], id = 0, r, s;
+  for (r = 3; r <= 15; r++) {
+    for (s = 0; s < 4; s++) deck.push({ id: id++, rank: r, suit: s });
+  }
+  deck.push({ id: id++, rank: JOKER_S, suit: -1 });
+  deck.push({ id: id++, rank: JOKER_B, suit: -1 });
+  return deck;
+}
+function shuffle(arr) {
+  var a = arr.slice(), i, j, t;
+  for (i = a.length - 1; i > 0; i--) {
+    j = rnd(i + 1);
+    t = a[i]; a[i] = a[j]; a[j] = t;
+  }
+  return a;
+}
+/* 手牌排序：点数从大到小，同点数按花色 */
+function sortHand(hand) {
+  hand.sort(function (a, b) {
+    if (a.rank !== b.rank) return b.rank - a.rank;
+    return a.suit - b.suit;
+  });
+  return hand;
+}
+function countsOf(cards) {
+  var m = {}, i, r;
+  for (i = 0; i < cards.length; i++) {
+    r = cards[i].rank;
+    m[r] = (m[r] || 0) + 1;
+  }
+  return m;
+}
+function ranksOf(cards) {
+  var m = countsOf(cards), out = [], k;
+  for (k in m) if (Object.prototype.hasOwnProperty.call(m, k)) out.push(Number(k));
+  out.sort(function (a, b) { return a - b; });
+  return out;
+}
+function isConsec(ranks) {
+  for (var i = 1; i < ranks.length; i++) if (ranks[i] !== ranks[i - 1] + 1) return false;
+  return true;
+}
+function mk(type, main, size) { return { type: type, main: main, size: size }; }
+function typeName(cls) { return cls && TYPE_NAME[cls.type] ? TYPE_NAME[cls.type] : '未知牌型'; }
+
+/* ---------- 牌型识别 ----------
+   返回 { type, main, size } 或 null
+   main：比大小的主牌点数（顺子/连对/飞机取最大点数）
+   size：序列长度（顺子=张数，连对=对数，飞机=三张组数），非序列牌型为 0
+--------------------------------- */
+function classify(cards) {
+  if (!cards || !cards.length) return null;
+  var n = cards.length;
+  var m = countsOf(cards);
+  var ranks = ranksOf(cards);
+  var i, c1 = 0, c2 = 0, c3 = 0, c4 = 0, c;
+
+  if (n === 2 && m[JOKER_S] === 1 && m[JOKER_B] === 1) return mk('rocket', JOKER_B, 0);
+  if (n === 4 && ranks.length === 1) return mk('bomb', ranks[0], 0);
+  if (n === 1) return mk('single', ranks[0], 0);
+  if (n === 2 && ranks.length === 1) return mk('pair', ranks[0], 0);
+  if (n === 3 && ranks.length === 1) return mk('trio', ranks[0], 0);
+
+  for (i = 0; i < ranks.length; i++) {
+    c = m[ranks[i]];
+    if (c === 1) c1++; else if (c === 2) c2++; else if (c === 3) c3++; else c4++;
+  }
+  if (n === 4 && c3 === 1) return mk('trio1', findCount(m, 3), 0);
+  if (n === 5 && c3 === 1 && c2 === 1) return mk('trio2', findCount(m, 3), 0);
+
+  /* 顺子：≥5 张连续单牌，不含 2 与王 */
+  if (n >= 5 && ranks.length === n && ranks[n - 1] <= SEQ_MAX && isConsec(ranks)) {
+    return mk('straight', ranks[n - 1], n);
+  }
+  /* 连对：≥3 组连续对子，不含 2 与王 */
+  if (n >= 6 && n % 2 === 0 && ranks.length === n / 2 && c2 === ranks.length &&
+      ranks[ranks.length - 1] <= SEQ_MAX && isConsec(ranks)) {
+    return mk('pairs', ranks[ranks.length - 1], ranks.length);
+  }
+  /* 飞机（含翅膀） */
+  var pl = classifyPlane(m, ranks, n);
+  if (pl) return pl;
+  /* 四带二 */
+  var f2 = classifyFour2(cards, m, ranks, n);
+  if (f2) return f2;
+  return null;
+}
+function findCount(m, want) {
+  var k;
+  for (k in m) if (Object.prototype.hasOwnProperty.call(m, k)) if (m[k] === want) return Number(k);
+  return -1;
+}
+function findConsecRuns(sortedRanks, k) {
+  var out = [], i, seg;
+  for (i = 0; i + k <= sortedRanks.length; i++) {
+    seg = sortedRanks.slice(i, i + k);
+    if (seg[k - 1] > SEQ_MAX) continue;
+    if (isConsec(seg)) out.push(seg);
+  }
+  return out;
+}
+/* 飞机核心 + 翅膀是否成立：core 为连续的三张点数，need = core 组数，unit = 1 带单 / 2 带对 */
+function planeWingsOK(m, core, need, unit) {
+  var i, r, k;
+  for (i = 0; i < core.length; i++) if (m[core[i]] !== 3) return false;  /* 核心必须是干净的三张 */
+  var restCount = 0, restRanks = 0, ok = true;
+  for (k in m) {
+    if (!Object.prototype.hasOwnProperty.call(m, k)) continue;
+    r = Number(k);
+    if (core.indexOf(r) >= 0) continue;
+    restCount += m[k];
+    restRanks++;
+    if (unit === 2 && m[k] !== 2) ok = false;   /* 带对：剩余必须两两成对 */
+  }
+  if (!ok) return false;
+  if (restCount !== need * unit) return false;
+  if (unit === 2 && restRanks !== need) return false;
+  return true;
+}
+function classifyPlane(m, ranks, n) {
+  var i, j, k, cores, trioRanks = [];
+  for (i = 0; i < ranks.length; i++) if (m[ranks[i]] >= 3) trioRanks.push(ranks[i]);
+
+  /* 纯飞机：k 组连续三张，无翅膀 */
+  if (n >= 6 && n % 3 === 0) {
+    k = n / 3;
+    if (k >= 2 && ranks.length === k && isConsec(ranks) && ranks[k - 1] <= SEQ_MAX) {
+      var pure = true;
+      for (i = 0; i < ranks.length; i++) if (m[ranks[i]] !== 3) pure = false;
+      if (pure) return mk('plane', ranks[k - 1], k);
+    }
+  }
+  /* 飞机带单：k 组三张 + k 张单牌（n = 4k） */
+  if (n % 4 === 0) {
+    k = n / 4;
+    if (k >= 2) {
+      cores = findConsecRuns(trioRanks, k);
+      for (j = 0; j < cores.length; j++) {
+        if (planeWingsOK(m, cores[j], k, 1)) return mk('plane1', cores[j][k - 1], k);
+      }
+    }
+  }
+  /* 飞机带对：k 组三张 + k 个对子（n = 5k） */
+  if (n % 5 === 0) {
+    k = n / 5;
+    if (k >= 2) {
+      cores = findConsecRuns(trioRanks, k);
+      for (j = 0; j < cores.length; j++) {
+        if (planeWingsOK(m, cores[j], k, 2)) return mk('plane2', cores[j][k - 1], k);
+      }
+    }
+  }
+  return null;
+}
+function classifyFour2(cards, m, ranks, n) {
+  if (n !== 6 && n !== 8) return null;
+  var quads = [], i, j, rest, rm, rk;
+  for (i = 0; i < ranks.length; i++) if (m[ranks[i]] === 4) quads.push(ranks[i]);
+  for (i = 0; i < quads.length; i++) {
+    rest = [];
+    for (j = 0; j < cards.length; j++) if (cards[j].rank !== quads[i]) rest.push(cards[j]);
+    if (n === 6) {
+      if (rest.length === 2) return mk('four2s', quads[i], 0);
+    } else {
+      rm = countsOf(rest);
+      rk = Object.keys(rm);
+      if (rk.length === 2 && rm[rk[0]] === 2 && rm[rk[1]] === 2) return mk('four2p', quads[i], 0);
+    }
+  }
+  return null;
+}
+
+/* ---------- 比大小 ---------- */
+function isBombType(t) { return t === 'bomb' || t === 'rocket'; }
+function beats(a, b) {
+  if (!a) return false;
+  if (!b) return true;                       /* 自由出牌，任何合法牌型都可以 */
+  if (a.type === 'rocket') return b.type !== 'rocket';
+  if (b.type === 'rocket') return false;
+  if (a.type === 'bomb') {
+    if (b.type === 'bomb') return a.main > b.main;
+    return true;                             /* 炸弹压一切非炸弹 */
+  }
+  if (b.type === 'bomb') return false;
+  if (a.type !== b.type) return false;
+  if (a.size !== b.size) return false;       /* 顺子/连对/飞机长度必须一致 */
+  return a.main > b.main;
+}
+
+/* ---------- 选牌非法的原因（给玩家看的提示） ---------- */
+function whyInvalid(cards) {
+  var n = cards.length;
+  if (!n) return '还没选牌';
+  var m = countsOf(cards), ranks = ranksOf(cards);
+  var c1 = 0, c2 = 0, c3 = 0, c4 = 0, i;
+  for (i = 0; i < ranks.length; i++) {
+    var c = m[ranks[i]];
+    if (c === 1) c1++; else if (c === 2) c2++; else if (c === 3) c3++; else c4++;
+  }
+  if (n === 2) return '两张牌不是对子（也不是双王）';
+  if (n === 4 && c3 === 1) return '三带一需要「三张同点 + 一张单牌」';
+  if (n === 5 && c3 === 1) return '三带二需要「三张同点 + 一对」';
+  if (n === 4 && c1 === 4) return '顺子至少 5 张（4 张连续牌不算顺子）';
+  if (n === 4 && c2 === 2) return '连对至少 3 对（两个对子不算）';
+  if (n >= 5 && ranks.length === n) {
+    if (ranks[ranks.length - 1] > SEQ_MAX) return '顺子不能包含 2 或王';
+    if (!isConsec(ranks)) return '顺子点数必须连续';
+    return '顺子至少 5 张';
+  }
+  if (n >= 6 && n % 2 === 0 && ranks.length === n / 2) {
+    if (ranks[ranks.length - 1] > SEQ_MAX) return '连对不能包含 2 或王';
+    if (!isConsec(ranks)) return '连对点数必须连续';
+    return '连对至少 3 对';
+  }
+  if (c3 >= 2) return '飞机需要连续的多个三张，且翅膀张数必须匹配';
+  if (c4 >= 1) return '四带二需要「四张同点 + 两张单牌或两个对子」';
+  return '这几张牌凑不出合法牌型';
+}
+
+/* ---------- 手牌枚举：所有可出的合法组合 ---------- */
+function groupHand(hand) {
+  var g = {}, i, r;
+  for (i = 0; i < hand.length; i++) {
+    r = hand[i].rank;
+    if (!g[r]) g[r] = [];
+    g[r].push(hand[i]);
+  }
+  return g;
+}
+function sortedRanks(g) {
+  var out = [], k;
+  for (k in g) if (Object.prototype.hasOwnProperty.call(g, k)) out.push(Number(k));
+  out.sort(function (a, b) { return a - b; });
+  return out;
+}
+/* 挑翅膀：优先不拆已有对子/三张，且尽量不用 2 和王 */
+function chooseWings(g, coreRanks, need, unit) {
+  var cands = [], k, i, j, r, out = [];
+  for (k in g) {
+    if (!Object.prototype.hasOwnProperty.call(g, k)) continue;
+    r = Number(k);
+    if (coreRanks.indexOf(r) >= 0) continue;
+    if (unit === 2 && r >= JOKER_S) continue;      /* 王不能凑对 */
+    if (g[k].length < unit) continue;
+    cands.push({ rank: r, cnt: g[k].length, arr: g[k] });
+  }
+  cands.sort(function (a, b) {
+    var pa = (a.cnt === unit ? 0 : 1) + (a.rank >= JOKER_S ? 100 : 0) + (a.rank === 15 ? 8 : 0);
+    var pb = (b.cnt === unit ? 0 : 1) + (b.rank >= JOKER_S ? 100 : 0) + (b.rank === 15 ? 8 : 0);
+    if (pa !== pb) return pa - pb;
+    return a.rank - b.rank;
+  });
+  if (cands.length < need) return null;
+  for (i = 0; i < need; i++) for (j = 0; j < unit; j++) out.push(cands[i].arr[j]);
+  return out;
+}
+function genAll(hand) {
+  var out = [], seen = {};
+  var g = groupHand(hand), rs = sortedRanks(g);
+  var i, j, L, s, t, r, ok, cs, core, coreRanks, w, quads = [], k;
+  var push = function (cards) {
+    var cls = classify(cards);
+    if (!cls) return;
+    var ids = [], x;
+    for (x = 0; x < cards.length; x++) ids.push(cards[x].id);
+    ids.sort(function (a, b) { return a - b; });
+    var key = ids.join(',');
+    if (seen[key]) return;
+    seen[key] = 1;
+    out.push({ cards: cards.slice(), cls: cls });
+  };
+
+  if (g[JOKER_S] && g[JOKER_B]) push([g[JOKER_S][0], g[JOKER_B][0]]);   /* 王炸 */
+
+  for (i = 0; i < rs.length; i++) {
+    r = rs[i];
+    if (g[r].length === 4) { quads.push(r); push(g[r].slice(0, 4)); }    /* 炸弹 */
+    push([g[r][0]]);                                                    /* 单张 */
+    if (g[r].length >= 2) push([g[r][0], g[r][1]]);                     /* 对子 */
+    if (g[r].length >= 3) push([g[r][0], g[r][1], g[r][2]]);            /* 三张 */
+  }
+  /* 三带一 / 三带二 */
+  for (i = 0; i < rs.length; i++) {
+    if (g[rs[i]].length < 3) continue;
+    core = [g[rs[i]][0], g[rs[i]][1], g[rs[i]][2]];
+    w = chooseWings(g, [rs[i]], 1, 1);
+    if (w) push(core.concat(w));
+    w = chooseWings(g, [rs[i]], 1, 2);
+    if (w) push(core.concat(w));
+  }
+  /* 顺子 */
+  for (L = 5; L <= 12; L++) {
+    for (s = 3; s + L - 1 <= SEQ_MAX; s++) {
+      ok = true; cs = [];
+      for (t = 0; t < L; t++) {
+        if (!g[s + t]) { ok = false; break; }
+        cs.push(g[s + t][0]);
+      }
+      if (ok) push(cs);
+    }
+  }
+  /* 连对 */
+  for (L = 3; L <= 10; L++) {
+    for (s = 3; s + L - 1 <= SEQ_MAX; s++) {
+      ok = true; cs = [];
+      for (t = 0; t < L; t++) {
+        if (!g[s + t] || g[s + t].length < 2) { ok = false; break; }
+        cs.push(g[s + t][0], g[s + t][1]);
+      }
+      if (ok) push(cs);
+    }
+  }
+  /* 飞机（纯 / 带单 / 带对） */
+  for (k = 2; k <= 6; k++) {
+    for (s = 3; s + k - 1 <= SEQ_MAX; s++) {
+      ok = true; core = []; coreRanks = [];
+      for (t = 0; t < k; t++) {
+        if (!g[s + t] || g[s + t].length < 3) { ok = false; break; }
+        core.push(g[s + t][0], g[s + t][1], g[s + t][2]);
+        coreRanks.push(s + t);
+      }
+      if (!ok) continue;
+      push(core);
+      w = chooseWings(g, coreRanks, k, 1);
+      if (w) push(core.concat(w));
+      w = chooseWings(g, coreRanks, k, 2);
+      if (w) push(core.concat(w));
+    }
+  }
+  /* 四带二（两单 / 两对） */
+  for (i = 0; i < quads.length; i++) {
+    w = chooseWings(g, [quads[i]], 2, 1);
+    if (w) push(g[quads[i]].slice(0, 4).concat(w));
+    w = chooseWings(g, [quads[i]], 2, 2);
+    if (w) push(g[quads[i]].slice(0, 4).concat(w));
+  }
+  return out;
+}
+
+/* ---------- 人机：叫分评估 ---------- */
+function botBidValue(hand) {
+  var g = groupHand(hand), score = 0, k, r;
+  if (g[JOKER_B]) score += 2.2;
+  if (g[JOKER_S]) score += 1.6;
+  if (g[15]) score += 1.1 * g[15].length;
+  if (g[14]) score += 0.6 * g[14].length;
+  for (k in g) {
+    if (!Object.prototype.hasOwnProperty.call(g, k)) continue;
+    r = Number(k);
+    if (g[k].length === 4) score += 3;                 /* 炸弹 */
+    if (r >= 11 && r <= 13) score += 0.15 * g[k].length;
+  }
+  return score;
+}
+function botBid(hand, highest) {
+  var v = botBidValue(hand);
+  if (Math.random() < 0.22) v += 1;                    /* 一点随机，别每次都一样 */
+  var want = v >= 7.5 ? 3 : (v >= 5 ? 2 : (v >= 2.6 ? 1 : 0));
+  if (want <= highest) return 0;
+  return Math.min(3, want);
+}
+
+/* ---------- 人机：自由出牌的偏好打分（越小越先出） ---------- */
+function leadScore(m) {
+  var s = m.cls.main;
+  if (m.cls.main >= JOKER_S) s += 80;
+  else if (m.cls.main === 15) s += 26;
+  else if (m.cls.main === 14) s += 9;
+  if (m.cls.type === 'straight' || m.cls.type === 'pairs' || m.cls.type === 'plane') s -= 3.5;
+  if (m.cls.type === 'trio1' || m.cls.type === 'trio2') s += 2.5;
+  if (m.cls.type === 'plane1' || m.cls.type === 'plane2') s += 2;
+  s -= m.cards.length * 0.45;
+  return s;
+}
+
+/* ---------- 人机：决策 ----------
+   opt = { mate: 队友刚出的牌, leadLeft: 出牌者剩余张数, isLandlord: 自己是否地主,
+           oppMin: 对手阵营最少剩牌数（2026-09-28 新增，压制/拆防用） }
+   返回要出的牌数组，或 null 表示不出
+
+   2026-09-28 增强要点（用户反馈「托管 AI 有点弱智」）：
+   ① 对手报单（剩 1 张）时绝不送小单张——优先出非单牌牌型，逼不得已出最大单张顶住；
+   ② 队友出牌但地主快走完（≤2 张）→ 农民用大单/大对顶牌抢控制权，保不住才动炸弹；
+   ③ 炸弹只在「对手 ≤2 张」或「炸完自己 ≤2 张能接管」时出手，不再浪费；
+   ④ 自由出牌有「出完这手只剩一张大牌（A/2/王）」的路径时优先走该路径。 ------- */
+function oppMinFor(p) {
+  var m = 99, i;
+  for (i = 0; i < 3; i++) {
+    if (i === p) continue;
+    if (!isLandlord(p) && !isLandlord(i)) continue;   /* 队友不算对手 */
+    if (game.hands[i].length < m) m = game.hands[i].length;
+  }
+  return m;
+}
+function handWithout(hand, cards) {
+  var ids = {}, out = [], i;
+  for (i = 0; i < cards.length; i++) ids[cards[i].id] = 1;
+  for (i = 0; i < hand.length; i++) if (!ids[hand[i].id]) out.push(hand[i]);
+  return out;
+}
+function botChoose(hand, lead, opt) {
+  opt = opt || {};
+  var moves = genAll(hand);
+  var i, pool, follow, plain;
+  if (!moves.length) return null;
+  var oppMin = (opt.oppMin != null) ? opt.oppMin : 99;
+
+  if (!lead) {
+    /* 自由出牌：能一次走完就直接走完 */
+    for (i = 0; i < moves.length; i++) if (moves[i].cards.length === hand.length) return moves[i].cards;
+    pool = [];
+    for (i = 0; i < moves.length; i++) {
+      if (!isBombType(moves[i].cls.type)) pool.push(moves[i]);
+    }
+    if (!pool.length) pool = moves;                     /* 只剩炸弹/王炸时才动它们 */
+
+    /* ① 对手报单：避免送小单张 */
+    if (oppMin === 1) {
+      var nonSingle = [], singles = [];
+      for (i = 0; i < pool.length; i++) {
+        if (pool[i].cls.type === 'single') singles.push(pool[i]);
+        else nonSingle.push(pool[i]);
+      }
+      if (singles.length) {
+        singles.sort(function (a, b) { return b.cls.main - a.cls.main; });
+        if (nonSingle.length) {
+          nonSingle.sort(function (a, b) { return leadScore(a) - leadScore(b); });
+          return nonSingle[0].cards;
+        }
+        return singles[0].cards;                        /* 只能出单：出最大的顶住 */
+      }
+    }
+
+    /* ④ 「出完只剩一张大牌」路径优先（下轮直接甩） */
+    for (i = 0; i < pool.length; i++) {
+      if (hand.length - pool[i].cards.length === 1) {
+        var rest = handWithout(hand, pool[i].cards);
+        if (rest.length === 1 && rest[0].rank >= 14) return pool[i].cards;
+      }
+    }
+
+    pool.sort(function (a, b) { return leadScore(a) - leadScore(b); });
+    return pool[0].cards;
+  }
+
+  follow = [];
+  for (i = 0; i < moves.length; i++) if (beats(moves[i].cls, lead)) follow.push(moves[i]);
+  if (!follow.length) return null;
+  /* 能一把走完就走完 */
+  for (i = 0; i < follow.length; i++) if (follow[i].cards.length === hand.length) return follow[i].cards;
+
+  /* 队友（另一个农民）刚出的牌 */
+  if (opt.mate) {
+    if (oppMin <= 2) {
+      /* ② 地主快走完：用不打断队友节奏的大单/大对顶牌抢控制 */
+      var top = null;
+      for (i = 0; i < follow.length; i++) {
+        if (isBombType(follow[i].cls.type)) continue;
+        if (follow[i].cls.type !== 'single' && follow[i].cls.type !== 'pair') continue;
+        if (!top || follow[i].cls.main > top.cls.main) top = follow[i];
+      }
+      if (top) return top.cards;
+      for (i = 0; i < follow.length; i++) if (isBombType(follow[i].cls.type)) return follow[i].cards;
+    }
+    return null;   /* 地主不急则不拆台 */
+  }
+
+  plain = [];
+  for (i = 0; i < follow.length; i++) if (!isBombType(follow[i].cls.type)) plain.push(follow[i]);
+  if (!plain.length) {
+    /* ③ 只能靠炸弹压：对手快走完、或炸完自己 ≤2 张可接管，才炸 */
+    var myAfter = hand.length - lead.cards.length;
+    if (opt.leadLeft !== undefined && opt.leadLeft > 2 && myAfter > 2) return null;
+    plain = follow;
+  }
+  plain.sort(function (a, b) {
+    if (a.cls.main !== b.cls.main) return a.cls.main - b.cls.main;
+    return a.cards.length - b.cards.length;
+  });
+  return plain[0].cards;
+}
+/* ==DDZ-ENGINE-END== */
+
+/* ============================================================
+   2. 牌局状态
+   ============================================================ */
+var MAX_REDEAL = 3;
+var game = {
+  /* 人机用三国杀武将名；不加「人机·」前缀，座位头像取首字才不会都显示成「人」 */
+  names: ['池子', '关羽', '张飞'],
+  /* §4.7.2 ⑤ 座位头像要用的性格（§I.4）：由 shell-seat 组局时写入；缺省 null → 生成器走默认纹样 */
+  personas: [null, null, null],
+  /* 【2026-10-01】座位头像的 seed（world.seat() 透传，stableHash 同款）：97 人下同姓多人，
+     不带 seed 时同姓 + 同性格头像完全一样；缺省 null → avatar 走旧版无 seed 行为。 */
+  seeds: [null, null, null],
+  hands: [[], [], []],
+  bottom: [],
+  bottomShown: false,
+  landlord: -1,
+  turn: -1,
+  phase: 'idle',            /* idle | bid | play | over */
+  lastPlay: null,           /* { player, cards, cls } —— 需要压过的牌 */
+  centerLast: null,         /* 中央展示用 */
+  actions: [null, null, null],
+  passCount: 0,
+  plays: [0, 0, 0],         /* 各家出牌次数：用于春天/反春天判定 */
+  bid: null,
+  redeal: 0,
+  winner: -1,
+  over: false,
+  auto: false,              /* 托管：玩家回合由人机 AI 代打 */
+  /* —— 经济（§4.4 / §H.4）：仅 shell 内使用 —— */
+  stake: 0,                 /* 本局带入：玩家 300 + 两 AI 带入之和 */
+  mult: 1,                  /* 倍数链：炸弹/春天/明牌/抢地主 ×2 相乘，无上限 */
+  multLog: [],              /* 倍数明细，用于结算展示 */
+  aiStakes: [0, 0],         /* 两名 AI 各自带入 */
+  chips: 0                  /* 玩家本局结束时的筹码（= 带入 ± 净赢，封顶后） */
+};
+var selIds = [];            /* 玩家已选中的牌 id */
+var hintIdx = 0;
+var lastLog = '';
+
+/* 好牌模式：开局给玩家（座位 0）一手强牌。
+   【2026-09-30 用户要求】改为「默认关闭、且不跨会话记忆」。
+   原实现 `lsGet(GOOD_KEY) === '1'` 会把上次的手动开启记忆到下次进入，
+   表现为「怎么每次进来都是开的」；而好牌模式是练习局（不计输赢），
+   默认关闭更符合经济安全预期。局内仍可随时手动开启，只是不再跨会话保留。 */
+var GOOD_KEY = 'csh_ddz_good';
+var goodMode = false;
+
+/* ============================================================
+   3. 牌局流程
+   ============================================================ */
+function isLandlord(p) { return game.landlord === p; }
+function nextIdx(p) { return (p + 1) % 3; }
+function logLine(s) { lastLog = s; var el = $('#status-line'); if (el) el.textContent = s; }
+
+/* 倍数链（§4.4）：炸弹/春天/明牌/抢地主 ×2 相乘，不设封顶 */
+function bumpMult(tag) {
+  game.mult *= 2;
+  game.multLog.push(tag);
+  var el = $('#mult-badge');
+  if (el) {
+    /* §4.7.2 ③ 倍数即本作的"池权重"，同样走 300ms 滚动（否则炸弹一响数字直接翻倍跳变） */
+    if (CRD) CRD.rollNum(el, game.mult, 300, function (v) { return '×' + Math.round(v); });
+    else el.textContent = '×' + game.mult;
+    el.classList.remove('bump');
+    /* 强制重排以重启动画 */
+    void el.offsetWidth;
+    el.classList.add('bump');
+  }
+  logLine('倍数 ' + tag + ' → ×' + game.mult);
+}
+
+/* 好牌模式：只重排牌堆顺序，不碰任何规则（判牌/AI/结算全照旧）。
+   保底牌 = 大小王 + 4 张 2（rank ≥ 15，恰好 6 张），即王炸 + 一个炸弹起步；
+   其余 11 张从剩余牌里纯随机抽，让每局差异明显。
+   发牌仍是 deck[i % 3]，座位 0 取下标 0,3,…,48，所以只需把这 17 张放进这些位置。 */
+function arrangeGoodDeck(deck) {
+  var core = [], rest = [], i, c;
+  for (i = 0; i < deck.length; i++) {
+    c = deck[i];
+    if (c.rank >= 15) core.push(c); else rest.push(c);
+  }
+  var pool = shuffle(rest);
+  var need = 17 - core.length;
+  var mine = shuffle(core.concat(pool.slice(0, need)));
+  var others = pool.slice(need);
+  var out = [], mi = 0, oi = 0;
+  for (i = 0; i < deck.length; i++) {
+    /* 下标 51 也能被 3 整除，但那时 mine 已发完，落到 else 走底牌 */
+    if (i % 3 === 0 && mi < mine.length) out.push(mine[mi++]);
+    else out.push(others[oi++]);
+  }
+  return out;
+}
+
+function newGame() {
+  var deck = shuffle(buildDeck());
+  /* 【2026-09-30 经济修复】好牌模式 = 练习局：标记在**开局**快照进 game 对象。
+     不能在结算时读当前开关——玩家可以开着好牌打完、结算前关掉，骗过练习判定拿真钱。 */
+  game.practice = goodMode;
+  if (goodMode) deck = arrangeGoodDeck(deck);
+  sfx.deal();
+  var i;
+  for (i = 0; i < 3; i++) game.hands[i] = [];
+  for (i = 0; i < 51; i++) game.hands[i % 3].push(deck[i]);
+  game.bottom = deck.slice(51, 54);
+  for (i = 0; i < 3; i++) sortHand(game.hands[i]);
+
+  game.bottomShown = false;
+  game.landlord = -1;
+  game.turn = -1;
+  game.phase = 'bid';
+  game.lastPlay = null;
+  game.centerLast = null;
+  game.actions = [null, null, null];
+  game.passCount = 0;
+  game.freeRound = false;
+  game.plays = [0, 0, 0];
+  game.winner = -1;
+  game.over = false;
+  selIds = [];
+  hintIdx = 0;
+
+  /* 经济复位（§H.4）：AI 名字与带入来自宿主抽取的「AI 角色世界」 */
+  game.mult = 1;
+  game.multLog = [];
+  game.aiStakes = [0, 0];
+  game.stake = Bridge.active ? Bridge.buyIn() : 0;
+  game.chips = game.stake;
+  if (Bridge.active) {
+    var opp = Bridge.opponents();
+    if (opp && opp.length) {
+      game.names[1] = opp[0].name || game.names[1];
+      game.names[2] = opp[1] ? (opp[1].name || game.names[2]) : game.names[2];
+      /* §4.7.2 ⑤ 连性格一起收下：座位头像的纹样由性格决定（§I.4）
+         【2026-10-01】seed 一并收下（world.seat() 透传）：同姓 AI 靠 seed 区分头像色板。 */
+      game.personas[1] = opp[0].persona || null;
+      game.personas[2] = opp[1] ? (opp[1].persona || null) : null;
+      game.seeds[1] = (opp[0].seed != null) ? opp[0].seed : null;
+      game.seeds[2] = opp[1] ? ((opp[1].seed != null) ? opp[1].seed : null) : null;
+      game.aiStakes[0] = Math.max(0, Math.floor(opp[0].stake || 0));
+      if (opp[1]) game.aiStakes[1] = Math.max(0, Math.floor(opp[1].stake || 0));
+      for (var q = 0; q < opp.length; q++) game.stake += Math.max(0, Math.floor(opp[q].stake || 0));
+      game.chips = game.stake;
+    }
+  }
+  /* 【2026-10-03 牌桌拟人】开局让一位对手说句话：语气按它的性格、内容看它当前的心态与
+     对你的恩怨（台词池在 core/csh_page.js 的 QUIPS，按 性格 × 场景 分声）。
+     opp[i] ↔ 座位 (i+1) ↔ #seat-(i+1)（见 newGame 上方 names[1]/names[2] 的对应关系）。 */
+  try {
+    var qp = (Bridge.active && Bridge.opponents) ? (Bridge.opponents() || []) : [];
+    if (qp.length) {
+      var qi = (qp.length > 1 && Math.random() < 0.4) ? 1 : 0;
+      CSHPage.sayThrottled($('#seat-' + (qi + 1)), qp[qi], 'greet');
+    }
+  } catch (eQ) {}
+  var mb = $('#mult-badge');
+  if (mb) {
+    /* 新一局：倍数回落到 ×1，也走 300ms 滚动（大倍数 → 1 的回卷比硬切更有"重开一局"的体感） */
+    if (CRD) CRD.rollNum(mb, 1, 300, function (v) { return '×' + Math.round(v); });
+    else mb.textContent = '×1';
+    mb.classList.remove('bump');
+  }
+
+  var s = rnd(3);
+  game.bid = {
+    order: [s, nextIdx(s), nextIdx(nextIdx(s))],
+    idx: 0, best: 0, bestPlayer: -1, start: s
+  };
+  hideBanner();
+  switchView('view-game');
+  renderAll(true);
+  if (goodMode) toast('好牌模式：本局手牌已强化（练习局，不计输赢）');
+  logLine('开始叫地主 · 由 ' + game.names[s] + ' 先叫');
+  bidStep();
+}
+
+function bidStep() {
+  if (!alive || game.phase !== 'bid') return;
+  if (game.bid.idx >= 3) { finishBid(); return; }
+  var p = game.bid.order[game.bid.idx];
+  renderAll();
+  if (p === 0) {
+    if (game.auto) {
+      logLine('托管中 · 自动叫分…');
+      later(function () { botBidAct(0); }, rndMs(360, 700));
+      return;
+    }
+    logLine('轮到你叫分（当前最高 ' + game.bid.best + ' 分）');
+    return;
+  }
+  later(function () { botBidAct(p); }, rndMs(620, 1140));
+}
+
+function botBidAct(p) {
+  if (!alive || game.phase !== 'bid') return;
+  if (game.bid.idx >= 3 || game.bid.order[game.bid.idx] !== p) return;
+  applyBid(p, botBid(game.hands[p], game.bid.best));
+}
+
+function applyBid(p, v) {
+  if (game.phase !== 'bid') return;
+  var before = game.bid.best;
+  var nm = game.names[p];
+  if (v > 0 && v > before) {
+    game.bid.best = v;
+    game.bid.bestPlayer = p;
+    logLine(nm + (before > 0 ? ' 抢地主 ' : ' 叫地主 ') + v + ' 分');
+  } else {
+    logLine(nm + ' 不叫');
+  }
+  game.bid.idx++;
+  if (game.bid.best === 3) { finishBid(); return; }
+  if (game.bid.idx >= 3) { finishBid(); return; }
+  bidStep();
+}
+
+function finishBid() {
+  if (game.phase !== 'bid') return;
+  if (game.bid.best === 0) {
+    game.redeal++;
+    if (game.redeal <= MAX_REDEAL) {
+      logLine('三家都不叫，重新发牌（第 ' + game.redeal + ' / ' + MAX_REDEAL + ' 次）');
+      toast('无人叫地主，重新发牌');
+      later(newGame, 820);
+      return;
+    }
+    game.bid.best = 1;
+    game.bid.bestPlayer = game.bid.order[0];
+    logLine('已到重发上限，指定 ' + game.names[game.bid.bestPlayer] + ' 为地主');
+    toast('无人叫地主，指定地主');
+  }
+  game.landlord = game.bid.bestPlayer;
+  game.phase = 'play';
+  for (var i = 0; i < 3; i++) game.hands[game.landlord].push(game.bottom[i]);
+  sortHand(game.hands[game.landlord]);
+  game.bottomShown = true;
+  /* 【2026-09-30 音效增强】地主确定 jingle（当-当-当~）替代原底牌翻看音 */
+  sfxPlay("lord");
+  game.turn = game.landlord;
+  game.lastPlay = null;
+  game.centerLast = null;
+  game.actions = [null, null, null];
+  game.passCount = 0;
+  selIds = [];
+  hintIdx = 0;
+  logLine(game.names[game.landlord] + ' 成为地主并拿走 3 张底牌');
+  toast(game.names[game.landlord] + ' 是地主（' + game.bid.best + ' 分）');
+  /* 抢地主倍数（§4.4）：叫分每高 1 分记一次 ×2（1 分 = 不抢） */
+  for (var m = 1; m < game.bid.best; m++) bumpMult('抢地主');
+  renderAll();
+  scheduleTurn();
+}
+
+function scheduleTurn() {
+  renderAll();
+  if (!alive || game.phase !== 'play' || game.over) return;
+  var p = game.turn;
+  if (p === 0) {
+    hintIdx = 0;
+    if (game.auto) {
+      logLine('托管中 · 自动出牌…');
+      later(autoPlayTurn, rndMs(420, 820));
+      return;
+    }
+    logLine(game.lastPlay
+      ? '轮到你出牌 · 需压过 ' + game.names[game.lastPlay.player] + ' 的' + typeName(game.lastPlay.cls)
+      : '轮到你出牌 · 自由出牌');
+    return;
+  }
+  logLine('等待 ' + game.names[p] + ' 出牌…');
+  later(function () { botTurn(p); }, rndMs(560, 1180));
+}
+
+/* ---------- 托管：玩家 0 的回合交给同一套人机 AI 代打 ---------- */
+function setAuto(on) {
+  game.auto = !!on;
+  renderActions();
+  toast(game.auto ? '已开启托管 · 自动叫分与出牌' : '已关闭托管');
+  if (game.auto) autoKick();
+}
+/* 中途开托管时把当前该我做的事补上 */
+function autoKick() {
+  if (!alive || !game.auto) return;
+  if (game.phase === 'bid' && game.bid && game.bid.idx < 3 && game.bid.order[game.bid.idx] === 0) {
+    later(function () { botBidAct(0); }, rndMs(360, 700));
+  } else if (game.phase === 'play' && game.turn === 0) {
+    later(autoPlayTurn, rndMs(420, 820));
+  }
+}
+function autoPlayTurn() {
+  if (!alive || !game.auto) return;
+  if (game.phase !== 'play' || game.turn !== 0) return;
+  var hand = game.hands[0];
+  if (!hand || !hand.length) return;
+  var lead = game.lastPlay ? game.lastPlay.cls : null;
+  var mate = false;
+  if (lead && !isLandlord(0) && !isLandlord(game.lastPlay.player)) mate = true;
+  var cards = botChoose(hand, lead, {
+    mate: mate,
+    leadLeft: game.lastPlay ? game.hands[game.lastPlay.player].length : 99,
+    isLandlord: isLandlord(0),
+    oppMin: oppMinFor(0)
+  });
+  if (cards && cards.length) { doPlay(0, cards, classify(cards)); return; }
+  if (lead) { doPass(0); return; }
+  var s = [hand[hand.length - 1]];
+  doPlay(0, s, classify(s));
+}
+
+function botTurn(p) {
+  if (!alive || game.phase !== 'play' || game.over) return;
+  if (game.turn !== p) return;
+  var hand = game.hands[p];
+  if (!hand.length) return;
+  var lead = game.lastPlay ? game.lastPlay.cls : null;
+  var mate = false;
+  if (lead && !isLandlord(p) && !isLandlord(game.lastPlay.player)) mate = true;
+  var leadLeft = game.lastPlay ? game.hands[game.lastPlay.player].length : 99;
+  var cards = botChoose(hand, lead, { mate: mate, leadLeft: leadLeft, isLandlord: isLandlord(p), oppMin: oppMinFor(p) });
+  if (cards && cards.length) {
+    doPlay(p, cards, classify(cards));
+  } else if (lead) {
+    doPass(p);
+  } else {
+    /* 兜底：自由出牌必须出，出最小的单张 */
+    var s = [hand[hand.length - 1]];
+    doPlay(p, s, classify(s));
+  }
+}
+
+function doPlay(p, cards, cls) {
+  if (!cls || !cards || !cards.length) return;
+  var ids = {}, i, rest = [];
+  for (i = 0; i < cards.length; i++) ids[cards[i].id] = 1;
+  for (i = 0; i < game.hands[p].length; i++) {
+    if (!ids[game.hands[p][i].id]) rest.push(game.hands[p][i]);
+  }
+  game.hands[p] = rest;
+  game.lastPlay = { player: p, cards: cards.slice(), cls: cls };
+  game.centerLast = { player: p, cards: cards.slice(), cls: cls, free: false };
+  game.actions[p] = { cards: cards.slice(), cls: cls };
+  game.freeRound = false;
+  game.passCount = 0;
+  game.plays[p] = (game.plays[p] || 0) + 1;
+  if (p === 0) { selIds = []; hintIdx = 0; }
+  if (isBombType(cls.type)) sfx.bomb(); else sfx.play();
+  /* 倍数链（§4.4）：炸弹 / 王炸 各 ×2 */
+  if (cls.type === 'bomb') bumpMult('炸弹');
+  else if (cls.type === 'rocket') bumpMult('王炸');
+  logLine(game.names[p] + ' 出牌：' + typeName(cls) + '（' + cards.length + ' 张）');
+  renderAll();
+  if (game.hands[p].length === 0) { endGame(p); return; }
+  game.turn = nextIdx(p);
+  scheduleTurn();
+}
+
+function doPass(p) {
+  game.actions[p] = { pass: true };
+  game.passCount++;
+  sfx.pass();
+  logLine(game.names[p] + ' 不出');
+  if (game.passCount >= 2) {
+    var leader = game.lastPlay.player;
+    /* 2026-09-28 用户反馈：没人跟牌时牌面要清空，否则有误解。
+       上一手牌只进侧栏动作记录（seat-act），中央桌面不再滞留旧牌。 */
+    game.centerLast = null;
+    game.lastPlay = null;
+    game.passCount = 0;
+    game.actions = [null, null, null];
+    game.freeRound = true;          /* 中央提示「上一轮无人跟」用 */
+    game.turn = leader;
+    logLine('两家都不出，' + game.names[leader] + ' 重新自由出牌（桌面已清空）');
+  } else {
+    game.turn = nextIdx(p);
+  }
+  renderAll();
+  scheduleTurn();
+}
+
+function endGame(winner) {
+  game.over = true;
+  game.phase = 'over';
+  game.winner = winner;
+  var lordWin = (winner === game.landlord);
+  var i, farmers = [];
+  for (i = 0; i < 3; i++) if (i !== game.landlord) farmers.push(i);
+
+  /* —— 倍数链：春天 / 反春天（§4.4）—— */
+  var spring = false;   /* 【2026-09-30 音效增强】春天局用专属胜利琶音 */
+  if (lordWin && game.plays[farmers[0]] === 0 && game.plays[farmers[1]] === 0) {
+    bumpMult('春天');
+    spring = true;
+  } else if (!lordWin && game.plays[game.landlord] <= 1) {
+    bumpMult('反春天');
+    spring = true;
+  }
+
+  /* —— 结算（§H.4）：玩家赢 = 从两 AI 带入里赢；净赢上限 = 两 AI 带入之和 —— */
+  /* 【2026-09-30 经济修复】好牌模式（开局快照 game.practice）= 练习局：
+     保底王炸 + 四个 2 的期望胜率远超 50%，原样结算就是无限刷 CBY 的印钞机。
+     练习局无论输赢一律退回带入（白玩），把强化手牌的期望收益精确归零。 */
+  var econ = null;
+  var practice = !!game.practice;
+  if (Bridge.active) {
+    var aiTotal = (game.aiStakes[0] || 0) + (game.aiStakes[1] || 0);
+    var myBase = Math.max(0, Math.floor(Bridge.buyIn()));   /* 门票即带入 300 */
+    var netRaw = Math.floor(myBase * game.mult);            /* 理论净赢（含倍数链） */
+    var netCap = aiTotal > 0 ? aiTotal : netRaw;            /* 天然上限 */
+    var net = practice ? 0 : Math.min(netRaw, netCap);
+    var capped = !practice && netRaw > netCap;
+    /* 玩家赢：chips = 带入 + 净赢；玩家输：chips = 带入 − min(带入, 净亏)；练习局：原路退回 */
+    if (winner === 0) game.chips = myBase + net;
+    else game.chips = practice ? myBase : Math.max(0, myBase - Math.min(myBase, netRaw));
+    econ = {
+      aiTotal: aiTotal, net: net, netRaw: netRaw, capped: capped,
+      chips: game.chips, myBase: myBase, practice: practice
+    };
+  }
+
+  var title = (lordWin ? '地主胜利' : '农民胜利') + (practice ? ' · 练习' : '');
+  var sub = '本局赢家：<b>' + esc(game.names[winner]) + '</b>（' + (lordWin ? '地主' : '农民') + ')' +
+    (game.mult > 1 ? ' · 倍数 <b>×' + game.mult + '</b>' : '');
+  logLine(title + ' · ' + game.names[winner] + ' 先出完' + (game.mult > 1 ? '（×' + game.mult + '）' : ''));
+  if (winner === 0) sfxPlay(spring ? "spring" : "win"); else sfx.lose();
+
+  /* 功勋上报（§G.6.3）：每局 play，赢再 win，倍数≥4 追加大胜。
+     【2026-09-30】练习局（好牌模式）不报——功勋虽不直接换钱，但也是成长资源，不能靠强化手牌刷。 */
+  if (Bridge.active && !practice) {
+    try {
+      Bridge.merit(1, 'play');
+      if (winner === 0) Bridge.merit(2, 'win');
+      if (winner === 0 && game.mult >= 4) Bridge.merit(5, 'bigwin');
+    } catch (eM) {}
+  }
+
+  showBanner(title, sub, null, (winner === 0), econ);
+
+  /* 2026-09-28 用户反馈「赢了 CBY 没加」：原先结算只在玩家点「再来一局/收工结算/
+     游戏内关闭」时才交回宿主——走壳层「关闭」直接退出就会把胜局弄丢。
+     改为本局结束（endGame）即刻交回，幂等保护使后续入口自动变空操作。
+     （入账提示由壳层统一 toast，避免双份。） */
+  if (Bridge.active && !Bridge.isSettled()) {
+    /* ★ 2026-09-29：改走 shell-settle-session（玩家入账 + AI 世界双向记账一次完成） */
+    var __opp = Bridge.opponents() || [];
+    var __seats = [];
+    for (var __q = 0; __q < __opp.length; __q++) {
+      __seats.push({
+        id: __opp[__q].id,
+        stake: (game.aiStakes && game.aiStakes[__q]) || __opp[__q].stake || 0
+      });
+    }
+    try {
+      Bridge.settleSession({
+        key: 'doudizhu',
+        buyIn: Math.max(0, Math.floor(Bridge.buyIn())),
+        chips: Math.max(0, Math.floor(game.chips)),
+        seats: __seats
+      }, function (ok) {
+        /* 主结算路径失败必须可见（§审计 B-11）：其余结算入口都有失败提示，唯独这里曾静默 */
+        if (ok === false) { try { toast('结算未成功，本局未入账（请勿反复重试，退出后重查余额）'); } catch (eT3) {} }
+      });
+    } catch (eSettle) {}
+  }
+  /* 【2026-10-03 牌桌拟人】本局收尾时，输家嘴硬一句 / 赢家说一句场面话。
+     winner 0 = 玩家：对手说"输了"的话；1/2 = 哪一位对手赢了，就由它来说。 */
+  try {
+    var rq = (Bridge.active && Bridge.opponents) ? (Bridge.opponents() || []) : [];
+    if (rq.length) {
+      if (winner === 0) {
+        var li = (rq.length > 1 && Math.random() < 0.5) ? 1 : 0;
+        CSHPage.sayThrottled($('#seat-' + (li + 1)), rq[li], 'lose');
+      } else if (rq[winner - 1]) {
+        CSHPage.sayThrottled($('#seat-' + winner), rq[winner - 1], 'win');
+      }
+    }
+  } catch (eQ2) {}
+  renderAll();
+  syncOverButtons();
+}
+
+/* 结算按钮行为（§H.3）：
+   shell 内「再来一局」= 把本局筹码交回宿主并重载（拉新带入 / 新 AI）；
+   shell 内再额外提供「收工结算」= 交回后关闭。
+   独立运行保持原行为（直接重开 / 回开局页）。 */
+function afterGameAction(kind) {
+  if (kind === 'back') { showStart(); return; }
+  if (Bridge.active) {
+    /* endGame 已即时结算（settled 置位）：已结算时「再来一局」走重载拉新带入，
+       静默 return 会让按钮变成死键（§审计 A-3） */
+    if (Bridge.isSettled()) { if (kind === 'again') window.location.reload(); return; }
+    /* ★ 2026-09-29 R3-2：结算回调此前不判 ok ⇒ 桥超时/失败仍照常 reload，
+       玩家以为已入账实际没有（带入已扣）。失败即如实提示，不重载、不谎报。 */
+    Bridge.settle(game.chips, function (ok) {
+      if (ok === false) { try { toast('结算未成功，本局未入账（请勿反复重试，退出后重查余额）'); } catch (eT) {} return; }
+      window.location.reload();
+    });
+    return;
+  }
+  game.redeal = 0; clearAllTimers(); newGame();
+}
+function cashOutGame() {
+  if (!Bridge.active) { closePage(); return; }
+  if (Bridge.isSettled()) { closePage(); return; }
+  Bridge.settle(game.chips, function (ok) {
+    if (ok === false) { try { toast('结算未成功，本局未入账（请重试）'); } catch (eT2) {} return; }
+    closePage();
+  });
+}
+/* 结算时同步两处按钮的文案：shell 内第二按钮是「收工结算」，否则「返回开局」 */
+function syncOverButtons() {
+  var a1 = $('#btn-again'), b1 = $('#btn-back-start');
+  var a2 = $('#btn-again-bar'), b2 = $('#btn-cash-bar');
+  if (a1) a1.textContent = '再来一局';
+  if (b1) b1.textContent = Bridge.active ? '收工结算' : '返回开局';
+  if (b2) b2.textContent = '收工结算';
+  /* 底部栏若无「收工结算」按钮（shell 内），补一个 */
+  if (Bridge.active && a2 && !b2) {
+    var b = document.createElement('button');
+    b.className = 'btn ghost'; b.type = 'button'; b.id = 'btn-cash-bar';
+    b.textContent = '收工结算';
+    b.addEventListener('click', function (e) { e.preventDefault(); cashOutGame(); });
+    a2.parentNode.appendChild(b);
+  }
+}
+
+function fmtNum(n) {
+  return String(Math.floor(Number(n) || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+}
+
+/* ============================================================
+   4. 渲染
+   ============================================================ */
+function cardHTML(card, cls) {
+  var c = 'pcard' + (cls ? ' ' + cls : '');
+  var inner;
+  if (card.rank === JOKER_S || card.rank === JOKER_B) {
+    c += (card.rank === JOKER_B ? ' red joker' : ' black joker');
+    inner = '<span class="r">' + (card.rank === JOKER_B ? '大' : '小') + '</span><span class="mid">王</span>';
+  } else {
+    if (card.suit === 1 || card.suit === 3) c += ' red';
+    var lab = RANK_LABEL[card.rank];
+    inner = '<span class="r' + (lab === '10' ? ' ten' : '') + '">' + lab + '</span>' +
+      '<span class="mid">' + SUITS[card.suit] + '</span>' +
+      '<span class="s">' + SUITS[card.suit] + '</span>';
+  }
+  return '<div class="' + c + '" data-id="' + card.id + '">' + inner + '</div>';
+}
+function backHTML(cls) {
+  return '<div class="pcard back' + (cls ? ' ' + cls : '') + '"></div>';
+}
+function cardsInnerHTML(cards, cls, max) {
+  var h = '', i, n = cards.length;
+  var lim = (max && n > max) ? max : n;
+  for (i = 0; i < lim; i++) h += cardHTML(cards[i], cls);
+  if (lim < n) h += '<span class="dim">+' + (n - lim) + '</span>';
+  return h;
+}
+function cardsRowHTML(cards, cls, max) {
+  return '<div class="cards-row">' + cardsInnerHTML(cards, cls, max) + '</div>';
+}
+function backsHTML(n, cls, max) {
+  var lim = max && n > max ? max : n, h = '', i;
+  for (i = 0; i < lim; i++) h += backHTML(cls);
+  return h;
+}
+/* 某一家"上次出牌"：规范 §9.3 —— 直接作为**小牌组**贴在座位卡里，
+   最多放 4 张（其余用 +N 表示），不占大卡片。没出过牌就什么都不画。 */
+function actHTML(a) {
+  if (!a) return '';
+  if (a.pass) return '<span class="act-tag">不出</span>';
+  return cardsRowHTML(a.cards, 'xs', 4);
+}
+
+function renderBottom() {
+  var el = $('#bottom-cards');
+  if (!el) return;
+  el.innerHTML = game.bottomShown ? cardsRowHTML(game.bottom, '', 3) : backsHTML(3, '', 3);
+  var cap = $('#bottom-label');
+  if (cap) cap.textContent = '底牌';
+  /* 【2026-10-03】地主身份不再有顶栏显示（topbar 已删）—— 替身早已存在：
+     座位卡的「地主」徽标 + 下方状态行的自己的身份，信息无损失。 */
+}
+
+/* 座位卡：横向紧凑条（头像 + 名字/身份 + 剩张/上次出牌）。
+   旧版是整列纵向大卡片（头像/牌背/出牌三块），手机横屏一进来就把中间挤成一条缝；
+   §5.1 要求边缘座位信息**覆盖在主战区左右边缘**，不单独占横行。 */
+function renderSeat(p, el) {
+  if (!el) return;
+  var isL = isLandlord(p);
+  var isTurn = (game.phase === 'play' && game.turn === p);
+  var isBidTurn = (game.phase === 'bid' && game.bid && game.bid.idx < 3 && game.bid.order[game.bid.idx] === p);
+  var h = '';
+  h += '<div class="seat-box">';
+  /* §4.7.2 ⑤ 座位头像换成程序化 SVG（§I.4）：姓氏定色、性格定纹样，与德州/廿一点同一套生成器。 */
+  h += '<div class="avatar' + (isL ? ' lord' : '') + '">';
+  if (p === 0 || !CRD) {
+    h += esc((game.names[p] || '?').slice(0, 1));
+  } else {
+    h += CRD.avatar((game.names[p] || '?').slice(0, 1), game.personas[p] || CRD.personaOf(game.names[p]), 38, (game.seeds[p] != null ? game.seeds[p] : undefined));
+  }
+  h += '</div>';
+  h += '<div class="seat-info">';
+  h += '<div class="seat-line"><span class="sname">' + esc(game.names[p]) + '</span>' +
+    (isL ? '<span class="badge lord">地主</span>' : '<span class="badge">农民</span>') + '</div>';
+  h += '<div class="seat-line"><span class="scount">剩 <b>' + game.hands[p].length + '</b> 张</span>' +
+    actHTML(game.actions[p]) + '</div>';
+  h += '</div></div>';
+  el.className = 'seat ' + (p === 1 ? 'seat-right' : 'seat-left') + ((isTurn || isBidTurn) ? ' turn' : '');
+  el.innerHTML = h;
+}
+
+function renderCenter() {
+  var t = $('#center-title'), z = $('#play-zone'), hint = $('#turn-hint');
+  if (game.phase === 'bid') {
+    t.textContent = '叫地主';
+    if (game.bid && game.bid.idx < 3) {
+      z.innerHTML = '<div class="center-note">' + esc(game.names[game.bid.order[game.bid.idx]]) + ' 正在叫分…（最高 ' + game.bid.best + ' 分）</div>';
+      hint.textContent = game.bid.order[game.bid.idx] === 0 ? '轮到你叫分' : '等待中…';
+      hint.className = 'turn-hint' + (game.bid.order[game.bid.idx] === 0 ? ' mine' : '');
+    } else {
+      z.innerHTML = '<div class="center-note">等待叫分结果…</div>';
+      hint.textContent = '';
+      hint.className = 'turn-hint';
+    }
+    return;
+  }
+  if (game.phase === 'play') {
+    if (game.lastPlay) {
+      t.textContent = '上一手：' + game.names[game.lastPlay.player] + ' · ' + typeName(game.lastPlay.cls);
+      z.innerHTML = cardsRowHTML(game.lastPlay.cards, '', 10);
+    } else if (game.centerLast) {
+      t.textContent = '自由出牌（上一手：' + game.names[game.centerLast.player] + '，已无人跟）';
+      z.innerHTML = cardsRowHTML(game.centerLast.cards, '', 10);
+    } else {
+      t.textContent = '自由出牌';
+      z.innerHTML = '<div class="center-note">' +
+        (game.freeRound ? '上一轮无人跟 · 桌面已清空' : '本局第一手') +
+        '</div>';
+    }
+    hint.textContent = game.turn === 0 ? '轮到你出牌' : '等待 ' + game.names[game.turn] + ' 出牌…';
+    hint.className = 'turn-hint' + (game.turn === 0 ? ' mine' : '');
+    return;
+  }
+  t.textContent = '本局结束';
+  z.innerHTML = '<div class="center-note">' + esc(game.names[game.winner] || '') + ' 先出完了牌</div>';
+  hint.textContent = '';
+  hint.className = 'turn-hint';
+}
+
+function renderHand(dealAnim) {
+  var wrap = $('#hand'), hand = game.hands[0] || [], i, el;
+  wrap.innerHTML = '';
+  for (i = 0; i < hand.length; i++) {
+    el = document.createElement('div');
+    el.innerHTML = cardHTML(hand[i]);
+    el = el.firstChild;
+    el.style.zIndex = i + 1;
+    if (dealAnim) {
+      el.className += ' in';
+      el.style.animationDelay = (i * 22) + 'ms';
+    }
+    wrap.appendChild(el);
+  }
+  var role = $('#my-role'), cnt = $('#my-count');
+  if (role) role.textContent = (game.landlord < 0 ? '身份待定' : (isLandlord(0) ? '地主' : '农民'));
+  if (cnt) cnt.textContent = hand.length;
+  applySelClasses();
+  fitHand();
+}
+
+/* 手牌扇的"绝不换行"兜底（规范 §9.2 / §16）：
+   牌宽已经由 --cw 按高度缩过一档，这里只在仍然放不下时**加重叠**（写一个 --ov），
+   保证永远是单行、永远不出现横向滚动条。
+   · 宽度宽裕 → 保持 20% 的轻微重叠（扇面感，§9.2 的 clamp(-16px,-1.8vw,-7px) 同量级）
+   · 放不下   → 逐步加重叠，下限 62%（至少露出 38% 牌面，还能点还能看）
+   只算一个偏移量，不读屏幕尺寸逐个改坐标（§20 禁止的是后者）。 */
+function fitHand() {
+  var wrap = $('#hand');
+  if (!wrap) return;
+  var cards = wrap.querySelectorAll('.pcard');
+  if (cards.length < 2) { wrap.style.removeProperty('--ov'); return; }
+  var cw = cards[0].getBoundingClientRect().width;
+  var avail = wrap.clientWidth - 4;               /* 减去左右内距 */
+  if (!cw || avail <= 0) { wrap.style.removeProperty('--ov'); return; }
+  var step = (avail - cw) / (cards.length - 1);
+  var ov = step - cw;                             /* 刚好铺满所需的重叠量 */
+  if (ov > -cw * .2) ov = -cw * .2;               /* 宽裕：最多只叠 20% */
+  if (ov < -cw * .62) ov = -cw * .62;             /* 极限：最少留 38% 牌面 */
+  wrap.style.setProperty('--ov', ov.toFixed(2) + 'px');
+}
+window.addEventListener('resize', function () { try { fitHand(); } catch (e) {} });
+
+/* Dock = 控制台（规范 §21）：只放**当前合法**的操作，不把无效按钮留在屏幕上占位。
+   · 叫分：只显示比当前最高分更高的档（不叫始终合法）
+   · 出牌：自由出牌时没有「不出」；「出牌」在没有合法选牌时禁用（点了会给出原因）
+   · 都不是我的回合 → 不显示任何按钮，只留一行状态文字 + 托管 */
+function renderActions() {
+  var isBid = (game.phase === 'bid');
+  var isPlay = (game.phase === 'play');
+  var isOver = (game.phase === 'over');
+  var myBidTurn = !!(isBid && game.bid && game.bid.idx < 3 && game.bid.order[game.bid.idx] === 0);
+  var myTurn = !!(isPlay && game.turn === 0 && !game.auto);
+  var bannerOpen = !$('#banner').classList.contains('hidden');
+
+  $('#bid-actions').classList.toggle('hidden', !myBidTurn);
+  $('#play-actions').classList.toggle('hidden', !myTurn);
+  $('#over-actions').classList.toggle('hidden', !(isOver && !bannerOpen));
+  $('#auto-group').classList.toggle('hidden', isOver);
+
+  if (myBidTurn) {
+    var btns = $$('#bid-actions .btn');
+    for (var i = 0; i < btns.length; i++) {
+      var v = Number(btns[i].dataset.v);
+      btns[i].classList.toggle('hidden', !(v === 0 || v > game.bid.best));   /* 叫不过就收起来 */
+      btns[i].disabled = false;
+      btns[i].textContent = (v === 0) ? '不叫' : ((game.bid.best > 0 ? '抢地主 ' : '叫地主 ') + v + ' 分');
+    }
+  }
+  if (myTurn) {
+    $('#btn-pass').classList.toggle('hidden', !game.lastPlay);   /* 自由出牌必须出，不留"不出"占位 */
+    $('#btn-hint').disabled = currentOptions().length === 0;
+  }
+
+  /* 空档说明（不是按钮）：等待 / 托管中 / 已结束 */
+  var waitTxt = '';
+  if (!myBidTurn && !myTurn && !isOver) {
+    if (game.auto) waitTxt = '托管中 · 自动叫分与出牌…';
+    else if (isBid && game.bid) waitTxt = '等待 ' + game.names[game.bid.order[Math.min(game.bid.idx, 2)]] + ' 叫分…';
+    else if (isPlay) waitTxt = '等待 ' + (game.names[game.turn] || '对手') + ' 出牌…';
+  } else if (isOver && bannerOpen) {
+    waitTxt = '本局结束';
+  }
+  var w = $('#dock-wait'), wt = $('#dock-wait-t');
+  if (w && wt) {
+    w.classList.toggle('hidden', !waitTxt);
+    wt.textContent = waitTxt;
+  }
+
+  var ab = $('#btn-auto');
+  if (ab) {
+    ab.classList.toggle('on', !!game.auto);
+    ab.textContent = game.auto ? '托管中' : '托管';
+  }
+}
+
+function renderAll(dealAnim) {
+  renderBottom();
+  renderSeat(2, $('#seat-2'));
+  renderSeat(1, $('#seat-1'));
+  renderCenter();
+  renderHand(dealAnim);
+  renderActions();
+  updateSelInfo();
+}
+
+/* ============================================================
+   5. 玩家交互
+   ============================================================ */
+function selectedCards() {
+  var hand = game.hands[0] || [], out = [], i;
+  for (i = 0; i < hand.length; i++) if (selIds.indexOf(hand[i].id) >= 0) out.push(hand[i]);
+  return out;
+}
+function applySelClasses() {
+  var cards = $('#hand').querySelectorAll('.pcard');
+  for (var i = 0; i < cards.length; i++) {
+    var on = selIds.indexOf(Number(cards[i].dataset.id)) >= 0;
+    cards[i].classList.toggle('sel', on);
+    cards[i].style.zIndex = on ? 200 : (i + 1);
+  }
+}
+function updateSelInfo() {
+  var el = $('#sel-info'), txt = $('#sel-text');
+  var mine = (game.phase === 'play' && game.turn === 0);
+  var cards = selectedCards();
+  var cls = cards.length ? classify(cards) : null;
+  var lead = game.lastPlay ? game.lastPlay.cls : null;
+  var legal = !!(cls && (!lead || beats(cls, lead)));
+  if (!cards.length) {
+    el.className = 'sel-info';
+    txt.textContent = mine ? '点牌选中 · 再点取消' : '我的状态';
+  } else if (!cls) {
+    el.className = 'sel-info bad';
+    txt.textContent = '已选 ' + cards.length + ' 张 · 牌型不合法：' + whyInvalid(cards);
+  } else if (!legal) {
+    el.className = 'sel-info bad';
+    txt.textContent = '已选 ' + cards.length + ' 张 · ' + typeName(cls) + '，压不过上家的' + typeName(lead);
+  } else {
+    el.className = 'sel-info ok';
+    txt.textContent = '你已选 ' + cards.length + ' 张 · 牌型：' + typeName(cls) + (lead ? '（可压过）' : '');
+  }
+  $('#btn-play').disabled = !(mine && legal);
+}
+
+function currentOptions() {
+  var hand = game.hands[0] || [];
+  var lead = game.lastPlay ? game.lastPlay.cls : null;
+  var moves = genAll(hand), out = [], i;
+  for (i = 0; i < moves.length; i++) {
+    if (!lead || beats(moves[i].cls, lead)) out.push(moves[i]);
+  }
+  out.sort(function (a, b) {
+    if (lead) {
+      var ba = isBombType(a.cls.type) ? 1 : 0;
+      var bb = isBombType(b.cls.type) ? 1 : 0;
+      if (ba !== bb) return ba - bb;
+      if (a.cls.main !== b.cls.main) return a.cls.main - b.cls.main;
+      return a.cards.length - b.cards.length;
+    }
+    return leadScore(a) - leadScore(b);
+  });
+  return out;
+}
+
+function tryPlay() {
+  if (game.auto) { toast('托管中，将自动出牌'); return; }
+  if (game.phase !== 'play' || game.turn !== 0) { toast('还没轮到你'); return; }
+  var cards = selectedCards();
+  if (!cards.length) { toast('请先选牌'); return; }
+  var cls = classify(cards);
+  if (!cls) { toast('牌型不合法：' + whyInvalid(cards)); return; }
+  var lead = game.lastPlay ? game.lastPlay.cls : null;
+  if (lead && !beats(cls, lead)) { toast('压不过上家的' + typeName(lead)); return; }
+  doPlay(0, cards, cls);
+}
+
+function doHint() {
+  if (game.auto) { toast('托管中，将自动出牌'); return; }
+  if (game.phase !== 'play' || game.turn !== 0) return;
+  var opts = currentOptions();
+  if (!opts.length) {
+    toast('没有能压过的牌，只能不出');
+    renderActions();
+    return;
+  }
+  var idx = hintIdx % opts.length;
+  hintIdx++;
+  var m = opts[idx];
+  selIds = [];
+  for (var i = 0; i < m.cards.length; i++) selIds.push(m.cards[i].id);
+  applySelClasses();
+  updateSelInfo();
+  toast('提示 ' + (idx + 1) + '/' + opts.length + '：' + typeName(m.cls));
+}
+
+/* ============================================================
+   6. 视图 / 横幅 / toast
+   ============================================================ */
+function switchView(id) {
+  var vs = $$('.view');
+  for (var i = 0; i < vs.length; i++) vs[i].classList.toggle('hidden', vs[i].id !== id);
+}
+/* 结算层（骨架 .csh-result / .rs-panel，规范 §13）：
+   半透明遮罩只压暗、不遮死 —— 背后仍能看到牌桌；面板里给出**对照信息**：
+     · 三家各是地主还是农民、最后剩几张牌
+     · 赢家靠什么牌型走完（最后那一手直接摆出来）
+     · 倍数从哪来（倍数链明细）
+   动画（180/200ms、结束时不透明）由 core/csh_layout.css 提供，本函数只管内容。 */
+function showBanner(title, sub, counts, win, econ) {
+  var t = $('#banner-title'), s = $('#banner-sub'), rows = $('#banner-rows'), ec = $('#banner-econ');
+  t.className = 'rs-title ' + (win ? 'win' : 'lose');
+  t.textContent = title;
+  s.innerHTML = sub;
+
+  var lord = game.landlord, wp = game.winner;
+  var html = '<div class="rs-cap">结果对照 · 地主 ' + esc(game.names[lord] || '-') + '</div>';
+  for (var i = 0; i < 3; i++) {
+    var isLord = (i === lord), isWin = (i === wp);
+    var last = (isWin && game.lastPlay && game.lastPlay.player === i) ? game.lastPlay : null;
+    html += '<div class="rs-row' + (i === 0 ? ' me' : '') + (isWin ? ' win' : '') + '">' +
+      '<span class="rs-name">' + (i === 0 ? '你' : esc(game.names[i])) + (isLord ? ' · 地主' : '') + '</span>' +
+      (last ? '<span class="rs-cards">' + cardsInnerHTML(last.cards, 'xs', 5) + '</span>' : '') +
+      '<span class="rs-hand">' + (last ? typeName(last.cls) + ' · 先出完' : '剩 ' + game.hands[i].length + ' 张') + '</span>' +
+      '<span class="rs-gain' + (isWin ? '' : ' zero') + '">' + (isWin ? '胜' : '负') + '</span></div>';
+  }
+  if (game.multLog && game.multLog.length) {
+    html += '<div class="rs-cap">倍数链：' + esc(game.multLog.join(' ×2 · ')) + ' ×2 → ×' + game.mult + '</div>';
+  }
+  rows.innerHTML = html;
+
+  var et = '';
+  if (econ) {
+    et = (econ.practice ? '<b>好牌练习局 · 不计输赢</b> · ' : '') +
+      '带入 <b>' + fmtNum(econ.myBase) + '</b> · 倍数 <b>×' + game.mult + '</b> · 本局' +
+      (wp === 0 ? '净赢' : '净亏') + ' <b>' + fmtNum(econ.net) + '</b>' +
+      (econ.capped ? '（上限 ' + fmtNum(econ.aiTotal) + '，受对手带入限制）' : '');
+  }
+  ec.innerHTML = et;
+  $('#banner').classList.remove('hidden');
+}
+function hideBanner() { $('#banner').classList.add('hidden'); }
+function toast(msg) {
+  var box = $('#toasts');
+  if (!box) return;
+  /* 【2026-09-30 修复】原先每次调用都无条件 append。叫分/出牌/倍率这类事件会连续触发，
+     toast 于是一路从顶部堆叠几百像素，压住下方的指令行
+     —— 这就是实机截图「顶部『轮到你叫分』被裁掉一半」的根因。限制同屏 3 条即可根治。
+     【2026-10-02 续修】3 条在矮屏（手机横屏，高 ≤480px）仍会从底部锚点上探进 .mid
+     出牌区（容器 bottom:146~208px，3 条高约 120px，顶端可达 y≈100px），
+     与 center-note「正在叫分…」视觉堆叠。矮屏收紧到 2 条，功能不删（只少留一条历史）。
+     【2026-10-03】顶部信息行已清零（战况改台面左上角标），toast 与顶部再无叠加对象。 */
+  var maxN = (window.innerHeight && window.innerHeight <= 480) ? 2 : 3;
+  while (box.children.length >= maxN) box.removeChild(box.firstChild);
+  var d = document.createElement('div');
+  d.className = 'toast';
+  d.textContent = msg;
+  box.appendChild(d);
+  later(function () { d.classList.add('fade'); }, 1500);
+  later(function () { if (d.parentNode) d.parentNode.removeChild(d); }, 2000);
+}
+
+/* ============================================================
+   7. 开局 / 收尾
+   ============================================================ */
+function startGame() {
+  var name = ($('#inp-name').value || '').trim().slice(0, 12) || '池子';
+  lsSet('csh_ddz_name', name);
+  game.names[0] = name;
+  game.names[1] = '关羽';
+  game.names[2] = '张飞';
+  game.redeal = 0;
+  game.auto = false;             /* 新开局默认不托管 */
+  clearAllTimers();
+  newGame();
+}
+function showStart() {
+  clearAllTimers();
+  game.phase = 'idle';
+  game.over = false;
+  game.auto = false;
+  game.hands = [[], [], []];
+  game.lastPlay = null;
+  game.centerLast = null;
+  game.actions = [null, null, null];
+  game.landlord = -1;
+  game.turn = -1;
+  selIds = [];
+  hideBanner();
+  switchView('view-start');
+}
+function closePage() {
+  alive = false;                 /* 先掐断人机定时器递归 */
+  clearAllTimers();
+  try {
+    /* shell 内：关窗前把本局余额交回宿主结算（幂等，最多一次）。
+       ★ 2026-09-29 补齐：此前只在 phase === 'over' 时结算 ——
+       叫牌/出牌中途关窗、甚至没开局就关窗，带入都凭空蒸发。
+       现在：没开局（idle）→ 全额退回带入；中途关窗 → 按当前筹码结算。 */
+    if (Bridge.active && !Bridge.isSettled()) {
+      var dzChips = (game.phase === 'idle')
+        ? Math.max(0, Math.floor(Bridge.buyIn() || 0))
+        : Math.max(0, Math.floor(game.chips || Bridge.buyIn() || 0));
+      try { Bridge.settle(dzChips, function (ok3) {
+        if (ok3 === false) { try { toast('结算未成功，本局未入账（可稍后重查余额）'); } catch (eT3) {} }
+      }); } catch (eS) {}
+    }
+    if (window.parent && window.parent !== window) {
+      window.parent.postMessage({ __csh: "doudizhu-close" }, "*");
+    } else if (typeof window.close === 'function') {
+      window.close();
+    }
+    document.body.style.display = 'none';
+  } catch (e) {
+    try { document.body.style.display = 'none'; } catch (e2) {}
+  }
+}
+
+/* ============================================================
+   8. 事件绑定
+   ============================================================ */
+$('#inp-name').value = lsGet('csh_ddz_name') || '池子';
+
+/* 好牌模式开关：状态记忆 + 回写 UI（用 class 驱动样式，不依赖 :has()） */
+function setGood(on) {
+  goodMode = !!on;
+  lsSet(GOOD_KEY, goodMode ? '1' : '0');
+  var row = $('#good-row'), chk = $('#chk-good');
+  if (chk) chk.checked = goodMode;
+  if (row) row.classList.toggle('on', goodMode);
+}
+$('#chk-good').addEventListener('change', function () { setGood(this.checked); });
+setGood(goodMode);
+
+/* 音效（2026-09-29 · 用户明确要求）：页面不再提供开/关开关，音效跟随系统。
+   统一总线默认开启；本页只保留播放入口 sfx.*，不再读写 per-game 开关键。 */
+
+/* 按钮点击音：一处委托即可覆盖叫分/开始/再来一局等全部按钮 */
+document.addEventListener('click', function (e) {
+  var t = e.target;
+  if (t && t.closest && t.closest('button, .seg-btn, .btn')) sfx.ui();
+}, true);
+
+$('#btn-start-game').addEventListener('click', startGame);
+/* ★ 2026-09-29：btn-close 已移除（壳顶带自有关闭） */
+$('#btn-again').addEventListener('click', function () { afterGameAction('again'); });
+$('#btn-again-bar').addEventListener('click', function () { afterGameAction('again'); });
+$('#btn-back-start').addEventListener('click', function () {
+  if (Bridge.active) cashOutGame(); else showStart();
+});
+
+$$('#bid-actions .btn').forEach(function (b) {
+  b.addEventListener('click', function () {
+    if (game.phase !== 'bid' || !game.bid || game.bid.idx >= 3) return;
+    if (game.bid.order[game.bid.idx] !== 0) return;
+    var v = Number(b.dataset.v) || 0;
+    if (v > 0 && v <= game.bid.best) return;
+    applyBid(0, v);
+  });
+});
+
+$('#btn-play').addEventListener('click', tryPlay);
+$('#btn-hint').addEventListener('click', doHint);
+$('#btn-auto').addEventListener('click', function () { setAuto(!game.auto); });
+$('#btn-pass').addEventListener('click', function () {
+  if (game.phase !== 'play' || game.turn !== 0 || !game.lastPlay) return;
+  if (game.auto) { toast('托管中，将自动出牌'); return; }
+  doPass(0);
+});
+
+/* 选牌命中（2026-09-28 重写）：不再走 e.target DOM 命中——手牌是 -40% 重叠扇面，
+   hover 又会把牌抬升，鼠标按下瞬间命中目标会漂移，「选不中/选到隔壁」就是这么来的。
+   改为按坐标换算：卡片步长 = 相邻卡 left 差，index = floor((x - 首卡left) / 步长)，
+   与「最上层可见切片」语义完全一致，且对位移/动画免疫。
+   双通道：鼠标/笔 → pointerdown 立即响应；触屏 → 合成 click（不阻止默认行为）。
+   【2026-10-03】手牌不再需要横滑看牌（§9.2：单行绝不换行、牌多时靠重叠收进一屏，
+   见 fitHand），所以触屏路径只剩"点选"这一件事。 */
+function toggleCardAt(x) {
+  var cards = $('#hand').querySelectorAll('.pcard');
+  if (!cards.length) return;
+  var r0 = cards[0].getBoundingClientRect();
+  var step;
+  if (cards.length > 1) {
+    var r1 = cards[1].getBoundingClientRect();
+    step = r1.left - r0.left;
+  }
+  if (!step || step <= 0) step = r0.width * 0.6;   /* 兜底：-40% 重叠 → 步长 0.6cw */
+  var idx = Math.floor((x - r0.left) / step);
+  if (idx < 0) idx = 0;
+  if (idx > cards.length - 1) idx = cards.length - 1;
+  var el = cards[idx];
+  if (!el || !el.dataset) return;
+  var id = Number(el.dataset.id);
+  var k = selIds.indexOf(id);
+  if (k >= 0) selIds.splice(k, 1); else selIds.push(id);
+  applySelClasses();
+  updateSelInfo();
+}
+var ddzSuppressClick = false;
+$('#hand').addEventListener('pointerdown', function (e) {
+  if (game.phase !== 'play') return;
+  if (game.auto) { toast('托管中，将自动出牌'); return; }
+  if (e.pointerType === 'touch') return;   /* 触屏走 click，保住横滑手势 */
+  ddzSuppressClick = true;
+  toggleCardAt(e.clientX);
+});
+$('#hand').addEventListener('click', function (e) {
+  if (ddzSuppressClick) { ddzSuppressClick = false; return; }
+  if (game.phase !== 'play') return;
+  if (game.auto) { toast('托管中，将自动出牌'); return; }
+  toggleCardAt(e.clientX);
+});
+
+/* Esc：先关模态/横幅，否则关页面 */
+document.addEventListener('keydown', function (e) {
+  if (e.key !== 'Escape') return;
+  if (!$('#banner').classList.contains('hidden')) {
+    hideBanner();
+    renderActions();
+    return;
+  }
+  closePage();
+});
+
+/* 页面销毁：iframe 被导航到 about:blank / 遮罩移除时，停掉一切定时器 */
+function onTeardown() {
+  alive = false;
+  clearAllTimers();
+}
+window.addEventListener('pagehide', onTeardown);
+window.addEventListener('beforeunload', onTeardown);
+window.addEventListener('unload', onTeardown);
+
+switchView('view-start');
+/* shell 内：先向宿主拉钱包快照并抽取同桌 AI，再让玩家进开始页 */
+/* ★ 2026-09-29：壳内右上角重复关闭按钮已整体移除（壳顶带自有关闭） */
+if (Bridge.active) {
+  var booted = false;
+  function boot() {
+    if (booted) return;
+    booted = true;
+    var tip = $('#econ-tip');
+    if (tip) {
+      var opp = Bridge.opponents();
+      var names = opp.length ? opp.map(function (o) { return esc(o.name); }).join('、') : '—';
+      var aiSum = 0;
+      for (var q = 0; q < opp.length; q++) aiSum += Math.max(0, Math.floor(opp[q].stake || 0));
+      tip.style.display = '';
+      /* 规范 §22：说明文字降级 —— 只留"这一局要吃多少、对手带多少、赢的上限在哪"，
+         回收率与倍数链属于背景知识，压成第二行的一句，不再各占一行。 */
+      tip.innerHTML = '带入 <b>' + fmtNum(Bridge.buyIn()) + '</b> CBY · 同桌 <b>' + names +
+        '</b> 共带 <b>' + fmtNum(aiSum) + '</b> CBY<br>' +
+        '倍数链各 ×2（炸弹 / 春天 / 明牌 / 抢地主） · 净赢上限 = 对手带入之和 · 收工按 90% 回收';
+    }
+    switchView('view-start');
+  }
+  Bridge.pull(function () { boot(); });
+  setTimeout(function () { if (!booted) boot(); }, 1800);
+}
+</script>
+</body>
+</html>

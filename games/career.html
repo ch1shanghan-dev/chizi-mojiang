@@ -1,0 +1,1230 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
+<title>池子魔将 · 生涯大厅</title>
+<!-- 隐藏自检 ?selftest=1（§12#1 不溢出 / #3 触摸目标 / #4 对比度）：
+     data-csh-selftest="auto" 表示「本页是独立文档，DOM 就绪后自动扫 document.body」。 -->
+<script src="../core/csh_selftest.js" data-csh-selftest="auto"></script>
+<script src="../core/csh_page.js"></script>
+<script src="../core/csh_achv.js"></script>
+<style>
+/* 生涯大厅（§4.1.6 / §G.7 / §J.5）：零外部资源 / 不用 vw·vh */
+:root{
+  --ink-0:#08090b;--ink-1:#101216;--ink-2:#171a1f;--ink-3:#1f232a;
+  --gold:#c9a86a;--gold-hi:#e6cf9a;
+  --gold-line:rgba(201,168,106,.26);
+  --gold-soft:rgba(201,168,106,.5);
+  --gold-fill:rgba(201,168,106,.07);
+  --rank-1:#8b93a0;--rank-2:#6f8ba3;--rank-3:#c9a86a;
+  --text:#e8e6e1;--text-dim:#8d939c;
+  --ok:#7fb7a0;--warn:#c98a6a;
+  --line:rgba(255,255,255,.08);
+  --r:12px;--r-sm:8px;
+  --fs-xs:11px;--fs-sm:13px;--fs-md:15px;--fs-xl:26px;
+  --st:env(safe-area-inset-top,0px);
+  --sb:env(safe-area-inset-bottom,0px);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:100%;height:100%;background:var(--ink-0);color:var(--text);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;
+  font-family:"Noto Sans SC","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+  -webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;overflow:hidden}
+#app{position:absolute;left:0;top:0;width:100%;height:100%;display:flex;flex-direction:column;
+  padding-top:var(--st);padding-bottom:var(--sb);overflow:hidden}
+/* 防溢出：网格/弹性子项一律允许收缩 */
+#body,.page,.card,.sect{min-width:0;max-width:100%}
+.wallet,.tasks,.rows,.agrid,.rgrid,.matrix,.axlabel{min-width:0;max-width:100%}
+
+/* ---------- 顶带：页签 ---------- */
+#tabs{flex:0 0 auto;display:flex;border-bottom:1px solid var(--line);background:var(--ink-1);position:relative;
+  padding-right:clamp(122px,16vw,178px)}
+/* 【2026-10-03 修 UI 堆叠】右侧为壳的悬浮件（余额胶囊 + ✕）预留空白带：
+   实测截图里胶囊正压在「官阶」页签上。预留后页签整体左移，浮层落进空档，
+   与游戏页 .csh-topbar 的预留同款（单点预留，一处生效）。 */
+.tab{flex:1;min-height:46px;border:0;background:transparent;color:var(--text-dim);
+  font-size:var(--fs-md);font-family:inherit;cursor:pointer;position:relative}
+.tab.on{color:var(--text)}
+.tab.on::after{content:"";position:absolute;left:0;right:0;bottom:0;height:3px;background:var(--gold)}
+.tab .dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--gold);
+  margin-left:5px;vertical-align:middle}
+
+/* ---------- 内容 ---------- */
+#body{flex:1 1 auto;min-height:0;overflow-y:auto;padding:14px 14px 20px;
+  -webkit-overflow-scrolling:touch}
+.page{display:none}
+.page.on{display:block}
+
+/* ---------- 总览双栏（2026-10-03）----------
+   ≥900px：左栏「身份与资产」/ 右栏「行动」，一屏看完（验收：1000×756 无纵向滚动）；
+   <900px 退回单列。密度同步收紧：卡片 14→12、块标题 16→12。 */
+@media (min-width:900px){
+  #p-overview{display:grid;grid-template-columns:minmax(0,11fr) minmax(0,13fr);gap:0 18px;align-items:start}
+  .ov-col{min-width:0}
+  .ov-col>.sect:first-child>h3{margin-top:0}
+}
+.sect>h3{font-size:var(--fs-xs);font-weight:400;color:var(--text-dim);letter-spacing:.08em;
+  border-left:2px solid var(--gold);padding-left:8px;margin:12px 0 8px}
+.sect:first-child>h3{margin-top:0}
+
+/* 卡 */
+.card{background:var(--ink-1);border:1px solid var(--line);border-radius:var(--r);padding:12px}
+
+/* ---------- 总览：官阶焦点（2026-10-03 瘦身） ----------
+   头像 104→76px、内距 18→12：它是"当前身份"的陈词，不是全页主角 ——
+   高度省下来给右栏的行动区，双栏才能在一屏内对齐。 */
+#rankFocus{display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px}
+#rankFocus .badge{width:76px;height:76px;display:flex;align-items:center;justify-content:center}
+#rankFocus .badge svg{width:76px;height:76px}
+#rankFocus .name{font-size:var(--fs-xl);font-weight:700;letter-spacing:.06em;line-height:1.1;color:var(--gold)}
+#rankFocus .sub{font-size:var(--fs-sm);color:var(--text-dim)}
+#rankFocus .segtag{display:inline-block;padding:2px 10px;border-radius:999px;font-size:var(--fs-xs);
+  border:1px solid var(--gold-line);background:var(--gold-fill);color:var(--gold-hi)}
+.bar{height:8px;border-radius:4px;background:rgba(255,255,255,.08);overflow:hidden;width:100%}
+.bar>i{display:block;height:100%;background:linear-gradient(90deg,var(--gold-soft),var(--gold-hi));
+  transition:width .3s ease-out}
+#rankFocus .foot{display:flex;justify-content:space-between;width:100%;font-size:var(--fs-xs);color:var(--text-dim)}
+
+/* 钱包格（2026-10-03：池子币与官阶卡大数字重复已删，剩两格自适应两列） */
+.wallet{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px}
+.wl{background:var(--ink-1);border:1px solid var(--line);border-radius:var(--r-sm);padding:10px;text-align:center}
+.wl .k{font-size:var(--fs-xs);color:var(--text-dim);letter-spacing:.06em}
+.wl .v{font-size:20px;font-weight:700;color:var(--gold-hi);font-variant-numeric:tabular-nums;line-height:1.2}
+
+/* 快捷开局 */
+#quick{display:flex;gap:8px;flex-wrap:wrap}
+#quick .qbtn{flex:1 1 88px;min-height:56px;border:1px solid var(--gold-line);border-radius:var(--r-sm);
+  background:var(--gold-fill);color:var(--gold-hi);font-size:var(--fs-sm);font-family:inherit;cursor:pointer}
+#quick .qbtn small{display:block;font-size:var(--fs-xs);color:var(--text-dim);margin-top:2px}
+
+/* ---------- 任务卡 ---------- */
+.tasks{display:flex;flex-direction:column;gap:8px}
+.task{display:flex;align-items:center;gap:10px;min-height:56px;padding:10px 12px;
+  background:var(--ink-1);border:1px solid var(--line);border-radius:var(--r-sm)}
+.task.done{border-color:var(--gold-line);background:var(--gold-fill)}
+.task .tk-main{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:5px}
+.task .tk-lab{font-size:var(--fs-sm);font-weight:700}
+.task .tk-num{font-size:var(--fs-xs);color:var(--text-dim)}
+.task .tk-rw{flex:0 0 auto;font-size:var(--fs-xs);color:var(--gold);font-weight:700}
+
+/* ---------- 成就网格 ---------- */
+.agrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:8px}
+.ach{background:var(--ink-1);border:1px solid var(--line);border-radius:var(--r-sm);
+  padding:10px 6px;text-align:center;cursor:pointer}
+.ach.on{border-color:var(--gold-line);background:var(--gold-fill)}
+.ach .ico{font-size:22px;line-height:1;margin-bottom:6px;filter:grayscale(1) opacity(.45)}
+.ach.on .ico{filter:none}
+.ach span{font-size:var(--fs-xs);color:var(--text-dim)}
+.ach.on span{color:var(--text)}
+/* 2026-09-28 成就墙扩展：进度条 / 分类筛选 / 领取按钮 / 池子币大字 */
+.ach .abar{width:100%;height:4px;background:rgba(255,255,255,.08);border-radius:2px;overflow:hidden;margin-top:4px}
+.ach .abar i{display:block;height:100%;background:var(--gold-line);border-radius:2px}
+.ach .alab{font-size:11px;color:var(--text-dim);margin-top:2px}
+.catchips{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 10px}
+.catchips .chip{font-size:var(--fs-xs);padding:4px 12px;border-radius:14px;cursor:pointer;
+  border:1px solid var(--line);color:var(--text-dim);background:var(--ink-1);user-select:none}
+.catchips .chip.on{border-color:var(--gold-line);color:var(--gold-hi);background:var(--gold-fill)}
+.ach .aclaim{margin-top:4px;font-size:11px;padding:3px 10px;border-radius:10px;cursor:pointer;
+  border:1px solid var(--gold-line);color:#1a130a;background:var(--gold-line);font-weight:700;user-select:none}
+.ach .aclaim.got{background:transparent;color:var(--text-dim);border-color:var(--line);font-weight:400}
+.pc-big{display:flex;align-items:baseline;justify-content:center;gap:8px;margin-top:8px}
+.pc-big span{font-size:26px;font-weight:900;color:var(--gold-hi);letter-spacing:1px;
+  text-shadow:0 2px 14px rgba(216,180,106,.35)}
+.pc-big small{font-size:var(--fs-xs);color:var(--text-dim)}
+
+/* ---------- 排行 ---------- */
+.rows{display:flex;flex-direction:column}
+.row{display:flex;align-items:center;gap:10px;min-height:48px;padding:6px 10px;
+  border-bottom:1px solid var(--line)}
+.row:last-child{border-bottom:0}
+.row .pvp{flex:0 0 auto;width:34px;height:34px;border-radius:50%;background:var(--ink-3);
+  display:flex;align-items:center;justify-content:center;font-size:var(--fs-xs);color:var(--text-dim)}
+.row .nm{flex:1 1 auto;min-width:0;font-size:var(--fs-sm);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .vl{flex:0 0 auto;font-size:var(--fs-sm);color:var(--gold-hi);font-variant-numeric:tabular-nums;font-weight:700}
+.row.me .nm{color:var(--gold)}
+
+/* ---------- 官阶图鉴 ---------- */
+.segblock{margin-bottom:14px}
+.segblock .seghd{display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:var(--fs-sm);font-weight:700}
+.segblock .seghd i{width:12px;height:12px;border-radius:3px;display:inline-block}
+.rgrid{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+.rcell{background:var(--ink-1);border:1px solid var(--line);border-radius:var(--r-sm);
+  padding:6px 3px;text-align:center;cursor:pointer;position:relative}
+.rcell.past{opacity:.4}
+.rcell.cur{border-color:var(--gold);background:var(--gold-fill)}
+.rcell .rb{width:40px;height:40px;margin:0 auto}
+.rcell .rb svg{width:40px;height:40px}
+.rcell .rn{font-size:10px;color:var(--text-dim);margin-top:3px;overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap}
+.rcell.cur .rn{color:var(--gold-hi)}
+.rcell .rm{font-size:9px;color:var(--text-dim);font-variant-numeric:tabular-nums}
+/* 方位将军 4×4 矩阵 */
+.matrix{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.mx{background:var(--ink-1);border:1px solid var(--line);border-radius:var(--r-sm);padding:8px 4px;text-align:center}
+.mx.cur{border-color:var(--gold);background:var(--gold-fill)}
+.mx .mn{font-size:var(--fs-sm);font-weight:700;color:var(--text-dim)}
+.mx.cur .mn{color:var(--gold-hi)}
+.axlabel{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:4px}
+.axlabel span{text-align:center;font-size:var(--fs-xs);color:var(--text-dim)}
+
+/* ---------- 数据迁移（§J.5） ---------- */
+textarea{width:100%;min-height:96px;background:var(--ink-2);border:1px solid var(--line);
+  border-radius:var(--r-sm);color:var(--text);font-family:ui-monospace,Consolas,monospace;
+  font-size:16px;padding:10px;resize:vertical}
+.migrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.btn{min-height:44px;padding:0 16px;border-radius:var(--r-sm);border:1px solid var(--gold-line);
+  background:var(--gold-fill);color:var(--gold-hi);font-size:var(--fs-sm);font-family:inherit;cursor:pointer}
+.btn.ghost{background:transparent;color:var(--text-dim);border-color:var(--line)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.diffbox{font-size:var(--fs-xs);color:var(--text-dim);line-height:1.8;margin-top:8px}
+
+/* ---------- 弹窗 ---------- */
+#modal{position:absolute;left:0;top:0;width:100%;height:100%;z-index:50;display:none;
+  background:rgba(0,0,0,.72);align-items:center;justify-content:center;padding:20px}
+#modal.on{display:flex}
+#modal .mbox{background:var(--ink-1);border:1px solid var(--gold-line);border-radius:var(--r);
+  width:100%;max-width:330px;padding:18px;text-align:center}
+#modal .mbox .mb{width:104px;height:104px;margin:0 auto 8px}
+#modal .mbox .mb svg{width:104px;height:104px}
+#modal .mbox h4{font-size:var(--fs-md);color:var(--gold-hi);margin-bottom:6px}
+#modal .mbox .mi{font-size:var(--fs-xs);color:var(--text-dim);line-height:1.9;text-align:left;
+  background:var(--ink-2);border-radius:var(--r-sm);padding:10px;margin:10px 0}
+/* ============================================================
+   世界动态（流言）与「世界之最」（2026-10-03 新增）
+   —— 只读派生：csh_world 的事件环 + worldStory/stats，经 shell-world 快照下发
+   ============================================================ */
+.feed{display:flex;flex-direction:column}
+.feed .fi{display:flex;gap:8px;align-items:baseline;font-size:var(--fs-sm);line-height:1.55;
+  padding:7px 0;border-bottom:1px solid var(--gold-line)}
+.feed .fi:last-child{border-bottom:0}
+.feed .fi .fw{flex:0 0 auto;font-size:var(--fs-xs);color:var(--text-dim);letter-spacing:.04em}
+.feed .fi .ft{flex:1 1 auto;color:var(--text)}
+.feed .fi .ft b{color:var(--gold-hi);font-weight:600}
+.wmax{display:flex;flex-direction:column}
+.wmax .wi{font-size:var(--fs-sm);line-height:1.7;color:var(--text);padding:5px 0;
+  border-bottom:1px solid var(--gold-line)}
+.wmax .wi:last-child{border-bottom:0}
+.wmax .wi .wk{color:var(--text-dim);font-size:var(--fs-xs);margin-right:8px;letter-spacing:.04em}
+.wmax .wi b{color:var(--gold-hi);font-weight:600}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="tabs">
+    <button class="tab on" data-p="overview">总览</button>
+    <button class="tab" data-p="tasks">任务</button>
+    <button class="tab" data-p="ach">成就</button>
+    <button class="tab" data-p="rank">官阶</button>
+    <button class="tab" data-p="board">排行</button>
+  </div>
+  <div id="body">
+    <!-- 总览（2026-10-03 · 双栏化）
+         宽屏（≥900px）左右两栏，一屏看完，不再上下滑：
+           左 = 身份与资产（官阶焦点卡 / 资产 / 今日签到） —— "我现在的状态"
+           右 = 行动（快捷开局 / 今日任务 / 数据迁移） —— "我现在能做的事"
+         窄屏退回单列（顺序不变）。池子币大数字只保留官阶卡里那一处
+         （原「资产」格里是同一位数字的第二份渲染，违反一层原则，已删）。 -->
+    <div class="page on" id="p-overview">
+      <div class="ov-col">
+        <div class="card" id="rankFocus">
+          <div class="badge" id="ov-badge"></div>
+          <div class="name" id="ov-rankname">—</div>
+          <div class="segtag" id="ov-segtag">—</div>
+          <div class="sub" id="ov-rankidx">—</div>
+          <div class="bar"><i id="ov-rankbar" style="width:0%"></i></div>
+          <div class="foot"><span id="ov-need">—</span><span id="ov-merit">—</span></div>
+          <!-- 2026-09-28：池子币大字展示（用户反馈「没有一个可以查看池子币的地方」） -->
+          <div class="pc-big"><span id="ov-pc-big">—</span><small>池子币 CBY</small></div>
+        </div>
+
+        <div class="sect"><h3>资产</h3>
+          <div class="wallet">
+            <div class="wl"><div class="k">连签</div><div class="v" id="ov-streak">0</div></div>
+            <div class="wl"><div class="k">生涯峰值</div><div class="v" id="ov-peak">0</div></div>
+          </div>
+        </div>
+
+        <div class="sect"><h3>今日</h3>
+          <div class="card">
+            <div class="diffbox" id="ov-today">状态载入中…</div>
+            <div class="migrow">
+              <button class="btn" id="ov-sign">签到领补给</button>
+              <button class="btn ghost" id="ov-relief">领取救济</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="ov-col">
+        <div class="sect"><h3>快捷开局</h3>
+          <div id="quick"></div>
+          <div class="diffbox" id="quick-note">带入制：入座前选带入，离桌后按比例结算；其余按门票计价。</div>
+        </div>
+
+        <div class="sect"><h3>今日任务 · 五游戏共用</h3>
+          <div class="tasks" id="ov-tasks"></div>
+          <div class="diffbox" id="ov-tasks-note">与各游戏内看到的是同一份进度。</div>
+        </div>
+
+        <div class="sect"><h3>数据迁移</h3>
+          <div class="card">
+            <div class="diffbox" id="mig-info">导出一份生涯存档（战绩 / 钱包 / 官阶 / AI 世界），可跨设备恢复。</div>
+            <div class="migrow">
+              <button class="btn" id="mig-export">导出</button>
+              <button class="btn ghost" id="mig-import">导入</button>
+              <button class="btn ghost" id="mig-backups">备份</button>
+            </div>
+            <div class="migrow" style="margin-top:10px">
+              <button class="btn" id="mig-reset" style="background:#a8442f;color:#fff;border-color:transparent">重置存档（回到初始状态）</button>
+            </div>
+            <div id="mig-panel" style="display:none;margin-top:10px">
+              <textarea id="mig-text" placeholder="粘贴存档串…"></textarea>
+              <div class="migrow">
+                <button class="btn" id="mig-apply">读取并确认覆盖</button>
+                <button class="btn ghost" id="mig-close">收起</button>
+              </div>
+              <div class="diffbox" id="mig-diff"></div>
+            </div>
+            <div id="mig-bkpanel" style="display:none;margin-top:10px"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 任务 -->
+    <div class="page" id="p-tasks">
+      <div class="sect"><h3>每日任务 · 日刷新</h3>
+        <div class="tasks" id="tk-list"></div>
+        <div class="diffbox" id="tk-note">完成即时入账，无未完成惩罚。</div>
+      </div>
+    </div>
+
+    <!-- 成就 -->
+    <div class="page" id="p-ach">
+      <div class="sect"><h3 id="ach-title">成就墙</h3>
+        <div class="diffbox" id="ach-summary">成就统计载入中…</div>
+        <div class="catchips" id="ach-cats"></div>
+        <div class="agrid" id="ach-grid"></div>
+        <div class="diffbox" id="ach-note">点击查看条件；达成的成就点「领取」入账。</div>
+      </div>
+    </div>
+
+    <!-- 官阶图鉴 -->
+    <div class="page" id="p-rank">
+      <div class="sect"><h3>五段 × 十阶</h3>
+        <div id="rank-catalog"></div>
+      </div>
+      <div class="sect"><h3>方位将军 · 4×4 矩阵</h3>
+        <div class="axlabel"><span>东</span><span>南</span><span>西</span><span>北</span></div>
+        <div class="matrix" id="rank-matrix"></div>
+        <div class="diffbox">行 = 平 → 安 → 镇 → 征（低 → 高）</div>
+      </div>
+    </div>
+
+    <!-- 排行 -->
+    <div class="page" id="p-board">
+      <div class="sect"><h3>世界动态</h3><div class="feed" id="bd-news"></div></div>
+      <div class="sect"><h3>世界之最</h3><div class="wmax" id="bd-most"></div></div>
+      <div class="diffbox" id="bd-note">数据源：AI 世界档案（资金与胜负随牌局实时演化）。</div>
+      <div class="sect"><h3>资金榜</h3><div class="rows" id="bd-fund"></div></div>
+      <div class="sect"><h3>牌技榜</h3><div class="rows" id="bd-skill"></div></div>
+      <div class="sect"><h3>胜率榜</h3><div class="rows" id="bd-win"></div></div>
+      <div class="sect"><h3>最大底池榜</h3><div class="rows" id="bd-pot"></div></div>
+      <div class="sect"><h3>已退隐</h3><div class="rows" id="bd-out"></div></div>
+    </div>
+  </div>
+</div>
+
+<div id="modal"><div class="mbox">
+  <div class="mb" id="md-badge"></div>
+  <h4 id="md-name">—</h4>
+  <div class="mi" id="md-info"></div>
+  <button class="btn" id="md-close" style="width:100%">知道了</button>
+</div></div>
+
+<script>
+(function () {
+"use strict";
+
+/* ============================================================
+   桥（与 Game Shell 通信；§4.1.6 / §G.7 / §J）
+   ============================================================ */
+var Bridge = (function () {
+  /* 传输核心来自 core/csh_page.js（唯一实现）；大厅用 2500ms 超时（子页响应较重） */
+  var T = CSHPage.transport({ closeName: 'career-close', timeout: 2500 });
+  return { active: T.active, call: T.call };
+})();
+
+function $(s) { return document.querySelector(s); }
+function fmt(n) { n = Math.round(Number(n) || 0); return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ","); }
+function el(t, c, x) { var e = document.createElement(t); if (c) e.className = c; if (x != null) e.textContent = x; return e; }
+/* 轻量 toast（成就领取反馈用；2026-09-28 新增） */
+var _toastBox = null;
+function toast(msg) {
+  try {
+    if (!_toastBox || !_toastBox.parentNode) {
+      _toastBox = document.createElement("div");
+      _toastBox.style.cssText = "position:fixed;left:50%;top:14px;transform:translateX(-50%);z-index:999;" +
+        "display:flex;flex-direction:column;gap:6px;align-items:center;pointer-events:none;width:max-content;max-width:80%";
+      document.body.appendChild(_toastBox);
+    }
+    var t = el("div", "", msg);
+    t.style.cssText = "background:rgba(21,17,12,.94);border:1px solid var(--gold-line);color:#f0dfae;" +
+      "padding:7px 16px;border-radius:18px;font-size:var(--fs-sm);text-align:center;max-width:100%";
+    _toastBox.appendChild(t);
+    setTimeout(function () { if (t.parentNode) t.parentNode.removeChild(t); }, 2400);
+  } catch (e) {}
+}
+
+var State = {
+  snap: null,       /* shell-wallet 快照（含 pc / pcPeak / ranks 真值 / tasks / world） */
+  games: null,      /* shell-games：宿主下发的游戏目录（含真实门票与可负担性） */
+  ranks: null,      /* shell-rank-all：{ ranks, current, perks, segList } */
+  world: null,      /* shell-world：{ leaderboard, ai } */
+  tasks: null,      /* shell-tasks：{ day, tier, defs:[{key,label,goal,reward,cur,done,claimed}] } */
+  badges: null,
+  ach: null,
+};
+/* 段名 / 官阶加成的**唯一来源**是钱包（csh_wallet.SEGMENTS / SEG_BONUS）。
+   2026-09-29 前这里自造了一套与之冲突的表（一段·伍长…／≤10,000／20%），
+   导致"玩家在大厅看到的段名与加成，钱包里根本不存在"（§S3/S4）。
+   现在只做转发：有真值用真值，无桥时才用带 [兜底] 标记的近似表。 */
+function segList() { return (State.ranks && State.ranks.segList) || null; }
+function segOfRank(lv) {
+  var list = segList();
+  lv = Math.max(0, Math.min(50, Math.floor(Number(lv) || 0)));
+  if (list && list.length) {
+    for (var i = list.length - 1; i >= 0; i--) {
+      if (lv >= list[i].from && lv <= list[i].to) return list[i];
+    }
+    return list[0];
+  }
+  /* [兜底] 与钱包 SEGMENTS 数值保持一致的近似（区间 0-9 / 10-19 / … / 40-50） */
+  var fallback = [
+    { seg: 0, from: 0, to: 9, name: "卒伍", color: 0 },
+    { seg: 1, from: 10, to: 19, name: "杂号", color: 0 },
+    { seg: 2, from: 20, to: 29, name: "中垒", color: 1 },
+    { seg: 3, from: 30, to: 39, name: "方镇", color: 1 },
+    { seg: 4, from: 40, to: 50, name: "上公", color: 2 },
+  ];
+  for (var j = fallback.length - 1; j >= 0; j--) {
+    if (lv >= fallback[j].from && lv <= fallback[j].to) return fallback[j];
+  }
+  return fallback[0];
+}
+function segColor(segIdx) { return ["#8b93a0", "#8b93a0", "#6f8ba3", "#6f8ba3", "#c9a86a"][segIdx || 0]; }
+/* 段加成真值：优先钱包 perks，其次 segList 对应项 */
+function perksOf(lv) {
+  var list = (State.ranks && State.ranks.perksAll) || null;
+  var seg = segOfRank(lv);
+  var p = null;
+  if (list) for (var i = 0; i < list.length; i++) if (list[i].seg === seg.seg) { p = list[i]; break; }
+  if (!p && State.ranks && State.ranks.perks && State.ranks.perks.seg === seg.seg) p = State.ranks.perks;
+  var stakes = (p && p.stakes) || [200];
+  return {
+    seg: seg.seg, name: seg.name,
+    sign: p ? p.sign : 0,
+    discount: p ? p.discount : 0,
+    stakes: stakes,
+    maxStake: stakes[stakes.length - 1],
+  };
+}
+
+/* ============================================================
+   页签
+   ============================================================ */
+function bindTabs() {
+  var tabs = document.querySelectorAll(".tab");
+  for (var i = 0; i < tabs.length; i++) {
+    tabs[i].addEventListener("click", function () {
+      var p = this.getAttribute("data-p");
+      var all = document.querySelectorAll(".tab");
+      for (var j = 0; j < all.length; j++) all[j].className = "tab";
+      this.className = "tab on";
+      var pages = document.querySelectorAll(".page");
+      for (var k = 0; k < pages.length; k++) pages[k].className = "page";
+      $("#p-" + p).className = "page on";
+    }, false);
+  }
+}
+
+/* ============================================================
+   总览
+   ============================================================ */
+function renderOverview() {
+  var s = State.snap;
+  if (!s) return;
+  $("#ov-pc-big").textContent = fmt(s.pc);   /* 池子币唯一渲染位（资产格的重复已删，2026-10-03） */
+  $("#ov-streak").textContent = fmt(s.streak) + " 天";
+  $("#ov-peak").textContent = fmt(s.pcPeak || s.pc || 0);
+
+  var r = s.rank || {};
+  var cur = r.rank || 0;
+  var info = State.ranks && State.ranks.current ? State.ranks.current : r;
+  /* 官阶名与进度 */
+  var ranks = (State.ranks && State.ranks.ranks) || [];
+  var rec = null;
+  for (var i = 0; i < ranks.length; i++) if (ranks[i].rank === cur) { rec = ranks[i]; break; }
+  var name = (info && info.name) || (rec && rec.name) || "平民";
+  $("#ov-rankname").textContent = name;
+  $("#ov-rankidx").textContent = "第 " + cur + " 阶 / 共 50 阶";
+
+  /* 段名：从钱包真值取（2026-09-29 起不再自造） */
+  var seg = segOfRank(cur);
+  var color = segColor(seg.color);
+  var pos = Math.max(1, Math.min(10, cur - seg.from + 1));
+  $("#ov-segtag").textContent = seg.name + " · " + pos + "/10";
+  $("#ov-segtag").style.color = color;
+  $("#ov-segtag").style.borderColor = color;
+
+  var threshold = (rec && rec.merit) || (info && info.threshold) || 0;
+  var nextTh = nextThreshold(cur, ranks);
+  var merit = (r.merit || 0);
+  var span = Math.max(1, nextTh - threshold);
+  var pct = cur >= 50 ? 100 : Math.max(0, Math.min(100, Math.round((merit - threshold) / span * 100)));
+  $("#ov-rankbar").style.width = pct + "%";
+  $("#ov-need").textContent = cur >= 50 ? "已达顶阶" : ("距下一阶还需 " + fmt(Math.max(0, nextTh - merit)) + " 功勋");
+  $("#ov-merit").textContent = "功勋 " + fmt(merit);
+
+  /* 徽章：由宿主生成器给出 SVG */
+  if (State.badges && State.badges[cur]) {
+    $("#ov-badge").innerHTML = State.badges[cur];
+  } else {
+    $("#ov-badge").innerHTML = fallbackBadge(cur, color);
+  }
+
+  renderToday();
+  renderTasksInto($("#ov-tasks"));
+  renderQuick();
+}
+
+/* 今日状态：全部真实（签到状态 / 本段加成 / 救济资格） */
+function renderToday() {
+  var s = State.snap || {};
+  var box = $("#ov-today");
+  if (!box) return;
+  var perks = perksOf((s.rank && s.rank.rank) || 0);
+  var lines = [];
+  lines.push("连签 <b>" + fmt(s.streak || 0) + "</b> 天 · 今日" + (s.signedToday ? "<b style='color:var(--ok)'>已签到</b>" : "<b style='color:var(--gold-hi)'>未签到</b>"));
+  if (s.rank) {
+    lines.push("功勋 <b>" + fmt(s.rank.merit || 0) + "</b>　今日入账 " + fmt(s.rank.meritToday || 0) +
+      " / 软上限 " + fmt(s.rank.softCap || 0));
+  }
+  lines.push("当前段「" + perks.name + "」加成：门票折扣 <b>" + Math.round((perks.discount || 0) * 100) + "%</b> · " +
+    "签到加成 <b>+" + fmt(perks.sign || 0) + "</b> CBY · 带入上限 <b>" + fmt(perks.maxStake) + "</b>");
+  if (s.world) {
+    lines.push("AI 世界 " + s.world.chars + " 人 · 在场 " + (s.world.chars - s.world.retired) +
+      " · 资金 " + fmt(s.world.fundMin) + " ~ " + fmt(s.world.fundMax));
+  }
+  box.innerHTML = lines.join("<br>");
+  /* 按钮可用性：真实判定 */
+  var signBtn = $("#ov-sign");
+  if (signBtn) {
+    signBtn.disabled = !!s.signedToday;
+    signBtn.textContent = s.signedToday ? "今日已签到" : "签到领补给";
+  }
+  var reliefBtn = $("#ov-relief");
+  if (reliefBtn) {
+    /* 救济门槛 = 全扩展最低非零门票（registry.minTicket，经 shell-wallet 下发）。
+       此前这里硬编码 150，与钱包侧 RELIEF_THRESHOLD 是两份副本。 */
+    var poor = (s.pc || 0) < (s.minTicket || 150);
+    reliefBtn.disabled = !poor;
+    reliefBtn.textContent = poor ? "领取救济 +800" : "余额充足 · 无需救济";
+  }
+}
+function nextThreshold(cur, ranks) {
+  for (var i = 0; i < ranks.length; i++) if (ranks[i].rank === cur + 1) return ranks[i].merit || 0;
+  return cur >= 50 ? 0 : 999999;
+}
+function fallbackBadge(rank, color) {
+  var n = Math.max(0, Math.min(50, rank));
+  return '<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="44" fill="none" stroke="' + color + '" stroke-width="3"/>' +
+    '<text x="50" y="58" text-anchor="middle" font-size="26" fill="' + color + '">' + n + '</text></svg>';
+}
+
+function renderQuick() {
+  var box = $("#quick");
+  if (!box) return;
+  box.innerHTML = "";
+  /* 目录与价格**不再由本页持有**：全部来自宿主的 shell-games
+     （真值链：core/csh_registry.js → csh_wallet 官阶折扣 → shell → 这里）。
+     此前这里硬编码了 { 标题, 门票, 最低余额 }，与真实门票表脱钩 ——
+     廿一点改免门票后本页仍写「门票 300」，余额 200~299 的玩家被误判为不足。 */
+  var list = State.games;
+  if (!list || !list.length) {
+    box.appendChild(el("div", "diffbox", "正在从宿主同步游戏目录…"));
+    return;
+  }
+  var pc = (State.snap && State.snap.pc) || 0;
+  for (var i = 0; i < list.length; i++) {
+    (function (g) {
+      var afford = pc >= g.need;
+      var b = el("button", "qbtn", g.title);
+      b.type = "button";
+      /* 副标题如实写出成本构成：带入制写「带入 X 起」，门票制写「门票 X」 */
+      var sub = g.needBuyIn
+        ? ("带入 " + fmt(g.minStake) + " 起" + (g.ticket > 0 ? " + 门票 " + fmt(g.ticket) : ""))
+        : (g.ticket > 0 ? ("门票 " + fmt(g.ticket)) : "免门票");
+      b.appendChild(el("small", "", sub));
+      if (!afford) { b.disabled = true; b.title = "池子币不足（需要 " + fmt(g.need) + "）"; }
+      /* ★ 2026-09-29 修复真 bug：此前这里发的是 shell-close（点了等于关掉大厅）。
+         现在发 shell-open，由宿主真正发起开局流程。
+         宿主侧也修了应答时序：此前应答被投递到刚打开的游戏帧，
+         本页 waiter 永远超时 → 每次快捷开局都误弹「无法打开」。 */
+      b.addEventListener("click", function () {
+        if (!afford) { toast("池子币不足，需要 " + fmt(g.need) + " CBY"); return; }
+        Bridge.call("shell-open", { key: g.key }, function (ok, r) {
+          if (!ok || !r || !r.key) toast("无法打开：" + g.title);
+        });
+      }, false);
+      box.appendChild(b);
+    })(list[i]);
+  }
+  var note = $("#quick-note");
+  if (note) {
+    var minNeed = Infinity;
+    for (var j = 0; j < list.length; j++) if (list[j].need < minNeed) minNeed = list[j].need;
+    if (!isFinite(minNeed)) minNeed = 0;
+    note.textContent = pc < minNeed
+      ? ("池子币不足 " + fmt(minNeed) + "，无法开局。点「领取救济」或等每日签到。")
+      : "带入制游戏（德州 / 斗地主 / 廿一点）：入座前选带入档位，离桌后按比例结算；其余游戏按门票计价。";
+  }
+}
+
+/* ============================================================
+   任务（2026-09-29：真值来自统一钱包，与德州同源）
+   ============================================================ */
+function renderTasksInto(box) {
+  if (!box) return;
+  box.innerHTML = "";
+  var t = State.tasks;
+  if (!t || !t.defs || !t.defs.length) {
+    box.appendChild(el("div", "diffbox", "正在从统一钱包同步任务状态…"));
+    return;
+  }
+  for (var i = 0; i < t.defs.length; i++) {
+    var d = t.defs[i];
+    var cur = Math.max(0, Math.min(d.cur || 0, d.goal || 1));
+    var goal = d.goal || 1;
+    var pct = Math.max(0, Math.min(100, Math.round(cur / goal * 100)));
+    var done = !!d.done;
+    var card = el("div", "task" + (done ? " done" : ""));
+    var main = el("div", "tk-main");
+    main.appendChild(el("span", "tk-lab", d.label));
+    var bar = el("span", "bar"); var fill = el("i"); fill.style.width = pct + "%";
+    bar.appendChild(fill); main.appendChild(bar);
+    main.appendChild(el("span", "tk-num", fmt(cur) + " / " + fmt(goal) + (d.claimed ? " · 已完成" : "")));
+    card.appendChild(main);
+    card.appendChild(el("span", "tk-rw", "+" + fmt(d.reward) + " CBY"));
+    box.appendChild(card);
+  }
+  var note = $("#ov-tasks-note");
+  if (note) note.textContent = "任务分档随官阶提升（当前 " + ["低段", "中段", "高段"][t.tier || 0] + "）。" +
+    "在德州内完成即由统一钱包即时入账。";
+}
+
+function loadTasks() {
+  Bridge.call("shell-tasks", null, function (ok, t) {
+    if (ok && t && t.defs) {
+      State.tasks = t;
+      renderTasksInto($("#ov-tasks"));
+      renderTasksInto($("#tk-list"));
+    }
+  });
+}
+
+/* ============================================================
+   成就（2026-09-28 全面扩容 → core/csh_achv.js，209 条程序化定义）
+   本页只做：取统计快照 → 引擎评估 → 分类渲染 → 领奖走桥。
+   统计不依赖 State.snap 之外的任何东西；快照未到时给全 0 的兜底。
+   ============================================================ */
+var achCat = "全部";           /* 当前筛选分类 */
+var achRows = [];              /* 最近一次 evalAll 结果 */
+/* 本地兜底统计（仅在快照尚未到达时使用；权威版本由宿主 shell-stats 聚合）。
+   全部取自真实快照字段，不含任何占位值。 */
+function achStats() {
+  var s = State.snap || {};
+  var w = s.world || {};
+  var r = s.rank || {};
+  return {
+    pc: s.pc || 0, pcPeak: s.pcPeak || 0, streak: s.streak || 0, signedToday: !!s.signedToday,
+    rank: r.rank || 0, merit: r.merit || 0, meritToday: r.meritToday || 0,
+    segIdx: (r.seg && r.seg.seg) || 0, segName: (r.seg && r.seg.name) || "",
+    cdkCount: 0, cdkGained: 0, cdkMax: 0,
+    wrGames: 0, wrWin: 0, wrLose: 0, wrKill: 0, wrChars: 0, wrModes: 0,
+    worldChars: w.chars || 0, worldHands: w.hands || 0,
+    worldFundMin: w.fundMin || 0, worldFundMax: w.fundMax || 0,
+    worldTopFund: w.richestFund || 0, worldRetired: w.retired || 0, worldSkillTop: w.skillTop || 0,
+    billionaires: w.tier3 || 0, billionaireBroke: w.billionaireBroke || 0,
+    interactTotal: 0, taskDone: 0, taskTotal: (State.tasks && State.tasks.defs ? State.tasks.defs.length : 0),
+    gamblePlays: 0, gambleWins: 0, gambleNet: 0, gambleBest: 0, gambleBust: 0,
+    nightOwl: (function () { var h = new Date().getHours(); return h >= 0 && h < 4; })(),
+  };
+}
+function renderAch() {
+  var AC = window.CSH_ACHV;
+  var box = $("#ach-grid");
+  if (!box) return;
+  if (!AC) { box.innerHTML = ""; $("#ach-summary").textContent = "成就引擎未加载（core/csh_achv.js）"; return; }
+  var st = achStats();
+  /* 快照未到时先用兜底渲染一次，桥回来后再刷 */
+  var useBridge = !!State.snap;
+  var paint = function (rows) {
+    achRows = rows;
+    var done = 0, claimedN = 0, claimable = 0;
+    for (var i = 0; i < rows.length; i++) {
+      if (rows[i].done) done++;
+      if (rows[i].claimed) claimedN++;
+      if (rows[i].done && !rows[i].claimed) claimable++;
+    }
+    $("#ach-title").textContent = "成就墙 · " + rows.length + " 枚";
+    $("#ach-summary").innerHTML = "已达成 <b>" + done + "</b> / " + rows.length +
+      " · 已领取 <b>" + claimedN + "</b>" +
+      (claimable ? " · <b style='color:var(--gold-hi)'>" + claimable + " 枚可领取</b>" : "");
+    /* 分类条 */
+    var cats = { "全部": 1 };
+    for (var c = 0; c < rows.length; c++) cats[rows[c].cat] = 1;
+    var chipBox = $("#ach-cats");
+    chipBox.innerHTML = "";
+    for (var key in cats) {
+      if (!Object.prototype.hasOwnProperty.call(cats, key)) continue;
+      (function (k) {
+        var chip = el("span", "chip" + (k === achCat ? " on" : ""), k);
+        chip.addEventListener("click", function () { achCat = k; renderAch(); }, false);
+        chipBox.appendChild(chip);
+      })(key);
+    }
+    /* 网格 */
+    box.innerHTML = "";
+    for (var i2 = 0; i2 < rows.length; i2++) {
+      (function (r) {
+        if (achCat !== "全部" && r.cat !== achCat) return;
+        var c = el("div", "ach" + (r.done ? " on" : ""));
+        c.appendChild(el("div", "ico", r.ico));
+        c.appendChild(el("span", "", r.label));
+        var bar = el("div", "abar"); var fill = el("i");
+        fill.style.width = Math.min(100, Math.round((r.cur / r.goal) * 100)) + "%";
+        bar.appendChild(fill); c.appendChild(bar);
+        c.appendChild(el("div", "alab", r.done ? ("已完成 +" + fmt(r.reward)) : (fmt(r.cur) + " / " + fmt(r.goal))));
+        if (r.done) {
+          var btn = el("button", "aclaim" + (r.claimed ? " got" : ""), r.claimed ? "已领取" : "领取 +" + fmt(r.reward));
+          btn.type = "button";
+          btn.addEventListener("click", function (e) {
+            e.stopPropagation();
+            if (r.claimed) return;
+            Bridge.call("shell-ach-claim", { key: r.key }, function (ok2, res2) {
+              if (ok2 && res2 && res2.ok) {
+                r.claimed = true;
+                toast("成就「" + r.label + "」+" + fmt(res2.reward) + " CBY");
+                renderAch();
+                loadWalletSnap(2);     /* 余额刷新 */
+              } else {
+                toast((res2 && res2.reason) ? "领取失败：" + res2.reason : "领取失败");
+              }
+            });
+          }, false);
+          c.appendChild(btn);
+        }
+        c.addEventListener("click", function () {
+          $("#ach-note").innerHTML = "<b>" + r.label + "</b>（" + r.cat + "）：" + r.desc +
+            " · 奖励 +" + fmt(r.reward) + " CBY · " +
+            (r.claimed ? "已领取" : (r.done ? "可领取" : "进度 " + fmt(r.cur) + " / " + fmt(r.goal)));
+        }, false);
+        box.appendChild(c);
+      })(rows[i2]);
+    }
+  };
+  if (!useBridge) {
+    paint(AC.evalAll(achStats()));
+    return;
+  }
+  Bridge.call("shell-stats", null, function (ok3, st3) {
+    paint(AC.evalAll(ok3 && st3 ? st3 : achStats()));
+  });
+}
+
+/* ============================================================
+   官阶图鉴（§G.7）
+   ============================================================ */
+var DIRS = ["东", "南", "西", "北"];
+var PRE = ["平", "安", "镇", "征"];
+function renderCatalog() {
+  var box = $("#rank-catalog");
+  box.innerHTML = "";
+  var ranks = (State.ranks && State.ranks.ranks) || [];
+  var cur = (State.snap && State.snap.rank && State.snap.rank.rank) || 0;
+  /* 按段分组（每段 10 阶） */
+  for (var s = 0; s < 5; s++) {
+    var blk = el("div", "segblock");
+    var hd = el("div", "seghd");
+    var segInfo = segOfRank(s * 10 + 1);
+    var dot = el("i"); dot.style.background = segColor(segInfo.color);
+    hd.appendChild(dot);
+    hd.appendChild(el("span", "", "第 " + (s + 1) + " 段「" + segInfo.name + "」（第 " + segInfo.from + "–" + (segInfo.to >= 50 ? 50 : segInfo.to) + " 阶）"));
+    blk.appendChild(hd);
+    var grid = el("div", "rgrid");
+    for (var i = s * 10 + 1; i <= s * 10 + 10 && i <= 50; i++) {
+      (function (lv) {
+        var rec = null;
+        for (var j = 0; j < ranks.length; j++) if (ranks[j].rank === lv) { rec = ranks[j]; break; }
+        var cell = el("div", "rcell" + (lv < cur ? " past" : lv === cur ? " cur" : ""));
+        var rb = el("div", "rb");
+        rb.innerHTML = (State.badges && State.badges[lv]) ? State.badges[lv] : fallbackBadge(lv, segColor(segOfRank(lv).color));
+        cell.appendChild(rb);
+        cell.appendChild(el("div", "rn", (rec && rec.name) || ("第 " + lv + " 阶")));
+        cell.appendChild(el("div", "rm", fmt((rec && rec.merit) || 0)));
+        cell.addEventListener("click", function () { showRankModal(lv, rec); }, false);
+        grid.appendChild(cell);
+      })(i);
+    }
+    blk.appendChild(grid);
+    box.appendChild(blk);
+  }
+}
+function renderMatrix() {
+  var box = $("#rank-matrix");
+  box.innerHTML = "";
+  var ranks = (State.ranks && State.ranks.ranks) || [];
+  var cur = (State.snap && State.snap.rank && State.snap.rank.rank) || 0;
+  var curName = "";
+  for (var i = 0; i < ranks.length; i++) if (ranks[i].rank === cur) curName = ranks[i].name || "";
+  for (var p = 0; p < PRE.length; p++) {
+    for (var d = 0; d < DIRS.length; d++) {
+      (function (pre, dir) {
+        var nm = pre + dir;
+        var cell = el("div", "mx" + (curName === nm ? " cur" : ""));
+        cell.appendChild(el("div", "mn", nm));
+        cell.addEventListener("click", function () {
+          var rec = null;
+          for (var k = 0; k < ranks.length; k++) if (ranks[k].name === nm) { rec = ranks[k]; break; }
+          showRankModal(rec ? rec.rank : 0, rec);
+        }, false);
+        box.appendChild(cell);
+      })(PRE[p], DIRS[d]);
+    }
+  }
+}
+function showRankModal(lv, rec) {
+  var seg = segOfRank(lv);
+  $("#md-badge").innerHTML = (State.badges && State.badges[lv]) ? State.badges[lv] : fallbackBadge(lv, segColor(seg.color));
+  $("#md-name").textContent = (rec && rec.name) || ("第 " + lv + " 阶");
+  var merit = (State.snap && State.snap.rank && State.snap.rank.merit) || 0;
+  var need = Math.max(0, ((rec && rec.merit) || 0) - merit);
+  var p = perksOf(lv);
+  var curRank = (State.snap && State.snap.rank ? State.snap.rank.rank : 0);
+  $("#md-info").innerHTML =
+    "所在段 <b>" + seg.name + "</b>（第 " + seg.from + "–" + (seg.to >= 50 ? 50 : seg.to) + " 阶）<br>" +
+    "功勋门槛 <b>" + fmt((rec && rec.merit) || 0) + "</b><br>" +
+    (lv <= curRank ? "已达成" : "还差 <b>" + fmt(need) + "</b> 功勋") + "<br>" +
+    "解锁带入档位 " + p.stakes.map(function (v) { return fmt(v); }).join(" / ") + "<br>" +
+    "门票折扣 <b>" + Math.round((p.discount || 0) * 100) + "%</b>（真实生效）<br>" +
+    "签到加成 <b>+" + fmt(p.sign || 0) + "</b> CBY";
+  $("#modal").className = "on";
+}
+
+/* ============================================================
+   排行
+   ============================================================ */
+function renderBoard() {
+  renderNarrative();
+  var ai = (State.world && State.world.ai) || [];
+  fillBoard("#bd-fund", ai.slice().sort(function (a, b) { return (b.fund || 0) - (a.fund || 0); }),
+    function (a) { return fmt(a.fund); }, function (a) { return a.tierName || ""; });
+  fillBoard("#bd-skill", ai.slice().sort(function (a, b) { return (b.skill || 0) - (a.skill || 0); }),
+    function (a) { return (a.skill || 0).toFixed(3); }, function (a) { return a.personaName || ""; });
+  fillBoard("#bd-win", ai.slice().filter(function (a) { return (a.hands || 0) >= 5; }).sort(function (a, b) {
+    var wa = a.hands ? a.wins / a.hands : 0, wb = b.hands ? b.wins / b.hands : 0;
+    return wb - wa;
+  }), function (a) { return a.hands ? Math.round(a.wins / a.hands * 100) + "%" : "—"; },
+    function (a) { return a.hands + " 手"; });
+  fillBoard("#bd-pot", ai.slice().sort(function (a, b) { return (b.biggestPot || 0) - (a.biggestPot || 0); }),
+    function (a) { return fmt(a.biggestPot || 0); }, function (a) { return a.bestStreak ? ("连胜 " + a.bestStreak) : ""; });
+  fillBoard("#bd-out", ai.slice().filter(function (a) { return a.retired; }),
+    function (a) { return fmt(a.fund); }, function () { return "已退隐"; });
+  var note = $("#bd-note");
+  if (note && State.world && State.world.ai) {
+    /* 【2026-10-02 文案修复】原先这段是「未加载时显示 36 名」的兜底文案：
+       HTML 里硬编码了 36（旧版名册规模），实际名册自 2026-10-01 起由
+       character/index.js 全表派生（当前 97 人，见 csh_world.js 的 TIER_COUNTS
+       8+18+41+30）。硬编码的数字在名册扩容后必然过期，所以：
+       · HTML 里不再写死人数（改成不含量纲的说明文字）；
+       · 加载完成后由这里统一覆盖为真实值，数字永远跟着 world.ai 走。
+       （顺带删掉原先未被使用的 var w = State.snapshotWorld。） */
+    /* 【2026-10-03】按 README §二十六（玩家可见文案规范）改口径：
+       原句「1.000 = 世界最强，越有钱越强，但穷牌手永不降智」是**设计说明**，
+       只留量纲（满分 1.000）。"越有钱越强 / 穷牌手不降智" 的机制解释放这里，
+       不进玩家文案。 */
+    note.textContent = "AI 世界档案 " + ai.length + " 名 · 资金 " + fmt(minFund(ai)) + " ~ " + fmt(maxFund(ai)) +
+      " · 牌技上限 " + (maxSkill(ai)).toFixed(3) + "（满分 1.000）";
+  }
+}
+/* ============================================================
+   世界动态（流言）/ 世界之最（2026-10-03 新增）
+   ------------------------------------------------------------
+   数据全部是**只读派生**：world.news() 把世界事件环渲染成人话（措辞在 csh_world 里
+   按事件稳定选中，所以同一条事每次读到的说法一致）；worldStory/stats 是聚合值。
+   渲染纪律：整句走 textContent / 文本节点，只有**名册里的名字**用真 <b> 元素高亮 ——
+   不拼 innerHTML，等于不给自己留注入后门（README §30.3）。
+   ============================================================ */
+function boldNamesInto(node, text, names) {
+  var rest = String(text == null ? "" : text), guard = 0;
+  while (rest && guard++ < 40) {
+    var hit = null, at = -1;
+    for (var i = 0; i < names.length; i++) {
+      var p = rest.indexOf(names[i]);
+      if (p >= 0 && (at < 0 || p < at)) { at = p; hit = names[i]; }
+    }
+    if (at < 0) break;
+    if (at > 0) node.appendChild(document.createTextNode(rest.slice(0, at)));
+    var b = document.createElement("b");
+    b.textContent = hit;
+    node.appendChild(b);
+    rest = rest.slice(at + hit.length);
+  }
+  if (rest) node.appendChild(document.createTextNode(rest));
+}
+function renderNarrative() {
+  var w = State.world || {};
+  var names = ((w.ai || []).map(function (a) { return a.name; })).filter(Boolean);
+  names.sort(function (a, b) { return b.length - a.length; });   /* 长名优先，避免被短名截断 */
+  var news = Array.isArray(w.news) ? w.news : [];
+  var box = $("#bd-news");
+  if (box) {
+    box.innerHTML = "";
+    if (!news.length) {
+      box.appendChild(el("div", "fi", "牌桌上最近很安静 —— 没什么值得说的。"));
+    } else {
+      news.forEach(function (n) {
+        var row = el("div", "fi");
+        row.appendChild(el("span", "fw", n.when || ""));
+        var ft = el("span", "ft");
+        boldNamesInto(ft, n.text || "", names);
+        row.appendChild(ft);
+        box.appendChild(row);
+      });
+    }
+  }
+  var most = $("#bd-most");
+  if (most) {
+    most.innerHTML = "";
+    var st = w.story || {}, ws = w.stats || {};
+    function rowOf(k, fn) {
+      var v = fn();
+      if (!v) return;
+      var r = el("div", "wi");
+      r.appendChild(el("span", "wk", k));
+      var t = el("span", "");
+      boldNamesInto(t, v, names);
+      r.appendChild(t);
+      most.appendChild(r);
+    }
+    rowOf("手气最热", function () {
+      var h = st.hottest; if (!h) return "";
+      return h.name + (h.rival ? "，正和 " + h.rival + " 较劲" : "");
+    });
+    rowOf("心态最崩", function () { return st.coldest ? st.coldest.name : ""; });
+    rowOf("最老练", function () {
+      var m = st.mostExperienced; if (!m) return "";
+      return m.name + "（经验 " + Math.round(m.skillPlay || 0) + "）";
+    });
+    rowOf("最容易上头", function () { return st.mostTilted ? st.mostTilted.name : ""; });
+    rowOf("最长连胜", function () {
+      if (!st.longestStreak) return "";
+      return st.longestStreak + " 局 —— " + (st.longestStreakBy || "？");
+    });
+    rowOf("最高单局", function () {
+      if (!st.bestPot) return "";
+      return fmt(st.bestPot) + " —— " + (st.bestPotBy || "？");
+    });
+    rowOf("打过的局数", function () {
+      return st.matches ? fmt(st.matches) + " 局 · 在场 " + Math.max(0, (ws.chars || 0) - (ws.retired || 0)) + " 人" : "";
+    });
+  }
+}
+function minFund(ai) { var m = Infinity; for (var i = 0; i < ai.length; i++) if ((ai[i].fund || 0) < m) m = ai[i].fund || 0; return m === Infinity ? 0 : m; }
+function maxFund(ai) { var m = 0; for (var i = 0; i < ai.length; i++) if ((ai[i].fund || 0) > m) m = ai[i].fund || 0; return m; }
+function maxSkill(ai) { var m = 0; for (var i = 0; i < ai.length; i++) if ((ai[i].skill || 0) > m) m = ai[i].skill || 0; return m; }
+function fillBoard(sel, arr, valFn, subFn) {
+  var box = $(sel);
+  if (!box) return;
+  box.innerHTML = "";
+  if (!arr.length) { box.appendChild(el("div", "diffbox", "暂无数据")); return; }
+  for (var i = 0; i < Math.min(arr.length, 10); i++) {
+    var a = arr[i];
+    var row = el("div", "row");
+    row.appendChild(el("div", "pvp", "第" + (i + 1)));
+    /* ★ 2026-09-29 修复：此前把 <span …> 拼进 textContent，
+       排行榜整列显示 HTML 源码（用户截图实锤）。改为真元素节点。 */
+    var nm = el("div", "nm");
+    /* 【2026-10-01 修复】name 语义就是全名（旧 36 人「荀伯玉」/ 97 人「张飞」皆全名），
+       surname 是头像用单字。此前 surname+name 拼接 → 「张张飞」「彬彬」（用户截图实锤）。 */
+    nm.appendChild(document.createTextNode((a.name || "") + (a.retired ? " · 已退隐" : "")));
+    if (subFn) {
+      var sp = document.createElement("span");
+      sp.style.color = "var(--text-dim)";
+      sp.style.fontSize = "11px";
+      sp.style.marginLeft = "6px";
+      sp.textContent = subFn(a);
+      nm.appendChild(sp);
+    }
+    row.appendChild(nm);
+    row.appendChild(el("div", "vl", valFn(a)));
+    box.appendChild(row);
+  }
+}
+
+/* ============================================================
+   数据迁移（§J.5）
+   ============================================================ */
+function bindMigrate() {
+  $("#mig-export").addEventListener("click", function () {
+    Bridge.call("shell-mig-export", null, function (ok, data) {
+      if (ok && data && data.code) {
+        $("#mig-panel").style.display = "block";
+        $("#mig-text").value = data.code;
+        $("#mig-text").select();
+        $("#mig-diff").innerHTML = "已生成存档串（已全选，可复制或粘贴保存）。";
+      } else {
+        $("#mig-info").textContent = "导出失败：迁移模块未加载。";
+      }
+    });
+  }, false);
+  $("#mig-import").addEventListener("click", function () {
+    $("#mig-panel").style.display = "block";
+    $("#mig-bkpanel").style.display = "none";
+    $("#mig-text").value = "";
+    $("#mig-text").focus();
+    $("#mig-diff").textContent = "把存档串粘贴到上方，然后点「读取并确认覆盖」。";
+  }, false);
+  $("#mig-close").addEventListener("click", function () { $("#mig-panel").style.display = "none"; }, false);
+  $("#mig-apply").addEventListener("click", function () {
+    var code = $("#mig-text").value.trim();
+    if (!code) { $("#mig-diff").textContent = "内容为空。"; return; }
+    /* 先 dryRun 拿差异 */
+    Bridge.call("shell-mig-import", { code: code, dryRun: true }, function (ok, r) {
+      if (!ok || !r.ok) { $("#mig-diff").innerHTML = '<span style="color:var(--warn)">' + ((r && r.err) || "解析失败") + "</span>"; return; }
+      var d = r.diff || {};
+      var txt = "将覆盖当前生涯：<br>池子币 " + fmt(d.pc.from) + " → " + fmt(d.pc.to) +
+        "<br>官阶 " + d.rank.from + " → " + d.rank.to + "<br>确认覆盖？";
+      $("#mig-diff").innerHTML = txt;
+      if (!window.confirm("将覆盖当前生涯，确认？\n池子币 " + fmt(d.pc.from) + " → " + fmt(d.pc.to))) return;
+      Bridge.call("shell-mig-import", { code: code }, function (ok2, r2) {
+        if (ok2 && r2.ok) { $("#mig-diff").innerHTML = "已恢复（备份戳 " + r2.backup + "）。"; reloadAll(); }
+        else $("#mig-diff").innerHTML = '<span style="color:var(--warn)">导入失败：' + ((r2 && r2.err) || "未知") + "</span>";
+      });
+    });
+  }, false);
+  $("#mig-backups").addEventListener("click", function () {
+    Bridge.call("shell-mig-backups", null, function (ok, list) {
+      var box = $("#mig-bkpanel");
+      box.style.display = "block";
+      box.innerHTML = "";
+      if (!list || !list.length) { box.appendChild(el("div", "diffbox", "暂无备份")); return; }
+      for (var i = 0; i < list.length; i++) {
+        (function (b) {
+          var row = el("div", "row");
+          row.appendChild(el("div", "nm", new Date(b.time).toLocaleString()));
+          row.appendChild(el("div", "vl", fmt(b.pc) + " CBY"));
+          var rb = el("button", "btn ghost", "回滚");
+          rb.style.minHeight = "34px";
+          rb.addEventListener("click", function () {
+            Bridge.call("shell-mig-rollback", { stamp: b.stamp }, function (ok2) {
+              if (ok2) { box.innerHTML = "已回滚。"; reloadAll(); }
+            });
+          }, false);
+          row.appendChild(rb);
+          box.appendChild(row);
+        })(list[i]);
+      }
+    });
+  }, false);
+  $("#md-close").addEventListener("click", function () { $("#modal").className = ""; }, false);
+
+  /* 重置存档：清空全部进度，回到出厂初始态（2000 CBY / 平民）。
+     二次确认 + 清空后刷新整个客户端（各模块用默认值重新初始化）。 */
+  $("#mig-reset").addEventListener("click", function () {
+    var msg = "确定要「重置存档」吗？将清空以下全部数据：\n\n" +
+      "· 池子币（CBY）余额 → 回到 2000\n" +
+      "· 官阶功勋 → 回到「平民」0 功勋\n" +
+      "· 签到 / 每日任务 / 成就进度\n" +
+      "· 各游戏最佳纪录 / 胜负统计\n" +
+      /* 人数不写死：名册由武将表派生（当前 97 人），硬编码会在扩容后过期 */
+      "· AI 世界（" + (((State.world && State.world.ai) || []).length || "全部") + " 名角色的资金与战绩）\n" +
+      "· CDK 兑换记录（已兑换的码会失效，请自行保存）\n\n" +
+      "重置后游戏会自动刷新，此操作不可撤销。";
+    if (!window.confirm(msg)) return;
+    if (!window.confirm("再次确认：真的要推倒重来，回到全新初始状态吗？")) return;
+    Bridge.call("shell-mig-reset", null, function (ok, r) {
+      if (ok && r && r.ok) {
+        try { toast("存档已重置，正在刷新…"); } catch (e) {}
+        setTimeout(function () {
+          try { window.parent.location.reload(); }
+          catch (e) { try { location.reload(); } catch (e2) {} }
+        }, 600);
+      } else {
+        toast("重置失败：" + ((r && r.err) || "未知错误"));
+      }
+    });
+  }, false);
+}
+
+/* ============================================================
+   数据加载
+   ============================================================ */
+/* 2026-09-28 韧性修复：真机上出现过总览整页「—」（shell-wallet 应答未回，
+   原因复现不出来但探针证明本页桥逻辑正常）。现在三层保障：
+   ① 桥应答；② 应答超时 → 1.2s 后重试一次；
+   ③ 仍失败 → file:// 同源直读父窗 lib.cshWallet/lib.cshShell 组快照。
+   三层任一成功即渲染，总览不再空荡。 */
+function fallbackSnap() {
+  var snap = null;
+  try {
+    var P = window.parent, L = P && P.lib;
+    if (L && L.cshWallet) {
+      var W = L.cshWallet;
+      var g = W.wallet.get();
+      var r = W.rank ? W.rank.get() : null;
+      snap = {
+        pc: g.pc || 0, pcPeak: g.pcPeak || 0, streak: g.streak || 0, signedToday: !!g.signedToday,
+        rank: r ? { rank: r.rank, merit: r.merit, meritToday: r.meritToday, softCap: r.softCap, seg: r.seg } : { rank: 0, merit: 0 },
+        buyIn: 0, key: "career", ticket: 0,
+        tiers: (W.tiers ? W.tiers() : [200, 2000, 20000, 200000]),
+      };
+      try { if (W.task && W.task.state) snap.tasks = W.task.state(); } catch (eT) {}
+      try { if (L.cshWorld && L.cshWorld.stats) snap.world = L.cshWorld.stats(); } catch (eW) {}
+      /* 游戏目录也一并兜底：同源直读父窗 registry，避免桥应答丢失时快捷开局区空荡。
+         ★ 修 bug：此前循环内 `var g = M[...]` 遮蔽了外层的钱包对象 g，
+         导致 `afford: (g.pc||0) >= need` 恒取 undefined→0，所有游戏都被判为「不可负担」。
+         同时门票门槛此前硬编码 [200,2000,...]，现改从钱包真实档位/已解锁档位取。 */
+      try {
+        var R = P.CSH && P.CSH.registry;
+        if (R) {
+          var M = (L.cshShell && L.cshShell.META) || {};
+          var pcNow = (typeof W.wallet.pc === "function") ? W.wallet.pc() : (g.pc || 0);
+          var stAll = (W.tiers ? W.tiers() : [200, 2000, 20000, 200000]) || [200, 2000, 20000, 200000];
+          var stMin = stAll[0];
+          try {
+            var unl = (W.rank && W.rank.unlockedStakes) ? W.rank.unlockedStakes() : null;
+            if (unl && unl.length) { stMin = unl[0]; for (var ui = 1; ui < unl.length; ui++) if (unl[ui] < stMin) stMin = unl[ui]; }
+          } catch (eU) {}
+          var ks = R.keys(), gs = [];
+          for (var gi = 0; gi < ks.length; gi++) {
+            var gm = M[ks[gi]];
+            if (!gm) continue;
+            var tk = (L.cshShell && L.cshShell.ticketOf) ? L.cshShell.ticketOf(ks[gi]) : 0;
+            var need = tk + (gm.needBuyIn ? stMin : 0);
+            gs.push({
+              key: ks[gi], title: gm.title, tag: gm.tag || "", desc: gm.desc || "",
+              settle: gm.settle, needBuyIn: !!gm.needBuyIn, ticket: tk,
+              minStake: gm.needBuyIn ? stMin : 0, need: need, afford: pcNow >= need,
+            });
+          }
+          snap.games = gs;
+        }
+      } catch (eG) {}
+    }
+  } catch (e) { snap = null; }
+  return snap;
+}
+function adoptSnap(snap) {
+  State.snap = snap;
+  if (snap && snap.tasks && snap.tasks.defs) {
+    State.tasks = snap.tasks;
+    renderTasksInto($("#ov-tasks"));
+    renderTasksInto($("#tk-list"));
+  }
+  renderOverview();
+  renderAch();          /* 成就墙依赖快照里的实时统计 */
+}
+function loadWalletSnap(round) {
+  round = round || 0;
+  Bridge.call("shell-wallet", null, function (ok, snap) {
+    if (ok && snap) { adoptSnap(snap); return; }
+    if (round === 0) { setTimeout(function () { loadWalletSnap(1); }, 1200); return; }
+    var fb = fallbackSnap();
+    if (fb) adoptSnap(fb);
+  });
+}
+function reloadAll() {
+  loadWalletSnap();
+  loadTasks();
+  /* 游戏目录（快捷开局）向宿主查询：真值链 registry → wallet 门票折扣 → shell → 本页。
+     本页**不再持有任何价格数字**（2026-09-29 架构收敛）。 */
+  Bridge.call("shell-games", null, function (ok, r) {
+    if (ok && r && r.list && r.list.length) { State.games = r.list; renderQuick(); }
+    else {
+      /* 桥失败时用同源直读兜底，绝不让快捷开局区停留在「同步中…」 */
+      var fb = fallbackSnap();
+      if (fb && fb.games) { State.games = fb.games; renderQuick(); }
+    }
+  });
+  Bridge.call("shell-rank-all", null, function (ok, r) {
+    /* ★ 2026-09-29 修复（P0）：allRanks() 真值的字段名是 {lv, merit, name}，
+       而本页 nextThreshold / renderCatalog / renderMatrix 全在找 `.rank`
+       ⇒ 永远找不到，「距下一阶」恒显示兜底值 999,999（用户截图实锤：
+       0 阶 8 功勋却显示"还差 999,991"）、官阶图鉴名称全空。
+       在入口处归一化一次，下游全部照旧。 */
+    if (ok && r) {
+      if (r.ranks && r.ranks.length && r.ranks[0].lv != null && r.ranks[0].rank == null) {
+        for (var i = 0; i < r.ranks.length; i++) r.ranks[i].rank = r.ranks[i].lv;
+      }
+      State.ranks = r; renderCatalog(); renderMatrix(); renderOverview();
+    }
+  });
+  Bridge.call("shell-world", null, function (ok, w) {
+    if (ok && w) { State.world = w; renderBoard(); }
+  });
+  Bridge.call("shell-badge-all", { form: "md" }, function (ok, b) {
+    if (ok && b && b.list) {
+      var map = {};
+      for (var i = 0; i < b.list.length; i++) map[b.list[i].rank] = b.list[i].svg;
+      State.badges = map;
+      renderOverview(); renderCatalog(); renderMatrix();
+    }
+  });
+}
+
+/* ============================================================
+   今日动作（签到 / 救济）—— 全部走统一钱包，同日幂等
+   ============================================================ */
+function bindActions() {
+  var signBtn = $("#ov-sign");
+  if (signBtn) signBtn.addEventListener("click", function () {
+    if (signBtn.disabled) return;
+    Bridge.call("shell-sign", { today: (State.snap && State.snap.rank && State.snap.rank.meritDate) || null }, function (ok, r) {
+      if (ok && r && r.ok) {
+        toast("签到成功 · 连签 " + r.streak + " 天 +" + fmt((r.gained || 0) + (r.bonus || 0)) + " CBY");
+        reloadAll();
+      } else {
+        toast((r && r.reason) ? ("签到失败：" + r.reason) : "今日已签到");
+        loadWalletSnap();
+      }
+    });
+  }, false);
+  var reliefBtn = $("#ov-relief");
+  if (reliefBtn) reliefBtn.addEventListener("click", function () {
+    if (reliefBtn.disabled) return;
+    Bridge.call("shell-relief", null, function (ok, r) {
+      if (ok && r && r.ok) { toast("救济已到账 +" + fmt(r.gained) + " CBY"); reloadAll(); }
+      else toast((r && r.reason) ? r.reason : "暂时无法领取救济");
+    });
+  }, false);
+}
+
+/* ---------- 启动 ---------- */
+bindTabs();
+bindMigrate();
+bindActions();
+renderTasksInto($("#ov-tasks"));
+renderTasksInto($("#tk-list"));
+renderAch();
+if (Bridge.active) {
+  reloadAll();
+} else {
+  var fb0 = fallbackSnap();
+  if (fb0) adoptSnap(fb0);
+}
+})();
+</script>
+</body>
+</html>

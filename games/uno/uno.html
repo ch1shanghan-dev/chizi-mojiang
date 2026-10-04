@@ -1,0 +1,1997 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UNO</title>
+<!-- 统一音效总线（§4.7.1）：唯一一份 Web Audio 合成实现，与主页面/其余 4 款游戏共用。
+     经典脚本同步加载 → 页面内联脚本执行时 window.CSH_SFX 必已就绪（或加载失败）。
+     加载失败也不要紧：SFX 退化成 no-op，游戏照常运行，只是没声音。 -->
+<script src="../../core/csh_sfx.js" data-game="uno"></script>
+<!-- BGM（2026-09-30）：本游戏主题曲，Web Audio 实时合成，零资源体积。 -->
+<script src="../../core/csh_bgm.js" data-game="uno"></script>
+<!-- 纸牌共用视觉层（§4.7.2 ①牌面高光 ②动效曲线 ③底池滚动 ④层级梯 ⑤AI 头像）：
+     零 import，一加载即注入统一样式表；主页面那份由 core/csh_cards.js 提供，这里只服务 iframe。 -->
+<script src="../../core/csh_cards.js"></script>
+<!-- AI 头像生成器（§I.4）：与主页面 csh_badge.js 共用同一份实现，源码只有 core/csh_svggen.js 一份。 -->
+<script src="../../core/csh_svggen.js"></script>
+<!-- 隐藏自检 ?selftest=1（§12#1 不溢出 / #3 触摸目标 / #4 对比度）：
+     data-csh-selftest="auto" 表示「本页是独立文档，DOM 就绪后自动扫 document.body」。 -->
+<script src="../../core/csh_selftest.js" data-csh-selftest="auto"></script>
+<script src="../../core/csh_page.js"></script>
+<!-- 统一布局系统（《UI 布局重构规范 v2.0》§18/§19/§20）：骨架 / 安全区 / 响应式 / Dock / 结算层。
+     放在本页 <style> 之前 —— 本页只写"这游戏长什么样"，不再各自声明尺寸体系。 -->
+<link rel="stylesheet" href="../../core/csh_layout.css">
+<style>
+  /* ============================================================
+     深色墨底 + 描金 · 单机纸牌（UNO 规则）
+     尺寸全部走 clamp(vh)，1280×720 ~ 2560×1440 均可自适应
+     ============================================================ */
+  :root {
+    --ink-0: #0b0a08;
+    --ink-1: #15110c;
+    --ink-2: #1e1811;
+    --gold: #d8b46a;
+    --gold-soft: rgba(216, 180, 106, .55);
+    --gold-line: rgba(216, 180, 106, .28);
+    --gold-fill: rgba(216, 180, 106, .07);
+    --text: #ece5d6;
+    --text-dim: #a2947a;
+    --card-w: clamp(52px, 12.6vh, 104px);    /* 手牌宽（牌高 = 宽 × 1.52，等比；§16 数量 > 单牌尺寸 > 间距） */
+    --pile-w: clamp(72px, min(40vh, 24vw), 200px);  /* 中央牌（牌堆 / 弃牌堆）宽上限；实际尺寸由 fitCenter() 按可用高度定 */
+    --fs-xs: clamp(12px, 1.35vh, 15px);
+    --fs-sm: clamp(13px, 1.5vh, 17px);
+    --fs-md: clamp(15px, 1.75vh, 20px);
+    --fs-lg: clamp(18px, 2.4vh, 34px);
+    --radius: 12px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+  html, body { height: 100%; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+    background: radial-gradient(ellipse at 50% 22%, var(--ink-2) 0%, var(--ink-1) 58%, var(--ink-0) 100%);
+    color: var(--text);
+    overflow: hidden;
+    font-size: var(--fs-sm);
+    user-select: none; -webkit-user-select: none;
+  }
+  .hidden { display: none !important; }
+  button { font-family: inherit; cursor: pointer; border: none; outline: none; color: inherit; }
+  input { font-family: inherit; outline: none; }
+
+  /* ---------- 开关行（音效开关用） ---------- */
+  .switch-row {
+    display: flex; align-items: center; gap: clamp(9px, 1.3vh, 15px); cursor: pointer;
+    background: rgba(0, 0, 0, .3); border: 1px solid var(--gold-line); border-radius: 12px;
+    padding: clamp(9px, 1.3vh, 15px) clamp(12px, 1.6vh, 18px);
+    transition: border-color .16s, background .16s;
+  }
+  .switch-row:hover { border-color: var(--gold-soft); background: rgba(216, 180, 106, .07); }
+  .switch-row.on { border-color: var(--gold-soft); background: rgba(216, 180, 106, .11); }
+  .switch-row input { position: absolute; width: 0; height: 0; opacity: 0; pointer-events: none; }
+  .switch-box {
+    position: relative; flex-shrink: 0; width: clamp(40px, 4.8vh, 54px); height: clamp(22px, 2.7vh, 30px);
+    border-radius: 999px; background: rgba(0, 0, 0, .55); border: 1px solid var(--gold-line);
+    transition: background .18s, border-color .18s;
+  }
+  .switch-box::after {
+    content: ''; position: absolute; top: 50%; left: 2px; transform: translateY(-50%);
+    width: calc(100% / 2.35); height: calc(100% / 2.35); border-radius: 50%;
+    background: #6f6653; transition: left .18s, transform .18s, background .18s;
+  }
+  .switch-row.on .switch-box { background: linear-gradient(180deg, #e8cd8c, #c9a457); border-color: #f4dfa8; }
+  .switch-row.on .switch-box::after { left: calc(100% - 2px); transform: translate(-100%, -50%); background: #241c10; }
+  .switch-row input:focus-visible + .switch-box { box-shadow: 0 0 0 2px rgba(216, 180, 106, .32); }
+  .switch-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+  .switch-text b { font-size: var(--fs-sm); font-weight: 700; color: var(--text); }
+  .switch-row.on .switch-text b { color: #f4dfa8; }
+  .switch-text em { font-style: normal; font-size: var(--fs-xs); color: var(--text-dim); line-height: 1.5; }
+
+  /* ---------- 通用 ---------- */
+  .view { position: absolute; inset: 0; display: flex; flex-direction: column; overflow: hidden; }
+  .btn {
+    padding: clamp(8px, 1.2vh, 14px) clamp(18px, 2.4vh, 30px);
+    border-radius: var(--radius); font-size: var(--fs-md); font-weight: 700; letter-spacing: .5px;
+    background: linear-gradient(180deg, #e8cd8c, #c9a457); color: #241c10;
+    box-shadow: 0 3px 0 #6d5a30; transition: transform .08s;
+  }
+  .btn:active { transform: translateY(2px); box-shadow: 0 1px 0 #6d5a30; }
+  .btn:disabled { background: #3a3428; color: #7d7360; box-shadow: none; cursor: default; }
+  .btn.ghost {
+    background: var(--gold-fill); color: var(--gold); border: 1px solid var(--gold-line);
+    box-shadow: none;
+  }
+  .btn.ghost:hover { border-color: var(--gold); color: #f0dfae; }
+  .btn.warn {
+    background: linear-gradient(180deg, #b4553f, #8c3b2a); color: #ffe9e0; box-shadow: 0 3px 0 #5c2519;
+  }
+  .btn.small { padding: clamp(5px, .8vh, 9px) clamp(12px, 1.6vh, 18px); font-size: var(--fs-sm); }
+
+  /* ---------- 开局视图 ---------- */
+  #view-start { align-items: center; justify-content: center; padding: 4vh 20px; }
+  .start-card {
+    width: min(440px, 90%); display: flex; flex-direction: column; gap: clamp(12px, 2vh, 24px);
+    background: linear-gradient(180deg, rgba(216, 180, 106, .08), rgba(216, 180, 106, .02));
+    border: 1px solid var(--gold-line); border-radius: 20px;
+    padding: clamp(20px, 3.4vh, 40px) clamp(20px, 3vh, 36px);
+    box-shadow: 0 24px 60px rgba(0, 0, 0, .6), inset 0 1px 0 rgba(216, 180, 106, .16);
+  }
+  .title {
+    font-size: var(--fs-lg); font-weight: 900; letter-spacing: 3px; text-align: center;
+    color: var(--gold); text-shadow: 0 2px 12px rgba(216, 180, 106, .28);
+  }
+  .subtitle { text-align: center; font-size: var(--fs-sm); color: var(--text-dim); margin-top: calc(-1 * clamp(6px, 1vh, 14px)); }
+  .field { display: flex; flex-direction: column; gap: clamp(6px, .9vh, 10px); }
+  .field label { font-size: var(--fs-xs); color: var(--text-dim); letter-spacing: 1px; }
+  .field input {
+    background: rgba(0, 0, 0, .42); border: 1px solid var(--gold-line); border-radius: 10px;
+    color: var(--text); font-size: var(--fs-md); padding: clamp(9px, 1.2vh, 14px) clamp(12px, 1.5vh, 16px);
+    width: 100%;
+  }
+  .field input:focus { border-color: var(--gold); box-shadow: 0 0 0 2px rgba(216, 180, 106, .16); }
+  .seg { display: flex; gap: clamp(6px, .9vh, 10px); }
+  .seg-btn {
+    flex: 1; padding: clamp(8px, 1.1vh, 12px) 0; border-radius: 10px; font-size: var(--fs-sm); font-weight: 700;
+    background: rgba(0, 0, 0, .32); border: 1px solid var(--gold-line); color: var(--text-dim);
+  }
+  .seg-btn.active { background: var(--gold-fill); border-color: var(--gold); color: var(--gold); }
+  .tip { font-size: var(--fs-xs); color: var(--text-dim); text-align: center; line-height: 1.7; }
+
+  /* ============================================================
+     对局页 · 骨架内的 UNO 专属样式（2026-10-03 重构，规范 §11）
+     ------------------------------------------------------------
+     骨架（topbar / stage / hudrow / board / seats / center / player / dock）
+     全部来自 core/csh_layout.css，这里**只写 UNO 自己的东西**：
+       · 对手行（头像 + 名字 + 手牌数量）
+       · 中心牌区（牌堆 / 弃牌堆 / 颜色环 / 当前规则与方向）
+       · CSS 画牌（与德州同一套做法：尺寸统一由局部 --cw 派生）
+       · 手牌扇（单行不换行：先缩牌宽、再重叠，规范 §16）
+     原五段式对局页（.top-bar / .table / .actions / .turn-banner / .hand-area）
+     已删除：每一段各自带 min-height，矮屏下把中央牌区挤到不足一半高（§11 点名的问题）。
+     ============================================================ */
+
+  /* ---------- 对局页根 ----------
+     ⚠ 覆盖顺序陷阱：本页 <style> 在 core/csh_layout.css **之后**加载，同权重时本页胜出；
+     而 .view（本页）写着 display:flex，会把骨架 .csh-game 的 display:grid 压掉 ——
+     那样 topbar / stage / dock 三段行高全部失效。用 ID 选择器显式声明 grid，
+     行高仍由 .csh-game 提供（与德州 / 斗地主完全同一处坑）。 */
+  #view-game { display: grid; overflow: hidden; }
+
+  /* ---------- 主战区：两行 grid（对手行 | 中心牌区） ----------
+     骨架给的 .csh-seats 是"覆盖整块主战区的绝对层"，那是德州左右座位的用法；
+     UNO 的对手信息是**一行手牌数量**，横排贴在中央牌区之上（§11 的顺序：玩家状态 →
+     对手手牌数量 → 当前牌 → 当前规则 / 方向 → 我的手牌）。
+     所以这里把主战区改成两行 grid：第一行对手、第二行中心牌区 —— 空间由 grid 分配，
+     中心牌区与对手行**几何上不可能重叠**（§6），不再靠 z-index 与 top:% 事后补救。 */
+  #view-game .csh-board {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: clamp(2px, .7vh, 8px);
+    padding: clamp(2px, .5vh, 6px) var(--game-pad);
+  }
+  #view-game .csh-seats {
+    position: relative; inset: auto;
+    display: flex; align-items: stretch; justify-content: center;
+    gap: var(--gap-sm); flex-wrap: nowrap; min-width: 0;
+  }
+  /* 中心牌区改由 grid 第二行承载：只清掉骨架给的绝对定位（保留其 z-index 与居中）。 */
+  #view-game .csh-center {
+    position: relative; left: auto; top: auto; transform: none;
+    gap: clamp(2px, .7vh, 8px);
+    max-width: 100%;
+  }
+  /* 上一步战况已并入 .info-bar（顶部清零，2026-10-03）；这里只留单行省略约束 */
+
+  /* ---------- ① 对手行：头像 + 名字 + 手牌数量（一行横排，不换行） ---------- */
+  .opp {
+    display: flex; align-items: center; gap: clamp(3px, .6vh, 7px);
+    min-width: 0; max-width: 30%; flex: 0 1 auto;
+    padding: clamp(2px, .5vh, 7px) clamp(7px, 1.1vh, 14px);
+    border-radius: 10px; position: relative;
+    background: var(--gold-fill); border: 1px solid transparent;
+  }
+  .opp.turn { border-color: var(--gold); box-shadow: 0 0 14px rgba(216, 180, 106, .32); animation: breathe 1.2s ease-in-out infinite; }
+  .opp.bot { border-style: dashed; border-color: rgba(150, 120, 190, .5); }
+  .opp.bot .oname { color: #cbbdf0; }
+  .opp.offline { opacity: .45; }
+  @keyframes breathe { 50% { box-shadow: 0 0 26px rgba(216, 180, 106, .6); } }
+  .opp .oname { font-size: var(--fs-sm); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .opp .ocount { font-size: var(--fs-xs); color: var(--text-dim); white-space: nowrap; }
+  .opp .ocount b { color: var(--gold); font-size: var(--fs-sm); font-variant-numeric: tabular-nums; }
+  .opp .crown { position: absolute; top: -7px; left: -5px; font-size: var(--fs-xs); }
+  .opp .out { position: absolute; top: -7px; right: -4px; font-size: var(--fs-xs); background: #4a4336; border-radius: 8px; padding: 0 5px; }
+  .uno-flag {
+    background: #b02a2a; color: #fff; font-size: var(--fs-xs); font-weight: 900;
+    padding: 0 6px; border-radius: 8px; white-space: nowrap; animation: breathe 1s infinite;
+  }
+
+  /* ---------- ② 中心牌区：牌堆（摸牌） + 弃牌堆（当前牌） ---------- */
+  /* .table 吃掉中心牌区的全部余量 —— 方向胶囊因此被钉在中心牌区底部、紧邻我的手牌（§11 的顺序）。 */
+  .table { flex: 1 1 auto; min-height: 0; display: flex; align-items: center; justify-content: center; gap: clamp(14px, 3.6vh, 54px); min-width: 0; }
+  /* 牌堆 / 弃牌堆：尺寸由 fitCenter() 把中心牌区的可用高度读出来写成 --pw（保底 = :root 的 --pile-w）。
+     不写死 clamp(…vh) 的原因：中心牌区高度 = 舞台高 − 顶栏 − 对手行 − 手牌区，
+     这几项各自的比例随视口高度变化（矮屏时手牌占比大得多），纯 vh 的 clamp 在 915×412
+     会留下大片空白、在 800×400 又会顶穿；改成「读一次可用高度 → 写一个 px」之后，
+     中央牌在任何尺寸都恰好填满中心牌区（§17：空白要还给牌，不是留给外边距）。 */
+  .pile, .discard {
+    --pw: var(--pile-w);
+    width: var(--pw); height: calc(var(--pw) * 1.52);
+    border-radius: min(var(--radius), calc(var(--pw) * .16));
+    flex-shrink: 0; position: relative;
+  }
+  .pile {
+    background: linear-gradient(135deg, #17120c, #241d13);
+    border: 2px dashed var(--gold-line);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; cursor: pointer;
+  }
+  .pile:active { transform: scale(.97); }
+  .pile .uno-logo { font-size: calc(var(--pw) * .32); font-weight: 900; color: var(--gold); letter-spacing: 1px; }
+  .pile .deckn { font-size: clamp(9px, calc(var(--pw) * .19), 15px); color: var(--text-dim); white-space: nowrap; }
+  .pile.can { border-color: var(--gold); border-style: solid; box-shadow: 0 0 18px rgba(216, 180, 106, .5); animation: breathe 1.2s infinite; }
+  .discard { background: rgba(216, 180, 106, .04); border: 1px solid var(--gold-line); }
+  .discard .ghost-card { position: absolute; opacity: .5; }
+  /* 弃牌堆的顶牌与底牌：与牌堆同尺寸（--cw 取 --pw，而不是手牌宽） */
+  .discard .card { --cw: var(--pw); }
+  .color-ring {
+    position: absolute; top: calc(var(--pw) * -.14); left: 50%; transform: translateX(-50%);
+    width: calc(var(--pw) * .26); height: calc(var(--pw) * .26); border-radius: 50%;
+    border: 3px solid rgba(255, 255, 255, .85); box-shadow: 0 0 10px rgba(0, 0, 0, .7);
+  }
+
+  /* ---------- ③ 当前规则 / 方向（挂在中心牌区之下，不另占一整条高度带） ---------- */
+  .info-bar { display: flex; align-items: center; justify-content: center; gap: var(--gap-sm); min-width: 0; }
+  .direction-ind {
+    font-size: var(--fs-sm); font-weight: 800; color: var(--gold);
+    display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;
+    padding: 1px 10px; border-radius: 999px;
+    border: 1px solid var(--gold-line); background: rgba(216, 180, 106, .08);
+  }
+  .direction-ind .arrow { display: inline-block; font-size: var(--fs-md); line-height: 1; }
+  .direction-ind.rev { color: #eba7b0; border-color: rgba(214, 110, 124, .5); background: rgba(214, 110, 124, .09); }
+  .direction-ind.rev .arrow { transform: scaleX(-1); }
+
+  /* ---------- 卡牌（纯 DOM + CSS 画牌，无图片、无外链） ----------
+     尺寸统一从局部 --cw 派生（默认继承 --card-w）：手牌扇要按数量缩牌宽时，
+     只需把 --cw 调小，点数 / 角标 / 圆角 / 描边会等比跟着缩 —— 与德州 .pcard 同一套做法。
+     配色、斜高光、四色与万能牌的黑底渐变全部保持原样（CSS 画牌方案不变）。 */
+  .card {
+    --cw: var(--card-w);
+    width: var(--cw); height: calc(var(--cw) * 1.52);
+    border-radius: min(var(--radius), calc(var(--cw) * .2)); position: relative;
+    background: #333; border: max(1px, calc(var(--cw) * .045)) solid #f3ece0;
+    box-shadow: 0 5px 14px rgba(0, 0, 0, .55);
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    transition: transform .12s; overflow: hidden;
+  }
+  .card::before {
+    content: ""; position: absolute; width: 78%; height: 150%;
+    background: rgba(255, 255, 255, .22); border-radius: 50%; transform: rotate(-28deg);
+    left: 11%; top: -25%;
+  }
+  .card .big {
+    position: relative; font-size: calc(var(--cw) * .55); font-weight: 900; color: #fff;
+    text-shadow: 2px 2px 0 rgba(0, 0, 0, .4); line-height: 1;
+  }
+  .card .corner {
+    position: absolute; top: 5%; left: 8%; font-size: calc(var(--cw) * .18); font-weight: 900; color: #fff;
+    text-shadow: 1px 1px 0 rgba(0, 0, 0, .5);
+  }
+  .card .corner.b { top: auto; left: auto; bottom: 5%; right: 8%; transform: rotate(180deg); }
+  .card.c-red { background: #c62828; } .card.c-yellow { background: #e0a80d; }
+  .card.c-green { background: #27884a; } .card.c-blue { background: #2a6fd6; }
+  .card.c-black { background: conic-gradient(#c62828 0 25%, #e0a80d 0 50%, #27884a 0 75%, #2a6fd6 0 100%); }
+  .card.c-black .big, .card.c-black .corner { text-shadow: 0 0 6px #000, 2px 2px 2px #000; }
+
+  /* ---------- ④ 玩家区：我的手牌（单行绝不换行，§16） ----------
+     flex-wrap:nowrap + overflow:hidden；牌多时**先缩牌宽**（fitHand 写 --hw），
+     仍放不下才由 fitHand 加重叠（--ov）—— 没有第二行、没有纵向滚动、也没有横向滚动条。 */
+  #view-game .csh-player { position: relative; }
+  .hand {
+    display: flex; align-items: flex-end; justify-content: center;
+    flex: 1 1 auto; min-width: 0;
+    flex-wrap: nowrap; overflow: hidden; gap: 0;
+    padding: clamp(8px, 2vh, 18px) 4px 2px;   /* 上方留给"可出的牌抬起" */
+  }
+  #hand .card { --cw: var(--hw, calc(var(--card-w) * .86)); }
+  #hand .card + .card { margin-left: var(--ov, 0px); }
+  #hand .card.playable { cursor: pointer; }
+  #hand .card.playable:hover, #hand .card.playable:active { transform: translateY(-12px); }
+  #hand .card.dim { filter: brightness(.5) saturate(.4); }
+
+  /* ---------- ⑤ Dock：只放当前合法操作（§21） ---------- */
+  .btn-uno {
+    padding: clamp(7px, 1vh, 13px) clamp(18px, 2.4vh, 30px); border-radius: 13px;
+    font-size: var(--fs-md); font-weight: 900; letter-spacing: 1px;
+    background: radial-gradient(circle at 35% 30%, #e05c4a, #a02318); color: #fff; box-shadow: 0 4px 0 #641410;
+  }
+  .btn-uno.ready { animation: unoPulse .7s infinite; }
+  .btn-uno.done { opacity: .45; }
+  .btn-uno.ghost {
+    background: transparent; color: var(--gold); box-shadow: none;
+    border: 1px solid var(--gold-line);
+    font-size: var(--fs-sm); font-weight: 700; letter-spacing: 2px;
+    padding: clamp(6px, 1vh, 12px) clamp(14px, 2vh, 24px); border-radius: 12px;
+  }
+  .btn-uno.ghost:hover { border-color: var(--gold); color: #f0dfae; }
+  .btn-uno.on {
+    background: linear-gradient(180deg, #f6e6b4, #dcb96c); color: #241c10;
+    border: 1px solid var(--gold-hi); box-shadow: 0 0 14px rgba(216, 180, 106, .45);
+  }
+  #btn-auto { min-width: clamp(70px, 9vh, 104px); }
+  @keyframes unoPulse { 50% { transform: scale(1.08); box-shadow: 0 0 22px #ff6b5a; } }
+
+  /* 【2026-10-03 · 顶部清零】回合状态并入台面下方状态行（.info-bar）。
+     「轮到你」是决策必需 —— 放在牌堆正下方，比屏幕右上角更靠近要操作的东西。 */
+  .turn-banner {
+    font-size: var(--fs-sm); color: var(--text-dim);
+    min-width: 0; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .turn-banner.mine { color: var(--gold); font-weight: 700; }
+  /* 手牌数胶囊（含 UNO! 提醒） */
+  .mycount-chip {
+    flex: 0 0 auto; font-size: var(--fs-xs); color: var(--text);
+    padding: 1px 10px; border-radius: 999px; white-space: nowrap;
+    border: 1px solid var(--gold-line); background: rgba(216, 180, 106, .06);
+    font-variant-numeric: tabular-nums;
+  }
+  /* 上一步：极低调的右侧小字（一行省略） */
+  #game-log-line {
+    flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    font-size: var(--fs-xs); color: var(--text-dim); text-align: right;
+  }
+
+  /* ---------- 模态 ---------- */
+  .modal-mask {
+    position: fixed; inset: 0; background: rgba(6, 5, 4, .78); z-index: 50;
+    display: flex; align-items: center; justify-content: center; padding: 20px;
+  }
+  .modal {
+    background: linear-gradient(180deg, #1f1811, #15110c);
+    border: 1px solid var(--gold-line); border-radius: 18px;
+    /* 【2026-09-30】短视口防顶裁（与壳收费卡同款病）：限高 + 卡内自滚 */
+    max-height: 92%; overflow-y: auto; -webkit-overflow-scrolling: touch;
+    padding: clamp(18px, 2.6vh, 32px); width: min(420px, 92%);
+    display: flex; flex-direction: column; gap: clamp(12px, 1.8vh, 20px); align-items: center;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, .75), inset 0 1px 0 rgba(216, 180, 106, .14);
+  }
+  .modal h3 { font-size: var(--fs-md); color: var(--gold); letter-spacing: 1px; }
+  .modal .sub { font-size: var(--fs-sm); color: var(--text-dim); }
+  .modal-row { display: flex; gap: clamp(10px, 1.4vh, 16px); flex-wrap: wrap; justify-content: center; }
+  .color-grid { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(10px, 1.4vh, 16px); width: 100%; }
+  .color-btn {
+    height: clamp(56px, 7.6vh, 92px); border-radius: 14px; font-weight: 900; font-size: var(--fs-md); color: #fff;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, .6); box-shadow: 0 4px 0 rgba(0, 0, 0, .35);
+  }
+  .color-btn:active { transform: translateY(3px); box-shadow: none; }
+  .color-btn.red { background: #c62828; } .color-btn.yellow { background: #e0a80d; }
+  .color-btn.green { background: #27884a; } .color-btn.blue { background: #2a6fd6; }
+  .winner-modal { text-align: center; }
+  .winner-modal .trophy { font-size: clamp(44px, 6.6vh, 76px); }
+  .winner-modal .wname { font-size: var(--fs-lg); font-weight: 900; color: var(--gold); margin: 6px 0 2px; }
+
+  /* ---------- toast（纯浮层，不占布局高度） ----------
+     【2026-10-03 · 顶部清零后】锚点 --game-topbar-h ≈ 40px 恰好落在对手卡行下缘
+     （对手行高度与旧顶栏相当），气泡半透明、2.6s 自散，短暂压暗不遮数据。 */
+  #toasts {
+    position: fixed; top: calc(var(--game-topbar-h) + 3px); left: 50%; transform: translateX(-50%); z-index: 80;
+    display: flex; flex-direction: column; gap: 6px; align-items: center; pointer-events: none;
+    width: max-content; max-width: 56%;
+  }
+  /* 半透明：toast 是浮层（pointer-events:none，2.6s 自散），它落在对手行上方 ——
+     压暗但不清空底下的座位信息，避免瞬时遮住手牌数。 */
+  .toast {
+    background: rgba(21, 17, 12, .86); border: 1px solid var(--gold-line); color: #f0dfae;
+    padding: clamp(5px, .8vh, 10px) clamp(13px, 1.8vh, 20px); border-radius: 20px;
+    font-size: var(--fs-sm); animation: toastIn .25s; box-shadow: 0 6px 18px rgba(0, 0, 0, .55);
+    max-width: 100%; text-align: center;
+  }
+  .toast.fade { opacity: 0; transition: opacity .4s; }
+  @keyframes toastIn { from { transform: translateY(-12px); opacity: 0; } }
+
+  /* ---------- 响应式：只用「方向 + 可用高度」（规范 §19） ----------
+     不再有 `max-width: X = 手机` 这类断点：小游戏跑在横屏 iframe 里，
+     瓶颈从来是高度不是宽度（915×412 有 915px 宽却只有 412px 高）。
+       L-NORMAL  横屏且高 > 430px：PC / 大平板，靠 clamp 上限自然放大，无额外规则
+       L-SHORT   横屏且高 ≤ 430px：手机横屏主场景（915×412 档）
+       L-TINY    横屏且高 ≤ 350px：极矮屏（分屏 / 老旧机型），再砍装饰
+     空间压缩顺序（§7）：先收紧间距与字号 → 再砍次级标签 → 最后才是隐藏内容。 */
+
+  /* L-SHORT：手机横屏主场景 */
+  @media (orientation: landscape) and (max-height: 430px) {
+    :root {
+      --card-w: clamp(44px, 13.4vh, 66px);  /* 手牌宽：矮屏反而要更大 —— 屏幕小，牌得自己抢眼 */
+      --fs-xs: 10px; --fs-sm: 11px; --fs-md: 12.5px; --fs-lg: 15px;
+    }
+    #view-game .csh-board { gap: 3px; }
+    #view-game .opp { padding: 2px 7px; border-radius: 8px; }
+    #view-game .table { gap: clamp(10px, 2.6vw, 24px); }
+    /* 主操作一律 44px：clamp 下限在 400px 高以下会被吸到 20~30px（与德州 / 斗地主同口径） */
+    .btn { min-height: 44px; }
+    .btn.small { min-height: 36px; }
+    .btn-uno { min-height: 44px; }
+    .btn-uno.ghost { min-height: 36px; }
+    /* 开局页「人机数量 1/2/3 个」是入座前必须点的控件，同样守 44px 红线 */
+    .seg-btn { min-height: 44px; padding: 6px 0; }
+    #view-start { padding: 3vh 16px; }
+    .start-card { gap: 10px; padding: 14px 18px; border-radius: 16px; }
+    .start-card > .subtitle { margin-top: 0; }
+  }
+
+  /* L-TINY：极矮屏 —— 再砍装饰，只留操作与主内容（§7 Level 2） */
+  @media (orientation: landscape) and (max-height: 350px) {
+    :root { --card-w: clamp(40px, 12.6vh, 58px); }
+    #view-game .opp .oname { display: none; }       /* 只留头像 + 张数（名字在回合提示里仍有） */
+    #view-game .opp { max-width: 18%; }
+    #view-game .opp .crown { display: none; }
+    .start-card > .subtitle { display: none; }
+  }
+
+  /* 无障碍：系统开启「减少动态效果」时关掉装饰性动效。
+     与德州 / 廿一点口径一致（§4.7.2 ② 引入统一动效后必须成对提供降级；
+     core/csh_cards.js 注入的动效本身已包在 no-preference 里，这里管的是页面自带动效）。 */
+  @media (prefers-reduced-motion: reduce) {
+    .opp.turn, .uno-flag, .pile.can, .btn-uno.ready { animation: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ★ 2026-09-29：移除页面自带浮动「关闭」—— 壳顶带已有关闭，双按钮冗余（同德州轮修复） -->
+
+<!-- ============ 开局页 ============ -->
+<div id="view-start" class="view">
+  <div class="start-card">
+    <div class="title">UNO</div>
+    <div class="subtitle">UNO 规则 · 与人机对战</div>
+    <div class="field">
+      <label for="inp-name">你的昵称</label>
+      <input id="inp-name" maxlength="12" placeholder="池子">
+    </div>
+    <div class="field">
+      <label>人机数量</label>
+      <div class="seg" id="seg-bots">
+        <button class="seg-btn" type="button" data-n="1">1 个</button>
+        <button class="seg-btn" type="button" data-n="2">2 个</button>
+        <button class="seg-btn active" type="button" data-n="3">3 个</button>
+      </div>
+    </div>
+    <button class="btn" id="btn-start-game" type="button">开始游戏</button>
+    <div class="tip" id="econ-tip" style="display:none"></div>
+    <!-- 【2026-10-03 精简】原第二行「手里剩 1 张前记得喊 UNO，否则罚摸 2 张」——
+         局内在剩 1 张时本来就会弹「喊 UNO」按钮，规则写在按钮旁边才有用；
+         开局页只留一行操作方式。 -->
+    <div class="tip">点可出的牌打出 · 没牌可出就摸牌</div>
+  </div>
+</div>
+
+<!-- ============ 对局页（2026-10-03 按《UI 布局重构规范 v2.0》§11 重做） ============
+     骨架 = csh_layout.css 的 .csh-game：[ topbar | stage | dock ]
+       topbar  只放"做决策必须知道"的数据（§14）：我 / 我的手牌数 / 回合状态
+       stage   三段安全区：[ HUD 槽 | 主战区 | 玩家区 ]（§4 / §6）
+               · hudrow   次级信息（最近一步战况）—— 任何档位可见（2026-10-03 起不再随 L-SHORT 隐藏）
+               · board    第一行对手手牌数（一行横排）｜第二行中心牌区（牌堆 / 弃牌堆 / 方向）
+               · player   我的手牌（单行不换行，牌多先缩宽再重叠）
+               —— 对手行 / 中心牌区 / 我的手牌由 grid 逐行分配空间，
+                  三者几何上不可能互相重叠，不再靠 z-index 与 top:% 事后补救。
+       dock    操作控制台，固定高度，只放**当前合法**的操作（§21）
+     原五段式对局页（.top-bar / .table / .actions / .turn-banner / .hand-area）已删除：
+     每一段都自带高度，把页面切成碎片，中央牌区在矮屏只剩不到一半（§11 点名的问题）。 -->
+<div id="view-game" class="view hidden csh-game no-topbar">
+
+  <div class="csh-stage">
+
+    <!-- ① 主战区：对手行（第一行）+ 中心牌区（第二行） -->
+    <div class="csh-board">
+      <div class="csh-seats" id="opponents"></div>
+      <div class="csh-center">
+        <div class="table">
+          <div class="pile" id="pile" title="点击摸牌">
+            <span class="uno-logo">UNO</span>
+            <span class="deckn" id="deck-count">0</span>
+          </div>
+          <div class="discard" id="discard"></div>
+        </div>
+        <!-- 状态行（2026-10-03 · 顶部清零）：方向 / 回合 / 手牌数 / 上一步
+             全部贴着你要操作的牌堆 —— 决策信息就在决策发生的地方（就近原则）。
+             原顶栏的「我 · 名字」删除（单人视角下无信息量）；
+             「UNO!」提醒保留在手牌数胶囊里（me.uno && 剩 1 张时出现）。 -->
+        <div class="info-bar">
+          <span class="direction-ind" id="direction-ind"><span class="arrow">⟳</span> <span id="dir-text">顺序</span></span>
+          <span class="turn-banner" id="turn-banner"></span>
+          <span class="mycount-chip" id="my-count">0 张</span>
+          <span class="uno-log" id="game-log-line"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ④ 玩家区：我的手牌（单行 + 按数量缩宽 / 重叠，§16） -->
+    <div class="csh-player">
+      <div class="hand my-hand" id="hand"></div>
+    </div>
+  </div>
+
+  <!-- ⑤ Dock：操作控制台（只显示当前合法操作；等待时只留托管） -->
+  <div class="csh-dock">
+    <button class="btn hidden" id="btn-draw" type="button">摸牌</button>
+    <button class="btn-uno hidden" id="btn-uno" type="button">UNO!</button>
+    <button class="btn-uno ghost hidden" id="btn-auto" type="button" title="托管：自动帮你出牌">托管</button>
+  </div>
+</div>
+
+<!-- 选色 -->
+<div class="modal-mask hidden" id="modal-color">
+  <div class="modal">
+    <h3>选择颜色</h3>
+    <div class="color-grid">
+      <button class="color-btn red" type="button" data-color="red">红</button>
+      <button class="color-btn yellow" type="button" data-color="yellow">黄</button>
+      <button class="color-btn green" type="button" data-color="green">绿</button>
+      <button class="color-btn blue" type="button" data-color="blue">蓝</button>
+    </div>
+    <button class="btn ghost small" id="btn-cancel-color" type="button">取消</button>
+  </div>
+</div>
+
+<!-- 摸到可出的牌 -->
+<div class="modal-mask hidden" id="modal-drawn">
+  <div class="modal">
+    <h3>摸到一张可出的牌</h3>
+    <!-- 槽高加上限 34vh：矮屏（含 915×380）下面板不能被这张牌顶到把两个按钮推出屏幕（§15） -->
+    <div id="drawn-card-slot" style="height:min(calc(var(--pile-w) * 1.52), 34vh);display:flex;align-items:center;justify-content:center"></div>
+    <div class="modal-row">
+      <button class="btn" id="btn-play-drawn" type="button">出这张</button>
+      <button class="btn ghost" id="btn-pass-drawn" type="button">不出，跳过</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 结算层（骨架 .csh-result，规范 §13 / §15） ============
+     三层结构（§15 三明治，与德州同一套）：
+       头部固定 → 「本局结算」+ 我第几名 · 击败几人（全屏唯一结论行）+ 冠军是谁
+       中段滚动 → 名次对照表：每家剩几张牌、第几名（UNO 是名次制，结算依据就是名次）
+       底部固定 → 「再来一局」「返回开局」「关闭」永远可见，绝不随内容滚出屏幕
+     遮罩只压暗不遮死（§13.1）：背后仍是完整的牌桌与所有人剩牌，
+     玩家能对照出"我为什么是这个名次"。动画与不透明度全部由骨架提供（§13.2），本页不覆写。
+     ★ 金额不在这里编：本局的钱由宿主按 {名次, 人数} 结算（门票 × 系数 × 击败人数），
+       页面拿不到最终数字就不写数字，避免谎报收益。 -->
+<div class="csh-result hidden" id="modal-end">
+  <div class="rs-panel">
+    <div class="rs-head">
+      <div class="rs-title" id="end-title">本局结算</div>
+      <div class="rs-net" id="end-net"></div>
+      <div class="rs-sub" id="end-sub"></div>
+    </div>
+    <div class="rs-body">
+      <div class="rs-sec">
+        <div class="rs-cap">名次对照（按剩余手牌升序）</div>
+        <div class="rs-rows" id="end-rows"></div>
+      </div>
+    </div>
+    <div class="rs-foot rs-acts">
+      <button class="btn" id="btn-again" type="button">再来一局</button>
+      <button class="btn ghost" id="btn-back-start" type="button">返回开局</button>
+      <button class="btn ghost small" id="btn-leave-game" type="button">关闭</button>
+    </div>
+  </div>
+</div>
+
+<div id="toasts"></div>
+
+<script>
+'use strict';
+
+/* ============================================================
+   -1. 统一钱包桥（§4.1.1 · §G.6.3）
+   本页跑在 Game Shell 的 iframe 内时：
+     · 门票 150（§F.3）已在收费屏扣除，宿主回传 buyIn
+     · 每局结束按名次向宿主上报功勋（play / win）
+     · 结算交回 {place, players}，由 Shell 按「门票 × 0.6 × 击败对手数」结算
+   不在 shell 内（独立打开调试）时自动降级：无经济、纯娱乐。
+   ============================================================ */
+var Bridge = (function () {
+  /* 传输核心（ack 监听 + 请求序号 + 超时 + 幂等守卫）来自 core/csh_page.js，
+     全扩展只有这一份 —— 不再每页复制一遍 P0-0 的病灶。 */
+  var T = CSHPage.transport({ closeName: 'uno-close' });
+  /* ★ 2026-09-30：壳「关闭」委托给本页 closePage 收尾（UNO 为门票制、无带入需回收，
+     仍走同一条链路以保持六页一致：页面自己决定怎么收尾，壳只负责关）。
+     注册点必须在 Bridge 内 —— T 是本闭包私有变量，注册在外层会 ReferenceError。 */
+  T.onCloseSelf(function () { closePage(); });
+  var call = T.call;
+  var ready = false, buyIn = 0, lastSnap = null;
+
+  return {
+    active: T.active,
+    call: call,
+    pull: function (cb) {
+      call('shell-wallet', null, function (ok, data) {
+        if (ok && data) {
+          lastSnap = data;
+          buyIn = Math.max(0, Math.floor(data.buyIn || data.ticket || 150));
+          ready = true;
+        }
+        if (cb) cb(ok, data);
+      });
+    },
+    buyIn: function () { return buyIn; },
+    snapshot: function () { return lastSnap; },
+    isReady: function () { return ready; },
+    merit: function (n, reason, cb) { call('shell-merit', { n: n, reason: reason }, cb); },
+    /* 结算（§G.6.3）：名次制。真值在 core/csh_registry.js（perBeat 0.6 / capMult 2）
+       与 csh_wallet.settle（门票×0.6×击败对手数），本页只负责**如实上报名次与人数**：
+         place   = 本局真实名次（1..N，按剩余手牌升序）
+         players = 本局真实人数（决定「击败了几个对手」）
+       此前这里写死 place = 赢?1:2 且不上报人数，2 人局输了也按「第 2 名」拿 180 →
+       期望收益 240 > 门票 150，可无限刷钱。现金额已改为与人数挂钩，杜绝该漏洞。 */
+    settle: function (place, players, cb) {
+      /* 走 CSHPage 的结算通道（T.settle）：成功应答才置"已结算"，失败释放认领，
+         使 closePage 的"已结束但未结算 → 补一次"兜底真正可达（壳侧幂等，重试不重复入账）。
+         超时 4000ms：结算属经济关键事务，安卓弱机下不能用 1200 缺省（二次复核统一口径）。 */
+      T.settle('shell-settle', {
+        data: {
+          place: Math.max(1, Math.floor(Number(place) || 1)),
+          players: Math.max(0, Math.floor(Number(players) || 0)),
+        }
+      }, cb, 4000);
+    },
+    /* 世界同桌（2026-10-03）：抽真实 AI 座位 —— 名字 / 性格 / 恩怨 / 头像种子都来自世界。
+       buyIn 只用于宿主侧"谁坐得起这张桌子"的筛选（UNO 是门票制，不用带入额结算）。 */
+    seats: function (n, cb) { call('shell-seat', { n: n, buyIn: Math.max(200, buyIn) }, cb); },
+    /* 战果回报（只记胜负、不动钱）：让同桌 AI 的手数 / 胜负 / 心态随对局演化。 */
+    result: function (id, won, cb) { call('shell-world-result', { id: id, won: won }, cb); },
+    isSettled: T.isSettled,
+  };
+})();
+
+/* ============================================================
+   0. 基础工具 / 生命周期标志
+   ============================================================ */
+var $ = function (s) { return document.querySelector(s); };
+var $$ = function (s) { return document.querySelectorAll(s); };
+
+/* 页面存活标志：销毁后不再排任何定时器（botAct 是 setTimeout 递归） */
+var alive = true;
+var timers = [];
+
+function later(fn, ms) {
+  if (!alive) return null;
+  var id = setTimeout(function () {
+    var i = timers.indexOf(id);
+    if (i >= 0) timers.splice(i, 1);
+    if (!alive) return;
+    try { fn(); } catch (e) { console.log('[UNO] 定时任务异常', e); }
+  }, ms);
+  timers.push(id);
+  return id;
+}
+function clearAllTimers() {
+  for (var i = 0; i < timers.length; i++) clearTimeout(timers[i]);
+  timers = [];
+}
+function genId(prefix) {
+  var p = prefix || '';
+  if (window.crypto && typeof crypto.randomUUID === 'function') return p + crypto.randomUUID();
+  return p + 'x-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+}
+function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+
+/* ---------- 音效：统一 SfxBus（§4.7.1） ----------
+ * 本文件不再自带 AudioContext 合成 —— 那套实现此前在 5 款游戏里各复制了一份，
+ * 开关键还统一写成 csh_sfx（互相串味：一款关掉，五款全哑）。现在全部走 core/csh_sfx.js：
+ *   · 每游戏独立开关 csh_uno_sfx（就是本页「音效」开关那一行）
+ *   · 共用音量档位 csh_sfx_volume（0/30/60/100，统一在调试面板里调，各游戏不再各设一套）
+ *   · 首次用户交互自动解锁 AudioContext（移动端必须）
+ * sfx.* 保持原有同名 API，调用点一行都不用改。 */
+var SFX = (function () {
+  var S = null;
+  try { S = (typeof window.CSH_SFX_SANDBOX === 'function') ? window.CSH_SFX_SANDBOX() : (window.CSH_SFX || null); } catch (e) { S = null; }
+  if (S) { try { S.init({ game: 'uno' }); } catch (e2) {} }
+  return S;
+})();
+function sfxOn() { try { return !!(SFX && SFX.enabled()); } catch (e) { return false; } }
+function setSfxOn(b) { try { if (SFX) SFX.setEnabled(!!b); } catch (e) {} }
+function sfxPlay(name, opt) { if (SFX) { try { SFX.play(name, opt); } catch (e) {} } }
+
+/* 音效（2026-09-29 · 用户明确要求）：页面不再提供开/关开关，音效跟随系统。
+   统一总线默认开启；本页只保留播放入口 sfx.*，不再读写 per-game 开关键。 */
+var sfx = {
+  unlock: function () { if (SFX) { try { SFX.unlock(); } catch (e) {} } },
+  ui: function () { sfxPlay('ui.tap'); },
+  deal: function () { sfxPlay('card.deal'); },
+  play: function () { sfxPlay('card.play'); },
+  draw: function () { sfxPlay('card.draw'); },
+  pass: function () { sfxPlay('card.pass'); },
+  skip: function () { sfxPlay('card.pass'); },
+  penal: function () { sfxPlay('ui.warn'); },
+  bomb: function () { sfxPlay('bomb'); },
+  uno: function () { sfxPlay('uno'); },
+  win: function () { sfxPlay('win'); },
+  lose: function () { sfxPlay('lose'); }
+};
+
+/* 纸牌共用视觉层（§4.7.2）：
+   ① 牌面高光 / ④ 层级梯 —— 由 core/csh_cards.js 注入样式表；
+   本文件用它补齐 UNO 原本**完全没有**的两项：② 发牌/翻牌动效（走统一曲线）、⑤ 对手 AI 头像。
+   UNO 没有底池（结算走 rank 而非筹码），故 ③ 不适用。拿不到共用层就静默降级。 */
+var CRD = null;
+try { CRD = (typeof window !== 'undefined' && window.CSH && window.CSH.cards) ? window.CSH.cards : null; } catch (eCrd) { CRD = null; }
+/* 弃牌堆顶牌的变化指纹：render 每次状态同步都跑，不判变化会每帧重播翻牌动画 */
+var lastTopSig = null;
+/* 摸到的那张牌的变化指纹（同理） */
+var lastDrawnSig = null;
+function esc(s) {
+  var d = document.createElement('div');
+  d.textContent = String(s);
+  return d.innerHTML;
+}
+
+/* ============================================================
+   1. 规则引擎（移植自 uno-online/server.js 的 Room，规则未改）
+      唯一改动：去掉 conn / 离线托管 / 断线重连 / 房间回收，
+      定时器统一走 later() 以支持页面销毁
+   ============================================================ */
+/* ==UNO-ENGINE-START== */
+var COLORS = ['red', 'yellow', 'green', 'blue'];
+var MAX_PLAYERS = 10;
+/* 人机名取自三国杀武将；人机身份由 .opp.bot 样式标识，不靠名字前缀 */
+var BOT_NAMES = [
+  '曹操', '司马懿', '关羽', '张飞', '诸葛亮',
+  '赵云', '孙权', '周瑜', '吕布', '貂蝉',
+];
+/* 人机思考间隔（原 700~1600ms，单机场景缩短等待） */
+var BOT_DELAY_MIN = 500;
+var BOT_DELAY_MAX = 1100;
+function botDelay() { return BOT_DELAY_MIN + Math.random() * (BOT_DELAY_MAX - BOT_DELAY_MIN); }
+
+function buildDeck() {
+  var deck = [];
+  var id = 0;
+  var push = function (color, value) { deck.push({ id: id++, color: color, value: value }); };
+  for (var ci = 0; ci < COLORS.length; ci++) {
+    var color = COLORS[ci];
+    push(color, '0');
+    for (var n = 1; n <= 9; n++) {
+      push(color, String(n));
+      push(color, String(n));
+    }
+    var effects = ['skip', 'reverse', 'draw2'];
+    for (var ei = 0; ei < effects.length; ei++) {
+      push(color, effects[ei]);
+      push(color, effects[ei]);
+    }
+  }
+  for (var i = 0; i < 4; i++) {
+    push('black', 'wild');
+    push('black', 'wild4');
+  }
+  return deck; /* 108 张 */
+}
+
+function shuffle(arr) {
+  for (var i = arr.length - 1; i > 0; i--) {
+    var j = Math.floor(Math.random() * (i + 1));
+    var t = arr[i];
+    arr[i] = arr[j];
+    arr[j] = t;
+  }
+  return arr;
+}
+
+function Room(id, net) {
+  this.id = id;
+  this.net = net || null;   /* 本地传输层，替代原来的 conn 集合 */
+  this.localPid = null;     /* 本机真人玩家 id */
+  this.players = [];        /* { id, name, conn, hand[], online, isHost, out, uno, isBot } */
+  this.deck = [];
+  this.discard = [];
+  this.topCard = null;
+  this.activeColor = null;
+  this.current = 0;
+  this.direction = 1;
+  this.state = 'waiting';   /* waiting | playing | ended */
+  this.winner = null;
+  this.turnHasDrawn = false;
+  this.drawnCardId = null;
+  this.botTimer = null;
+  this.autoPlay = false;    /* 托管：本机真人回合也交给同一套人机 AI */
+  this.log = [];
+}
+
+Room.prototype.alivePlayers = function () {
+  return this.players.filter(function (p) { return !p.out; });
+};
+
+Room.prototype.playerById = function (pid) {
+  return this.players.find(function (p) { return p.id === pid; });
+};
+
+/* 该玩家是否由 AI 代打：人机恒为真；托管开启时本机真人也为真 */
+Room.prototype.isAuto = function (p) {
+  return !!p && (p.isBot || (this.autoPlay && p.id === this.localPid));
+};
+
+Room.prototype.addPlayer = function (name, conn, pid) {
+  if (this.state !== 'waiting') return { err: '游戏已开始，无法加入' };
+  if (this.players.length >= MAX_PLAYERS) return { err: '房间已满（最多 10 人）' };
+  if (this.playerById(pid)) return { err: '你已在该房间中' };
+  var player = {
+    id: pid,
+    name: String(name).slice(0, 20).trim() || '玩家',
+    conn: conn,
+    hand: [],
+    online: true,
+    isHost: this.players.length === 0,
+    out: false,
+    uno: false,
+    isBot: false,
+  };
+  this.players.push(player);
+  /* 空值保护：单机 conn 为 null */
+  if (conn) conn.playerId = pid;
+  if (!this.localPid) this.localPid = pid;
+  var hostIsBot = this.players.some(function (p) { return p.isHost && p.isBot; });
+  if (hostIsBot || !this.players.some(function (p) { return p.isHost; })) {
+    for (var i = 0; i < this.players.length; i++) this.players[i].isHost = false;
+    player.isHost = true;
+  }
+  return { player: player };
+};
+
+Room.prototype.addBot = function (seat) {
+  if (this.state === 'playing') return { err: '游戏进行中，无法添加人机' };
+  if (this.players.length >= MAX_PLAYERS) return { err: '房间已满（最多 10 人）' };
+  var used = {};
+  for (var i = 0; i < this.players.length; i++) used[this.players[i].name] = true;
+  /* 【2026-10-03】优先用**真实世界座位**的名字与人格：此前走下面的 BOT_NAMES 名字池，
+     而池里的名字（曹操/张飞/周瑜…）与 AI 世界名册重名 —— 牌桌上会出现一个"张飞"，
+     却和世界里的张飞毫无关系（名字撞车 + 没有性格/恩怨/战绩）。seat 为空时仍退回名字池。 */
+  var name = (seat && seat.name) ? seat.name : null;
+  if (!name) {
+    var pool = BOT_NAMES.filter(function (n) { return !used[n]; });
+    name = pool.length ? pool[Math.floor(Math.random() * pool.length)] : '无名氏' + (this.players.length + 1);
+  }
+  var player = {
+    id: genId('bot-'),
+    name: name,
+    conn: null,
+    hand: [],
+    online: false, /* 人机无连接；界面按 isBot 区分，不显示"离线" */
+    isHost: false,
+    out: false,
+    uno: false,
+    isBot: true,
+    seat: seat || null,   /* 世界座位（台词与战果回报要用；本地机器人时为 null） */
+  };
+  this.players.push(player);
+  return { player: player };
+};
+
+Room.prototype.removeBot = function (botId) {
+  if (this.state === 'playing') return { err: '游戏进行中，无法移除人机' };
+  var idx = -1;
+  if (botId) {
+    idx = this.players.findIndex(function (p) { return p.isBot && p.id === botId; });
+  } else {
+    for (var i = this.players.length - 1; i >= 0; i--) {
+      if (this.players[i].isBot) { idx = i; break; }
+    }
+  }
+  if (idx === -1) return { err: '没有可移除的人机' };
+  var name = this.players[idx].name;
+  this.players.splice(idx, 1);
+  this.pushLog(name + ' 被移出了房间');
+  return {};
+};
+
+Room.prototype.pushLog = function (msg) {
+  this.log.push(msg);
+  if (this.log.length > 30) this.log.shift();
+};
+
+/* 单机只有一路接收方：本地传输层 */
+Room.prototype.broadcast = function (obj) {
+  if (this.net) this.net.push(obj);
+};
+
+Room.prototype.toast = function (msg) {
+  /* 【2026-09-30 修复】原实现同时 pushLog + broadcast，于是**同一句话被渲染两次**：
+     顶部浮层气泡（#toasts）一次、右侧 #game-log-line 又一次（且右侧那条带
+     text-overflow:ellipsis 会被截断）—— 用户看到的就是「同一句提示出现两次、
+     右侧那次还被裁掉」。现在 toast 只负责浮层强调；
+     常规流水（出牌/摸牌/UNO）由各自的 pushLog 提供，两者不再重复。 */
+  this.broadcast({ t: 'toast', msg: msg });
+};
+
+Room.prototype.drawFromDeck = function (n) {
+  var drawn = [];
+  for (var i = 0; i < n; i++) {
+    if (this.deck.length === 0) this.refillDeck();
+    if (this.deck.length === 0) break; /* 极端情况无牌可摸 */
+    drawn.push(this.deck.pop());
+  }
+  return drawn;
+};
+
+Room.prototype.refillDeck = function () {
+  if (this.discard.length <= 1) return;
+  var top = this.discard.pop();
+  this.deck = shuffle(this.discard.slice());
+  this.discard = [top];
+};
+
+Room.prototype.canPlay = function (card) {
+  if (!this.topCard) return true;
+  if (card.color === 'black') return true;
+  if (card.color === this.activeColor) return true;
+  if (card.value === this.topCard.value) return true;
+  return false;
+};
+
+Room.prototype.peekNext = function (steps) {
+  var idx = this.current;
+  while (steps > 0) {
+    idx = (idx + this.direction + this.players.length) % this.players.length;
+    if (!this.players[idx].out) steps--;
+  }
+  return idx;
+};
+
+Room.prototype.advance = function (steps) {
+  this.current = this.peekNext(steps);
+};
+
+Room.prototype.giveCards = function (player, n) {
+  var cards = this.drawFromDeck(n);
+  for (var i = 0; i < cards.length; i++) player.hand.push(cards[i]);
+  player.uno = false;
+  return cards;
+};
+
+Room.prototype.start = function () {
+  if (this.state === 'playing') return { err: '游戏进行中' };
+  if (this.players.length < 2) return { err: '至少需要 2 名玩家' };
+  for (var i = 0; i < this.players.length; i++) {
+    this.players[i].hand = [];
+    this.players[i].out = false;
+    this.players[i].uno = false;
+  }
+  this.deck = shuffle(buildDeck());
+  this.discard = [];
+  this.direction = 1;
+  this.current = 0;
+  this.winner = null;
+  this.turnHasDrawn = false;
+  this.drawnCardId = null;
+  this.log = [];
+  for (var j = 0; j < this.players.length; j++) this.giveCards(this.players[j], 7);
+  /* 翻起始牌：重翻直到数字牌，避免开局效果争议 */
+  var first;
+  do {
+    first = this.deck.pop();
+    this.discard.push(first);
+  } while (!/^\d$/.test(first.value));
+  this.topCard = first;
+  this.activeColor = first.color;
+  this.state = 'playing';
+  sfx.deal();
+  this.pushLog('游戏开始！');
+  this.scheduleBot(); /* 首位玩家若是人机，立即排程其行动 */
+  return {};
+};
+
+Room.prototype.nextTurn = function (extraSkip) {
+  var skip = extraSkip || 0;
+  this.turnHasDrawn = false;
+  this.drawnCardId = null;
+  if (this.botTimer) {
+    clearTimeout(this.botTimer);
+    this.botTimer = null;
+  }
+  if (this.state !== 'playing') return;
+  this.advance(1 + skip);
+  this.scheduleBot();
+};
+
+Room.prototype.applyEffect = function (card) {
+  var steps = 1;
+  var aliveCount = this.alivePlayers().length;
+  switch (card.value) {
+    case 'skip': {
+      var victim = this.players[this.peekNext(1)];
+      this.toast(victim.name + ' 被跳过了');
+      steps = 2;
+      break;
+    }
+    case 'reverse':
+      this.direction *= -1;
+      this.toast('出牌方向反转！');
+      if (aliveCount === 2) steps = 2;
+      break;
+    case 'draw2':
+    case 'wild4': {
+      var n = card.value === 'draw2' ? 2 : 4;
+      var target = this.players[this.peekNext(1)];
+      this.giveCards(target, n);
+      this.toast(target.name + ' 被罚摸 ' + n + ' 张，且被跳过');
+      steps = 2;
+      break;
+    }
+  }
+  return steps;
+};
+
+Room.prototype.play = function (pi, cardId, chosenColor) {
+  if (this.state !== 'playing') return { err: '游戏未在进行中' };
+  if (pi !== this.current) return { err: '还没轮到你' };
+  var p = this.players[pi];
+  if (!p || p.out) return { err: '你已出局' };
+  var card = p.hand.find(function (c) { return c.id === cardId; });
+  if (!card) return { err: '你没有这张牌' };
+  if (this.turnHasDrawn && this.drawnCardId !== null && card.id !== this.drawnCardId) {
+    return { err: '本回合摸牌后只能出摸到的那张' };
+  }
+  if (!this.canPlay(card)) return { err: '这张牌现在不能出' };
+  if (card.color === 'black' && COLORS.indexOf(chosenColor) === -1) return { err: '请选择颜色' };
+
+  p.hand.splice(p.hand.indexOf(card), 1);
+  this.discard.push(card);
+  this.topCard = card;
+  this.activeColor = card.color === 'black' ? chosenColor : card.color;
+  var cardDesc = this.cardText(card, card.color === 'black' ? chosenColor : card.color);
+  this.pushLog(p.name + ' 打出了 ' + cardDesc);
+  if (card.value === 'draw2' || card.value === 'wild4') sfx.penal();
+  else if (card.value === 'skip' || card.value === 'reverse') sfx.skip();
+  else sfx.play();
+
+  /* UNO 判定：出牌后剩 1 张且事前未声明 → 罚摸 2 张 */
+  if (p.hand.length === 1) {
+    if (!p.uno) {
+      this.giveCards(p, 2);
+      this.toast(p.name + ' 没喊 UNO，罚摸 2 张！');
+    } else {
+      this.toast(p.name + ' 喊出了 UNO！');
+    }
+  }
+  p.uno = p.hand.length === 1 && p.uno;
+
+  if (p.hand.length === 0) {
+    this.state = 'ended';
+    this.winner = p.name;
+    if (this.botTimer) {
+      clearTimeout(this.botTimer);
+      this.botTimer = null;
+    }
+    this.pushLog('🏆 ' + p.name + ' 获胜！');
+    return {};
+  }
+
+  var steps = this.applyEffect(card);
+  this.nextTurn(steps - 1);
+  return {};
+};
+
+Room.prototype.draw = function (pi) {
+  if (this.state !== 'playing') return { err: '游戏未在进行中' };
+  if (pi !== this.current) return { err: '还没轮到你' };
+  if (this.turnHasDrawn) return { err: '本回合已经摸过牌了' };
+  var p = this.players[pi];
+  var cards = this.drawFromDeck(1);
+  if (cards.length === 0) {
+    this.nextTurn();
+    return {};
+  }
+  var card = cards[0];
+  p.hand.push(card);
+  p.uno = false;
+  this.turnHasDrawn = true;
+  sfx.draw();
+  this.pushLog(p.name + ' 摸了 1 张牌');
+  if (this.canPlay(card)) {
+    this.drawnCardId = card.id; /* 客户端询问：出这张 / 不出 */
+  } else {
+    this.nextTurn();
+  }
+  return {};
+};
+
+/* 摸到可出的牌后选择不出（原 handleGameMsg 的 pass 分支） */
+Room.prototype.pass = function (pi) {
+  if (this.state !== 'playing' || pi !== this.current) return { err: '还没轮到你' };
+  if (this.drawnCardId === null) return { err: '现在不能跳过' };
+  var p = this.players[pi];
+  this.pushLog(p.name + ' 选择不出摸到的牌');
+  this.nextTurn();
+  return {};
+};
+
+/* 提前宣言 UNO（原 handleGameMsg 的 uno 分支） */
+Room.prototype.declareUno = function (pid) {
+  var me = this.playerById(pid);
+  if (this.state === 'playing' && me && me.hand.length === 2 && !me.uno) {
+    me.uno = true;
+    sfx.uno();
+    this.pushLog(me.name + ' 提前喊了 UNO！');
+    return { ok: true };
+  }
+  return { err: '现在不用喊 UNO' };
+};
+
+Room.prototype.cardText = function (card, activeColor) {
+  var cn = { red: '红', yellow: '黄', green: '绿', blue: '蓝', black: '万能' };
+  var vn = { skip: '跳过', reverse: '反转', draw2: '+2', wild: '变色', wild4: '+4' };
+  var v = /^\d$/.test(card.value) ? card.value : (vn[card.value] || card.value);
+  return card.color === 'black'
+    ? '万能(' + v + (activeColor ? '→' + cn[activeColor] : '') + ')'
+    : cn[card.color] + ' ' + v;
+};
+
+/* 人机回合排程（原 scheduleOffline；单机没有离线托管，只保留人机分支） */
+Room.prototype.scheduleBot = function () {
+  if (this.botTimer) {
+    clearTimeout(this.botTimer);
+    this.botTimer = null;
+  }
+  var p = this.players[this.current];
+  if (!alive || this.state !== 'playing' || !p) return;
+  if (!this.isAuto(p)) return; /* 真人回合：等玩家操作，不排程 */
+  var self = this;
+  this.botTimer = later(function () {
+    self.botTimer = null;
+    self.botAct();
+  }, botDelay());
+};
+
+/* ============ 人机 AI（原样保留） ============ */
+
+Room.prototype.botPlay = function (pi, card) {
+  var color = card.color === 'black' ? this.botPickColor(this.players[pi]) : undefined;
+  var r = this.play(pi, card.id, color);
+  return !r.err;
+};
+
+Room.prototype.botChooseCard = function (p, playable) {
+  var next = this.players[this.peekNext(1)];
+  var threat = !!next && next !== p && next.hand.length <= 2;
+  var attackRank = { wild4: 0, draw2: 1, skip: 2, reverse: 3 };
+  var score = function (c) {
+    if (c.color === 'black') return c.value === 'wild4' ? 90 : 80;
+    if (attackRank[c.value] !== undefined) {
+      return threat ? attackRank[c.value] : 40 + attackRank[c.value];
+    }
+    return 20 - Number(c.value); /* 数字牌优先出大点数 */
+  };
+  var best = playable[0];
+  var bestScore = Infinity;
+  for (var i = 0; i < playable.length; i++) {
+    var s = score(playable[i]);
+    if (s < bestScore) {
+      bestScore = s;
+      best = playable[i];
+    }
+  }
+  return best;
+};
+
+Room.prototype.botPickColor = function (p) {
+  var count = { red: 0, yellow: 0, green: 0, blue: 0 };
+  for (var i = 0; i < p.hand.length; i++) {
+    if (p.hand[i].color !== 'black') count[p.hand[i].color]++;
+  }
+  var best = COLORS[0];
+  var n = -1;
+  for (var k = 0; k < COLORS.length; k++) {
+    if (count[COLORS[k]] > n) {
+      n = count[COLORS[k]];
+      best = COLORS[k];
+    }
+  }
+  return best;
+};
+
+Room.prototype.botAct = function () {
+  if (!alive || this.state !== 'playing') return;
+  var p = this.players[this.current];
+  if (!p || !this.isAuto(p)) return;
+  var pi = this.current;
+  var self = this;
+  var stillMe = function () {
+    return self.state === 'playing' && self.players[self.current] === p && !p.out;
+  };
+
+  /* 出牌后剩 1 张前先声明 UNO，避免罚牌（摸牌会重置 uno，出牌前都要补声明） */
+  var declareUno = function () {
+    if (p.hand.length === 2 && !p.uno) {
+      p.uno = true;
+      sfx.uno();
+      self.pushLog(p.name + ' 喊了 UNO！');
+    }
+  };
+  declareUno();
+
+  if (this.turnHasDrawn && this.drawnCardId !== null) {
+    var card = p.hand.find(function (c) { return c.id === self.drawnCardId; });
+    var ok = card ? this.botPlay(pi, card) : false;
+    if (!ok && stillMe()) this.nextTurn();
+  } else if (!this.turnHasDrawn) {
+    var playable = p.hand.filter(function (c) { return self.canPlay(c); });
+    if (playable.length > 0) {
+      var done = this.botPlay(pi, this.botChooseCard(p, playable));
+      if (!done && stillMe()) this.nextTurn(); /* 出牌失败的兜底 */
+    } else {
+      this.draw(pi); /* 摸到不可出的牌时已自动过牌 */
+      if (this.drawnCardId !== null && stillMe()) {
+        var c2 = p.hand.find(function (c) { return c.id === self.drawnCardId; });
+        if (c2) {
+          declareUno(); /* 摸牌可能把手牌凑成 2 张且重置了 uno */
+          this.botPlay(pi, c2);
+        }
+      }
+      if (this.turnHasDrawn && this.drawnCardId === null && stillMe()) this.nextTurn();
+    }
+  } else if (stillMe()) {
+    this.nextTurn(); /* 防御：异常状态兜底过牌 */
+  }
+  this.broadcastState();
+};
+
+/* 给指定玩家生成个性化视图（全量快照） */
+Room.prototype.viewFor = function (pid) {
+  var self = this;
+  var meIdx = this.players.findIndex(function (p) { return p.id === pid; });
+  var me = this.players[meIdx];
+  var canAct = this.state === 'playing' && meIdx === this.current && !me.out;
+  var hand = me
+    ? me.hand.slice().sort(function (a, b) {
+        var co = COLORS.concat('black');
+        var d = co.indexOf(a.color) - co.indexOf(b.color);
+        if (d !== 0) return d;
+        return a.value < b.value ? -1 : a.value > b.value ? 1 : a.id - b.id;
+      }).map(function (c) {
+        return {
+          id: c.id,
+          color: c.color,
+          value: c.value,
+          playable: canAct ? self.canPlay(c) : false,
+        };
+      })
+    : [];
+  return {
+    t: 'state',
+    you: meIdx,
+    room: {
+      id: this.id,
+      state: this.state,
+      winner: this.winner,
+      direction: this.direction,
+      current: this.current,
+      activeColor: this.activeColor,
+      deckCount: this.deck.length,
+      topCard: this.topCard,
+      turnHasDrawn: this.turnHasDrawn,
+      drawnCardId: this.state === 'playing' && meIdx === this.current ? this.drawnCardId : null,
+      canUno: canAct && me && me.hand.length === 2 && !me.uno,
+      unoDeclared: !!(me && me.uno && me.hand.length <= 2),
+      players: this.players.map(function (p, i) {
+        return {
+          name: p.name,
+          id: p.id,
+          isBot: !!p.isBot,
+          isHost: p.isHost,
+          online: p.online,
+          out: p.out,
+          count: p.hand.length,
+          isTurn: self.state === 'playing' && i === self.current,
+          uno: p.hand.length === 1 && p.uno,
+        };
+      }),
+      log: this.log.slice(-12),
+    },
+    hand: hand,
+  };
+};
+
+Room.prototype.broadcastState = function () {
+  if (!this.net || !this.localPid) return;
+  this.net.push(this.viewFor(this.localPid));
+};
+
+Room.prototype.destroy = function () {
+  if (this.botTimer) {
+    clearTimeout(this.botTimer);
+    this.botTimer = null;
+  }
+};
+/* ==UNO-ENGINE-END== */
+
+/* ============================================================
+   2. 本地传输层（顶替原 WebSocket）
+   ============================================================ */
+var room = null;
+
+var LocalNet = (function () {
+  var onmsg = null;
+
+  function push(obj) {
+    if (!alive || !onmsg) return;
+    try { onmsg(obj); } catch (e) { console.log('[UNO] 渲染异常', e); }
+  }
+
+  function handleUp(msg) {
+    var pi = room.players.findIndex(function (p) { return p.id === room.localPid; });
+    var r = {};
+    switch (msg.t) {
+      case 'start': r = room.start(); break;
+      case 'addBot': r = room.addBot(); break;
+      case 'removeBot': r = room.removeBot(msg.botId); break;
+      case 'play': r = room.play(pi, Number(msg.cardId), msg.color); break;
+      case 'draw': r = room.draw(pi); break;
+      case 'pass': r = room.pass(pi); break;
+      case 'uno': r = room.declareUno(room.localPid); break;
+      default: return;
+    }
+    if (r && r.err) { push({ t: 'error', msg: r.err }); return; }
+    room.broadcastState();
+  }
+
+  return {
+    /* 房间 → 客户端（Room.broadcast / broadcastState 调用） */
+    push: push,
+    /* 由页面在初始化时挂上渲染入口 */
+    attach: function (handler) { onmsg = handler; },
+    /* 顶替原客户端的 send：不再序列化，直接进房间 */
+    send: function (obj) {
+      if (!room) return;
+      try { handleUp(obj); } catch (e) { push({ t: 'error', msg: String((e && e.message) || e) }); }
+    },
+  };
+})();
+function send(obj) { LocalNet.send(obj); }
+
+/* ============================================================
+   3. 客户端状态
+   ============================================================ */
+var view = null;    /* 最新 room 对象（全量快照） */
+var myHand = [];    /* 自己手牌（含 playable） */
+var youIdx = -1;
+var pendingColorCard = null;
+var endSfxDone = false;
+var botCount = 3;
+
+/* ============================================================
+   4. 工具
+   ============================================================ */
+var CARD_CN = { skip: '⊘', reverse: '⇄', draw2: '+2', wild: 'W', wild4: '+4' };
+function cardLabel(v) { return CARD_CN[v] !== undefined ? CARD_CN[v] : v; }
+function colorHex(c) {
+  return { red: '#c62828', yellow: '#e0a80d', green: '#27884a', blue: '#2a6fd6', black: '#2a2a2a' }[c] || '#2a2a2a';
+}
+function toast(msg) {
+  var box = $('#toasts');
+  var el = document.createElement('div');
+  el.className = 'toast';
+  el.textContent = msg;
+  box.appendChild(el);
+  while (box.children.length > 3) box.removeChild(box.firstChild);
+  setTimeout(function () {
+    el.classList.add('fade');
+    setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, 450);
+  }, 2600);
+}
+function makeCardEl(card, opts) {
+  var o = opts || {};
+  var el = document.createElement('div');
+  el.className = 'card c-' + card.color + (o.playable ? ' playable' : '') + (o.dim ? ' dim' : '');
+  if (card.id !== undefined) el.dataset.id = card.id;
+  var lb = cardLabel(card.value);
+  el.innerHTML =
+    '<span class="corner">' + lb + '</span>' +
+    '<span class="big">' + lb + '</span>' +
+    '<span class="corner b">' + lb + '</span>';
+  return el;
+}
+function switchView(id) {
+  $$('.view').forEach(function (v) { v.classList.add('hidden'); });
+  $('#' + id).classList.remove('hidden');
+}
+
+/* ============================================================
+   5. 收消息（原 handleMsg，去掉重连分支）
+   ============================================================ */
+function handleMsg(msg) {
+  switch (msg.t) {
+    case 'state':
+      view = msg.room;
+      youIdx = msg.you;
+      myHand = msg.hand;
+      renderAll();
+      break;
+    case 'toast':
+      toast(msg.msg);
+      break;
+    case 'error':
+      toast(msg.msg);
+      break;
+  }
+}
+LocalNet.attach(handleMsg);
+
+/* ============================================================
+   6. 渲染
+   ============================================================ */
+function renderAll() {
+  if (!view) return;
+  switchView('view-game');
+  renderGame();
+  syncModals();
+  if (view.state === 'playing') requestWakeLock();
+}
+
+function renderGame() {
+  var me = view.players[youIdx] || {};
+  var isMyTurn = view.state === 'playing' && view.current === youIdx;
+
+  /* 对手区（不含自己；从自己下家开始，体现方向感） */
+  var opps = $('#opponents');
+  opps.innerHTML = '';
+  var n = view.players.length;
+  var rot = [];
+  if (n > 0) {
+    var dir = view.direction || 1;
+    var idx = (youIdx + dir + n) % n;
+    while (idx !== youIdx) {
+      rot.push(idx);
+      idx = (idx + dir + n) % n;
+    }
+  }
+  for (var ri = 0; ri < rot.length; ri++) {
+    var p = view.players[rot[ri]];
+    var el = document.createElement('div');
+    el.className =
+      'opp' +
+      (p.isTurn ? ' turn' : '') +
+      (p.isBot ? ' bot' : '') +
+      (p.online || p.isBot ? '' : ' offline');
+    var html = '';
+    if (p.isHost) html += '<span class="crown">👑</span>';
+    if (p.out) html += '<span class="out">出局</span>';
+    /* §4.7.2 ⑤ 对手头像（§I.4）：UNO 的对手没有 §I 世界档案，
+       故用姓名哈希派生性格 → 同名恒定同纹样（personaOf 的用途就在这）。 */
+    if (CRD) html += '<span class="opp-av">' + CRD.avatar(String(p.name || '?').slice(0, 1), CRD.personaOf(p.name), 30) + '</span>';
+    html += '<span class="oname">' + esc(p.name) + '</span>';
+    html += '<span class="ocount"><b>' + p.count + '</b> 张</span>';
+    if (p.uno) html += '<span class="uno-flag">UNO!</span>';
+    el.innerHTML = html;
+    opps.appendChild(el);
+  }
+
+  $('#direction-ind').className = 'direction-ind' + (view.direction === -1 ? ' rev' : '');
+  $('#dir-text').textContent = view.direction === -1 ? '逆序' : '顺序';
+  $('#deck-count').textContent = '剩 ' + view.deckCount + ' 张';
+  var logs = view.log || [];
+  $('#game-log-line').textContent = logs.length ? logs[logs.length - 1] : '';
+
+  /* 弃牌堆：底牌小偏移叠放 + 顶牌 + 当前颜色环 */
+  var dis = $('#discard');
+  dis.innerHTML = '';
+  var ghostDefs = [
+    { rot: -9, dx: -8, dy: -6 },
+    { rot: 6, dx: 7, dy: 5 },
+    { rot: -4, dx: -3, dy: 8 },
+  ];
+  ghostDefs.forEach(function (g0, i) {
+    var g = makeCardEl({ color: 'black', value: 'wild' });
+    g.classList.add('ghost-card');
+    g.style.left = '50%';
+    g.style.top = '50%';
+    g.style.transform = 'translate(-50%, -50%) translate(' + g0.dx + 'px, ' + g0.dy + 'px) rotate(' + g0.rot + 'deg)';
+    g.style.zIndex = i + 1;
+    dis.appendChild(g);
+  });
+  if (view.topCard) {
+    var top = makeCardEl(view.topCard);
+    top.style.position = 'absolute';
+    top.style.left = '50%';
+    top.style.top = '50%';
+    top.style.transform = 'translate(-50%,-50%) rotate(3deg)';
+    top.style.zIndex = 5;
+    /* §4.7.2 ② 只有"顶牌真的换了"才播 —— 用 csh-soft 而非 csh-flip：
+       csh-flip 的关键帧动 transform，会把这行 inline 的 translate(-50%,-50%) 一起顶掉、牌会瞬移。 */
+    var sig = String((view.topCard.color || '')) + '|' + String((view.topCard.value || '')) + '|' + String(view.topCard.id);
+    if (CRD && lastTopSig !== null && sig !== lastTopSig) { try { CRD.anim(top, 'soft'); } catch (eT) {} }
+    lastTopSig = sig;
+    dis.appendChild(top);
+  } else {
+    lastTopSig = null;
+  }
+  var ring = document.createElement('div');
+  ring.className = 'color-ring';
+  ring.style.background = colorHex(view.activeColor || 'black');
+  dis.appendChild(ring);
+
+  /* 摸牌堆 */
+  var canDraw = isMyTurn && !view.turnHasDrawn && view.state === 'playing';
+  $('#pile').classList.toggle('can', canDraw);
+  /* Dock 只放**当前合法**的操作（规范 §21）：摸牌键只在"轮到我且本回合未摸牌"时出现，
+     不在屏幕上留不可用按钮占位（它和牌堆走同一条处理链，见 drawFromPile）。 */
+  $('#btn-draw').classList.toggle('hidden', !canDraw);
+  /* 【2026-10-03】顶栏已删（顶部清零）：原「我 · 名字」写入随之移除 ——
+     单人视角下自己是谁没有信息量，手牌就摆在屏幕底部。 */
+
+  /* UNO 按钮 */
+  var btnUno = $('#btn-uno');
+  var myCount = me.count || 0;
+  var showUno = view.state === 'playing' && myCount <= 2;
+  btnUno.classList.toggle('hidden', !showUno);
+  if (showUno) {
+    btnUno.classList.toggle('ready', !!view.canUno);
+    btnUno.classList.toggle('done', !!view.unoDeclared);
+    btnUno.textContent = view.unoDeclared ? '已喊UNO' : 'UNO!';
+  }
+
+  /* 托管按钮 */
+  var btnAuto = $('#btn-auto');
+  var autoOn = !!(room && room.autoPlay);
+  btnAuto.classList.toggle('hidden', view.state !== 'playing');
+  btnAuto.classList.toggle('on', autoOn);
+  btnAuto.textContent = autoOn ? '托管中' : '托管';
+
+  /* 回合横幅 */
+  var tb = $('#turn-banner');
+  if (view.state === 'playing') {
+    tb.className = 'turn-banner' + (isMyTurn ? ' mine' : '');
+    tb.textContent = autoOn
+      ? '托管中'
+      : (isMyTurn ? '轮到你了'
+        : '等待 ' + (view.players[view.current] ? view.players[view.current].name : '') + ' 出牌…');
+  } else {
+    tb.className = 'turn-banner';
+    tb.textContent = '';
+  }
+
+  /* 我的手牌 */
+  var handEl = $('#hand');
+  handEl.innerHTML = '';
+  myHand.forEach(function (c) {
+    var el = makeCardEl(c, { playable: c.playable, dim: !c.playable && view.state === 'playing' });
+    el.addEventListener('click', function () { onHandCard(c); });
+    handEl.appendChild(el);
+  });
+  $('#my-count').textContent = myCount + ' 张' + (me.uno && myCount === 1 ? ' · UNO!' : '');
+  fitHand();
+  fitCenter();
+}
+
+function onHandCard(c) {
+  if (!view || view.state !== 'playing') { toast('游戏未开始'); return; }
+  if (room && room.autoPlay) { toast('托管中，将自动出牌'); return; }
+  if (view.current !== youIdx) { toast('还没轮到你'); return; }
+  if (view.turnHasDrawn && view.drawnCardId !== null && c.id !== view.drawnCardId) {
+    toast('摸牌后只能出摸到的那张');
+    return;
+  }
+  if (!c.playable) { toast('这张牌不能出：需要颜色或数字匹配'); return; }
+  if (c.color === 'black') {
+    pendingColorCard = c.id;
+    $('#modal-color').classList.remove('hidden');
+  } else {
+    send({ t: 'play', cardId: c.id });
+  }
+}
+
+/* 真实名次：按剩余手牌升序排（0 张即胜者），返回 { place, players }。
+   平局（手牌数相同）按座位序，先手者靠前 —— 与房主的发牌顺序一致，结果可复现。 */
+function rankOf(viewObj, myName) {
+  var ps = (viewObj && viewObj.players) || [];
+  var arr = ps.map(function (p, i) { return { name: p.name, count: Number(p.count) || 0, seat: i }; });
+  arr.sort(function (a, b) { return a.count !== b.count ? a.count - b.count : a.seat - b.seat; });
+  var place = arr.length;
+  for (var i = 0; i < arr.length; i++) if (arr[i].name === myName) { place = i + 1; break; }
+  return { place: place, players: arr.length };
+}
+
+/* 结算面板（规范 §13）：只做**展示** —— 名次对照（每家剩牌 / 名次 / 我击败几人），
+   让玩家看清"我为什么是这个名次"。排序规则与 rankOf 一致（剩余手牌升序、同数按座位序），
+   但**不参与结算**：上报名次仍走 rankOf → Bridge.settle，金额裁决权始终在宿主
+   （csh_wallet.settleRun）。页面拿不到最终金额，就不显示金额，避免谎报收益。 */
+function renderEndPanel(winner, iWin) {
+  var ps = (view && view.players) || [];
+  var arr = ps.map(function (p, i) {
+    return { name: p.name, count: Number(p.count) || 0, me: i === youIdx, uno: !!p.uno };
+  });
+  /* Array#sort 自 ES2019 起稳定：剩牌相同者保持座位序 —— 与 rankOf 的并列规则一致 */
+  arr.sort(function (a, b) { return a.count - b.count; });
+  var box = $('#end-rows');
+  if (box) {
+    box.innerHTML = '';
+    arr.forEach(function (p, i) {
+      var r = document.createElement('div');
+      r.className = 'rs-row' + (p.me ? ' me' : '') + (i === 0 ? ' win' : '');
+      r.innerHTML =
+        '<div class="rs-name">' + esc(p.name) + '</div>' +
+        '<div class="rs-hand">' + (p.count === 0 ? '出完了' : '剩 ' + p.count + ' 张') +
+          (p.uno && p.count === 1 ? ' · UNO' : '') + '</div>' +
+        '<div class="rs-gain">第 ' + (i + 1) + ' 名</div>';
+      box.appendChild(r);
+    });
+  }
+  var place = 0, k;
+  for (k = 0; k < arr.length; k++) if (arr[k].me) { place = k + 1; break; }
+  var beat = place > 0 ? arr.length - place : 0;
+  var tEl = $('#end-title'), netEl = $('#end-net'), subEl = $('#end-sub');
+  if (tEl) {
+    tEl.textContent = iWin ? '你赢了' : '本局结束';
+    tEl.className = 'rs-title ' + (iWin ? 'win' : 'lose');
+  }
+  if (netEl) {
+    netEl.textContent = place > 0 ? ('第 ' + place + ' 名 · 击败 ' + beat + ' 人') : '';
+    netEl.className = 'rs-net ' + (beat > 0 ? 'plus' : 'minus');
+  }
+  if (subEl) {
+    subEl.innerHTML = (winner ? ('冠军 <b>' + esc(winner) + '</b> · ') : '') +
+      '本局 <b>' + arr.length + '</b> 人';
+  }
+}
+
+/* 模态同步：摸到可出的牌 / 结算 */
+function syncModals() {
+  var autoOn = !!(room && room.autoPlay);
+  var drawn = view && view.state === 'playing' && view.current === youIdx && view.drawnCardId !== null && !autoOn;
+  var modal = $('#modal-drawn');
+  if (drawn) {
+    modal.classList.remove('hidden');
+    var c = myHand.find(function (x) { return x.id === view.drawnCardId; });
+    if (c) {
+      var slot = $('#drawn-card-slot');
+      slot.innerHTML = '';
+      var dc = makeCardEl(c, { playable: true });
+      /* §4.7.2 ② UNO 此前完全没有发牌动效：摸到的那张牌现在按统一曲线入场（仅换牌时播一次） */
+      if (CRD && lastDrawnSig !== String(c.id)) { try { CRD.anim(dc, 'deal'); } catch (eD) {} }
+      lastDrawnSig = String(c.id);
+      slot.appendChild(dc);
+      $('#btn-play-drawn').onclick = function () {
+        if (c.color === 'black') {
+          pendingColorCard = c.id;
+          $('#modal-color').classList.remove('hidden');
+        } else {
+          send({ t: 'play', cardId: c.id });
+        }
+      };
+      $('#btn-pass-drawn').onclick = function () { send({ t: 'pass' }); };
+    }
+  } else {
+    modal.classList.add('hidden');
+  }
+
+  var endModal = $('#modal-end');
+  if (view && view.state === 'ended') {
+    endModal.classList.remove('hidden');
+    var winner = view.winner;
+    var myName = (view.players[youIdx] || {}).name;
+    var iWin = !!(winner && winner === myName);
+    renderEndPanel(winner, iWin);
+    if (!endSfxDone) {
+      endSfxDone = true;
+      if (iWin) sfx.win(); else sfx.lose();
+      /* 经济接入（§G.6.3）：每局 play，第 1 名再 win，并按名次结算 */
+      if (Bridge.active) {
+        try {
+          Bridge.merit(1, 'play');
+          if (iWin) Bridge.merit(2, 'win');
+        } catch (eM) {}
+        /* 名次：按剩余手牌升序真实排名（0 张即第 1），并如实上报本局人数 */
+        var rk = rankOf(view, myName);
+        /* ★ 2026-09-29 R3-2：结算回调此前完全不看 ok ⇒ 桥超时/失败时玩家毫无感知
+           （门票已扣，收益没入账）。失败即如实提示，不谎报成功。 */
+        try { Bridge.settle(rk.place, rk.players, function (ok) {
+          if (ok === false) { try { toast('结算未成功，本局未入账（可退出后重查余额）'); } catch (eT) {} }
+        }); } catch (eS) {}
+        /* 【2026-10-03】同桌拟人 + 战果回报：让对手说一句，并把这一局的胜负记进世界
+           （只记胜负、不动钱：UNO 是门票制，世界资金的零和记账不参与本游戏）。 */
+        try {
+          var myLeft = (view && youIdx >= 0 && view.players[youIdx]) ? (Number(view.players[youIdx].count) || 0) : myHand.length;
+          reportBots(myLeft);
+          quipEnd(iWin);
+        } catch (eQW) {}
+      }
+    }
+  } else {
+    endModal.classList.add('hidden');
+    endSfxDone = false;
+  }
+}
+
+/* ============================================================
+   7. 开局 / 收尾
+   ============================================================ */
+/* 托管：把本机真人的回合也交给同一套人机 AI（isAuto 在 Room 里判定） */
+function setAuto(on) {
+  if (!room) return;
+  room.autoPlay = !!on;
+  toast(room.autoPlay ? '已开启托管 · 自动出牌' : '已关闭托管');
+  /* 当前若正好是我的回合，立刻补排一次，否则要等到下一轮才生效 */
+  if (room.autoPlay && view && view.state === 'playing') room.scheduleBot();
+  room.broadcastState();
+}
+
+/* ---------- 牌桌拟人 + 战果回报（2026-10-03） ----------
+   台词走共享层（core/csh_page.js 的 QUIPS：按性格 × 场景分声，全页 6 秒节流）；
+   战果走 Bridge.result（只记胜负不动钱 —— UNO 是门票制，不参与世界对赌资金）。 */
+var botSeats = [];
+function quipGreet() {
+  try {
+    if (!botSeats.length) return;
+    var s = botSeats[Math.floor(Math.random() * botSeats.length)];
+    CSHPage.sayThrottled(CSHPage.seatAnchor(s.name), s, 'greet');
+  } catch (eQ) {}
+}
+function leftOf(name) {
+  var ps = (view && view.players) || [];
+  for (var j = 0; j < ps.length; j++) if (ps[j].name === name) return Number(ps[j].count) || 0;
+  return null;
+}
+function quipEnd(iWin) {
+  try {
+    if (!botSeats.length) return;
+    var s = null;
+    if (!iWin) {
+      /* 玩家没赢：由"牌最少的那位人机"来说赢家该说的话（它最接近赢） */
+      var bestLeft = Infinity;
+      for (var i = 0; i < botSeats.length; i++) {
+        var left = leftOf(botSeats[i].name);
+        if (left != null && left < bestLeft) { bestLeft = left; s = botSeats[i]; }
+      }
+    }
+    if (!s) s = botSeats[Math.floor(Math.random() * botSeats.length)];
+    CSHPage.sayThrottled(CSHPage.seatAnchor(s.name), s, iWin ? 'lose' : 'win');
+  } catch (eQ2) {}
+}
+function reportBots(myLeft) {
+  try {
+    for (var i = 0; i < botSeats.length; i++) {
+      var s = botSeats[i];
+      if (!s || !s.id) continue;
+      var left = leftOf(s.name);
+      if (left == null) continue;
+      Bridge.result(s.id, left < myLeft);   /* 谁先出完谁赢 —— 逐个同桌记一笔胜负 */
+    }
+  } catch (eR) {}
+}
+
+function startGame() {
+  var name = ($('#inp-name').value || '').trim().slice(0, 12) || '池子';
+  lsSet('csh_uno_name', name);
+
+  if (room) room.destroy();
+  clearAllTimers();
+  view = null;
+  myHand = [];
+  youIdx = -1;
+
+  room = new Room('LOCAL', LocalNet);
+  var r = room.addPlayer(name, null, 'local-me'); /* 单机：conn 传 null */
+  if (r.err) { toast(r.err); return; }
+  /* 【2026-10-03】同桌换成**真实世界 AI**：先拉座位（异步），拿到就按座位建机器人再开局；
+     拉不到（不在壳内 / 世界无人）立刻退回内置名字池 —— 开局绝不被桥超时阻塞。 */
+  botSeats = [];
+  Bridge.seats(botCount, function (ok, d) {
+    botSeats = (ok && d && d.seats && d.seats.length) ? d.seats : [];
+    for (var i = 0; i < botCount; i++) room.addBot(botSeats[i] || null);
+    var rs = room.start();
+    if (rs.err) { toast(rs.err); return; }
+    room.broadcastState();
+    quipGreet();
+  });
+}
+
+function showStart() {
+  if (room) { room.destroy(); room = null; }
+  clearAllTimers();
+  view = null;
+  myHand = [];
+  youIdx = -1;
+  pendingColorCard = null;
+  $('#modal-end').classList.add('hidden');
+  $('#modal-drawn').classList.add('hidden');
+  $('#modal-color').classList.add('hidden');
+  switchView('view-start');
+}
+
+function closePage() {
+  alive = false;              /* 先掐断机器人定时器递归 */
+  clearAllTimers();
+  if (room) { try { room.destroy(); } catch (e) {} room = null; }
+  /* 兜底：若对局已结束但尚未结算（如直接关窗），按当前结果补一次（幂等） */
+  if (Bridge.active && !Bridge.isSettled() && view && view.state === 'ended') {
+    var myName2 = (view.players[youIdx] || {}).name;
+    var rk2 = rankOf(view, myName2);
+    try { Bridge.settle(rk2.place, rk2.players, function (ok2) {
+      if (ok2 === false) { try { toast('结算未成功，本局未入账（可退出后重查余额）'); } catch (eT2) {} }
+    }); } catch (eS2) {}
+  }
+  try { window.parent.postMessage({ __csh: "uno-close" }, "*"); } catch (e) {}
+}
+
+/* ============================================================
+   8. 事件绑定
+   ============================================================ */
+$('#inp-name').value = lsGet('csh_uno_name') || '池子';
+
+$('#seg-bots').addEventListener('click', function (e) {
+  var b = e.target.closest ? e.target.closest('.seg-btn') : null;
+  if (!b) return;
+  botCount = Number(b.dataset.n) || 3;
+  $$('#seg-bots .seg-btn').forEach(function (x) { x.classList.toggle('active', x === b); });
+});
+
+$('#btn-start-game').addEventListener('click', startGame);
+/* ★ 2026-09-29：btn-close 已移除（壳顶带自有关闭） */
+$('#btn-again').addEventListener('click', function () { send({ t: 'start' }); });
+$('#btn-back-start').addEventListener('click', showStart);
+$('#btn-leave-game').addEventListener('click', closePage);
+
+$('#btn-auto').addEventListener('click', function () { setAuto(!(room && room.autoPlay)); });
+
+$('#btn-uno').addEventListener('click', function () {
+  if (room && room.autoPlay) { toast('托管中，将自动出牌'); return; }
+  if (view && view.canUno) {
+    send({ t: 'uno' });
+    toast('已喊 UNO！');
+  }
+});
+
+/* 摸牌：牌堆本身仍可点（保持原交互），Dock 里的「摸牌」按钮走**同一条**处理链 ——
+   只是把同一个入口搬到操作控制台，判定与规则一行未改。 */
+function drawFromPile() {
+  if (!view || view.state !== 'playing') return;
+  if (room && room.autoPlay) { toast('托管中，将自动出牌'); return; }
+  if (view.current !== youIdx) { toast('还没轮到你'); return; }
+  if (view.turnHasDrawn) { toast('本回合已摸过牌'); return; }
+  send({ t: 'draw' });
+}
+$('#pile').addEventListener('click', drawFromPile);
+$('#btn-draw').addEventListener('click', drawFromPile);
+
+$$('#modal-color .color-btn').forEach(function (b) {
+  b.addEventListener('click', function () {
+    if (pendingColorCard !== null) {
+      send({ t: 'play', cardId: pendingColorCard, color: b.dataset.color });
+      pendingColorCard = null;
+    }
+    $('#modal-color').classList.add('hidden');
+  });
+});
+$('#btn-cancel-color').addEventListener('click', function () {
+  pendingColorCard = null;
+  $('#modal-color').classList.add('hidden');
+});
+
+/* Esc：先关模态，否则关页面（§17.2：有模态打开时 Esc 不得关整局） */
+document.addEventListener('keydown', function (e) {
+  if (e.key !== 'Escape') return;
+  if (!$('#modal-color').classList.contains('hidden')) {
+    pendingColorCard = null;
+    $('#modal-color').classList.add('hidden');
+    return;
+  }
+  /* 摸牌决策 / 结算弹窗打开时 Esc 不动作：决策要靠按钮完成，结算横幅不许被误触关掉 */
+  if (!$('#modal-drawn').classList.contains('hidden')) return;
+  if (!$('#modal-end').classList.contains('hidden')) return;
+  closePage();
+});
+
+/* 中央牌尺寸（规范 §17）：把中心牌区的可用高度读出来，写成牌堆 / 弃牌堆的 --pw。
+   只读一次、只写一个 px 变量，不逐个改坐标（§20 禁止的是后者）；
+   渲染后与窗口尺寸变化时各算一次。 */
+function fitCenter() {
+  var c = document.querySelector('#view-game .csh-center');
+  if (!c) return;
+  var info = c.querySelector('.info-bar');
+  var gap = parseInt(getComputedStyle(c).rowGap, 10) || 0;
+  var avail = c.clientHeight - (info ? info.offsetHeight : 0) - gap - 2;
+  if (avail <= 0) return;
+  var w = avail / 1.52;               /* 卡面比例 = 宽 × 1.52 */
+  if (w > 200) w = 200;               /* PC：最大 200px 宽，不再无限放大 */
+  var px = Math.round(w) + 'px';
+  var pl = $('#pile'), dis = $('#discard');
+  if (pl) pl.style.setProperty('--pw', px);
+  if (dis) dis.style.setProperty('--pw', px);
+}
+window.addEventListener('resize', function () { try { fitCenter(); } catch (e) {} });
+
+/* 手牌单行绝不换行（规范 §16）：先按数量缩牌宽，仍放不下再加重叠。
+   全程只写两个自定义属性（--hw 牌宽 / --ov 重叠量），不读屏幕尺寸逐个改坐标
+   （规范 §20 禁止的是后者）。既没有第二行，也没有纵向滚动，更没有横向滚动条。 */
+function fitHand() {
+  var wrap = $('#hand');
+  if (!wrap) return;
+  var cards = wrap.querySelectorAll('.card');
+  /* 先复位再量"自然尺寸"：否则第二轮回量到上一轮的缩小值，牌会一路缩没 */
+  wrap.style.removeProperty('--hw');
+  wrap.style.removeProperty('--ov');
+  if (cards.length < 2) return;
+  var nat = cards[0].getBoundingClientRect().width;
+  var avail = wrap.clientWidth - 8;
+  if (!nat || avail <= 0) return;
+  if (nat * cards.length <= avail) return;              /* 放得下：保持自然尺寸、不重叠 */
+  var hw = Math.max(nat * 0.5, avail / cards.length);   /* ① 缩牌宽（下限 = 自然宽的一半） */
+  wrap.style.setProperty('--hw', hw.toFixed(1) + 'px');
+  var w2 = cards[0].getBoundingClientRect().width;      /* 缩完重量，剩余空间用重叠补齐 */
+  if (!w2) return;
+  var ov = (avail - w2) / (cards.length - 1) - w2;      /* ② 重叠 */
+  if (ov > 0) ov = 0;
+  if (ov < -w2 * 0.55) ov = -w2 * 0.55;                 /* 极限：至少露出 45% 牌面，仍可点可看 */
+  wrap.style.setProperty('--ov', ov.toFixed(1) + 'px');
+}
+window.addEventListener('resize', function () { try { fitHand(); } catch (e) {} });
+
+/* 手牌左右滚动指示：手牌改为单行自适应后不再横向滚动，指示自然不再出现；
+   这里保留原实现（元素不存在时立即返回），与其余页面同构且零风险。 */
+var handEl = $('#hand');
+
+function updateHandFades() {
+  var l = $('#hand-fade-l');
+  var r = $('#hand-fade-r');
+  if (!l || !r) return;
+  l.classList.toggle('show', handEl.scrollLeft > 8);
+  r.classList.toggle('show', handEl.scrollLeft + handEl.clientWidth < handEl.scrollWidth - 8);
+}
+handEl.addEventListener('scroll', updateHandFades, { passive: true });
+window.addEventListener('resize', updateHandFades);
+
+/* 游戏中防息屏（iframe 内可能被拒，失败无害） */
+var wakeLock = null;
+function requestWakeLock() {
+  try {
+    if ('wakeLock' in navigator && document.visibilityState === 'visible' && !wakeLock) {
+      navigator.wakeLock.request('screen').then(function (lock) {
+        wakeLock = lock;
+        lock.addEventListener('release', function () { wakeLock = null; });
+      }).catch(function () { wakeLock = null; });
+    }
+  } catch (e) { wakeLock = null; }
+}
+document.addEventListener('visibilitychange', function () {
+  if (!document.hidden && view && view.state === 'playing') requestWakeLock();
+});
+
+/* 页面销毁：iframe 被导航到 about:blank / 遮罩移除时，停掉一切定时器 */
+function onTeardown() {
+  alive = false;
+  clearAllTimers();
+  if (room) { try { room.destroy(); } catch (e) {} }
+}
+window.addEventListener('pagehide', onTeardown);
+window.addEventListener('beforeunload', onTeardown);
+window.addEventListener('unload', onTeardown);
+
+switchView('view-start');
+/* shell 内：先向宿主拉一次钱包快照（拿到本次门票带入），再进开始页 */
+if (Bridge.active) {
+  var booted = false;
+  function boot() {
+    if (booted) return;
+    booted = true;
+    var tip = $('#econ-tip');
+    if (tip) {
+      var tkTxt = String(Math.floor(Bridge.buyIn() || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+      /* 结算口径不在这里硬编码：读宿主下发的 plan（真值来自 core/csh_registry.js） */
+      var pl = (Bridge.snapshot() && Bridge.snapshot().plan) || null;
+      var formula;
+      if (pl && pl.mode === 'rank') {
+        var per = Math.round((pl.ticket || 0) * (pl.perBeat == null ? 0.6 : pl.perBeat));
+        var cap = Math.round((pl.ticket || 0) * (pl.capMult == null ? 2 : pl.capMult));
+        formula = '每击败 1 名对手 +<b>' + per + '</b> CBY · 单局封顶 <b>' + cap + '</b>';
+      } else {
+        formula = '结算按真实名次（剩余手牌升序）：每击败 1 名对手计奖';
+      }
+      tip.style.display = '';
+      tip.innerHTML = '门票 <b>' + tkTxt + '</b> CBY · ' + formula;
+    }
+    switchView('view-start');
+  }
+  Bridge.pull(function () { boot(); });
+  setTimeout(function () { if (!booted) boot(); }, 1800);
+}
+</script>
+</body>
+</html>

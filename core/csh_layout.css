@@ -1,0 +1,301 @@
+/* ============================================================================
+   池子魔将 · 休闲小游戏统一布局系统（csh_layout.css）
+   ----------------------------------------------------------------------------
+   依据：《休闲游戏页面 UI 布局重构规范 v2.0》
+
+   解决的问题（规范 §30 的结论）：此前每款游戏各自「给每个元素找一个位置」——
+   一堆 position:absolute 之后凭经验调 top/left，装不下就压牌桌、加滚动条，
+   手机上还得再复制一套 DOM。本文件把布局升级为**系统**：
+
+     统一骨架 → 统一安全区 → 统一响应式 → 统一信息优先级 → 统一操作 Dock → 统一结算层
+
+   骨架（规范 §2/§3）：
+     .csh-game   = grid  [ topbar | stage | dock ]，minmax(0,1fr) 兜住主舞台
+     .csh-stage  = grid  [ HUD 槽 | 主战区 | 玩家区 ]  ← 三个安全区，几何上互不重叠
+     .csh-center = 主战区里的中心安全区（公共牌 / 底池 / 结果依据）
+     .csh-player = 玩家安全区（我的手牌与我的状态）
+     .csh-dock   = 操作控制台（固定高度，不因文字换行）
+
+   为什么中心区与玩家区**不可能重叠**（规范 §6）：
+     它们不是两个绝对定位的盒子再去互相避让，而是 grid 的第二行与第三行 ——
+     空间由布局分配，不是由 z-index 事后补救。z-index 只决定谁在上面，
+     决定不了「两者占不占同一块空间」，所以规范明确禁止只靠 z-index。
+
+   响应式（规范 §19）：只用「方向 + 可用高度」，不用「宽度 < X = 手机」：
+     L-NORMAL  横屏且高 ≥ 430px（PC / 大平板）
+     L-SHORT   横屏且高  < 430px（手机横屏，主场景 915×412）
+     L-TINY    横屏且高  < 350px（极矮，如分屏 / 老旧机型）
+     竖屏不再为小游戏做专门布局（游戏本身要求横屏，壳有旋转引导）
+
+   使用方式：游戏页 <link rel="stylesheet" href="../../core/csh_layout.css">
+   本文件只提供骨架与通用件，不含任何游戏玩法相关的样式。
+   ============================================================================ */
+
+/* ---------- 1. 统一尺寸变量（规范 §18） ---------- */
+:root {
+  /* 骨架高度：手机矮屏取低值、PC 取高值（§2.1 建议 34~40px） */
+  --game-topbar-h: clamp(34px, 8vh, 40px);
+  --game-dock-h: clamp(52px, 13vh, 72px);
+  --game-pad: clamp(6px, 1.2vw, 18px);
+
+  /* 统一间距阶梯（禁止各页自造 mobileTop / shortScreen 之类分裂体系） */
+  --gap-xs: clamp(3px, .5vw, 8px);
+  --gap-sm: clamp(6px, .8vw, 12px);
+  --gap-md: clamp(10px, 1.4vw, 20px);
+
+  /* 三级字号（规范 §14：HUD 少而明确；§22：说明文字降到二/三级） */
+  --fs-1: clamp(13px, 1.9vh, 16px);   /* 一级：做决策必须知道 */
+  --fs-2: clamp(11px, 1.6vh, 14px);   /* 二级：状态 */
+  --fs-3: clamp(10px, 1.4vh, 12.5px); /* 三级：标签 / 说明 */
+
+  /* 主战区三段：HUD 行按内容高（grid auto），玩家区保底 --stage-player-min
+     ⚠ 玩家区用 `minmax(min, auto)` 而不是写死百分比：手牌是**内容不是文本**
+     （规范 §16），牌高由 --cw 决定；写死百分比会在矮屏把牌裁掉。
+     auto 让玩家区按内容长，主战区吃剩下的，两边都不牺牲。
+     【2026-10-03】原 --stage-hud 百分比变量已删：grid 一直用 auto，从未消费过它。 */
+  --stage-player-min: 18%;
+
+  /* 兜底色板：游戏页通常已自带同名 token，缺失时用这些（深色金主题） */
+  --csh-gold: var(--gold, #d8b46a);
+  --csh-gold-hi: var(--gold-hi, #f4dfa8);
+  --csh-line: var(--gold-line, rgba(216, 180, 106, .28));
+  --csh-text: var(--text, #ece5d6);
+  --csh-text-dim: var(--text-dim, #a49a86);
+}
+
+/* ---------- 2. 页面骨架（规范 §3） ---------- */
+.csh-game {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-rows: var(--game-topbar-h) minmax(0, 1fr) var(--game-dock-h);
+  overflow: hidden;
+}
+.csh-game > * { min-width: 0; min-height: 0; }
+/* 【2026-10-03 · 顶部清零】没有顶部信息条的页面加 .no-topbar：
+   骨架从三行变两行 —— 否则第一行会留一条 topbar 高的空带，
+   且 grid 自动放置会把 .csh-stage 塞进那一行（实渲染实测：牌桌整块错位）。
+   显式指定行号，别依赖自动放置。 */
+.csh-game.no-topbar { grid-template-rows: minmax(0, 1fr) var(--game-dock-h); }
+.csh-game.no-topbar > .csh-stage { grid-row: 1; }
+.csh-game.no-topbar > .csh-dock { grid-row: 2; }
+
+/* ---------- 3. Topbar（规范 §2.1 / §14）：只放实时做决策需要的数据 ---------- */
+.csh-topbar {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-sm);
+  padding: 0 var(--game-pad);
+  /* 【2026-10-03】右侧预留壳的悬浮控制组（余额胶囊 + 关闭）的空白带：
+     壳顶带 40px 整条已删除，控制组改为浮在游戏帧右上角（csh_shell.js 的 #csh-shell-dock）。
+     这一条保证任何游戏页的数据都不会被那组悬浮件压住 —— 单点预留，五页通用。
+     （独立直开游戏页时右侧会空出同宽，代价可忽略。） */
+  padding-right: clamp(148px, 19vw, 186px);
+  overflow: hidden;
+  border-bottom: 1px solid var(--csh-line);
+  background: rgba(0, 0, 0, .18);
+}
+.csh-topbar .tb-item {
+  display: flex; align-items: baseline; gap: 4px;
+  min-width: 0; white-space: nowrap;
+}
+.csh-topbar .tb-k { font-size: var(--fs-3); color: var(--csh-text-dim); letter-spacing: .5px; }
+.csh-topbar .tb-v {
+  font-size: var(--fs-2); font-weight: 800; color: var(--csh-gold-hi);
+  font-variant-numeric: tabular-nums;
+  /* 规范 §15：数字永不被视口切掉 —— 允许省略号，绝不允许半个数字 */
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis;
+}
+.csh-topbar .tb-v.plain { color: var(--csh-text); }
+.csh-topbar .tb-grow { flex: 1 1 auto; min-width: 0; }
+.csh-topbar .tb-sep { flex: 0 0 1px; height: 45%; background: var(--csh-line); }
+
+/* ---------- 4. Stage：三个安全区（规范 §4 / §6.1） ---------- */
+.csh-stage {
+  display: grid;
+  /* 第一行用 auto 而不是百分比：HUD 槽只有一行文字，按百分比会白占几十像素
+     （实测 1280x720 下占 73px，其中约 50px 是纯空白）。auto = 按内容高度。
+     【2026-10-03】HUD 行在任何档位都不再 display:none（用户实机反馈「手机端
+     部分信息被遮蔽」）—— 矮屏上它只占一行 10~12px 文字的高度。 */
+  grid-template-rows: auto minmax(0, 1fr) minmax(var(--stage-player-min), auto);
+  overflow: hidden;
+}
+.csh-stage > * { min-width: 0; min-height: 0; }
+/* 显式指定 grid-row：HUD 行与主战区、玩家区各归各位，不依赖自动放置的次序 */
+.csh-hudrow { grid-row: 1; }
+.csh-board { grid-row: 2; }
+.csh-player { grid-row: 3; }
+
+/* ① Top HUD 槽：本局次级状态（连签 / 倍率 / 进度）。
+   【2026-10-03 用户实机反馈】任何档位都**不再隐藏** —— 手机横屏也要看到
+   生涯 / 带入 / 连签 / 第几手；它只有一行文字高，空间代价可忽略。 */
+.csh-hudrow {
+  display: flex; align-items: center; gap: var(--gap-sm);
+  padding: 0 var(--game-pad);
+  overflow: hidden;
+}
+.csh-hudrow .tb-item { display: flex; align-items: baseline; gap: 4px; min-width: 0; white-space: nowrap; }
+.csh-hudrow .tb-k { font-size: var(--fs-3); color: var(--csh-text-dim); }
+.csh-hudrow .tb-v { font-size: var(--fs-2); font-weight: 700; color: var(--csh-text); font-variant-numeric: tabular-nums; }
+.csh-hudrow .tb-grow { flex: 1 1 auto; }
+
+/* ② 主战区：座位层覆盖左右边缘（§5.1），中心安全区承载公共牌/底池 */
+.csh-board { position: relative; overflow: hidden; }
+.csh-seats { position: absolute; inset: 0; pointer-events: none; }
+.csh-seats > * { pointer-events: auto; }
+.csh-center {
+  position: absolute;
+  left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: var(--gap-xs);
+  z-index: 3;               /* 只保证牌面在座位之上，不承担"防重叠"职责 */
+  max-width: 96%;
+}
+
+/* ③ 玩家安全区（规范 §8.2：压成 1~2 行） */
+.csh-player {
+  display: flex; align-items: center; justify-content: center;
+  gap: var(--gap-md);
+  padding: 0 var(--game-pad);
+  overflow: hidden;
+}
+.csh-player .pl-brief {
+  display: flex; flex-direction: column; gap: 2px;
+  min-width: 0; max-width: 46%;
+  font-size: var(--fs-3); color: var(--csh-text-dim);
+}
+.csh-player .pl-line { display: flex; align-items: baseline; gap: 6px; min-width: 0; white-space: nowrap; }
+.csh-player .pl-line b { font-size: var(--fs-2); font-weight: 800; color: var(--csh-gold-hi); font-variant-numeric: tabular-nums; }
+.csh-player .pl-line .hand-name { color: var(--ok, #7fd8c4); font-weight: 700; }
+.csh-player .pl-line em { font-style: normal; color: var(--csh-text-dim); }
+
+/* ---------- 5. Action Dock（规范 §21）：稳定的控制台 ---------- */
+.csh-dock {
+  display: flex; align-items: center; justify-content: center;
+  gap: var(--gap-sm);
+  padding: 0 var(--game-pad);
+  overflow: hidden;
+  border-top: 1px solid var(--csh-line);
+  background: rgba(0, 0, 0, .18);
+}
+.csh-dock .btn,
+.csh-dock button {
+  flex: 0 0 auto;
+  min-height: clamp(38px, 10vh, 48px);
+  white-space: nowrap;          /* 规范 §21：按钮不因文字长度换行 */
+}
+.csh-dock .btn.grow { flex: 1 1 auto; }
+
+/* ---------- 6. 统一结算层（规范 §13） ----------
+   要点：结算层**不盖住牌桌** —— 它是压在牌桌上的紧凑浮层，背后仍能看到游戏桌，
+   且动画结束时**完全不透明**（禁止停在半透明，否则像"界面穿透"）。 */
+.csh-result {
+  position: fixed; inset: 0; z-index: 60;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: var(--gap-sm);
+  padding: var(--game-pad);
+  background: rgba(6, 5, 4, .46);      /* 只压暗，不遮死：规范 §13.1 */
+  animation: cshResultIn .18s ease-out both;
+}
+@keyframes cshResultIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.csh-result .rs-panel {
+  width: min(560px, 94%);
+  max-height: 88%;
+  overflow-y: auto;
+  display: flex; flex-direction: column; align-items: stretch;
+  gap: var(--gap-sm);
+  padding: clamp(12px, 2vh, 22px) clamp(14px, 2.2vw, 26px);
+  border: 1px solid var(--csh-line);
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(34, 26, 17, .985), rgba(21, 17, 12, .985));
+  box-shadow: 0 20px 50px rgba(0, 0, 0, .75);
+  animation: cshResultPanelIn .2s ease-out both;
+}
+@keyframes cshResultPanelIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+/* 三明治结构（规范 §15）：头部固定 / 中段内部滚动 / 底部按钮固定。
+   「下一手」这类 CTA 必须始终可见，绝不能跟着内容滚出屏幕 ——
+   这正是旧实现"底部内容被面板截掉"的成因（固定一个过矮的 modal 高度）。 */
+.csh-result .rs-head { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: 2px; text-align: center; }
+.csh-result .rs-body {
+  flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+  display: flex; flex-direction: column; gap: var(--gap-sm);
+}
+.csh-result .rs-foot { flex: 0 0 auto; display: flex; gap: var(--gap-sm); justify-content: center; flex-wrap: wrap; }
+.csh-result .rs-title { font-size: var(--fs-1); font-weight: 900; letter-spacing: 2px; }
+.csh-result .rs-title.win { color: var(--csh-gold-hi); }
+.csh-result .rs-title.lose { color: var(--danger, #d66e7c); }
+/* 「本手净变化 ±X」是全屏最大的一行数字：玩家唯一必须先看到的结论（方案 §11/§21） */
+.csh-result .rs-net { font-size: calc(var(--fs-1) * 1.35); font-weight: 900; letter-spacing: 1px; font-variant-numeric: tabular-nums; line-height: 1.2; }
+.csh-result .rs-net.plus { color: var(--ok, #7fd8c4); }
+.csh-result .rs-net.minus { color: var(--danger, #d66e7c); }
+.csh-result .rs-sec { display: flex; flex-direction: column; gap: 4px; }
+.csh-result .rs-sub { font-size: var(--fs-3); color: var(--csh-text-dim); line-height: 1.7; text-align: center; }
+.csh-result .rs-sub b { color: var(--csh-text); font-variant-numeric: tabular-nums; }
+.csh-result .rs-acts { display: flex; gap: var(--gap-sm); flex-wrap: wrap; justify-content: center; }
+
+/* 对照表（规范 §13）：结算依据必须一眼可读 */
+.csh-result .rs-rows { width: 100%; display: flex; flex-direction: column; gap: 4px; }
+.csh-result .rs-cap { font-size: var(--fs-3); color: var(--csh-text-dim); letter-spacing: 1px; text-align: left; }
+.csh-result .rs-row {
+  display: flex; align-items: center; gap: var(--gap-sm);
+  padding: clamp(3px, .6vh, 7px) clamp(7px, 1vh, 12px);
+  border: 1px solid var(--csh-line); border-radius: 10px;
+  background: rgba(0, 0, 0, .3);
+  font-size: var(--fs-2); text-align: left;
+}
+.csh-result .rs-row.me { background: rgba(216, 180, 106, .08); }
+.csh-result .rs-row.win { border-color: var(--csh-gold-hi); box-shadow: 0 0 0 1px rgba(244, 223, 168, .3); }
+.csh-result .rs-name { flex: 0 0 auto; max-width: 6.5em; font-weight: 700; color: var(--csh-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.csh-result .rs-cards { flex: 0 0 auto; display: flex; gap: 3px; }
+.csh-result .rs-hand { flex: 1 1 auto; min-width: 0; font-weight: 700; color: var(--ok, #7fd8c4); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.csh-result .rs-gain { flex: 0 0 auto; font-weight: 900; color: var(--csh-gold-hi); font-variant-numeric: tabular-nums; }
+.csh-result .rs-gain.zero { font-weight: 400; color: var(--csh-text-dim); }
+
+/* ---------- 7. 说明文字降级（规范 §22）：三级信息默认收起 ---------- */
+.csh-note { font-size: var(--fs-3); color: var(--csh-text-dim); line-height: 1.5; text-align: center; }
+.csh-note.devtip { display: none; }   /* 开发者说明不进普通玩家界面 */
+
+/* ---------- 8. 响应式：方向 + 可用高度（规范 §19） ---------- */
+
+/* L-SHORT：手机横屏主场景（915×412 档）—— 压缩间距，HUD 行保留但收紧行距 */
+@media (orientation: landscape) and (max-height: 430px) {
+  :root {
+    --stage-player-min: 15%;
+    --gap-md: 8px;
+  }
+  /* 【2026-10-03 用户实机反馈】HUD 槽不再整行隐藏（此前 display:none，
+     用户实测手机上「部分信息被遮蔽」）。只压上下 padding，一行文字的高度。 */
+  .csh-hudrow { padding-top: 1px; padding-bottom: 1px; }
+  .csh-result { padding: 6px; }
+  .csh-result .rs-panel { padding: 9px 12px; gap: 6px; border-radius: 12px; }
+  .csh-result .rs-sub { line-height: 1.5; }
+}
+
+/* L-TINY：极矮屏 —— 再砍装饰，只留操作与主内容 */
+@media (orientation: landscape) and (max-height: 350px) {
+  :root {
+    --stage-player-min: 16%;
+    --game-pad: 5px;
+  }
+  /* 【2026-10-03 用户实机反馈】标签（街道/筹码/盲注…）不再隐藏：横屏宽度充裕，
+     标签是纯水平开销、不占纵向空间，砍掉只会让数值失去含义（用户实测看不懂 2,000 是什么）。 */
+  .csh-player .pl-brief { font-size: 10px; }
+  .csh-first-cut { display: none !important; } /* 供各页标记"第一个该砍的装饰" */
+}
+
+/* 竖屏：小游戏要求横屏（壳有旋转引导），这里只保证不出现滚动条 */
+@media (orientation: portrait) {
+  .csh-game { overflow: hidden; }
+}
+
+/* 减少动态偏好：结算层不做动画 */
+@media (prefers-reduced-motion: reduce) {
+  .csh-result, .csh-result .rs-panel { animation: none; }
+}

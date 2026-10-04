@@ -1,0 +1,19 @@
+# 文本文件交给 git 自动识别、按标准方式换行
+* text=auto
+
+# 二进制资源：禁止任何换行转换与 diff 噪音
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.mp3 binary
+*.mp4 binary
+*.ogg binary
+*.wav binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+*.exe binary
+*.dll binary
