@@ -15,7 +15,7 @@ if command -v node >/dev/null 2>&1; then
 	exec node tools/check.js
 fi
 
-for exe in "../../../noname.exe" "../noname.exe" "../../../无名杀.exe"; do
+for exe in "../../../../noname.exe" "../../../../../无名杀.exe" "../../../../../无名杀/bin/无名杀.exe"; do
 	if [ -f "$exe" ]; then
 		echo "[池子魔将] 未找到 node，使用 Electron 运行时：$exe"
 		ELECTRON_RUN_AS_NODE=1 exec "$exe" tools/check.js

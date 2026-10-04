@@ -77,6 +77,7 @@ function targets() {
 	for (const f of collect(path.join(ROOT, "main"))) list.push(f);
 	for (const f of collect(path.join(ROOT, "character"))) list.push(f);
 	for (const f of collect(path.join(ROOT, "card"))) list.push(f);
+	for (const f of collect(path.join(ROOT, "skills"))) list.push(f);
 	for (const f of collect(path.join(ROOT, "mobilefx"))) list.push(f);
 	for (const f of collect(path.join(ROOT, "tools"))) {
 		/* 工具脚本自身也纳入检查，但跳过正在运行的这个文件以外的无关项 */
