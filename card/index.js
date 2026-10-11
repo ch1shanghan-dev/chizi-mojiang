@@ -819,7 +819,17 @@ export default {
                 },
                 onLose: function () {
                     player.addTempSkill("csh_huntianyi_skill_lose");
-                    if (event.getParent(2) && event.getParent(2).name == "csh_huntianyi_skill") {
+                    /* 【2026-10-05】按官方牌面：只有「受到伤害防止」这一条路（挡伤时
+                       csh_huntianyi_skill 在 lose 事件上打的 _csh_hty_destroy 标记）才销毁；
+                       被拆/被顺走等其他移出不销毁，照常进弃牌堆或对方手里（失去后照常摸两张）。
+                       标记检查**遍历整条祖先链**：引擎为 onLose 单独 createEvent，其直接 parent
+                       不保证恰是打标记的 lose 事件（层级随调用路径漂移），逐层查才稳。 */
+                    var found = false, evt = event;
+                    while (evt && !found) {
+                        if (evt._csh_hty_destroy) found = true;
+                        evt = evt.parent;
+                    }
+                    if (found) {
                         cards.forEach(function (card) {
                             card.fix();
                             card.remove();

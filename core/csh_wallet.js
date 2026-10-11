@@ -297,6 +297,59 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 	}
 
 	/* ============================================================
+	   2.5 哈希链账本（2026-10-05 · 防手改第二层）
+	   每笔余额变动记 {s:序号, d:变动, b:变动后余额, h:哈希}，
+	   h = 双轮 fnv1a(盐 | 上一笔哈希 | 序号 | 变动 | 变动后余额)。
+	   校验 = 重放整链：链内逐环验哈希与账实相续，链尾余额必须等于 wallet.pc。
+	   只改余额不动链 → 账实不符；改余额顺带改链尾 → 重放哈希对不上。
+	   断链/错账 → 走完整性回滚（快照）。诚实边界同 §4.5.6：防手改，不防"会重放全链的人"。
+	   ============================================================ */
+	var CHAIN_MAX = 120;
+	function chainHash(prev, seq, delta, balAfter) {
+		var s = HMAC_SALT + "|" + prev + "|" + seq + "|" + delta + "|" + balAfter;
+		var a = fnv1a(s), b = fnv1a(a + "|" + s.length);
+		return a + b;
+	}
+	function seedChain(reason) {
+		try {
+			wallet.chain = [];
+			wallet.chainSeq = 0;
+			wallet.chainBase = "GENESIS-" + reason;
+			wallet.chainBaseBal = wallet.pc;
+			wallet.chainBal = wallet.pc;
+		} catch (e) {}
+	}
+	function appendChain(delta) {
+		try {
+			if (!Array.isArray(wallet.chain) || typeof wallet.chainSeq !== "number") seedChain("init");
+			wallet.chainSeq += 1;
+			var balAfter = wallet.pc;
+			var prev = wallet.chain.length ? wallet.chain[wallet.chain.length - 1].h : wallet.chainBase;
+			wallet.chain.push({ s: wallet.chainSeq, d: delta, b: balAfter, h: chainHash(prev, wallet.chainSeq, delta, balAfter) });
+			if (wallet.chain.length > CHAIN_MAX) {
+				var dropped = wallet.chain.shift();
+				wallet.chainBase = dropped.h;      // 链头滚出窗口后，基线前移到它的哈希/余额
+				wallet.chainBaseBal = dropped.b;
+			}
+			wallet.chainBal = balAfter;
+		} catch (e) { /* 账本异常不阻断业务 */ }
+	}
+	function verifyChain() {
+		try {
+			if (!Array.isArray(wallet.chain) || typeof wallet.chainBaseBal !== "number" || typeof wallet.chainBal !== "number") return false;
+			var bal = wallet.chainBaseBal, prev = wallet.chainBase;
+			for (var i = 0; i < wallet.chain.length; i++) {
+				var e = wallet.chain[i];
+				if (!e || typeof e.d !== "number" || typeof e.s !== "number" || typeof e.b !== "number") return false;
+				if (chainHash(prev, e.s, e.d, e.b) !== e.h) return false;   // 链断
+				if (e.b !== bal + e.d) return false;                        // 账实不续
+				bal = e.b; prev = e.h;
+			}
+			return bal === wallet.chainBal && wallet.chainBal === wallet.pc;
+		} catch (e) { return false; }
+	}
+
+	/* ============================================================
 	   3. 钱包（§F.2 / §F.4 / §F.5）
 	   ============================================================ */
 	var walletDef = function () {
@@ -315,6 +368,8 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 	/* 死字段清理（2026-09-29）：老存档里残留的 bank/quota/quotaDate 直接删除，
 	   避免它们继续被误读为真值。 */
 	delete wallet.bank; delete wallet.quota; delete wallet.quotaDate;
+	/* 哈希链账本迁移（2026-10-05）：老存档/新装无链 → 以当前余额为基线播种 */
+	if (!Array.isArray(wallet.chain) || typeof wallet.chainBal !== "number") seedChain("migrate");
 
 	/* 写盘合并（2026-09-29 优化）：热点路径 addPC/spendPC 在实时游戏里每帧触发，
 	   若每次都同步全量 JSON.stringify×2 写 localStorage，低端设备会可感知卡顿。
@@ -364,6 +419,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 		var before = wallet.pc;
 		wallet.pc = clampNum(before + n, 0, PC_CAP);
 		var got = wallet.pc - before;
+		if (got > 0) appendChain(got);
 		scheduleSave();
 		logInfo("入账 " + got + " CBY（" + (reason || "") + "）→ " + wallet.pc);
 		return got;
@@ -374,6 +430,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 		if (n <= 0) return true;
 		if (wallet.pc < n) return false;
 		wallet.pc -= n;
+		appendChain(-n);
 		scheduleSave();
 		logInfo("出账 " + n + " CBY（" + (reason || "") + "）→ " + wallet.pc);
 		return true;
@@ -1218,6 +1275,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 				wallet.pc = clampNum(snap.pc, 0, PC_CAP);
 				wallet.streak = clampNum(snap.streak, 0, 9999);
 				wallet.lastSign = snap.lastSign || "";
+				seedChain("sig-rollback");
 				saveWallet();
 				logError("钱包完整性校验失败 → 已从快照回滚至 " + wallet.pc + " CBY");
 				toast("检测到存档异常，已恢复至最近合法状态");
@@ -1227,6 +1285,24 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 			wallet.pc = clampNum(wallet.pc, 0, PC_CAP);
 			saveWallet();
 			logError("钱包完整性校验失败且无快照 → 已钳制");
+			return { ok: false, action: "clamp", pc: wallet.pc };
+		}
+		/* 哈希链账本（2026-10-05）：签名对得上但账实不符（比如重算了 _sig）→ 第二层防线 */
+		if (!verifyChain()) {
+			var snap2 = lsJSON(K_SNAP, null);
+			if (snap2 && verifySig(snap2)) {
+				wallet.pc = clampNum(snap2.pc, 0, PC_CAP);
+				wallet.streak = clampNum(snap2.streak, 0, 9999);
+				wallet.lastSign = snap2.lastSign || "";
+				seedChain("chain-rollback");
+				saveWallet();
+				logError("哈希链账本校验失败 → 已从快照回滚至 " + wallet.pc + " CBY");
+				toast("检测到存档异常，已恢复至最近合法状态");
+				return { ok: false, action: "rollback", pc: wallet.pc };
+			}
+			seedChain("chain-clamp");
+			saveWallet();
+			logError("哈希链账本校验失败且无快照 → 已重建账本并钳制");
 			return { ok: false, action: "clamp", pc: wallet.pc };
 		}
 		return { ok: true, action: "none" };
@@ -1265,6 +1341,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 			}
 			if (typeof old.streak === "number") wallet.streak = clampNum(old.streak, 0, 9999);
 			if (typeof old.lastSignDay === "string") wallet.lastSign = old.lastSignDay;
+			seedChain("legacy-migrate");
 			saveWallet();
 			// 旧键保留为只读备份，不再写入
 			try { lsSet("csh_texas_bank_legacy", JSON.stringify(old)); } catch (e) {}

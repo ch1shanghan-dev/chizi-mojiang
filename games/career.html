@@ -22,74 +22,218 @@
   --ok:#7fb7a0;--warn:#c98a6a;
   --line:rgba(255,255,255,.08);
   --r:12px;--r-sm:8px;
-  --fs-xs:11px;--fs-sm:13px;--fs-md:15px;--fs-xl:26px;
+  /* ---------- 字体三档规范（A1 · 2026-10-07）----------
+     ① --ff-title  宋体系：宋祖有骨，撑「标题字」——菜单项 / 区块标题 / 官阶名 / 大数字；
+     ② --ff-body   黑体系：笔画均匀，长文本与控件最耐看——正文 / 说明 / 按钮 / 标签；
+     ③ --ff-num    等宽数字：tabular 对齐，数据列不跳动——余额 / 榜值 / 计数 / 编号。
+     为什么分三档：中文界面里「宋 + 黑」的对比就是高级感的来源（标题呼吸、正文稳当），
+     而数字单列一档是因为界面里所有数字都要竖着对齐 —— 靠字体而非逐处 margin。
+     字体只按「语义」归类，不按大小：同一元素改了字号仍属于同一档。 */
+  --ff-title:"Noto Serif SC","Source Han Serif SC","Songti SC","STSong","SimSun",serif;
+  --ff-body:"Noto Sans SC","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+  --ff-num:ui-monospace,"Cascadia Mono",Consolas,"SF Mono",Menlo,monospace;
+  /* 字号标尺（7 档，全部由 --fs-base 派生 —— 「改一个数字，全页按比例呼吸」）：
+     **移动端优先**：基数 12.5px 直接按手机横屏（915×412，本页主战场）定档，
+     桌面/平板用同一套值（不设第二套断点数字）—— 在手机上成立的密度，在桌面上必然成立。
+     比例表（相对基数）：10/13 角标 · 11.5/13 辅助 · 1 正文 · 1.2 导语 · 1.44 菜单 · 2.08 标题 · 2.32 数字牌。 */
+  --fs-base:12.5px;
+  --fs-tiny:calc(var(--fs-base) * .8);      /* 10px：角标（菜单编号、徽章刻度） */
+  --fs-cap:calc(var(--fs-base) * .92);      /* 11.5px：辅助标签（字段名、脚注、任务进度） */
+  --fs-body:var(--fs-base);                 /* 12.5px：正文（说明、按钮、列表行） */
+  --fs-lead:calc(var(--fs-base) * 1.2);     /* 15px：导语（卡片主标题） */
+  --fs-menu:calc(var(--fs-base) * 1.44);    /* 18px：菜单（页签） */
+  --fs-title:calc(var(--fs-base) * 2.08);   /* 26px：标题（官阶名、面板标题） */
+  --fs-display:calc(var(--fs-base) * 2.32); /* 29px：数字牌（全页唯一主角） */
+  --fs-xs:var(--fs-cap);--fs-sm:var(--fs-body);--fs-md:var(--fs-lead);--fs-xl:var(--fs-title);
   --st:env(safe-area-inset-top,0px);
   --sb:env(safe-area-inset-bottom,0px);
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{width:100%;height:100%;background:var(--ink-0);color:var(--text);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;
-  font-family:"Noto Sans SC","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+  font-family:var(--ff-body);
   -webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;overflow:hidden}
-#app{position:absolute;left:0;top:0;width:100%;height:100%;display:flex;flex-direction:column;
+#app{position:absolute;left:0;top:0;width:100%;height:100%;display:flex;flex-direction:row;
   padding-top:var(--st);padding-bottom:var(--sb);overflow:hidden}
 /* 防溢出：网格/弹性子项一律允许收缩 */
 #body,.page,.card,.sect{min-width:0;max-width:100%}
 .wallet,.tasks,.rows,.agrid,.rgrid,.matrix,.axlabel{min-width:0;max-width:100%}
 
 /* ---------- 顶带：页签 ---------- */
-#tabs{flex:0 0 auto;display:flex;border-bottom:1px solid var(--line);background:var(--ink-1);position:relative;
-  padding-right:clamp(122px,16vw,178px)}
-/* 【2026-10-03 修 UI 堆叠】右侧为壳的悬浮件（余额胶囊 + ✕）预留空白带：
-   实测截图里胶囊正压在「官阶」页签上。预留后页签整体左移，浮层落进空档，
-   与游戏页 .csh-topbar 的预留同款（单点预留，一处生效）。 */
-.tab{flex:1;min-height:46px;border:0;background:transparent;color:var(--text-dim);
-  font-size:var(--fs-md);font-family:inherit;cursor:pointer;position:relative}
+#tabs{flex:0 0 200px;display:flex;flex-direction:column;border-bottom:0;border-right:1px solid var(--line);background:var(--ink-1);position:relative;
+  padding:46px 0 14px}
+/* 【2026-10-07 根因修复】此前的 padding-right:clamp(122px,16vw,178px) 是横排顶带时代
+   给壳悬浮件留的右侧空白带 —— 改为竖排侧栏后它把 200px 宽的侧栏吃掉 178px，
+   内容区只剩 ~10px：文字逐字竖排、tm 数据叠字、"红框空白"全是它。
+   竖排布局下悬浮件仍在右上角 ⇒ 预留改为**顶部** 46px（覆盖胶囊+✕ 高度），右侧归零。 */
+.tab{flex:1 1 auto;min-height:58px;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;column-gap:8px;border:0;background:transparent;color:var(--text-dim);text-align:left;padding:12px 20px;
+  font-size:var(--fs-menu);font-family:var(--ff-title);cursor:pointer;position:relative;letter-spacing:.12em;transition:color .15s ease,transform .15s ease,background .15s ease}
+#tabs{counter-reset:menu}
+.tab::before{counter-increment:menu;content:"0" counter(menu);flex:0 0 100%;font-size:var(--fs-tiny);font-family:var(--ff-num);color:var(--gold);opacity:.55;letter-spacing:.2em;line-height:1}
+.tab:hover{color:var(--text);transform:translateX(4px);background:linear-gradient(90deg,rgba(255,255,255,.04),transparent)}
+.tab.on{color:var(--gold-hi);transform:translateX(4px);background:linear-gradient(90deg,rgba(var(--gold-rgb,201,168,106),.10),transparent)}
+.tab .tm{flex:0 0 auto;font-size:var(--fs-cap);font-family:var(--ff-num);font-style:normal;color:var(--gold);opacity:.8;font-variant-numeric:tabular-nums;letter-spacing:.02em;max-width:96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tab.on::before{opacity:1;font-weight:700}
 .tab.on{color:var(--text)}
-.tab.on::after{content:"";position:absolute;left:0;right:0;bottom:0;height:3px;background:var(--gold)}
+.tab.on::after{content:"";position:absolute;right:0;left:auto;top:0;bottom:0;width:3px;height:100%;background:var(--gold)}
 .tab .dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--gold);
   margin-left:5px;vertical-align:middle}
 
 /* ---------- 内容 ---------- */
-#body{flex:1 1 auto;min-height:0;overflow-y:auto;padding:14px 14px 20px;
+/* 下内距 20→16px（2026-10-07 A1）：字号标尺换档后总览双栏在 1000×756 溢 3px，
+   实测两列高度 725、可视 756 —— 差额就在这下内距里。收到 16px 换回一屏无滚动。 */
+#body{flex:1 1 auto;min-height:0;overflow-y:auto;padding:12px 12px 14px;
   -webkit-overflow-scrolling:touch}
 .page{display:none}
 .page.on{display:block}
 
-/* ---------- 总览双栏（2026-10-03）----------
-   ≥900px：左栏「身份与资产」/ 右栏「行动」，一屏看完（验收：1000×756 无纵向滚动）；
-   <900px 退回单列。密度同步收紧：卡片 14→12、块标题 16→12。 */
-@media (min-width:900px){
-  #p-overview{display:grid;grid-template-columns:minmax(0,11fr) minmax(0,13fr);gap:0 18px;align-items:start}
-  .ov-col{min-width:0}
-  .ov-col>.sect:first-child>h3{margin-top:0}
+/* ---------- 总览双栏（2026-10-03 立 · 2026-10-07 A1.5 修判定）----------   左栏「身份与资产」/ 右栏「行动」，一屏看完。
+   ★ 判定同样加了高度条件：手机横屏 915×412 比 900px 宽的旧判定**更宽**，
+     于是它被当成桌面、拿到双栏 —— 但 412px 高塞不下两栏各自的高度。
+     加高度条件后，低窗（手机横屏）自动退回单列，一屏内滚动的只有一列，信息不再被拉到屏外。 */
+@media (min-width:900px) and (min-height:641px){
+  /* 焦点卡是总览的直接子元素（A1.5 起），此处显式落进第 1 列 —— 不设的话它也会被自动放置，
+     实测会被塞进第 2 列、把「资产」挤到首位。
+     两列用 display:contents 摊平成网格项（列容器本身不出框），再逐块指定列 ——
+     与窄屏 flex 版共用同一份 HTML，只是排布不同。 */
+  .page.on#p-overview{display:grid;grid-template-columns:minmax(0,11fr) minmax(0,13fr);gap:0 26px;align-items:stretch}
+  .ov-col{display:contents}
+  /* 每一块都用「起/止」双值显式定位（起点+终点）—— 只写起点时，若该格与别的显式定位项冲突，
+     grid 会把这一项**整行撑满**（实测「资产」被拉到全宽），观感与设计意图完全不符。 */
+  #p-overview>#rankFocus{grid-column:1 / 2;grid-row:1}
+  #p-overview>.ov-col:first-child>.sect:nth-of-type(1){grid-column:1 / 2;grid-row:2}
+  #p-overview>.ov-col:first-child>.sect:nth-of-type(2){grid-column:1 / 2;grid-row:3}
+  #p-overview>.ov-col:last-child>.sect:nth-of-type(1){grid-column:2 / 3;grid-row:1 / span 2}
+  #p-overview>.ov-col:last-child>.sect:nth-of-type(2){grid-column:2 / 3;grid-row:3}
+  #p-overview>.ov-col:first-child>.sect:first-of-type>h3{margin-top:0}
 }
-.sect>h3{font-size:var(--fs-xs);font-weight:400;color:var(--text-dim);letter-spacing:.08em;
-  border-left:2px solid var(--gold);padding-left:8px;margin:12px 0 8px}
+#p-board .row.me{scroll-margin:80px}
+/* 排行榜子页签（资金/牌技/胜率/底池）—— 2026-10-07 误删过一次，恢复：它是页内互斥切换的唯一样式源 */
+.bd-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.bd-tab{border:1px solid var(--line);background:transparent;color:var(--text-dim);padding:6px 16px;border-radius:999px;cursor:pointer;font-size:var(--fs-sm);letter-spacing:.04em;transition:all .15s ease}
+.bd-tab.on{border-color:var(--gold);color:var(--gold-hi);background:rgba(255,255,255,.04)}
+#p-board .bd-view{display:none}
+#p-board .bd-view.on{display:block}
+#p-board .bd-view.on .rows{max-height:min(52vh,560px);overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding-right:4px}
+.sect>h3{font-size:var(--fs-body);font-family:var(--ff-title);font-weight:400;color:var(--text-dim);letter-spacing:.14em;
+  padding-left:8px;margin:10px 0 7px;position:relative}
+/* A2：左缘竖条改为「斜切金杠」（与侧栏记号同源），标题下加一条渐隐金线 ——
+   比 1px 通栏实线更像"手绘的一道界"。 */
+.sect>h3::before{content:"";position:absolute;left:0;top:.08em;bottom:.08em;width:2px;
+  background:var(--grad-gold);transform:skewY(-10deg)}
+.sect>h3::after{content:"";position:absolute;left:0;right:0;bottom:-4px;height:1px;
+  background:linear-gradient(90deg,rgba(201,168,106,.42),rgba(201,168,106,.06) 62%,transparent)}
 .sect:first-child>h3{margin-top:0}
 
 /* 卡 */
-.card{background:var(--ink-1);border:1px solid var(--line);border-radius:var(--r);padding:12px}
+/* ============================================================================
+   A2 材质光影三件套（2026-10-07 · 选样页 tools/material_ab.html 定的组合）
+   ----------------------------------------------------------------------------
+   三件套 = ① 发丝金线（描边这一层）② 金晕微光（卡片这一层）③ 光影金（面这一层）。
+   为什么用这三样而不是贴图/滤镜：全部是 CSS 渐变与 inset 阴影 —— 零外链（红线 #12）、
+   不申请合成层、不参与布局（只画不排），所以对帧率与尺寸都零风险。
+   三条纪律（照 A1 的教训）：
+     · 只画不排：材质一律走 border/background/box-shadow，绝不碰 padding/margin/尺寸；
+     · 单一真源：三档金的色值集中在下面 --gold-* 三个变量，消费方不写第二份；
+     · 有明暗方向：金属感来自「光从上往下」，所以任何渐变都从上缘亮到下缘暗（B 组做法）。
+   ============================================================================ */
+:root{
+  /* 三档金（暗金 / 主金 / 亮金）：与既有 --gold / --gold-hi 同一族，
+     只补一个"暗金"与两条渐变，供面/边/字三层分别取用。 */
+  --gold-dark:#8f7136;
+  --grad-gold:linear-gradient(180deg,var(--gold),var(--gold-dark));
+  --grad-gold-hi:linear-gradient(180deg,#fbeec4,#d8b46a);
+  /* 发丝金线：上缘亮、中段金、下缘收 —— 一根被光照到的金丝 */
+  --edge-filament:linear-gradient(180deg,rgba(255,255,255,.22),rgba(var(--gold-rgb,201,168,106),.55) 38%,rgba(255,255,255,.16));
+  /* 金晕：顶缘金高光 + 底部压暗（卡片浮起） */
+  --glow-card:inset 0 1px 0 rgba(201,168,106,.20),inset 0 -18px 26px -20px rgba(0,0,0,.9);
+}
+.card{background:var(--ink-1);border-radius:var(--r);padding:10px;
+  /* 双背景技法：padding-box 画底、border-box 画渐变描边 ⇒ 一根 1px 的发丝金线 */
+  border:1px solid transparent;
+  background:linear-gradient(var(--ink-1),var(--ink-1)) padding-box,var(--edge-filament) border-box;
+  box-shadow:var(--glow-card)}
 
-/* ---------- 总览：官阶焦点（2026-10-03 瘦身） ----------
-   头像 104→76px、内距 18→12：它是"当前身份"的陈词，不是全页主角 ——
-   高度省下来给右栏的行动区，双栏才能在一屏内对齐。 */
-#rankFocus{display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px}
+/* ---------- 移动端压缩（2026-10-07 · A1 配套）----------
+   作者定则：主要信息尽量一屏内看到，非必要不滑动。
+   ★ 判定为什么用「高度」而不是宽度：手机横屏是 915×412 —— 比本页的 900px 桌面断点还宽，
+     按宽度判定会让手机走进「桌面」分支（侧栏 200px、字号较大），而它其实只有 412px 高。
+     紧凑断点一律用 max-height（与 csh_layout.css 的 L-SHORT 同口径），宽度只用于竖屏。
+   这里只做三件事（不藏信息、不缩字号）：① 侧栏收窄，宽度还给内容；② 卡片内距/块间距收紧；
+   ③ 成就墙按内容宽度自适应列数。桌面（≥900px 且不矮）完全不受影响。 */
+@media (max-height:640px),(max-width:899px){
+  #tabs{flex:0 0 168px}
+  .tab{padding:10px 14px;min-height:52px}
+  .card{padding:9px}
+  .sect>h3{margin:8px 0 6px}
+  .wallet{gap:6px}
+  .wl{padding:8px}
+  .agrid{grid-template-columns:repeat(auto-fill,minmax(76px,1fr));gap:6px}
+  /* ★ 窄屏总览重排（A1.5 核心）：不删内容，改排布 —— 竖排五大块 → 「横幅 + 左窄右宽两列」。
+       第 1 行（跨两列）：官阶焦点卡 —— 它本就是横排布局，当横幅正好
+       第 2 行：[左] 资产 · 今日（我现在的状态，窄栏够用）｜[右] 今日任务 + 数据迁移
+     为什么用 flex 而不是 grid：先前的 grid 版把三块放进同一行轨道，
+     轨道高由最高的那块（今日任务 302px）决定 ⇒ 左列两块之间空出 227px 死白（实测）。
+     flex 行内两列各自成栈、向上补齐，没有轨道概念，也就没有空档。
+     单份 HTML 两种排布，桌面仍是原来的左右两栏（由上面那条 grid 规则接管）。 */
+  .page.on#p-overview{display:flex;flex-wrap:wrap;align-items:flex-start;gap:7px 10px}
+  .ov-col{display:flex;flex-direction:column;gap:7px;min-width:0}
+  #p-overview>#rankFocus{flex:0 0 100%;order:1}                 /* 焦点卡整行横幅 */
+  #p-overview>.ov-col{flex:1 1 calc(50% - 5px);order:3}         /* 两列等宽（左右宽度差由内容自定） */
+  #p-overview>.ov-col:not(:last-child){flex:0 0 calc(42% - 5px);order:2}  /* 左窄列：资产 / 今日 */
+  /* 焦点卡在窄屏收三档：徽章 76→44、官阶名 26→20、大数字 29→21 —— 都是"陈词级"信息
+     （谁 / 什么衔 / 多少钱），真正的决策信息是进度与功勋。收档后整卡 273→约 110px。 */
+  #rankFocus{padding:8px;gap:10px}
+  #rankFocus .badge,#rankFocus .badge svg{width:44px;height:44px}
+  #rankFocus .name{font-size:calc(var(--fs-base) * 1.6)}
+  #rankFocus .rf-id{gap:2px}
+  #rankFocus .pc-big span{font-size:calc(var(--fs-base) * 1.7)}
+  #rankFocus .pc-big{margin-top:0;justify-content:flex-end}
+  #rankFocus .foot{font-size:var(--fs-tiny)}
+  #rankFocus .bar{height:6px}
+  .sect>h3{margin:2px 0 5px}
+  .card{padding:8px}
+  .wallet{gap:6px}
+  .wl{padding:6px}
+  .tasks{gap:4px}
+  .task{padding:5px 8px;min-height:34px;gap:6px}
+  #ov-tasks-note{display:none}   /* 任务说明：标题已交代"五游戏共用"，这条属重复交代 */
+  .migrow{margin-top:6px;gap:6px}
+  .migrow .btn{padding:6px 11px}
+  .diffbox{margin-top:4px;line-height:1.5}
+  #ov-today{line-height:1.5}
+  #body{padding:10px 10px 12px}
+}
+
+/* ---------- 总览：官阶焦点（2026-10-03 瘦身 → 2026-10-07 A1.5 横排化） ----------
+   原竖排五层（徽章/官阶名/段位/进度/大数字）在手机横屏占 273px —— 全页最贵的一块。
+   现改**横排双栏**：左「我是谁」（徽章 + 官阶名 + 段位），右「我什么水平」（进度 + 功勋 + 钱包）。
+   两侧靠 flex 分布对齐（不是靠 margin 猜位置）；大数字仍贴在卡的右下角，视觉重心不变。 */
+#rankFocus{display:flex;flex-direction:row;align-items:center;gap:14px;padding:12px}
+#rankFocus .rf-id{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:4px}
+#rankFocus .rf-main{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:5px}
 #rankFocus .badge{width:76px;height:76px;display:flex;align-items:center;justify-content:center}
 #rankFocus .badge svg{width:76px;height:76px}
-#rankFocus .name{font-size:var(--fs-xl);font-weight:700;letter-spacing:.06em;line-height:1.1;color:var(--gold)}
-#rankFocus .sub{font-size:var(--fs-sm);color:var(--text-dim)}
+#rankFocus .name{font-size:var(--fs-title);font-family:var(--ff-title);font-weight:700;letter-spacing:.06em;line-height:1.1;color:var(--gold)}
+#rankFocus .sub{font-size:var(--fs-sm);font-family:var(--ff-num);color:var(--text-dim);font-variant-numeric:tabular-nums}
 #rankFocus .segtag{display:inline-block;padding:2px 10px;border-radius:999px;font-size:var(--fs-xs);
   border:1px solid var(--gold-line);background:var(--gold-fill);color:var(--gold-hi)}
 .bar{height:8px;border-radius:4px;background:rgba(255,255,255,.08);overflow:hidden;width:100%}
 .bar>i{display:block;height:100%;background:linear-gradient(90deg,var(--gold-soft),var(--gold-hi));
   transition:width .3s ease-out}
-#rankFocus .foot{display:flex;justify-content:space-between;width:100%;font-size:var(--fs-xs);color:var(--text-dim)}
+#rankFocus .foot{display:flex;justify-content:space-between;align-items:center;gap:10px;width:100%;font-size:var(--fs-xs);color:var(--text-dim)}
+#rankFocus .foot span{font-family:var(--ff-num);font-variant-numeric:tabular-nums;white-space:nowrap}
+#rankFocus .foot .segtag{font-family:var(--ff-body)}
+#rankFocus .pcrow{display:flex;align-items:baseline;justify-content:flex-end;gap:7px}
+/* 阶序与功勋差额的两档文案走 §"两档文案机制" 的 .two-tier（JS 生成两个 span，CSS 切显示）——
+   早期版本用 data-* + ::before{content:attr()} 实现，但 attr() 只能出纯文本，
+   遇到要加 <b> 的文案会把标签当字面字符打出来；且与 .two-tier 并存等于两套写法，已统一。 */
 
 /* 钱包格（2026-10-03：池子币与官阶卡大数字重复已删，剩两格自适应两列） */
 .wallet{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px}
-.wl{background:var(--ink-1);border:1px solid var(--line);border-radius:var(--r-sm);padding:10px;text-align:center}
+.wl{background:var(--ink-1);border:1px solid var(--line);border-radius:var(--r-sm);padding:10px;text-align:center;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.07),inset 0 -14px 22px -18px rgba(0,0,0,.9)}   /* A2 顶缘微光 */
 .wl .k{font-size:var(--fs-xs);color:var(--text-dim);letter-spacing:.06em}
-.wl .v{font-size:20px;font-weight:700;color:var(--gold-hi);font-variant-numeric:tabular-nums;line-height:1.2}
+.wl .v{font-size:var(--fs-menu);font-family:var(--ff-num);font-weight:700;color:var(--gold-hi);font-variant-numeric:tabular-nums;line-height:1.2}
 
 /* 快捷开局 */
 #quick{display:flex;gap:8px;flex-wrap:wrap}
@@ -97,15 +241,39 @@ html,body{width:100%;height:100%;background:var(--ink-0);color:var(--text);-webk
   background:var(--gold-fill);color:var(--gold-hi);font-size:var(--fs-sm);font-family:inherit;cursor:pointer}
 #quick .qbtn small{display:block;font-size:var(--fs-xs);color:var(--text-dim);margin-top:2px}
 
-/* ---------- 任务卡 ---------- */
-.tasks{display:flex;flex-direction:column;gap:8px}
-.task{display:flex;align-items:center;gap:10px;min-height:56px;padding:10px 12px;
+/* ---------- 任务卡（2026-10-07 A1.5 行式化）----------
+   原「标签/进度」两行竖排，6 条占 548px —— 手机横屏里仅次于整体滚动的第二贵项。
+   改为**单行三栏**：名称（左，可省略）/ 进度条（中，吃满剩余宽度）/ 进度与奖励（右，等宽数字）。
+   信息一条不少，只是不再各占一行；窄屏奖励显示为「+600」（省略 CBY，单位在标题栏已交代）。 */
+.tasks{display:flex;flex-direction:column;gap:6px}
+.task{display:flex;align-items:center;gap:10px;min-height:42px;padding:7px 11px;
   background:var(--ink-1);border:1px solid var(--line);border-radius:var(--r-sm)}
 .task.done{border-color:var(--gold-line);background:var(--gold-fill)}
-.task .tk-main{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:5px}
-.task .tk-lab{font-size:var(--fs-sm);font-weight:700}
-.task .tk-num{font-size:var(--fs-xs);color:var(--text-dim)}
-.task .tk-rw{flex:0 0 auto;font-size:var(--fs-xs);color:var(--gold);font-weight:700}
+/* 收缩优先级（A1.5 实测教训）：进度条是"可压缩"的那一格，名称绝不能被压成省略号。
+   第一版给了 .bar flex:1 1 auto + .tk-lab flex:0 1 auto ⇒ 浏览器先压缩标签，
+   「德州打满 3 手」被截成「德州打…」。现在名称 0 0 auto、进度条 1 1 40px 承担全部收缩。 */
+.task .tk-main{flex:1 1 auto;min-width:0;display:flex;flex-direction:row;align-items:center;gap:8px}
+.task .tk-lab{font-size:var(--fs-sm);font-weight:700;flex:0 0 auto;max-width:46%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.task .bar{flex:1 1 40px;min-width:36px;height:6px}   /* 行式布局下由它吃掉剩余宽度（也只由它承担收缩） */
+/* 收纳行（默认 · 窄屏优先）：名称 + 进度条 + 进度/奖励，一行读完 */
+.task .tk-num{flex:0 0 auto;font-size:var(--fs-cap);font-family:var(--ff-num);color:var(--text-dim)}
+.task .tk-rw{flex:0 0 auto;font-size:var(--fs-cap);font-family:var(--ff-num);color:var(--gold);font-weight:700}
+/* ---------- 两档文案机制（A1.5）----------
+   同一份真值、两种呈现（窄屏短式 / 桌面全称），**由 CSS 按尺寸切换**，JS 只负责写内容。
+   为什么不用 data-* + ::before{content:attr()}：attr() 只能输出纯文本，
+   而这里有些文案要带 <b> 强调（如「门票折扣 10%」）—— 富文本会被当成字面字符打出来。
+   机制：JS 生成 .two-tier[data-full]/[data-compact] 两个 span，CSS 一次只显示一个；
+   元素的 innerHTML 因此天然是空的，不需要 font-size:0 之类的隐藏技巧。
+   断点：**窄屏优先**（默认短式），只在「够宽且不矮」时换全称 —— 与 §"移动端压缩" 同一条件。 */
+.two-tier{display:inline}
+.two-tier>[data-compact]{display:inline}
+.two-tier>[data-full]{display:none}
+@media (min-width:900px) and (min-height:641px){
+  .two-tier>[data-compact]{display:none}
+  .two-tier>[data-full]{display:inline}
+}
+/* 单元素版（纯文本，无富文本需求）已由 .two-tier 统一取代 —— 不再保留 ::before 版本，
+   一处机制一处实现（避免"两种两档写法并存"这种下次必然出错的债）。 */
 
 /* ---------- 成就网格 ---------- */
 .agrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:8px}
@@ -114,23 +282,25 @@ html,body{width:100%;height:100%;background:var(--ink-0);color:var(--text);-webk
 .ach.on{border-color:var(--gold-line);background:var(--gold-fill)}
 .ach .ico{font-size:22px;line-height:1;margin-bottom:6px;filter:grayscale(1) opacity(.45)}
 .ach.on .ico{filter:none}
-.ach span{font-size:var(--fs-xs);color:var(--text-dim)}
+.ach span{font-size:var(--fs-cap);color:var(--text-dim)}
 .ach.on span{color:var(--text)}
 /* 2026-09-28 成就墙扩展：进度条 / 分类筛选 / 领取按钮 / 池子币大字 */
 .ach .abar{width:100%;height:4px;background:rgba(255,255,255,.08);border-radius:2px;overflow:hidden;margin-top:4px}
 .ach .abar i{display:block;height:100%;background:var(--gold-line);border-radius:2px}
-.ach .alab{font-size:11px;color:var(--text-dim);margin-top:2px}
+.ach .alab{font-size:var(--fs-cap);color:var(--text-dim);margin-top:2px}
 .catchips{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 10px}
 .catchips .chip{font-size:var(--fs-xs);padding:4px 12px;border-radius:14px;cursor:pointer;
   border:1px solid var(--line);color:var(--text-dim);background:var(--ink-1);user-select:none}
 .catchips .chip.on{border-color:var(--gold-line);color:var(--gold-hi);background:var(--gold-fill)}
-.ach .aclaim{margin-top:4px;font-size:11px;padding:3px 10px;border-radius:10px;cursor:pointer;
+.ach .aclaim{margin-top:4px;font-size:var(--fs-cap);padding:3px 10px;border-radius:10px;cursor:pointer;
   border:1px solid var(--gold-line);color:#1a130a;background:var(--gold-line);font-weight:700;user-select:none}
 .ach .aclaim.got{background:transparent;color:var(--text-dim);border-color:var(--line);font-weight:400}
-.pc-big{display:flex;align-items:baseline;justify-content:center;gap:8px;margin-top:8px}
-.pc-big span{font-size:26px;font-weight:900;color:var(--gold-hi);letter-spacing:1px;
-  text-shadow:0 2px 14px rgba(216,180,106,.35)}
-.pc-big small{font-size:var(--fs-xs);color:var(--text-dim)}
+.pc-big{display:flex;align-items:baseline;justify-content:center;gap:8px;margin-top:8px;flex-wrap:nowrap}
+.pc-big span{font-size:var(--fs-display);font-family:var(--ff-title);font-weight:900;color:var(--gold-hi);letter-spacing:.02em;
+  font-variant-numeric:tabular-nums;text-shadow:0 2px 14px rgba(216,180,106,.35)}
+/* 单位不许折行（A1.5）：窄栏里「池子币 CBY」被挤成三行会把整卡顶高一倍 —— 宁可让它溢出也不换行 */
+.pc-big small{font-size:var(--fs-xs);color:var(--text-dim);white-space:nowrap;flex:0 0 auto}
+.pc-big span{min-width:0}
 
 /* ---------- 排行 ---------- */
 .rows{display:flex;flex-direction:column}
@@ -138,14 +308,17 @@ html,body{width:100%;height:100%;background:var(--ink-0);color:var(--text);-webk
   border-bottom:1px solid var(--line)}
 .row:last-child{border-bottom:0}
 .row .pvp{flex:0 0 auto;width:34px;height:34px;border-radius:50%;background:var(--ink-3);
-  display:flex;align-items:center;justify-content:center;font-size:var(--fs-xs);color:var(--text-dim)}
+  display:flex;align-items:center;justify-content:center;font-size:var(--fs-tiny);font-family:var(--ff-num);color:var(--text-dim)}
 .row .nm{flex:1 1 auto;min-width:0;font-size:var(--fs-sm);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.row .vl{flex:0 0 auto;font-size:var(--fs-sm);color:var(--gold-hi);font-variant-numeric:tabular-nums;font-weight:700}
+.row .vl{flex:0 0 auto;font-size:var(--fs-body);font-family:var(--ff-num);color:var(--gold-hi);font-variant-numeric:tabular-nums;font-weight:700}
+.row.me{border:1px solid var(--gold);background:rgba(255,255,255,.03);
+  box-shadow:inset 0 1px 0 rgba(201,168,106,.22),0 0 18px -12px rgba(201,168,106,.5)}   /* A2 金晕 */
+.row.me .nm{color:var(--gold-hi);font-weight:700}
 .row.me .nm{color:var(--gold)}
 
 /* ---------- 官阶图鉴 ---------- */
 .segblock{margin-bottom:14px}
-.segblock .seghd{display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:var(--fs-sm);font-weight:700}
+.segblock .seghd{display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:var(--fs-body);font-family:var(--ff-title);font-weight:700}
 .segblock .seghd i{width:12px;height:12px;border-radius:3px;display:inline-block}
 .rgrid{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
 .rcell{background:var(--ink-1);border:1px solid var(--line);border-radius:var(--r-sm);
@@ -154,10 +327,10 @@ html,body{width:100%;height:100%;background:var(--ink-0);color:var(--text);-webk
 .rcell.cur{border-color:var(--gold);background:var(--gold-fill)}
 .rcell .rb{width:40px;height:40px;margin:0 auto}
 .rcell .rb svg{width:40px;height:40px}
-.rcell .rn{font-size:10px;color:var(--text-dim);margin-top:3px;overflow:hidden;text-overflow:ellipsis;
+.rcell .rn{font-size:var(--fs-tiny);color:var(--text-dim);margin-top:3px;overflow:hidden;text-overflow:ellipsis;
   white-space:nowrap}
 .rcell.cur .rn{color:var(--gold-hi)}
-.rcell .rm{font-size:9px;color:var(--text-dim);font-variant-numeric:tabular-nums}
+.rcell .rm{font-size:var(--fs-tiny);font-family:var(--ff-num);color:var(--text-dim);font-variant-numeric:tabular-nums}
 /* 方位将军 4×4 矩阵 */
 .matrix{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
 .mx{background:var(--ink-1);border:1px solid var(--line);border-radius:var(--r-sm);padding:8px 4px;text-align:center}
@@ -173,9 +346,19 @@ textarea{width:100%;min-height:96px;background:var(--ink-2);border:1px solid var
   font-size:16px;padding:10px;resize:vertical}
 .migrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
 .btn{min-height:44px;padding:0 16px;border-radius:var(--r-sm);border:1px solid var(--gold-line);
-  background:var(--gold-fill);color:var(--gold-hi);font-size:var(--fs-sm);font-family:inherit;cursor:pointer}
-.btn.ghost{background:transparent;color:var(--text-dim);border-color:var(--line)}
-.btn:disabled{opacity:.45;cursor:not-allowed}
+  background:var(--gold-fill);color:var(--gold-hi);font-size:var(--fs-sm);font-family:inherit;cursor:pointer;
+  /* A2：主操作按钮走"光影金"——垂直渐变 + 顶缘内高光，按下去有实体的感觉 */
+  background:var(--grad-gold);color:var(--gold-dark);font-weight:700;border-color:transparent;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.30),inset 0 -1px 0 rgba(0,0,0,.28),0 2px 10px -6px rgba(201,168,106,.5)}
+.btn:hover{background:var(--grad-gold-hi)}
+.btn:active{box-shadow:inset 0 2px 6px rgba(0,0,0,.30)}
+.btn.ghost{background:transparent;color:var(--text-dim);border-color:var(--line);box-shadow:none;font-weight:400}
+.btn.ghost:hover{background:rgba(255,255,255,.04);color:var(--text)}
+/* 禁用态（实测踩坑）：主按钮的墨字压"金色实底"才成立，
+   一旦禁用退回素底，墨字就变成深底上的深字 —— 看不清。
+   所以禁用态必须把前景翻回浅色、压掉金底与描边，让状态一眼可辨。 */
+.btn:disabled{background:rgba(255,255,255,.05);color:var(--text-dim);border-color:var(--line);
+  box-shadow:none;font-weight:400;cursor:not-allowed}
 .diffbox{font-size:var(--fs-xs);color:var(--text-dim);line-height:1.8;margin-top:8px}
 
 /* ---------- 弹窗 ---------- */
@@ -211,11 +394,11 @@ textarea{width:100%;min-height:96px;background:var(--ink-2);border:1px solid var
 <body>
 <div id="app">
   <div id="tabs">
-    <button class="tab on" data-p="overview">总览</button>
-    <button class="tab" data-p="tasks">任务</button>
-    <button class="tab" data-p="ach">成就</button>
-    <button class="tab" data-p="rank">官阶</button>
-    <button class="tab" data-p="board">排行</button>
+    <button class="tab on" data-p="overview">总览<i class="tm" id="tm-overview"></i></button>
+    <button class="tab" data-p="tasks">任务<i class="tm" id="tm-tasks"></i></button>
+    <button class="tab" data-p="ach">成就<i class="tm" id="tm-ach"></i></button>
+    <button class="tab" data-p="rank">官阶<i class="tm" id="tm-rank"></i></button>
+    <button class="tab" data-p="board">排行<i class="tm" id="tm-board"></i></button>
   </div>
   <div id="body">
     <!-- 总览（2026-10-03 · 双栏化）
@@ -225,17 +408,25 @@ textarea{width:100%;min-height:96px;background:var(--ink-2);border:1px solid var
          窄屏退回单列（顺序不变）。池子币大数字只保留官阶卡里那一处
          （原「资产」格里是同一位数字的第二份渲染，违反一层原则，已删）。 -->
     <div class="page on" id="p-overview">
-      <div class="ov-col">
-        <div class="card" id="rankFocus">
+      <!-- 官阶焦点卡（2026-10-07 A1.5：从 ov-col 里提出来，成为总览的**直接子元素**）——
+           窄屏总览因此可以排成「横幅 + 左窄右宽两列」：焦点卡独占整行当横幅，
+           下面两列各自成栈。宽屏见 §总览双栏（grid 3 列，它占第 1 列）。 -->
+      <div class="card" id="rankFocus">
+        <div class="rf-id">
           <div class="badge" id="ov-badge"></div>
           <div class="name" id="ov-rankname">—</div>
-          <div class="segtag" id="ov-segtag">—</div>
-          <div class="sub" id="ov-rankidx">—</div>
+        </div>
+        <div class="rf-main">
+          <!-- 进度条是这张卡的视觉主行（A1.5：从"塞在中间"提到最上面） -->
           <div class="bar"><i id="ov-rankbar" style="width:0%"></i></div>
-          <div class="foot"><span id="ov-need">—</span><span id="ov-merit">—</span></div>
+          <div class="foot"><span id="ov-need">—</span><span id="ov-rankidx">—</span></div>
+          <div class="foot"><span id="ov-merit">—</span><span class="segtag" id="ov-segtag">—</span></div>
           <!-- 2026-09-28：池子币大字展示（用户反馈「没有一个可以查看池子币的地方」） -->
           <div class="pc-big"><span id="ov-pc-big">—</span><small>池子币 CBY</small></div>
         </div>
+      </div>
+
+      <div class="ov-col">
 
         <div class="sect"><h3>资产</h3>
           <div class="wallet">
@@ -256,11 +447,6 @@ textarea{width:100%;min-height:96px;background:var(--ink-2);border:1px solid var
       </div>
 
       <div class="ov-col">
-        <div class="sect"><h3>快捷开局</h3>
-          <div id="quick"></div>
-          <div class="diffbox" id="quick-note">带入制：入座前选带入，离桌后按比例结算；其余按门票计价。</div>
-        </div>
-
         <div class="sect"><h3>今日任务 · 五游戏共用</h3>
           <div class="tasks" id="ov-tasks"></div>
           <div class="diffbox" id="ov-tasks-note">与各游戏内看到的是同一份进度。</div>
@@ -268,11 +454,13 @@ textarea{width:100%;min-height:96px;background:var(--ink-2);border:1px solid var
 
         <div class="sect"><h3>数据迁移</h3>
           <div class="card">
-            <div class="diffbox" id="mig-info">导出一份生涯存档（战绩 / 钱包 / 官阶 / AI 世界），可跨设备恢复。</div>
+            <!-- A1.5：这一屏是"低频操作"，说明文字在手机横屏折叠成 3 行占掉 60px。
+                 说明移入按钮 tooltip（信息不丢），面板标题已交代场景；桌面端用 CSS 还原这句说明。 -->
+            <div class="diffbox mig-note" id="mig-info">导出一份生涯存档（战绩 / 钱包 / 官阶 / AI 世界），可跨设备恢复。</div>
             <div class="migrow">
-              <button class="btn" id="mig-export">导出</button>
-              <button class="btn ghost" id="mig-import">导入</button>
-              <button class="btn ghost" id="mig-backups">备份</button>
+              <button class="btn" id="mig-export" title="导出一份生涯存档（战绩 / 钱包 / 官阶 / AI 世界），可跨设备恢复">导出存档</button>
+              <button class="btn ghost" id="mig-import" title="粘贴存档串，恢复一份生涯存档">导入</button>
+              <button class="btn ghost" id="mig-backups" title="查看本机保存的历史备份，可回滚">备份</button>
             </div>
             <div class="migrow" style="margin-top:10px">
               <button class="btn" id="mig-reset" style="background:#a8442f;color:#fff;border-color:transparent">重置存档（回到初始状态）</button>
@@ -326,10 +514,18 @@ textarea{width:100%;min-height:96px;background:var(--ink-2);border:1px solid var
       <div class="sect"><h3>世界动态</h3><div class="feed" id="bd-news"></div></div>
       <div class="sect"><h3>世界之最</h3><div class="wmax" id="bd-most"></div></div>
       <div class="diffbox" id="bd-note">数据源：AI 世界档案（资金与胜负随牌局实时演化）。</div>
-      <div class="sect"><h3>资金榜</h3><div class="rows" id="bd-fund"></div></div>
-      <div class="sect"><h3>牌技榜</h3><div class="rows" id="bd-skill"></div></div>
-      <div class="sect"><h3>胜率榜</h3><div class="rows" id="bd-win"></div></div>
-      <div class="sect"><h3>最大底池榜</h3><div class="rows" id="bd-pot"></div></div>
+      <div class="sect">
+        <div class="bd-tabs">
+          <button class="bd-tab on" data-bd="bd-fund">资金</button>
+          <button class="bd-tab" data-bd="bd-skill">牌技</button>
+          <button class="bd-tab" data-bd="bd-win">胜率</button>
+          <button class="bd-tab" data-bd="bd-pot">底池</button>
+        </div>
+        <div class="sect bd-view on" id="v-bd-fund"><h3>资金榜</h3><div class="rows" id="bd-fund"></div></div>
+        <div class="sect bd-view" id="v-bd-skill"><h3>牌技榜</h3><div class="rows" id="bd-skill"></div></div>
+        <div class="sect bd-view" id="v-bd-win"><h3>胜率榜</h3><div class="rows" id="bd-win"></div></div>
+        <div class="sect bd-view" id="v-bd-pot"><h3>最大底池榜</h3><div class="rows" id="bd-pot"></div></div>
+      </div>
       <div class="sect"><h3>已退隐</h3><div class="rows" id="bd-out"></div></div>
     </div>
   </div>
@@ -358,6 +554,27 @@ var Bridge = (function () {
 function $(s) { return document.querySelector(s); }
 function fmt(n) { n = Math.round(Number(n) || 0); return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ","); }
 function el(t, c, x) { var e = document.createElement(t); if (c) e.className = c; if (x != null) e.textContent = x; return e; }
+/* 两档文案（A1.5）：生成一个 .two-tier 容器，内含「桌面全称 / 窄屏短式」两个 span；
+   CSS 按尺寸只显示其中一个。富文本用 innerHTML 写入（强调 <b> 不会被当字面字符）。 */
+function tiered(fullHtml, compactHtml, ariaLabel) {
+  var wrap = document.createElement("span");
+  wrap.className = "two-tier";
+  var f = document.createElement("span"); f.setAttribute("data-full", ""); f.innerHTML = fullHtml;
+  var c = document.createElement("span"); c.setAttribute("data-compact", ""); c.innerHTML = compactHtml;
+  wrap.appendChild(f); wrap.appendChild(c);
+  if (ariaLabel) wrap.setAttribute("aria-label", ariaLabel);
+  return wrap;
+}
+/* 就地替换某元素的文案为两档形态（用于 HTML 里写死结构的元素，如官阶卡的阶序/差额） */
+function setTiered(node, fullHtml, compactHtml, ariaLabel) {
+  if (!node) return;
+  node.classList.add("two-tier");
+  node.innerHTML = "";
+  var f = document.createElement("span"); f.setAttribute("data-full", ""); f.innerHTML = fullHtml;
+  var c = document.createElement("span"); c.setAttribute("data-compact", ""); c.innerHTML = compactHtml;
+  node.appendChild(f); node.appendChild(c);
+  if (ariaLabel) node.setAttribute("aria-label", ariaLabel);
+}
 /* 轻量 toast（成就领取反馈用；2026-09-28 新增） */
 var _toastBox = null;
 function toast(msg) {
@@ -454,7 +671,8 @@ function bindTabs() {
 function renderOverview() {
   var s = State.snap;
   if (!s) return;
-  $("#ov-pc-big").textContent = fmt(s.pc);   /* 池子币唯一渲染位（资产格的重复已删，2026-10-03） */
+  $("#ov-pc-big").textContent = fmt(s.pc);
+  var tmO = document.querySelector("#tm-overview"); if (tmO) tmO.textContent = fmt(s.pc);   /* 池子币唯一渲染位（资产格的重复已删，2026-10-03） */
   $("#ov-streak").textContent = fmt(s.streak) + " 天";
   $("#ov-peak").textContent = fmt(s.pcPeak || s.pc || 0);
 
@@ -467,7 +685,10 @@ function renderOverview() {
   for (var i = 0; i < ranks.length; i++) if (ranks[i].rank === cur) { rec = ranks[i]; break; }
   var name = (info && info.name) || (rec && rec.name) || "平民";
   $("#ov-rankname").textContent = name;
-  $("#ov-rankidx").textContent = "第 " + cur + " 阶 / 共 50 阶";
+  /* 阶序（2026-10-07 A1.5）：窄栏里「第 23 阶 / 共 50 阶」会挤爆右侧数据列，
+     改用两档文案（桌面全称 / 窄屏 23/50）—— 同一份真值，两种呈现，不写第二份数字。 */
+  setTiered($("#ov-rankidx"), "第 " + cur + " 阶 / 共 50 阶", cur + "/50", "当前第 " + cur + " 阶，共 50 阶");
+  var tmR = document.querySelector("#tm-rank"); if (tmR) tmR.textContent = name;
 
   /* 段名：从钱包真值取（2026-09-29 起不再自造） */
   var seg = segOfRank(cur);
@@ -484,6 +705,9 @@ function renderOverview() {
   var pct = cur >= 50 ? 100 : Math.max(0, Math.min(100, Math.round((merit - threshold) / span * 100)));
   $("#ov-rankbar").style.width = pct + "%";
   $("#ov-need").textContent = cur >= 50 ? "已达顶阶" : ("距下一阶还需 " + fmt(Math.max(0, nextTh - merit)) + " 功勋");
+  var needFull = cur >= 50 ? "已达顶阶" : ("距下一阶还需 " + fmt(Math.max(0, nextTh - merit)) + " 功勋");
+  setTiered($("#ov-need"), needFull,
+    cur >= 50 ? "已达顶阶" : ("还需 " + fmt(Math.max(0, nextTh - merit))), needFull);
   $("#ov-merit").textContent = "功勋 " + fmt(merit);
 
   /* 徽章：由宿主生成器给出 SVG */
@@ -498,7 +722,12 @@ function renderOverview() {
   renderQuick();
 }
 
-/* 今日状态：全部真实（签到状态 / 本段加成 / 救济资格） */
+/* 今日状态：全部真实（签到状态 / 本段加成 / 救济资格）
+   【2026-10-07 A1.5 文案精简】窄栏里每多一个字就可能多折一行 —— 手机横屏 342px 栏宽下
+   原文四行被折成六行（204px）。精简只删"重复交代的上下文词"，不删信息：
+     · 「今日入账 X / 软上限 Y」→「今日 X / 上限 Y」（"入账"由前面的"功勋"承接）
+     · 「当前段「中垒」加成：…」→「加成：…」（段名已在页签数据槽与本卡段标显示）
+     · 数据保留位数不变。 */
 function renderToday() {
   var s = State.snap || {};
   var box = $("#ov-today");
@@ -507,15 +736,20 @@ function renderToday() {
   var lines = [];
   lines.push("连签 <b>" + fmt(s.streak || 0) + "</b> 天 · 今日" + (s.signedToday ? "<b style='color:var(--ok)'>已签到</b>" : "<b style='color:var(--gold-hi)'>未签到</b>"));
   if (s.rank) {
-    lines.push("功勋 <b>" + fmt(s.rank.merit || 0) + "</b>　今日入账 " + fmt(s.rank.meritToday || 0) +
-      " / 软上限 " + fmt(s.rank.softCap || 0));
+    lines.push("功勋 <b>" + fmt(s.rank.merit || 0) + "</b> · 今日 " + fmt(s.rank.meritToday || 0) +
+      " / 上限 " + fmt(s.rank.softCap || 0));
   }
-  lines.push("当前段「" + perks.name + "」加成：门票折扣 <b>" + Math.round((perks.discount || 0) * 100) + "%</b> · " +
-    "签到加成 <b>+" + fmt(perks.sign || 0) + "</b> CBY · 带入上限 <b>" + fmt(perks.maxStake) + "</b>");
-  if (s.world) {
-    lines.push("AI 世界 " + s.world.chars + " 人 · 在场 " + (s.world.chars - s.world.retired) +
-      " · 资金 " + fmt(s.world.fundMin) + " ~ " + fmt(s.world.fundMax));
-  }
+  /* 加成行两档文案（A1.5）：窄屏 342px 栏里「门票折扣 10% · 签到 +500 CBY · 带入上限 20,000」
+     要折两行 —— 数字一个不少，只把"折扣/上限"这类可由上下文理解的限定词在窄屏省略。
+     走与官阶卡/任务卡同一条机制：真值写进 data-*，呈现交给 CSS。 */
+  var addFull = "加成：门票折扣 <b>" + Math.round((perks.discount || 0) * 100) + "%</b> · " +
+    "签到 <b>+" + fmt(perks.sign || 0) + "</b> CBY · 带入上限 <b>" + fmt(perks.maxStake) + "</b>";
+  var addMini = "加成：门票 <b>" + Math.round((perks.discount || 0) * 100) + "%</b> · " +
+    "签到 <b>+" + fmt(perks.sign || 0) + "</b> · 带入 " + fmt(perks.maxStake);
+  lines.push(tiered(addFull, addMini, "").outerHTML);
+  /* AI 世界一行已移除（2026-10-07 A1.5）：世界规模/在场人数/资金区间在「排行」页有完整呈现
+     （世界动态 + 世界之最 + 榜单 + AI 世界档案 N 名），总览再报一次是同一位事实的第二份渲染，
+     手机横屏下更要多折一行。这里只留玩家自己的状态。 */
   box.innerHTML = lines.join("<br>");
   /* 按钮可用性：真实判定 */
   var signBtn = $("#ov-sign");
@@ -539,11 +773,12 @@ function nextThreshold(cur, ranks) {
 function fallbackBadge(rank, color) {
   var n = Math.max(0, Math.min(50, rank));
   return '<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="44" fill="none" stroke="' + color + '" stroke-width="3"/>' +
-    '<text x="50" y="58" text-anchor="middle" font-size="26" fill="' + color + '">' + n + '</text></svg>';
+    '<text x="50" y="58" text-anchor="middle" font-size="26" font-family="ui-monospace,Consolas,monospace" fill="' + color + '">' + n + '</text></svg>';
 }
 
 function renderQuick() {
   var box = $("#quick");
+  if (!box) return;
   if (!box) return;
   box.innerHTML = "";
   /* 目录与价格**不再由本页持有**：全部来自宿主的 shell-games
@@ -610,12 +845,16 @@ function renderTasksInto(box) {
     var done = !!d.done;
     var card = el("div", "task" + (done ? " done" : ""));
     var main = el("div", "tk-main");
-    main.appendChild(el("span", "tk-lab", d.label));
+    var lab = el("span", "tk-lab", d.label);
+    lab.title = d.label;                       /* 窄栏被省略号截断时仍可读全名 */
+    main.appendChild(lab);
     var bar = el("span", "bar"); var fill = el("i"); fill.style.width = pct + "%";
     bar.appendChild(fill); main.appendChild(bar);
     main.appendChild(el("span", "tk-num", fmt(cur) + " / " + fmt(goal) + (d.claimed ? " · 已完成" : "")));
     card.appendChild(main);
-    card.appendChild(el("span", "tk-rw", "+" + fmt(d.reward) + " CBY"));
+    var rw = el("span", "tk-rw");
+    rw.appendChild(tiered("+" + fmt(d.reward) + " CBY", "+" + fmt(d.reward), "奖励 " + fmt(d.reward) + " 池子币"));
+    card.appendChild(rw);
     box.appendChild(card);
   }
   var note = $("#ov-tasks-note");
@@ -629,6 +868,7 @@ function loadTasks() {
       State.tasks = t;
       renderTasksInto($("#ov-tasks"));
       renderTasksInto($("#tk-list"));
+  var tmT = document.querySelector("#tm-tasks"); if (tmT) { try { var tt2 = (t.defs || []).length || 3; var cl2 = (State.snap && State.snap.tasks && State.snap.tasks.claimed || []).length; tmT.textContent = cl2 + "/" + tt2; } catch (eTm) {} }
     }
   });
 }
@@ -666,6 +906,7 @@ function renderAch() {
   var box = $("#ach-grid");
   if (!box) return;
   if (!AC) { box.innerHTML = ""; $("#ach-summary").textContent = "成就引擎未加载（core/csh_achv.js）"; return; }
+  /* 页签数据槽回填（2026-10-07）：成就进度概览 */
   var st = achStats();
   /* 快照未到时先用兜底渲染一次，桥回来后再刷 */
   var useBridge = !!State.snap;
@@ -681,6 +922,7 @@ function renderAch() {
     $("#ach-summary").innerHTML = "已达成 <b>" + done + "</b> / " + rows.length +
       " · 已领取 <b>" + claimedN + "</b>" +
       (claimable ? " · <b style='color:var(--gold-hi)'>" + claimable + " 枚可领取</b>" : "");
+    var tmA = document.querySelector("#tm-ach"); if (tmA) tmA.textContent = done + "/" + rows.length;
     /* 分类条 */
     var cats = { "全部": 1 };
     for (var c = 0; c < rows.length; c++) cats[rows[c].cat] = 1;
@@ -715,7 +957,7 @@ function renderAch() {
             Bridge.call("shell-ach-claim", { key: r.key }, function (ok2, res2) {
               if (ok2 && res2 && res2.ok) {
                 r.claimed = true;
-                toast("成就「" + r.label + "」+" + fmt(res2.reward) + " CBY");
+                /* 双弹去重（2026-10-07）：壳侧 shell-ach-claim 已发唯一成就 toast，本页不再重复 */
                 renderAch();
                 loadWalletSnap(2);     /* 余额刷新 */
               } else {
@@ -828,17 +1070,29 @@ function showRankModal(lv, rec) {
 function renderBoard() {
   renderNarrative();
   var ai = (State.world && State.world.ai) || [];
-  fillBoard("#bd-fund", ai.slice().sort(function (a, b) { return (b.fund || 0) - (a.fund || 0); }),
+  /* 排行榜加「你」（2026-10-07 · 作者要求）：资金榜把玩家按 CBY 插入排序 ——
+     玩家也是世界的一员，理应看得见自己的排位；「你」行有专属样式。 */
+  var meSnap = State.snap || {};
+  var withMe = ai.concat([{ name: "你", fund: meSnap.pc || 0, tierName: "CBY", isMe: true }]);
+  fillBoard("#bd-fund", withMe.sort(function (a, b) { return (b.fund || 0) - (a.fund || 0); }),
     function (a) { return fmt(a.fund); }, function (a) { return a.tierName || ""; });
+  var myIdx = -1;
+  for (var mi = 0; mi < withMe.length; mi++) if (withMe[mi].isMe) { myIdx = mi; break; }
+  var tmB = document.querySelector("#tm-board");
+  if (tmB) tmB.textContent = myIdx >= 0 ? ("第 " + (myIdx + 1) + " 名") : "";
   fillBoard("#bd-skill", ai.slice().sort(function (a, b) { return (b.skill || 0) - (a.skill || 0); }),
     function (a) { return (a.skill || 0).toFixed(3); }, function (a) { return a.personaName || ""; });
-  fillBoard("#bd-win", ai.slice().filter(function (a) { return (a.hands || 0) >= 5; }).sort(function (a, b) {
+  var withMePot = ai.concat([{ name: "你", biggestPot: meSnap.meBigPot || 0, bestStreak: 0, isMe: true }]);
+  fillBoard("#bd-pot", withMePot.sort(function (a, b) { return (b.biggestPot || 0) - (a.biggestPot || 0); }),
+    function (a) { return fmt(a.biggestPot || 0); }, function (a) { return a.isMe ? "CBY" : (a.bestStreak ? ("连胜 " + a.bestStreak) : ""); });
+  /* 胜率榜：玩家终身胜率（csh_winrate d.me 聚合）入榜 */
+  var meWr = (meSnap.meWrGames > 0) ? Math.round(meSnap.meWrWin / meSnap.meWrGames * 100) : null;
+  var withMeWin = ai.concat(meWr == null ? [] : [{ name: "你", hands: meSnap.meWrGames, wins: meSnap.meWrWin, isMe: true }]);
+  fillBoard("#bd-win", withMeWin.filter(function (a) { return a.isMe || (a.hands || 0) >= 5; }).sort(function (a, b) {
     var wa = a.hands ? a.wins / a.hands : 0, wb = b.hands ? b.wins / b.hands : 0;
     return wb - wa;
   }), function (a) { return a.hands ? Math.round(a.wins / a.hands * 100) + "%" : "—"; },
-    function (a) { return a.hands + " 手"; });
-  fillBoard("#bd-pot", ai.slice().sort(function (a, b) { return (b.biggestPot || 0) - (a.biggestPot || 0); }),
-    function (a) { return fmt(a.biggestPot || 0); }, function (a) { return a.bestStreak ? ("连胜 " + a.bestStreak) : ""; });
+    function (a) { return a.isMe ? ("生涯 " + a.hands + " 局") : (a.hands + " 手"); });
   fillBoard("#bd-out", ai.slice().filter(function (a) { return a.retired; }),
     function (a) { return fmt(a.fund); }, function () { return "已退隐"; });
   var note = $("#bd-note");
@@ -949,10 +1203,13 @@ function fillBoard(sel, arr, valFn, subFn) {
   if (!box) return;
   box.innerHTML = "";
   if (!arr.length) { box.appendChild(el("div", "diffbox", "暂无数据")); return; }
-  for (var i = 0; i < Math.min(arr.length, 10); i++) {
+  /* 排行榜全量渲染（2026-10-07 · 作者要求核心=完整可浏览+找到自己）：
+     不再截前 10，整榜滚动；「你」行自动滚进视野。 */
+  for (var i = 0; i < arr.length; i++) {
     var a = arr[i];
-    var row = el("div", "row");
-    row.appendChild(el("div", "pvp", "第" + (i + 1)));
+    var row = el("div", "row" + (a.isMe ? " me" : ""));
+    if (a.isMe) setTimeout(function () { try { row.scrollIntoView({ block: "center" }); } catch (eS) {} }, 0);
+    row.appendChild(el("div", "pvp", String(i + 1)));
     /* ★ 2026-09-29 修复：此前把 <span …> 拼进 textContent，
        排行榜整列显示 HTML 源码（用户截图实锤）。改为真元素节点。 */
     var nm = el("div", "nm");
@@ -962,7 +1219,7 @@ function fillBoard(sel, arr, valFn, subFn) {
     if (subFn) {
       var sp = document.createElement("span");
       sp.style.color = "var(--text-dim)";
-      sp.style.fontSize = "11px";
+      sp.style.fontSize = "var(--fs-cap)";
       sp.style.marginLeft = "6px";
       sp.textContent = subFn(a);
       nm.appendChild(sp);
@@ -1224,6 +1481,19 @@ if (Bridge.active) {
   var fb0 = fallbackSnap();
   if (fb0) adoptSnap(fb0);
 }
+/* 排行榜子页签（2026-10-07 修正版）：事件委托一次绑定（独立于 renderBoard 的重渲染），
+   点按必然生效；与内联 onclick 互斥保护（同一时刻只有一个 on）。 */
+document.addEventListener("click", function (e) {
+  var t = e.target && e.target.closest ? e.target.closest(".bd-tab") : null;
+  if (!t) return;
+  var all = document.querySelectorAll(".bd-tab");
+  for (var j = 0; j < all.length; j++) all[j].className = "bd-tab";
+  t.className = "bd-tab on";
+  var vs = document.querySelectorAll(".bd-view");
+  for (var k = 0; k < vs.length; k++) vs[k].className = "sect bd-view";
+  var v = document.getElementById("v-" + t.getAttribute("data-bd"));
+  if (v) v.className = "sect bd-view on";
+}, false);
 })();
 </script>
 </body>

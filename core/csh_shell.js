@@ -211,6 +211,8 @@ import "./csh_registry.js";
 		try {
 			var el = document.querySelector("#" + OV_ID + " .csh-sh-pc");
 			if (!el) return;
+			/* 生涯大厅的胶囊隐藏由 body.csh-shell-career 类 + CSS 单一实现
+			   （见样式表），此处不再特判——单一真值，不设保险层。 */
 			var W = wallet();
 			el.textContent = W ? (fmt(W.wallet.pc()) + " CBY") : "";
 		} catch (e) {}
@@ -250,13 +252,21 @@ import "./csh_registry.js";
 			"display:flex!important;align-items:center!important;gap:6px!important;",
 			"opacity:.62!important;transition:opacity .18s ease!important;}",
 			"#csh-shell-dock:hover,#csh-shell-dock:active{opacity:1!important;}",
-			"#csh-shell-dock .csh-sh-pc{display:block!important;flex:0 0 auto!important;font-size:12.5px!important;font-weight:700!important;",
-			"color:var(--csh-accent)!important;white-space:nowrap!important;padding:5px 11px!important;border-radius:999px!important;",
-			"background:rgba(var(--csh-bg-deep-rgb),.72)!important;border:1px solid rgba(var(--csh-accent-rgb),.30)!important;}",
+			/* 【2026-10-07 真凶修复】原 display:block!important 会**压制一切行内 display:none**
+   （浏览器实验证实：带 !important 时行内隐藏 computed=block，去掉后=none）——
+   这就是 career 场景胶囊反复隐藏不掉的原因。display 是"可被程序意图覆盖"的属性，
+   此处不加 !important；其余装饰属性保留 !important 无妨。 */
+			"#csh-shell-dock .csh-sh-pc{display:block;flex:0 0 auto!important;font-size:12.5px!important;font-weight:700!important;",
+			/* 生涯大厅 dock 形态唯一实现（2026-10-07）：类级声明式，无时序依赖。
+			   注意 display 不带 !important —— 该属性必须允许程序意图覆盖（postmortems #18）。 */
+			"body.csh-shell-career #csh-shell-dock .csh-sh-pc{display:none;}",
+			"body.csh-shell-career #csh-shell-dock{margin-right:96px;}",
+			"color:var(--csh-ink-plate)!important;white-space:nowrap!important;padding:5px 12px!important;border-radius:999px!important;font-weight:800!important;letter-spacing:.03em!important;box-shadow:0 2px 10px rgba(var(--csh-accent-rgb),.35)!important;",
+			"background:var(--csh-accent)!important;border:1px solid rgba(var(--csh-accent-rgb),.45)!important;}",
 			"#csh-shell-dock button{flex:0 0 auto!important;min-width:44px!important;height:44px!important;",
 			"padding:0!important;font-size:15px!important;line-height:1!important;cursor:pointer!important;user-select:none!important;",
-			"border-radius:999px!important;color:var(--csh-paper)!important;background:rgba(var(--csh-bg-deep-rgb),.72)!important;",
-			"border:1px solid rgba(var(--csh-accent-rgb),.30)!important;touch-action:manipulation!important;}",
+			"border-radius:999px!important;color:var(--csh-accent)!important;font-weight:800!important;background:rgba(var(--csh-bg-deep-rgb),.80)!important;",
+			"border:1.5px solid rgba(var(--csh-accent-rgb),.60)!important;touch-action:manipulation!important;}",
 			"#csh-shell-dock button:hover,#csh-shell-dock button:active{border-color:rgba(var(--csh-accent-rgb),.95)!important;",
 			"background:rgba(var(--csh-accent-rgb),.22)!important;}",
 			/* 壳内 toast（结算/入账提示用，浮在顶带下方） */
@@ -643,6 +653,28 @@ import "./csh_registry.js";
 		try {
 			if (lib.cshWorld && lib.cshWorld.stats) out.world = lib.cshWorld.stats();
 		} catch (e7) {}
+		/* 玩家终身战绩（2026-10-07）：排行榜让「你」上也上胜率/底池榜 ——
+		   胜率聚合从 csh_winrate 的 d.me.chars（按角色各记 games/win/lose）；
+		   最大底池取德州页持久化的生涯最佳（csh_texas_best）。
+		   两处都是同源 localStorage，只读不写、失败即缺省。 */
+		try {
+			var wr = 0, wg = 0;
+			var rawW = localStorage.getItem("extension_池子魔将_winrateData");
+			if (rawW) {
+				var wd = JSON.parse(rawW);
+				var mc = (wd && wd.me && wd.me.chars) || {};
+				for (var mk in mc) {
+					if (!Object.prototype.hasOwnProperty.call(mc, mk)) continue;
+					wg += mc[mk].games || 0;
+					wr += mc[mk].win || 0;
+				}
+			}
+			out.meWrWin = wr; out.meWrGames = wg;
+		} catch (eWr) {}
+		try {
+			var rawB = localStorage.getItem("csh_texas_best");
+			if (rawB) { var bd = JSON.parse(rawB); out.meBigPot = (bd && bd.biggestPot) || 0; }
+		} catch (eBp) {}
 		return out;
 	}
 	function ackToGame(req, ok, data, reqOverride) {
@@ -1015,6 +1047,9 @@ import "./csh_registry.js";
 		GUARD = {};
 
 		var ov = ensureChrome();
+		/* dock 形态：唯一实现 = body 类 + 样式表规则（声明式，无时序依赖、无保险层）。
+		   career：隐藏 CBY 胶囊（页内官阶卡已有同值大字）+ 右让 96px 防与页内控件重叠。 */
+		try { document.body.classList.toggle("csh-shell-career", key === "career"); } catch (eDk) {}
 		setTitle(m.title);
 		paused = false; totalPaused = 0; enteredAt = Date.now();
 		paintTop();                      /* 顶带真实状态（带入 / 门票 / 余额 / 时长） */

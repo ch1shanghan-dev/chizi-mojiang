@@ -98,6 +98,7 @@
   .title {
     font-size: var(--fs-lg); font-weight: 900; letter-spacing: 3px; text-align: center;
     color: var(--gold); text-shadow: 0 2px 12px rgba(216, 180, 106, .28);
+    font-family: var(--ff-title, serif);   /* A1 标题宋 */
   }
   .subtitle { text-align: center; font-size: var(--fs-sm); color: var(--text-dim); margin-top: calc(-1 * clamp(6px, 1vh, 14px)); }
   .field { display: flex; flex-direction: column; gap: clamp(6px, .9vh, 10px); }
@@ -337,7 +338,8 @@
      旧 .banner-mask 是 rgba(6,5,4,.74) 的全屏遮罩 + 0.34s 淡入停在半透明：
      既把牌桌盖死（玩家看不到"谁剩几张、靠什么走完"），又像"界面穿透"。
      现在外观全部由 core/csh_layout.css 提供：180/200ms、**结束时不透明**。 */
-  .csh-result .rs-title { font-size: clamp(15px, 4.2vh, 22px); text-shadow: 0 2px 14px rgba(216, 180, 106, .3); }
+  .csh-result .rs-title { font-size: clamp(15px, 4.2vh, 22px); text-shadow: 0 2px 14px rgba(216, 180, 106, .3);
+    font-family: var(--ff-title, serif); }   /* A1 标题宋 */
   .csh-result .rs-cards .pcard { --cw: clamp(22px, 3.6vh, 36px); }
   .csh-result .rs-sub b { color: var(--gold-hi); }
   .csh-result .rs-cap { margin-top: 2px; }

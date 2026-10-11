@@ -1,0 +1,83 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8">
+<title>生涯大厅预览宿主（临时探针，不入包）</title>
+<style>
+html,body{margin:0;height:100%;background:#000;overflow:hidden}
+#frame{display:block;width:100%;height:100%;border:0}
+</style></head><body>
+<!-- A1 字体标尺实测用：本页只做「假宿主」，把 csh_shell 的桥协议按真实载荷形状应答，
+    让 career.html 在脱离无名杀的环境里以**真实内容**渲染，便于逐项核对字号/字体。
+     应答形状全部抄自 core/csh_shell.js（walletSnapshot / shell-rank-all / shell-world）。 -->
+<iframe id="frame" src="../games/career.html"></iframe>
+<script>
+var RANKS = [[0,0,"平民"],[1,100,"兵卒"],[2,300,"屯长"],[3,600,"军侯"],[4,1000,"军司马"],[5,1500,"都尉"],[6,2100,"校尉"],[7,2800,"中郎将"],[8,3600,"裨将军"],[9,4500,"偏将军"],[10,5500,"牙门将军"],[11,6600,"伏波将军"],[12,7800,"翊武将军"],[13,9100,"翊师将军"],[14,10500,"建威将军"],[15,12000,"建武将军"],[16,13600,"振威将军"],[17,15300,"振武将军"],[18,17100,"领军将军"],[19,19000,"护军将军"],[20,21000,"武卫将军"],[21,23100,"中垒将军"],[22,25300,"镇军将军"],[23,27600,"抚军将军"],[24,30000,"镇国将军"],[25,32500,"龙骧将军"],[26,35100,"平东将军"],[27,37800,"平南将军"],[28,40600,"平西将军"],[29,43500,"平北将军"],[30,46500,"安东将军"],[31,49600,"安南将军"],[32,52800,"安西将军"],[33,56100,"安北将军"],[34,59500,"镇东将军"],[35,63000,"镇南将军"],[36,66600,"镇西将军"],[37,70300,"镇北将军"],[38,74100,"征东将军"],[39,78000,"征南将军"],[40,82000,"征西将军"],[41,86100,"征北将军"],[42,90300,"前将军"],[43,94600,"后将军"],[44,99000,"左将军"],[45,103500,"右将军"],[46,108100,"骠骑将军"],[47,112800,"车骑将军"],[48,117600,"卫将军"],[49,122500,"安国将军"],[50,127500,"大将军"]];
+var SEGNAMES = ["卒伍","杂号","中垒","方镇","上公"];
+function segOf(lv){ var i = lv<10?0:lv<20?1:lv<30?2:lv<40?3:4;
+  return { seg:i, from:i*10, to:i===4?50:i*10+9, name:SEGNAMES[i], color:i<2?0:(i<4?1:2) }; }
+var badge = function(lv,color){ var c=["#8b93a0","#6f8ba3","#c9a86a"][color||0];
+  return '<svg viewBox="0 0 64 64" width="64" height="64"><circle cx="32" cy="32" r="28" fill="none" stroke="'+c+'" stroke-width="2"/><text x="32" y="39" text-anchor="middle" font-size="22" fill="'+c+'">'+lv+'</text></svg>'; };
+var AINAMES = ["张飞","赵云","马超","黄忠","魏延","姜维","关羽","张辽","徐晃","许褚","夏侯惇","甘宁","太史慈","陆逊","周瑜","吕蒙","荀彧","郭嘉","贾诩","司马懿","邓艾","钟会","诸葛诞","文鸯","孙坚","沙摩柯","魔腾","卡尔·秘仪","清河公主","皇甫嵩"];
+var PERSONA = ["激进","保守","莽夫","数学家","诈唬"];
+var ai = AINAMES.map(function(n,i){ return {
+  name:n, surname:n.charAt(0), fund: Math.round(320000 * Math.pow(0.86, i) + 1200), retired: i>=26,
+  skill: Math.max(0.30, 1 - i*0.023), personaName: PERSONA[i%5], biggestPot: Math.round(48000*Math.pow(0.9,i)),
+  bestStreak: (i*3)%9, hands: 40 + i*7, wins: Math.round((40+i*7)*(0.55 - i*0.006)), tierName: "豪赌桌" }; });
+var TASKDEFS = [
+  { key:"tk_texas",  label:"德州打满 3 手",     goal:3,     cur:2,   reward:600, done:false, claimed:false },
+  { key:"tk_bj",     label:"廿一点赢 2 手",     goal:2,     cur:2,   reward:400, done:true,  claimed:true  },
+  { key:"tk_sign",   label:"完成今日签到",       goal:1,     cur:1,   reward:300, done:true,  claimed:false },
+  { key:"tk_win",    label:"任意牌桌取胜 1 局",  goal:1,     cur:1,   reward:500, done:true,  claimed:false },
+  { key:"tk_merit",  label:"赚取 800 功勋",      goal:800,   cur:520, reward:800, done:false, claimed:false },
+  { key:"tk_hands",  label:"累计打完 12 手",     goal:12,    cur:12,  reward:1000,done:true,  claimed:false }
+];
+var NEWS = [
+  { when:"今天",   text:"张飞在豪赌桌连下七城，围观的人说他把台费当成了小费。" },
+  { when:"今天",   text:"魔腾和卡尔·秘仪又坐在了同一张桌上 —— 这已经是本周第四次。" },
+  { when:"昨天",   text:"甘宁散场时没跟任何人打招呼，只留下一句「明天见」。" },
+  { when:"昨天",   text:"魏延的资金跌破四位数，一贫如洗的传闻开始流传。" },
+  { when:"3 天前", text:"黄忠复出，资金来源成谜：有人说他卖了马。" },
+  { when:"5 天前", text:"清河公主连胜引发恐慌，三名牌手同时换了座位。" },
+  { when:"6 天前", text:"孙坚与沙摩柯的恩怨局，观众站满了整个看台。" },
+  { when:"8 天前", text:"世界迎来第 100,000 手牌局，扑克牌背面印着所有人的名字。" }
+];
+function payloadFor(cmd){
+  switch(cmd){
+    case "shell-wallet": return { data: { pc: 2845600, pcPeak: 3120000, streak: 7, signedToday: false, signNext: 800,
+        minTicket: 150, buyIn: 2000, key: "texas", ticket: 0, tiers:[500,1000,2000,5000],
+        rank: { rank: 23, merit: 41200, meritToday: 260, name: "抚军将军", seg: segOf(23), meritDate: "2026-10-07", lastSign: "2026-10-06" },
+        perks: { seg: 2, sign: 700, discount: 0.15, stakes: [2000, 5000, 20000] },
+        world: { chars: 98, hands: 100000, retired: 7, richestFund: 12400000, tier3: 6, skillTop: 0.94 },
+        tasks: { claimed: ["tk_bj"] } } };
+    case "shell-games": return { data: { list: [
+        { key:"texas", title:"德州扑克", tag:"主桌", desc:"7 人满桌 · 带入制", afford:true },
+        { key:"blackjack", title:"廿一点", tag:"庄家分级", desc:"三档庄家规则", afford:true },
+        { key:"doudizhu", title:"斗地主", tag:"三名", desc:"练习局不计输赢", afford:true },
+        { key:"uno", title:"UNO", tag:"名次", desc:"按击败对手计奖", afford:false } ] } };
+    case "shell-tasks": return { data: { day:"2026-10-07", tier:2, defs: TASKDEFS } };
+    case "shell-rank-all": return { data: { ranks: RANKS.map(function(r){ return { lv:r[0], merit:r[1], name:r[2] }; }),
+        current: { rank:23, merit:41200, name:"抚军将军", seg: segOf(23) },
+        perks: { seg:2, sign:700, discount:0.15, stakes:[2000,5000,20000] },
+        segList: [0,1,2,3,4].map(function(i){ return segOf(i*10); }),
+        perksAll: [0,1,2,3,4].map(function(i){ return { seg:i, sign:300+i*100, discount:i*0.05, stakes:[200,2000,20000] }; }) } };
+    case "shell-world": return { data: { leaderboard: ai.slice().sort(function(a,b){return b.fund-a.fund;}), ai: ai,
+        news: NEWS, stats: { chars:98, hands:100000, retired:7 },
+        story: { hottest:{ name:"张飞", rival:"甘宁" }, coldest:{ name:"魏延" }, mostExperienced:{ name:"司马懿", skillPlay:912 },
+                 mostTilted:{ name:"魔腾" }, longestStreak:9, longestStreakBy:"张飞", bestPot:48200, bestPotBy:"黄忠", matches:100000 } } };
+    case "shell-badge-all": return { data: { list: RANKS.map(function(r){ return { rank:r[0], svg: badge(r[0], segOf(r[0]).color) }; }) } };
+    case "shell-stats": return { data: { pc:2845600, pcPeak:3120000, streak:7, rank:23, merit:41200, meritToday:260,
+        segIdx:2, segName:"中垒", wrGames:186, wrWin:104, wrLose:82, wrKill:266, wrChars:41, wrModes:9,
+        worldChars:98, worldHands:100000, worldFundMin:1200, worldFundMax:12400000, worldTopFund:12400000,
+        worldRetired:7, worldSkillTop:0.94, billionaires:6, billionaireBroke:2, signedToday:false,
+        interactTotal:214, taskDone:4, taskTotal:6, gamblePlays:12, gambleWins:5, gambleNet:-38000, gambleBest:96000, gambleBust:1 } };
+  }
+  return null;
+}
+window.addEventListener("message", function(ev){
+  var d = ev.data; if (!d || typeof d !== "object" || typeof d.__csh !== "string") return;
+  if (/-ack$/.test(d.__csh) || d.__csh === "csh-skin-change") return;
+  var p = payloadFor(d.__csh);
+  if (!p) return;
+  var ack = { __csh: d.__csh + "-ack", req: d.req, ok: true, data: p.data };
+  ev.source.postMessage(ack, "*");
+}, false);
+</script>
+</body></html>

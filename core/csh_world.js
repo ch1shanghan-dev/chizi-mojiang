@@ -307,10 +307,17 @@ import cshCharacter from "../character/index.js";
 	   脏字符串 id）一律重建，避免误把导入的 0 号 id 当合法档。 */
 	function migrateLegacyWorld() {
 		if (!world || !Array.isArray(world.ai) || !world.ai.length) return false;
-		var firstId = world.ai[0].id;
-		if (typeof firstId === "string" && idInRoster(firstId)) return false;
+		/* 【P1-7 修（2026-10-06）】判定从"只看第一条 id"改为"任一 id 命中名册"——
+		   此前第一条恰好损坏（脏 id）而其余条目完好时，整档资金/战绩被无谓清零重建。
+		   白名单语义不变：一条都命中不了才重建（数字旧档 / 整档脏数据）；
+		   命中的档交给 normalizeWorld 逐条修复（缺的补、坏的修、外来的丢）。 */
+		var anyMatch = false;
+		for (var i = 0; i < world.ai.length; i++) {
+			if (world.ai[i] && typeof world.ai[i].id === "string" && idInRoster(world.ai[i].id)) { anyMatch = true; break; }
+		}
+		if (anyMatch) return false;
 		var gambles = world.gambles;
-		logInfo("检测到旧版/脏世界档案（首 id=" + firstId + "）→ 重建为 " + AI_COUNT + " 人");
+		logInfo("检测到旧版/脏世界档案（首 id=" + (world.ai[0] && world.ai[0].id) + "，无一命中名册）→ 重建为 " + AI_COUNT + " 人");
 		world = defaultWorld();
 		if (gambles) world.gambles = gambles;
 		saveWorld();
@@ -680,16 +687,23 @@ import cshCharacter from "../character/index.js";
 			if (world.heartbeatDay !== today) { world.heartbeatDay = today; world.heartbeatMatches = 0; }
 			var leftMatches = HEARTBEAT_MATCH_MAX - (world.heartbeatMatches || 0);
 			if (leftMatches > 0) {
+				/* 【P0-4.2 修（2026-10-06）】把"本日剩余额度"作为**显式桌数预算**传入
+				   playRounds —— 此前 roundsWanted = ceil(left/10) 轮、每轮最多 10 桌，
+				   剩余额度非 10 的倍数时最后一轮仍开满 10 桌（剩 1 桌额度实际打出 10 桌），
+				   单日总量最多超发 9 桌。现在实际执行量恒 ≤ remaining；
+				   roundsWanted 仍按"每轮 10 桌"估算轮数，只作外层循环上限。 */
 				var roundsWanted = Math.max(1, Math.ceil(leftMatches / 10));
-				var r2 = playRounds(roundsWanted);
+				var r2 = playRounds(roundsWanted, leftMatches);
 				world.heartbeatMatches = (world.heartbeatMatches || 0) + r2.rounds;
-				if (r2.rounds > 0) saveWorld();
-			/* 日报（2026-10-03）：同日心跳也记一条（pushHistory 会与今天那条合并），
-			   这样"世界动态"永远不会因为阈值太高而空着。 */
-			if (r2.rounds > 0) { pushHistory({ kind: "day", m: r2.rounds, pot: batchMaxPot, d: 0 }); batchMaxPot = 0; }
+				/* 日报（2026-10-03）：同日心跳也记一条（pushHistory 会与今天那条合并），
+				   这样"世界动态"永远不会因为阈值太高而空着。
+				   【P0-4.3 修（2026-10-06）】日报必须在**最终 saveWorld() 之前**写入——
+				   此前先 saveWorld 再 pushHistory，若此后没有其它落盘点，这条日报只活在
+				   内存里，重启即丢（"离开 N 天"日报偶发消失的根因）。 */
+				if (r2.rounds > 0) { pushHistory({ kind: "day", m: r2.rounds, pot: batchMaxPot, d: 0 }); batchMaxPot = 0; }
 				var woke0 = false;
 				for (var k0 = 0; k0 < world.ai.length; k0++) if (tryComeback(world.ai[k0], today)) woke0 = true;
-				if (woke0) saveWorld();
+				if (r2.rounds > 0 || woke0) saveWorld();
 				if (r2.rounds > 0) logInfo("同日心跳：" + r2.rounds + " 桌（今日累计 " + world.heartbeatMatches + "/" + HEARTBEAT_MATCH_MAX + "）");
 				return { days: 0, rounds: r2.rounds, changed: r2.rounds > 0 || woke0 };
 			}
@@ -704,21 +718,31 @@ import cshCharacter from "../character/index.js";
 		world.lastTick = today;
 		world.heartbeatDay = today;            // 跨天后同日额度重新开始
 		world.heartbeatMatches = 0;
-		saveWorld();
+		/* 【P0-4.3 修（2026-10-06）】日报先写、再统一落盘 —— 此前 saveWorld 在前、
+		   pushHistory 在后，日报在"没有后续落盘点"时随关页丢失。playOne 本身不落盘，
+		   这次 saveWorld 是离线推演唯一的持久化点，必须排在所有 world 变更之后。 */
 		if (res.rounds > 0) {
 			logInfo("离线结算 " + days + " 天：" + res.rounds + " 笔资金转移，世界已变化");
 			/* 日报（2026-10-03）：先记"离开期间发生了什么"，再让破纪录/退隐/复出等事件覆盖在上层 */
 			pushHistory({ kind: "day", m: res.rounds, pot: batchMaxPot, d: days });
 			batchMaxPot = 0;
 		}
+		saveWorld();
 		return { days: days, rounds: res.rounds, changed: res.rounds > 0 };
 	}
 	/* 把"打若干轮"抽出来，供离线结算与同日心跳共用。
-	   rounds: 轮数（每轮最多 10 桌对局）。返回 {rounds, bust}。 */
-	function playRounds(roundsWanted) {
+	   roundsWanted: 轮数（每轮最多 10 桌对局）；maxTables: **桌数预算**（可选）——
+	   实际打过的桌数到达预算即停（P0-4.2，2026-10-06）：剩余额度不是 10 的倍数时，
+	   最后一轮不许再开满 10 桌。
+	   返回 { rounds, bust }。⚠ rounds 的真实语义是**实际打过的桌数**
+	   （playOne 成功一次计 1，738 行），键名沿用旧称；调用方（心跳配额 / 日报"共 X 桌"）
+       都按桌数理解。 */
+	function playRounds(roundsWanted, maxTables) {
 		var rounds = 0, bust = 0;
+		var budget = (typeof maxTables === "number" && isFinite(maxTables) && maxTables > 0)
+			? Math.floor(maxTables) : Infinity;
 		var today = dayIndex();
-		for (var d = 0; d < roundsWanted; d++) {
+		for (var d = 0; d < roundsWanted && rounds < budget; d++) {
 			var pool = activeList();
 			if (pool.length < 2) break;
 			/* ★ 2026-10-03 修（审计 P2-10，"轮"的真实语义）：此前每桌都各自 randInt 抽两人
@@ -732,7 +756,7 @@ import cshCharacter from "../character/index.js";
 				var tmp = deck[sf]; deck[sf] = deck[jj]; deck[jj] = tmp;
 			}
 			var pairs = Math.min(Math.floor(deck.length / 2), 10);
-			for (var p = 0; p < pairs; p++) {
+			for (var p = 0; p < pairs && rounds < budget; p++) {
 				var A = deck[p * 2], B = deck[p * 2 + 1];
 				if (!A || !B || A === B) continue;
 				if (playOne(A, B)) rounds++;
@@ -976,7 +1000,13 @@ import cshCharacter from "../character/index.js";
 				])
 				: pickBy(seed, [
 					ev.w + " 一局从 " + ev.l + " 那里端走 " + fmtMoney(ev.amt),
-					ev.l + " 手气不好，" + ev.w + " 顺势收下 " + fmtMoney(ev.amt),
+					ev.l + " 手气不好，" + ev.w + " 顺势收下 " + fmtMoney(ev.amt),					ev.w + " 打穿了 " + ev.l + " 的底池（" + fmtMoney(ev.amt) + "），这个数字挂在那儿一时半会没人碰得到",
+					"这手结束后，" + ev.w + " 的桌上多了 " + fmtMoney(ev.amt) + "，" + ev.l + " 的桌上多了个故事",
+					"有人统计过，" + ev.l + " 花了三手才接受这个结果",
+					"这手 " + ev.w + " 赢了 " + fmtMoney(ev.amt) + "——据说是牌好的关系（本人坚称是技术）",
+					ev.w + " 微笑着收下 " + fmtMoney(ev.amt) + "，" + ev.l + " 当场开始复盘",
+					"一进一出，" + fmtMoney(ev.amt) + " 换了主人：归 " + ev.w,
+
 				]);
 		}
 		if (ev.kind === "retire") {
@@ -987,14 +1017,20 @@ import cshCharacter from "../character/index.js";
 				])
 				: pickBy(seed, [
 					ev.n + " 输光了家底，收摊走人",
-					ev.n + " 的筹码见了底，今天不打了",
+					ev.n + " 的筹码见了底，今天不打了",					"散场时 " + ev.n + " 没跟任何人打招呼",
+					"牌桌少了个熟面孔：" + ev.n + "，输光了",
+					ev.n + " 临走前把椅子摆得整整齐齐——有点体面",
+
 				]);
 		}
 		if (ev.kind === "comeback") {
 			return pickBy(seed, [
 				"歇了 " + (ev.d || RETIRE_DAYS) + " 天，" + ev.n + " 又坐回来了，兜里揣着 " + fmtMoney(ev.f),
 				ev.n + " 复出了 —— 带 " + fmtMoney(ev.f) + " 回来重头爬",
-				"以为 " + ev.n + " 不来了，结果他今天又出现在牌桌上，本钱 " + fmtMoney(ev.f),
+				"以为 " + ev.n + " 不来了，结果他今天又出现在牌桌上，本钱 " + fmtMoney(ev.f),					ev.n + " 回来了，谁也没问钱是哪来的",
+					"听说 " + ev.n + " 这几天四处凑了 " + fmtMoney(ev.f),
+					"复出消息传开时，" + ev.n + " 已经在牌桌上坐了半小时",
+
 			]);
 		}
 		if (ev.kind === "tier3") {
@@ -1008,7 +1044,9 @@ import cshCharacter from "../character/index.js";
 			return pickBy(seed, [
 				ev.a + " 和 " + ev.b + " 又碰上了，这已经是第 " + ev.c + " 次",
 				"第 " + ev.c + " 次交手：" + ev.a + " 与 " + ev.b + "，谁也不服谁",
-				ev.a + " 一见 " + ev.b + " 就来劲 —— 两人已经打了 " + ev.c + " 局",
+				ev.a + " 一见 " + ev.b + " 就来劲 —— 两人已经打了 " + ev.c + " 局",					"第 " + ev.c + " 次：全场自动分成两派看戏",
+					ev.a + " 与 " + ev.b + " 的第 " + ev.c + " 次恩怨局，连庄家都在看",
+
 			]);
 		}
 		if (ev.kind === "grudge") {
@@ -1036,7 +1074,8 @@ import cshCharacter from "../character/index.js";
 				/* 前缀由 UI 补（"今天 / N 天前"），所以这里不写"今天" —— 写"这 N 天"才通顺 */
 				return pickBy(seed, [
 					"这 " + ev.d + " 天里牌桌没停：共 " + mTxt + pTxt,
-					"你不在的这些天，牌桌上打了 " + mTxt + pTxt,
+					"你不在的这些天，牌桌上打了 " + mTxt + pTxt,					"离开的 " + ev.d + " 天里没人闲着：" + mTxt + pTxt,
+
 				]);
 			}
 			return pickBy(seed, [
@@ -1048,7 +1087,10 @@ import cshCharacter from "../character/index.js";
 		if (ev.kind === "streak") {
 			return pickBy(seed, [
 				ev.n + " 连赢 " + ev.c + " 局，手风顺得不像话",
-				ev.n + " 已经连下 " + ev.c + " 城，对面几个脸色不太好看",
+				ev.n + " 已经连下 " + ev.c + " 城，对面几个脸色不太好看",					"连赢 " + ev.c + " 局的 " + ev.n + " 开始接受采访（自问自答）",
+					ev.n + " 的连胜纪录引发了小范围恐慌",
+					"有人说 " + ev.n + " 换了副手套，连赢就没停过",
+
 			]);
 		}
 		if (ev.kind === "gstreak") {
@@ -1359,6 +1401,10 @@ import cshCharacter from "../character/index.js";
 		   否则这两条只能靠整轮世界推演间接观察。 */
 		tierCountsFor: tierCountsFor,
 		fundForIndex: fundForIndex,
+		/* 心跳桌数推演出口（2026-10-06 导出）：供验收器直接断言"批次不得超发桌数预算"
+		   （P0-4.2）——与 tierCountsFor/fundForIndex 同理，纯函数级出口让上限语义
+		   可以被直接验证，而不必靠整轮世界推演间接观察。仅供测试/诊断调用。 */
+		playRounds: playRounds,
 		list: function () { return world.ai.map(function (a) { return publicOf(a); }); },
 		active: function () { return activeList().map(function (a) { return a.id; }); },
 		byId: function (id) { var a = byId(id); return a ? JSON.parse(JSON.stringify(a)) : null; },
@@ -1413,11 +1459,13 @@ import cshCharacter from "../character/index.js";
 		if (typeof window !== "undefined") { window.CSH = window.CSH || {}; window.CSH.world = CSH; }
 	} catch (e) {}
 
-	/* 启动即做一次离线结算（§I.2） */
-	try {
-		var res = tick();
-		if (res.changed) toast("你离开的这 " + res.days + " 天，牌桌上又有了新的输赢");
-	} catch (e) { logError("启动离线结算失败", e); }
+	/* 【2026-10-05】启动离线结算已撤下：原「启动即做一次离线结算（§I.2）」会让
+	   每次打开无名杀都弹「你离开的这 N 天，牌桌上又有了新的输赢」，打扰正常对局。
+	   现改为打开「池子休闲」页签时结算并提示 —— csh_debug 的 setTab("games")
+	   调 lib.cshWorld.heartbeat()（内部有当日去重与单日桌数上限，反复进出不重复结算）。
+	   【P0-4.1 修（2026-10-06）】调用方此前写的是 lib.cshWorld.world.heartbeat() ——
+	   导出对象上没有 .world 这一层，守卫恒假、心跳自上线起从未运行；调用点已改，
+	   此处注释一并更正，防止下一个读码人再被带偏。 */
 
 	var st = stats();
 	logInfo("AI 世界已加载：" + st.chars + " 名角色，在场 " + activeList().length +

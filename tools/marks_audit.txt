@@ -1,0 +1,134 @@
+== 大冰 ==
+  skills/index.js:4005       csh_dabing_qirui[奇瑞]     「无距」
+  skills/index.js:4044       csh_dabing_qirui[奇瑞]     「无次」
+  skills/index.js:4068       csh_dabing_qirui[奇瑞]     「无应」
+  skills/index.js:4141       csh_dabing_shicai[恃才]    「才」
+  skills/index.js:4218       csh_dabing_shicai[恃才]    「恃才」
+== 平凡之人 ==
+  skills/index.js:1296       csh_jilei                「积累」
+  skills/index.js:1335       csh_huyou                「护佑」
+  skills/index.js:1448       csh_daizi                「带子」
+  skills/index.js:1495       csh_qiangbao_count       「襁褓」 ※衍生
+  skills/index.js:1617       csh_qiangbao_sha         「襁褓」 ※衍生
+== 彬 ==
+  skills/index.js:2230       csh_gangbei[钢背]          「钢背」
+  skills/index.js:2362       csh_gangbei[钢背]          「钢背」
+  skills/index.js:2441       csh_shiyi[世一]            「世一」
+  skills/index.js:2983       csh_damie_sha            「暗裔」
+== 神曹植 ==
+  skills/index.js:4944       csh_qibu[七步]             「♦︎︎」
+  skills/index.js:4954       csh_qibu[七步]             「♣︎︎」
+  skills/index.js:4964       csh_qibu[七步]             「♠︎︎」
+  skills/index.js:4974       csh_qibu[七步]             「♥︎」
+== 明日香 ==
+  skills/index.js:28215      csh_tongbu[同步]           「同步」
+  skills/index.js:28510      csh_xinmo[心魔]            「心魔」
+  skills/index.js:28584      csh_lichang[力场]          「力场」
+  skills/index.js:28622      csh_langqiang[朗枪]        「朗枪」
+== 谋谋黄忠 ==
+  skills/index.js:11554      csh_liegong              「蓄弦」
+  skills/index.js:11590      csh_liegong              「蓄弦」
+  skills/index.js:11607      csh_liegong              「封印」
+  skills/index.js:11895      csh_lieqiong             「创伤」
+== 奎桑提 ==
+  skills/index.js:24414      csh_tuofu[陀斧]            「陀斧」
+  skills/index.js:24498      csh_tuofu[陀斧]            「饮血」
+  skills/index.js:24781      csh_kui[奎]               「奎宿」
+  skills/index.js:25170      csh_pifeng_skill[辟锋]     「辟锋」
+== 徐荣 ==
+  skills/index.js:15788      csh_xionghuo[凶镬]         「👿」
+  skills/index.js:15899      csh_xionghuo[凶镬]         「🤐」
+  skills/index.js:15917      csh_xionghuo[凶镬]         「😭」
+== 洞克 ==
+  skills/index.js:20356      csh_yumiao[预瞄]           「预瞄」
+  skills/index.js:20458      csh_yaqiang[压枪]          「压枪」
+  skills/index.js:20490      csh_yaqiang[压枪]          「压枪」
+== 载物 ==
+  skills/index.js:1785       csh_jiagiang_sha         「架枪」
+  skills/index.js:1989       csh_goute                「弹药」
+  skills/index.js:3120       csh_goute_blocksha       「栓」 ※衍生
+== 塞拉斯 ==
+  skills/index.js:25219      csh_daodao[盗道]           「盗道」
+  skills/index.js:25538      csh_yongshuang[永霜]       「永霜」
+  skills/index.js:25560      csh_yongshuang[永霜]       「永霜」
+== 童渊 ==
+  skills/index.js:30884      csh_qiangshen[枪神]        「鸟」
+  skills/index.js:30947      csh_santu[三徒]            「☯」
+  skills/index.js:31115      csh_santu_youwei_perm[佑维] 「佑维」
+== 司马懿 ==
+  skills/index.js:5885       csh_renshen[忍神]          「忍神」
+  skills/index.js:5911       csh_renjie[忍戒]           「忍戒」
+== 杨间 ==
+  skills/index.js:22526      csh_guiyan[鬼眼]           「鬼眼」
+  skills/index.js:22827      csh_guiyu[鬼域]            「鬼域」
+== 姜大哥 ==
+  skills/index.js:27863      csh_theshy_xueren[血刃]    「血刃」
+  skills/index.js:28103      _csh_theshy_chang        「短」
+== 大爱仙尊 ==
+  skills/index.js:19579      csh_chunqiu[春秋]          「金蝉」
+  skills/index.js:20580      csh_fangyuan_niliu_state[逆流护体] 「逆流」
+== 佐助 ==
+  skills/index.js:21136      csh_renjin[忍禁]           「忍禁」
+  skills/index.js:21346      csh_tianzhao_yan[天照]     「天照」
+== 魔腾 ==
+  skills/index.js:23184      csh_e                    「噩兆」
+  skills/index.js:23528      csh_shie                 「摸牌」
+== 莫德凯撒 ==
+  skills/index.js:19914      csh_mingdun[冥盾]          「冥盾」
+  skills/index.js:20190      csh_lunjing[轮境]          「境界」
+== 孙权 ==
+  skills/index.js:27387      csh_junkchigang[持纲]      「☯」
+  skills/index.js:7134       csh_jianwu[王剑]           「王剑」
+== 孙坚 ==
+  skills/index.js:14104      csh_jsrgpingtao[平讨]      「平讨」
+  skills/index.js:14125      csh_jsrgpingtao[平讨]      「平讨」
+== 菲比 ==
+  skills/index.js:18916      csh_feibininghui[凝辉]     「(空)」
+== 奶龙 ==
+  skills/index.js:16606      csh_daxiao[大笑]           「🤣」
+== 卧龙诸葛 ==
+  skills/index.js:15302      csh_xingyou[星佑]          「⭐」
+== 拉莫斯 ==
+  skills/index.js:21556      csh_chaogong[嘲攻]         「嘲讽」
+== 豆豆 ==
+  skills/index.js:18668      csh_qiangu[千古]           「千古」
+== 貂蝉 ==
+  skills/index.js:3500       csh_yunming_pact         「死斗」
+== ？（未收录，看行号） ==
+  skills/index.js:547        csh_karl_tuji[图谱]        「谱」
+== 陆绩 ==
+  skills/index.js:10659      csh_jieluji_fennu[奋驽]    「奋驽」
+== 赵襄 ==
+  skills/index.js:9560       csh_fanghun[芳魂]          「芳魂」
+== 方圣帝君 ==
+  skills/index.js:25900      csh_sbyingzi[英姿]         「英姿」
+== 孙尚香 ==
+  skills/index.js:30492      csh_ssx_pianzhu[偏助]      「☯」
+== 钟会 ==
+  skills/index.js:11272      csh_quanji[权计]           「权计」
+== 关羽 ==
+  skills/index.js:7726       csh_wuwei[武威]            「武威」
+== 郭淮 ==
+  skills/index.js:7036       csh_twjingce[精策]         「精策」
+== 诸葛青 ==
+  skills/index.js:19173      csh_qimen[奇门]            「奇门」
+== 黄月英 ==
+  skills/index.js:29954      csh_hyy_jizhi_hand[集智]   「集智」
+== 卡尔 ==
+  skills/index.js:417        csh_karl_miyihuan[秘仪]    「秘」
+== 邓艾 ==
+  skills/index.js:13053      csh_jixi[急袭]             「急袭」
+== 花鬘 ==
+  skills/index.js:21782      csh_xiangzhen[象阵]        「象阵」
+== 星星甘宁 ==
+  skills/index.js:29230      csh_jinfan[锦帆]           「铃」
+== 贾诩 ==
+  skills/index.js:25809      csh_sbweimu[帷幕]          「☯」
+== 周处 ==
+  skills/index.js:21960      csh_xianghai[乡害]         「乡害」
+== 李曦明 ==
+  skills/index.js:28759      csh_xiantu[仙途]           「仙途」
+== 程普 ==
+  skills/index.js:6485       csh_jishe[极奢]            「极奢」
+
+TOTAL: 87 条 marktext

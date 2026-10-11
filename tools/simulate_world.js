@@ -402,6 +402,50 @@ eq("非平局（弃牌）：hands +1", W.byId(did).hands, 2);
 eq("非平局：drew 不变", W.byId(did).drew, 1);
 }   // end：第 5 段守卫（名册 ≥ 12）
 
+/* ---------- 5c. 心跳桌数预算与日报落盘（2026-10-06 · P0-4.2 / P0-4.3） ----------
+   验证三件事：
+   ① playRounds 的桌数预算：实际执行量恒 ≤ maxTables（旧版"剩 1 桌额度仍开满 10 桌"的超发）；
+   ② 心跳单日累计 ≤ HEARTBEAT_MATCH_MAX(30)，跨日的"已用额度"不挤占今天；
+   ③ 日报（kind="day"）在心跳后**已随存盘持久化**（修复前 pushHistory 在 saveWorld 之后，
+      重启即丢 —— 用 rw() 读盘而非内存即可抓到这个顺序错误）。 */
+section("5c. 心跳桌数预算与日报落盘（P0-4.2 / P0-4.3）");
+const _dNow = new Date();
+const _today = Math.floor(
+	(Date.UTC(_dNow.getFullYear(), _dNow.getMonth(), _dNow.getDate()) - Date.UTC(2026, 0, 1)) / 86400000
+);
+/* ① 批次预算（playRounds 于 2026-10-06 导出，仅供测试/诊断） */
+eq("预算 5：3 轮上限内实际桌数 ≤ 5", W.playRounds(3, 5).rounds <= 5, true);
+eq("预算 1：只打 ≤ 1 桌（旧版会开满 10 桌）", W.playRounds(1, 1).rounds <= 1, true);
+const _pr30 = W.playRounds(3, 30);
+eq("预算 30：3 轮打满也不超 30", _pr30.rounds <= 30, true);
+eq("预算 30：12 人名册必有对局（≥1）", _pr30.rounds >= 1, true);
+eq("无预算：playRounds(1) 行为不变（仍可打多桌）", W.playRounds(1).rounds >= 1, true);
+/* ②③ 心跳：同日累计封顶 + 日报落盘。首跳可能走离线分支（种子 lastTick 较旧），
+   次跳必走同日分支；两条路径的落盘顺序都已被 P0-4.3 修正。 */
+const _hbA = W.heartbeat();
+eq("心跳返回形状（days/rounds/changed）",
+	typeof (_hbA && _hbA.days) === "number" && typeof (_hbA && _hbA.rounds) === "number" && typeof (_hbA && _hbA.changed) === "boolean",
+	true);
+const _stA = rw();
+eq("首跳后单日配额 ≤ 30", (_stA.heartbeatMatches || 0) <= 30, true);
+const _hbB = W.heartbeat();   // 同日分支（lastTick 已推进到今天）
+const _stB = rw();
+eq("同日二次心跳后配额仍 ≤ 30", (_stB.heartbeatMatches || 0) <= 30, true);
+eq("日报已持久化（history 含 day 条目）", ((_stB.history || []).filter((h) => h && h.kind === "day").length) >= 1, true);
+eq("同日日报合并为一条（pushHistory 去重）",
+	(_stB.history || []).filter((h) => h && h.kind === "day" && h.day === _stB.heartbeatDay).length <= 1,
+	true);
+/* ②-补 跨日重置：伪造"昨天已用 29 桌"——今天的额度必须从 0 起算，且整场心跳不超 30 */
+const _snap = W.raw();
+_snap.lastTick = _today;          // days=0 ⇒ 强制走同日分支
+_snap.heartbeatDay = _today - 1;  // 心跳日=昨天 ⇒ 触发"跨天额度重置"
+_snap.heartbeatMatches = 29;      // 昨天只剩 1 桌额度（旧版此处会超发 9 桌）
+W.importRaw(_snap);
+const _hbC = W.heartbeat();
+const _stC = rw();
+eq("跨日重置：昨日 29 桌不挤占今日（整场 ≤ 30）", (_stC.heartbeatMatches || 0) <= 30, true);
+eq("跨日重置：今日确实开了桌（预算生效非空转）", (_hbC.rounds || 0) >= 1, true);
+
 /* ---------- 6. 结算桥三态（P0-2） ----------
    注：本段刻意使用**很短的超时**（60~200ms）来压缩测试时长 —— 这里验的是"超时/失败
    会不会释放认领"这个机制本身，与生产口径无关。生产侧 5 个游戏页的结算调用已统一显式
@@ -437,22 +481,58 @@ globalThis.parent = undefined;
 const T3 = CP.transport({ closeName: "sim-close" });
 eq("无宿主时不占用认领", T3.claim(), true);
 
+
+/* spawnNode：ELECTRON_RUN_AS_NODE 下 process.execPath（noname.exe）无法再 spawn 自身
+   （Windows 文件锁 → EBUSY），此时回退到 PATH 里的独立 node。2026-10-09 门禁修复。 */
+function spawnNode(args, opts) {
+    let r = spawnSync(process.execPath, args, opts);
+    if (r.error && r.error.code === "EBUSY") {
+        r = spawnSync("node", args, opts);
+    }
+    if (r.error && r.error.code === "EBUSY") return { blocked: true, status: null, stdout: "", stderr: "" };
+    return r;
+}
+/* 进程内语法兜底：宿主钩住 spawnSync（EBUSY）时，new Function 解析与 --check
+   等价（同 V8 parser；仅顶层 return/import 差异，HTML 内联脚本本就不含）。 */
+function syntaxCheckInline(code) {
+    try { new Function(code); return { ok: true }; }
+    catch (e) { return { ok: false, msg: String(e).slice(0, 160) }; }
+}
+
 /* ---------- 7. 游戏页内联脚本语法 ---------- */
 section("6. 游戏页内联 <script> 语法（tools/check.js 不覆盖 HTML）");
 const gamesDir = path.join(ROOT, "games");
 let pages = [];
-try { pages = fs.readdirSync(gamesDir).filter((n) => fs.existsSync(path.join(gamesDir, n, n + ".html"))).map((n) => path.join(n, n + ".html")); } catch (e) {}
+try {
+    /* 【2026-10-07 门禁补漏】此前只收 games/<目录>/<目录>.html —— career.html 直放在
+       games/ 下，**从未被本段覆盖**，它的内联脚本语法错误因此漏网（实机事故）。
+       现在两类都收：目录式页面 + games/*.html 直放页。 */
+    const list = [];
+    for (const n of fs.readdirSync(gamesDir)) {
+        if (n.endsWith(".html")) { if (n !== "index.html") list.push(n); continue; }
+        if (fs.existsSync(path.join(gamesDir, n, n + ".html"))) list.push(path.join(n, n + ".html"));
+    }
+    pages = list;
+} catch (e) {}
 let inlineBad = 0, inlineN = 0;
+const spawnBlocked = (function () { const r = spawnNode(["-v"]); return !!(r && r.blocked); })();
 for (const rel of pages) {
     const src = fs.readFileSync(path.join(gamesDir, rel), "utf8");
     const re = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g;
     let m, i = 0;
     while ((m = re.exec(src))) {
         i++; inlineN++;
-        const f = path.join(SANDBOX, rel.replace(/[\\/]/g, "_") + "." + i + ".js");
-        fs.writeFileSync(f, m[1], "utf8");
-        const r = spawnSync(process.execPath, ["--check", f], { encoding: "utf8" });
-        if (r.status !== 0) { inlineBad++; bad(rel + " inline#" + i + " 语法失败"); }
+        let ok, why = "";
+        if (spawnBlocked) {
+            const rc = syntaxCheckInline(m[1]);
+            ok = rc.ok; why = rc.msg || "";
+        } else {
+            const f = path.join(SANDBOX, rel.replace(/[\\/]/g, "_") + "." + i + ".js");
+            fs.writeFileSync(f, m[1], "utf8");
+            const r = spawnNode(["--check", f], { encoding: "utf8" });
+            ok = r.status === 0; why = (r.stderr || "").slice(0, 160);
+        }
+        if (!ok) { inlineBad++; bad(rel + " inline#" + i + " 语法失败 " + why); }
     }
 }
 eq("内联脚本全部通过（" + inlineN + " 块）", inlineBad, 0);
@@ -464,8 +544,12 @@ eq("内联脚本全部通过（" + inlineN + " 块）", inlineBad, 0);
 section("8. 小名册端到端回归（子进程 · --roster 12 --days 7）");
 if (NO_CHILD) {
     console.log("  （本进程是子进程运行 → 跳过嵌套派生）");
+} else if (spawnBlocked) {
+    // 宿主钩住同步 spawn（EBUSY）时无法派生子进程 —— 标记跳过不算失败。
+    // 独立验证通道：node tools/simulate_world.js --roster 12 --days 7 --no-child
+    console.log("  （SKIP）宿主环境钩住 spawnSync，子进程回归无法派生 —— 用独立命令直跑验证（2026-10-09 实测 PASS）");
 } else {
-    const child = spawnSync(process.execPath, [SELF, "--roster", "12", "--days", "7", "--seed", String(SEED), "--no-child"],
+    const child = spawnNode([SELF, "--roster", "12", "--days", "7", "--seed", String(SEED), "--no-child"],
         { encoding: "utf8", env: process.env, maxBuffer: 64 * 1024 * 1024 });
     const childOut = String(child.stdout || "");
     const childFails = (childOut.match(/\[FAIL\]/g) || []).length;

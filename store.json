@@ -1,0 +1,92 @@
+{
+	"updated": "2026-10-05",
+	"note": "其他扩展货单（池子魔将维护）。repo 根目录=扩展内容才可上架；branch 留空则安装时自动取默认分支。zip 字段可选：扁平布局 zip 直链（单请求优先走它）。下架=删条目+push。",
+	"extensions": [
+		{
+			"name": "胜负统计",
+			"author": "PZ157",
+			"repo": "PZ157/noname_sftj",
+			"branch": "main",
+			"intro": "全模式武将胜负场次统计 · 实时胜率排行榜 · 同名武将去重 · 伪·玩家可选AI禁选（整合 AI优化/官将重修 部分功能）",
+			"source": "https://github.com/PZ157/noname_sftj"
+		},
+		{
+			"name": "千幻聆音",
+			"author": "玄牡江湖工作室 & 雨（啦啦啦修改版）",
+			"repo": "dragonJadeRan/qianhuan_mine",
+			"branch": "main",
+			"intro": "武将语音包 · 插件管理 · 制卡器",
+			"source": "https://github.com/dragonJadeRan/qianhuan_mine"
+		},
+		{
+			"name": "呼风唤雨",
+			"author": "shibaiderman096",
+			"repo": "shibaiderman096/noname-extension-hufenghuanyu",
+			"intro": "武将扩展《呼风唤雨》",
+			"source": "https://github.com/shibaiderman096/noname-extension-hufenghuanyu"
+		},
+		{
+			"name": "舰R杀",
+			"author": "cvlunicorn",
+			"repo": "cvlunicorn/Rkill_heroes",
+			"intro": "舰娘（舰R）主题武将扩展，含 limitedBanner / 皮肤系统 / 技能动画",
+			"source": "https://github.com/cvlunicorn/Rkill_heroes"
+		},
+		{
+			"name": "东方Project",
+			"author": "WindySmile512",
+			"repo": "WindySmile512/Touhou-Project",
+			"intro": "东方 Project 主题武将扩展（幻想乡全员）。⚠ 体积很大、文件极多，安装耗时较长请耐心等待",
+			"source": "https://github.com/WindySmile512/Touhou-Project"
+		},
+		{
+			"name": "少女乐队",
+			"author": "Antarctics",
+			"repo": "Antarctics/GirlsBand-Noname-Expansion",
+			"intro": "《少女乐队》主题武将扩展",
+			"source": "https://github.com/Antarctics/GirlsBand-Noname-Expansion"
+		},
+		{
+			"name": "温柔一刀",
+			"author": "QCXYLTJ",
+			"repo": "QCXYLTJ/The-Gentle-Slash",
+			"intro": "《温柔一刀》武将扩展",
+			"source": "https://github.com/QCXYLTJ/The-Gentle-Slash"
+		},
+		{
+			"name": "怒焰三国杀",
+			"author": "zhonghui1966",
+			"repo": "zhonghui1966/nyKill",
+			"intro": "还原《怒焰三国杀》玩法与武将",
+			"source": "https://github.com/zhonghui1966/nyKill"
+		},
+		{
+			"name": "AI禁将",
+			"author": "nineMangos",
+			"repo": "nineMangos/AI-Prohibition",
+			"intro": "【AI禁将】—— 禁止 AI 选择指定武将的扩展开源仓库",
+			"source": "https://github.com/nineMangos/AI-Prohibition"
+		},
+		{
+			"name": "AI优化（已停更）",
+			"author": "PZ157",
+			"repo": "PZ157/noname_AIOptimization",
+			"intro": "用于优化 AI 出牌决策的扩展（作者已停更，仍可用）",
+			"source": "https://github.com/PZ157/noname_AIOptimization"
+		},
+		{
+			"name": "皮肤切换",
+			"author": "Ysclmml（yscl）",
+			"repo": "Ysclmml/skinSwitch",
+			"intro": "武将皮肤切换器，支持联机",
+			"source": "https://github.com/Ysclmml/skinSwitch"
+		},
+		{
+			"name": "守林人",
+			"author": "VelopeVoice",
+			"repo": "VelopeVoice/noname_FirewatchExtension",
+			"intro": "明日方舟主题武将扩展《守林人》",
+			"source": "https://github.com/VelopeVoice/noname_FirewatchExtension"
+		}
+	]
+}

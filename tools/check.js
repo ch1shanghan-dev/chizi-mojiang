@@ -3,7 +3,7 @@
  * 池子魔将 · 改动门禁（只读检查，不改任何业务文件）
  *
  * 用法：
- *   node tools/check.js              # 语法 + 版本一致性
+ *   node tools/check.js              # 语法 + 自由变量 + import + 技能/翻译/音频一致性 + 版本
  *   node tools/check.js --syntax     # 只跑语法
  *   node tools/check.js --versions   # 只跑版本一致性
  *   node tools/check.js --strict     # 任一告警也视为失败（CI 用）
@@ -18,6 +18,11 @@
  *   无名杀 app/ 的 package.json 声明 "type":"module"，源码都是 ESM。
  *   用 `node --check` 检查时，Node 按扩展名判定模块类型，因此把待检文件
  *   复制到临时目录下的 .mjs 再检查，可正确按 ESM 解析（不执行代码）。
+ *
+ * 关于技能/翻译/音频一致性（2026-10-08 新增）：
+ *   postmortem #1（三向核对）、#9（无译名技能被引擎 silent 抢跑）、#14（_info 是渲染门槛）
+ *   与卡尔语音事故（audio 字符串引用不存在的技能 → console.error 且无声）的共同点：
+ *   全都静态可查、运行时静默失败。这里固化为常驻判据。
  */
 
 import fs from "fs";
@@ -133,6 +138,7 @@ function balanceCheck(srcText) {
 	const stack = [];
 	const errors = [];
 	let state = "normal"; // normal | sq | dq | tpl | lc | bc | re
+	let reCls = false; // 正则字符类 [ ] 内（/ 不结束正则）
 	let line = 1;
 	let col = 0;
 	let prev = ""; // 前一个有效字符，用于正则字面量判定
@@ -156,7 +162,7 @@ function balanceCheck(srcText) {
 			if (c === "`") { state = "tpl"; col++; prev = c; continue; }
 			/* 正则字面量启发式：/ 出现在不能接除号的位置时视为正则开始 */
 			if (c === "/" && /[(,=:[!&|?{};+\-*%~^<>]/.test(prev) === true) {
-				state = "re"; col++; prev = c; continue;
+				state = "re"; reCls = false; col++; prev = c; continue;
 			}
 			if (c === "(" || c === "[" || c === "{") { stack.push({ ch: c, line, col }); col++; prev = c; continue; }
 			if (c === ")" || c === "]" || c === "}") {
@@ -181,7 +187,12 @@ function balanceCheck(srcText) {
 		}
 		if (state === "re") {
 			if (c === "\\") { i++; col += 2; continue; }
-			if (c === "/") { state = "normal"; col++; prev = c; continue; }
+			/* 【2026-10-09 修】字符类 [ ] 内的 "/" 不结束正则（JS 语法本身如此）——
+			   此前 /[\\/]/g 与 /[^A-Za-z0-9._\-/]/ 这类"字符类含斜杠"的正则会被误判
+			   提前闭合，把后面的代码当正则内容吞掉，连锁报出假的括号不匹配。 */
+			if (c === "[") reCls = true;
+			else if (c === "]") reCls = false;
+			else if (c === "/" && !reCls) { state = "normal"; col++; prev = c; continue; }
 			col++; continue;
 		}
 		/* sq / dq / tpl */
@@ -299,6 +310,26 @@ function declaredNames(code) {
 	const decRe = /\b(?:var|let|const|function|class)\s+([A-Za-z_$][\w$]*)/g;
 	let m;
 	while ((m = decRe.exec(code))) names.add(m[1]);
+	/* 【2026-10-08 补】三种漏收的声明形态——不收齐会把合法变量误报成自由变量：
+	   · 多声明符列表 `var a = 1, b = 2, c;`（原正则只抓第一个名字）；
+	   · catch 参数 `catch (eXxx)`；
+	   · 箭头函数参数 `x => …` / `(a, b) => …`。
+	   多收名字只会让检查更松（不产生新误报），换来判据可用。 */
+	const multiRe = /\b(?:var|let|const)\s+([^\n;]+)/g;
+	while ((m = multiRe.exec(code))) {
+		const nameRe = /(?:^|,)\s*([A-Za-z_$][\w$]*)\s*(?==|,|$)/g;
+		let mm;
+		while ((mm = nameRe.exec(m[1]))) names.add(mm[1]);
+	}
+	const catchRe = /catch\s*\(\s*([A-Za-z_$][\w$]*)/g;
+	while ((m = catchRe.exec(code))) names.add(m[1]);
+	const arrowRe = /(?:\(([^()]*)\)|([A-Za-z_$][\w$]*))\s*=>/g;
+	while ((m = arrowRe.exec(code))) {
+		(m[1] || m[2] || "").split(",").forEach((s) => {
+			const n = s.trim().replace(/=.*$/, "").replace(/^\.\.\./, "").trim();
+			if (/^[A-Za-z_$][\w$]*$/.test(n)) names.add(n);
+		});
+	}
 	const fnRe = /function\s*[A-Za-z_$\w]*\s*\(([^)]*)\)/g;
 	while ((m = fnRe.exec(code))) {
 		m[1].split(",").forEach((s) => {
@@ -351,6 +382,20 @@ function freeVarsOf(file) {
 		if (/^\s*:/.test(code.slice(ns + m[1].length, ns + m[1].length + 3))) continue;
 		hits.add(m[1]);
 	}
+	/* 【2026-10-08 补线】上一条只认 csh[A-Z]… 前缀的助手，漏掉了 tongyuanBird 这类驼峰助手：
+	   童渊并入时 22 处引用悬空（模块级管理器没随技能块搬入），check 全绿、运行时必炸。
+	   这里补一条收窄判据：**驼峰标识符 + 紧跟属性访问**（name.xxx）——正是「模块级助手对象」的
+	   用法形态。不查普通调用（parseInt(...) 之类宿主全局会误报），宿主全局另行白名单豁免。 */
+	const HOST_GLOBALS = new Set([
+		"localStorage", "sessionStorage", "queueMicrotask", "structuredClone",
+		"webkitAudioContext", "AudioContext", "OffscreenCanvas", "createImageBitmap",
+	]);
+	const re2 = /(\b[a-z][A-Za-z0-9_]*[A-Z][A-Za-z0-9_]*)\b(?=\s*\.)/g;
+	while ((m = re2.exec(code))) {
+		const ns = m.index;
+		if (declared.has(m[1]) || HOST_GLOBALS.has(m[1]) || isPropertyAccess(code, ns)) continue;
+		hits.add(m[1]);
+	}
 	if (hasImport) {
 		for (const nb of NONAME_BINDINGS) {
 			if (declared.has(nb)) continue;
@@ -375,6 +420,9 @@ function runFreeVars() {
 		...collect(path.join(ROOT, "character")),
 		...collect(path.join(ROOT, "card")),
 		...collect(path.join(ROOT, "core")),
+		/* 【2026-10-08 补】skills/ 此前不在扫描范围 —— 而它正是拆分事故的高发区
+		   （skills/index.js 曾因缺 noname import 让全扩展 ReferenceError）。 */
+		...collect(path.join(ROOT, "skills")),
 	].filter((f) => fs.existsSync(f));
 	let bad = 0;
 	for (const f of files) {
@@ -517,13 +565,152 @@ function runVersions() {
 }
 
 /* ------------------------------------------------------------------ *
+ * 五、技能 / 翻译 / 音频 一致性（2026-10-08 新增）
+ *
+ * 三件「静态可查、运行时静默失败」的事，来自事故复盘：
+ *   · postmortem #1：武将 skills 数组 ↔ 技能注册键 ↔ 翻译键，任一处拼错即整体失效；
+ *   · postmortem #9 / #14：无译名技能会被引擎当 silent 直接抢跑；_info 是技能列表渲染门槛；
+ *   · 卡尔语音事故（2026-10-08）：audio 字符串是「引用另一个技能」，被引用技能不存在时
+ *     引擎 console.error 且无声（get/audio.ts 的 SkillAudio 构造），6 个秘术因此全哑。
+ * 判据：A/A2/C 失败；B 告警（silent 子技能无译名是合法设计，只提示）。
+ * ------------------------------------------------------------------ */
+function sliceBetween(src, startMark, endMark, label) {
+	const s = src.indexOf(startMark);
+	const e = s < 0 ? -1 : src.indexOf(endMark, s + startMark.length);
+	if (s < 0 || e < 0) return null;
+	return src.slice(s, e);
+}
+
+/* 本体技能名索引（character/ 全目录扫一遍，结果缓存；只用于解析 audio 引用） */
+let __baseSkillIndex = null;
+function baseSkillIndex() {
+	if (__baseSkillIndex) return __baseSkillIndex;
+	const base = path.resolve(ROOT, "..", ".."); // resources/app
+	const set = new Set();
+	const walk = (d) => {
+		let entries;
+		try { entries = fs.readdirSync(d, { withFileTypes: true }); } catch { return; }
+		for (const e of entries) {
+			const p = path.join(d, e.name);
+			if (e.isDirectory()) walk(p);
+			else if (e.name.endsWith(".js")) {
+				let t = "";
+				try { t = fs.readFileSync(p, "utf8"); } catch { continue; }
+				for (const m of t.matchAll(/^\s*"?([A-Za-z_][A-Za-z0-9_]*)"?\s*:\s*\{/gm)) set.add(m[1]);
+			}
+		}
+	};
+	walk(path.join(base, "character"));
+	__baseSkillIndex = set;
+	return set;
+}
+
+function runConsistency() {
+	log("== 技能 / 翻译 / 音频 一致性 ==");
+	const skillsPath = path.join(ROOT, "skills", "index.js");
+	const charPath = path.join(ROOT, "character", "index.js");
+	const cardPath = path.join(ROOT, "card", "index.js");
+	if (!fs.existsSync(skillsPath) || !fs.existsSync(charPath)) {
+		warn("skills/index.js 或 character/index.js 不存在，跳过一致性检查");
+		log("");
+		return;
+	}
+	const skillsSrc = fs.readFileSync(skillsPath, "utf8");
+	const charSrc = fs.readFileSync(charPath, "utf8");
+	const cardSrc = fs.existsSync(cardPath) ? fs.readFileSync(cardPath, "utf8") : "";
+
+	const skillBlock = sliceBetween(skillsSrc, "\n        skill: {", "\n        translate: {", "skill");
+	const skillsTrans = sliceBetween(skillsSrc, "\n        translate: {", "\nexport default cshSkillPack;", "translate");
+	if (!skillBlock || !skillsTrans) {
+		fail("skills/index.js 的 skill / translate 区块定位失败（结构变了？同步更新本检查）");
+		log("");
+		return;
+	}
+
+	/* 技能键（over-approximate：任意缩进的 name: { 都算已定义，宁松勿误报） */
+	const skillKeys = new Set();
+	for (const m of skillBlock.matchAll(/"?([A-Za-z_][A-Za-z0-9_]*)"?\s*:\s*\{/g)) skillKeys.add(m[1]);
+	/* 翻译键：skills 区 + character 区 + card 区（武将名/技能名/标记名可能分居三处） */
+	const transKeys = new Set();
+	const addTrans = (text) => {
+		if (!text) return;
+		for (const m of text.matchAll(/^\s*"?([A-Za-z_][A-Za-z0-9_]*)"?\s*:/gm)) transKeys.add(m[1]);
+	};
+	addTrans(skillsTrans);
+	addTrans(sliceBetween(charSrc, "\n        translate: {", "\n                        characterIntro:", "char.translate"));
+	addTrans(sliceBetween(charSrc, "\n                        characterIntro:", "\n        characterTitle:", "char.intro"));
+	addTrans(sliceBetween(cardSrc, "\n        translate: {", "\n        skill:", "card.translate"));
+	/* card 键（衍生卡/装备技名） */
+	const cardKeys = new Set();
+	for (const m of cardSrc.matchAll(/"([A-Za-z_][A-Za-z0-9_]*)"\s*:/g)) cardKeys.add(m[1]);
+
+	/* 武将技能数组 */
+	const charEntries = [];
+	const starts = [];
+	for (const m of charSrc.matchAll(/^\s{12}"(csh_[A-Za-z0-9_]+)":\s*\{\s*$/gm)) starts.push({ id: m[1], at: m.index });
+	for (let i = 0; i < starts.length; i++) {
+		const body = charSrc.slice(starts[i].at, i + 1 < starts.length ? starts[i + 1].at : charSrc.length);
+		const sm = body.match(/skills:\s*\[([^\]]*)\]/);
+		const skills = sm ? [...sm[1].matchAll(/"([^"]+)"/g)].map((x) => x[1]) : [];
+		charEntries.push({ id: starts[i].id, skills });
+	}
+
+	/* A：武将技能必须能解析到技能键 / card 键 */
+	const missA = [];
+	for (const c of charEntries) for (const s of c.skills) {
+		if (!skillKeys.has(s) && !cardKeys.has(s)) missA.push(c.id + " → " + s);
+	}
+	if (missA.length) fail("武将技能未定义（" + missA.length + "）：" + missA.slice(0, 8).join("；") + "。武将技会整体空白");
+	else ok(charEntries.length + " 名武将的技能数组均可解析到技能键");
+
+	/* A2：武将技能必须有译名 + _info（引擎渲染门槛，postmortem #14） */
+	const missA2 = [];
+	for (const c of charEntries) for (const s of c.skills) {
+		if (!skillKeys.has(s) && !cardKeys.has(s)) continue;
+		if (!transKeys.has(s)) missA2.push(c.id + " → " + s + "（缺名称）");
+		else if (!transKeys.has(s + "_info")) missA2.push(c.id + " → " + s + "（缺 _info）");
+	}
+	if (missA2.length) fail("武将技能缺译名 / _info（" + missA2.length + "）：" + missA2.slice(0, 8).join("；") + "。技能列表不渲染");
+	else ok("武将技能的译名与 _info 齐备");
+
+	/* B：技能键缺译名（告警级；silent 子技能无译名是合法设计） */
+	const missB = [];
+	for (const s of skillKeys) {
+		if (!s.startsWith("csh_") || transKeys.has(s)) continue;
+		const at = skillBlock.indexOf('"' + s + '": {') >= 0 ? skillBlock.indexOf('"' + s + '": {') : skillBlock.indexOf(s + ": {");
+		const body = at >= 0 ? skillBlock.slice(at, at + 900) : "";
+		missB.push(s + (/silent:\s*true/.test(body) ? "" : "（非 silent）"));
+	}
+	if (missB.length) warn("技能缺译名 " + missB.length + " 个（多为 silent 子技能，可接受；非 silent 项需补名）：" + missB.slice(0, 6).join("、"));
+	else ok("全部技能均有译名");
+
+	/* C：audio 字符串引用必须解析到实体技能（扩展内 / 本体） */
+	const refs = new Map();
+	for (const m of skillBlock.matchAll(/audio:\s*"([^"]+)"/g)) {
+		const v = m[1];
+		if (v.includes("/") || v.includes(":") || v.includes(".")) continue; // 路径 / ext: 路径不当引用
+		refs.set(v, (refs.get(v) || 0) + 1);
+	}
+	const base = baseSkillIndex();
+	const missC = [];
+	for (const [name] of refs) {
+		if (skillKeys.has(name) || cardKeys.has(name) || base.has(name)) continue;
+		missC.push(name);
+	}
+	if (missC.length) fail("audio 字符串引用无法解析（" + missC.length + "）：" + missC.join("、") +
+		"。引擎会 console.error 且无声（语音全哑）——改成现存技能 id，或 audio: false");
+	else ok("audio 引用全部可解析（" + refs.size + " 个外部/裸名引用，本体技能索引 " + base.size + " 项）");
+	log("");
+}
+
+/* ------------------------------------------------------------------ *
  * 主流程
  * ------------------------------------------------------------------ */
 log("池子魔将 · 改动门禁");
 log("项目根：" + ROOT);
 log("");
 
-if (!ONLY_VERSIONS) { runSyntax(); runFreeVars(); runImports(); }
+if (!ONLY_VERSIONS) { runSyntax(); runFreeVars(); runImports(); runConsistency(); }
 if (!ONLY_SYNTAX) runVersions();
 
 log("----------------------------------------");

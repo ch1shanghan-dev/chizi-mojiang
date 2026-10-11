@@ -159,7 +159,8 @@
 	}
 	function volume() {
 		var v = parseInt(lsGet(K_VOL, String(DEFAULT_VOL)), 10);
-		return LEVELS.indexOf(v) >= 0 ? v : DEFAULT_VOL;
+		if (!isFinite(v)) return DEFAULT_VOL;
+		return Math.max(0, Math.min(100, v));   /* 平滑音量（2026-10-07）：0~100 任意整值 */
 	}
 
 	/* 自动识别当前游戏：<script src=".../csh_bgm.js" data-game="texas"> */
@@ -491,7 +492,7 @@
 	}
 
 	function setVolume(v) {
-		if (LEVELS.indexOf(v) < 0) return false;
+		v = Math.max(0, Math.min(100, Math.round(Number(v) || 0)));
 		lsSet(K_VOL, v);
 		if (AC && musicGain && timer) fadeTo(musicGain, targetGain(), 0.3);
 		return true;

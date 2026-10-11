@@ -119,7 +119,8 @@
     width: 100%;
   }
   #view-game .raise-panel input[type=range] { flex: 1 1 auto; min-width: 0; accent-color: var(--gold); height: 26px; }
-  #view-game .raise-panel .rv { font-size: var(--fs-2); font-weight: 900; color: var(--gold-hi); min-width: 3.6em; text-align: right; font-variant-numeric: tabular-nums; }
+  #view-game .raise-panel .rv { font-size: var(--fs-2); font-weight: 900; color: var(--gold-hi); min-width: 3.6em; text-align: right; font-variant-numeric: tabular-nums;
+    font-family: var(--ff-num, monospace); }   /* A1 数值走等宽档 */
 
   /* 额度补足时 1px 金线扫过（全屏唯一高光）
      【2026-10-03 修复】触发方是 sweepLife()，它给 **.life**（开局页额度面板）加 .sweep；
@@ -145,7 +146,8 @@
     box-shadow: 0 24px 60px rgba(0, 0, 0, .6), inset 0 1px 0 rgba(216, 180, 106, .16);
     margin: auto 0;
   }
-  .title { font-size: var(--fs-lg); font-weight: 900; letter-spacing: 3px; text-align: center; color: var(--gold); text-shadow: 0 2px 12px rgba(216, 180, 106, .28); }
+  .title { font-size: var(--fs-lg); font-weight: 900; letter-spacing: 3px; text-align: center; color: var(--gold); text-shadow: 0 2px 12px rgba(216, 180, 106, .28);
+    font-family: var(--ff-title, serif); }   /* A1 标题宋 */
   .subtitle { text-align: center; font-size: var(--fs-sm); color: var(--text-dim); margin-top: calc(-1 * clamp(4px, .8vh, 12px)); letter-spacing: 1px; }
 
   /* 生涯数据条 —— B 重排：余额独占整行（大数字+全宽进度条+条下说明），连签/战绩收为下方两小指标 */
@@ -159,7 +161,8 @@
   .life-bank { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
   .life-bank-top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
   .life-bank-top .k { font-size: var(--fs-xs); color: var(--text-dim); letter-spacing: 1px; }
-  .life-bank-top .v { font-size: var(--fs-xl); font-weight: 900; color: var(--gold-hi); line-height: 1; letter-spacing: .5px; }
+  .life-bank-top .v { font-size: var(--fs-xl); font-weight: 900; color: var(--gold-hi); line-height: 1; letter-spacing: .5px;
+    font-family: var(--ff-num, monospace); font-variant-numeric: tabular-nums; }   /* A1 等宽档：余额竖排不跳 */
   .life-quota { font-size: var(--fs-xs); color: var(--text-dim); letter-spacing: .5px; }
   .life-cell { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
   .life-cell .k { font-size: var(--fs-xs); color: var(--text-dim); letter-spacing: 1px; }
@@ -187,8 +190,10 @@
   .task .tk-lab { font-size: var(--fs-sm); color: var(--text); font-weight: 700; }
   .task .tk-bar { height: 6px; background: rgba(255, 255, 255, .08); border-radius: 3px; overflow: hidden; }
   .task .tk-bar > i { display: block; height: 100%; background: linear-gradient(90deg, var(--gold), var(--gold-hi)); }
-  .task .tk-num { font-size: var(--fs-xs); color: var(--text-dim); }
-  .task .tk-rw { flex: 0 0 auto; font-size: var(--fs-xs); color: var(--gold); font-weight: 700; text-align: right; }
+  .task .tk-num { font-size: var(--fs-xs); color: var(--text-dim);
+    font-family: var(--ff-num, monospace); font-variant-numeric: tabular-nums; }   /* A1 等宽档 */
+  .task .tk-rw { flex: 0 0 auto; font-size: var(--fs-xs); color: var(--gold); font-weight: 700; text-align: right;
+    font-family: var(--ff-num, monospace); font-variant-numeric: tabular-nums; }   /* A1 等宽档 */
   .seg-btn {
     flex: 1 1 0; min-width: 0; min-height: clamp(34px, 4.8vh, 48px);
     display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
@@ -276,8 +281,10 @@
     border: 1px solid rgba(127, 216, 196, .3); color: var(--ok); background: rgba(127, 216, 196, .06);
     transform: scale(.9);
   }
-  .seat-chips { font-size: var(--fs-xs); color: var(--gold); font-weight: 700; }
-  .seat-bet { font-size: var(--fs-xs); color: var(--text-dim); }
+  .seat-chips { font-size: var(--fs-xs); color: var(--gold); font-weight: 700;
+    font-family: var(--ff-num, monospace); font-variant-numeric: tabular-nums; }   /* A1 等宽档 */
+  .seat-bet { font-size: var(--fs-xs); color: var(--text-dim);
+    font-family: var(--ff-num, monospace); font-variant-numeric: tabular-nums; }   /* A1 等宽档 */
   .seat-cards { display: flex; gap: 2px; flex: 0 0 auto; }
 
   /* 【2026-10-03 统一断点】此处原有一条 `@media (max-width:620px)` 的座位卡压缩，
@@ -445,7 +452,11 @@
   @keyframes signIn { from { transform: translateY(14px); opacity: 0; } }
   .sign-title { font-size: var(--fs-md); font-weight: 900; letter-spacing: 2px; color: var(--gold); }
   .sign-dots { display: flex; gap: clamp(5px, .9vh, 10px); align-items: center; }
-  .sdot {
+  /* 签到卡美化（2026-10-07）：宋体标题 + 金线分隔 + 卡片描金（与生涯大厅同语汇） */
+  #sign-title { font-family: Noto Serif SC,Source Han Serif SC,Songti SC,STSong,SimSun,serif; letter-spacing: .1em; }
+  #sign-card { border: 1px solid var(--gold-line); box-shadow: 0 18px 48px -20px rgba(0, 0, 0, .8), inset 0 0 0 1px rgba(216, 180, 106, .06); position: relative; }
+  #sign-card::before { content: ""; position: absolute; left: 12%; right: 12%; top: 44px; height: 1px; background: linear-gradient(90deg, transparent, var(--gold-line) 30%, var(--gold-line) 70%, transparent); }
+    .sdot {
     width: clamp(15px, 2.1vh, 24px); height: clamp(15px, 2.1vh, 24px); border-radius: 50%;
     border: 1px solid var(--gold-line); background: rgba(0, 0, 0, .4);
     display: flex; align-items: center; justify-content: center;
@@ -1677,6 +1688,15 @@ function roundDone() {
    行动与推进（四轮下注）
    ============================================================ */
 function applyAction(idx, act, amount) {
+  /* 对手建模·记账（方案 §16-1 最小版，2026-10-07）：只统计**人类玩家**的翻前行为——
+     hands=参与的翻前手数，vpip=主动入池（跟/加/全下），raises=加注。
+     三个数只在会话内存里（不落盘），AI 在 aiDecide 中消费。 */
+  if (idx === 0 && G && G.community && G.community.length === 0) {
+    var os = G.opStats || (G.opStats = { hands: 0, vpip: 0, raises: 0 });
+    os.hands++;
+    if (act === 'call' || act === 'raise' || act === 'allin') os.vpip++;
+    if (act === 'raise' || act === 'allin') os.raises++;
+  }
   if (!G || G.over || G.sessionOver) return;
   var p = G.players[idx];
   if (!p || p.out || p.folded || p.allin) return;
@@ -2048,6 +2068,19 @@ function aiDecide(idx) {
   var bl = per.bluff * (0.6 + 0.8 * sk);            /* 高技能诈唬更克制 */
   var potOdds = toCall > 0 ? toCall / (G.pot + toCall) : 0;
   var canRaise = (p.bet + p.chips) > G.currentBet;
+
+  /* 对手建模·消费（方案 §16-1 最小版，2026-10-07）：人类玩家的三统计量
+     （手数/VPIP/加注率）在样本 ≥6 手后微调阈值——
+     疯子（VPIP≥0.7 或激进≥0.5）的加注可信度降（thr−0.04，AI 更敢跟）；
+     石头（VPIP≤0.25 且激进≤0.2）的加注可信度升（thr+0.04，AI 更早弃）。
+     只动阈值 ±0.04：不读牌、不改发牌，样本不足零修正（信息公平红线）。 */
+  (function () {
+    var os = G.opStats;
+    if (!os || os.hands < 6) return;
+    var vp = os.vpip / os.hands, ag = os.raises / os.hands;
+    if (toCall > 0 && (vp >= 0.7 || ag >= 0.5)) thr -= 0.04;
+    else if (toCall > 0 && vp <= 0.25 && ag <= 0.2) thr += 0.04;
+  })();
 
   if (toCall === 0) {
     if (canRaise && (eq > thr + 0.14 || r < bl * 0.5)) return { act: 'raise', amount: aiBetSize(p, per) };
@@ -2599,6 +2632,12 @@ function showHandBanner() {
     ' · 带入 <b>' + fmt(G.buyIn) + '</b> · 第 <b>' + G.handNo + '</b> 手';
 
   /* ---------- 玩家结果（方案 §12 第一层）：按本手净变化排序 ---------- */
+  /* 【2026-10-06 修】四个小节可能被 endSession（收工/通吃/输光）隐藏过：先统一恢复，
+     再填充；其中「摊牌比牌」随后按有没有摊牌自行决定收起（见下方 tally 分支）。 */
+  ['#banner-players', '#banner-sd', '#banner-pots', '#banner-ledger'].forEach(function (sel) {
+    var el = $(sel);
+    if (el && el.parentNode) el.parentNode.style.display = '';
+  });
   boxPlayers.innerHTML = '';
   if (led) {
     var lrows = led.ledger.slice().sort(function (a, b) { return b.net - a.net; });
@@ -2745,6 +2784,10 @@ function showSessionBanner(reason, left, capped, buyIn, chips, discarded) {
   ['#banner-players', '#banner-sd', '#banner-pots', '#banner-ledger'].forEach(function (sel) {
     var el = $(sel);
     if (el) el.innerHTML = '';
+    /* 【2026-10-06 修】小节容器（标题+行容器）一并隐藏 —— 此前只清行不藏小节，
+       收工结算/通吃/输光三视图都留下四个裸标题，看着像信息缺失（实机截图确认）。
+       恢复逻辑在本手结算渲染开头（banner-* 四段填充前）。 */
+    if (el && el.parentNode) el.parentNode.style.display = 'none';
   });
   t.className = 'rs-title';
   t.textContent = reason === 'bust' ? '本场结束 · 筹码输光'    : (reason === 'sweep' ? '本场结束 · 通吃全场'
@@ -2755,16 +2798,49 @@ function showSessionBanner(reason, left, capped, buyIn, chips, discarded) {
   var net = ch - bi;
   var detail = '';
   if (bi > 0) {
-    detail = '带入 <b>' + fmt(bi) + '</b> · 结束 <b>' + fmt(ch) + '</b><br>' +
+    /* T3 结算画面：实得/结束/余额用 <b class="cu" data-v> 承载，渲染后 rAF 数字滚动 */
+    detail = '带入 <b>' + fmt(bi) + '</b> · 结束 <b class="cu" data-v="' + ch + '">0</b><br>' +
       (net >= 0
-        ? '净赢 <b class="win">+' + fmt(net) + '</b> × 回收 ' + Math.round(DECAY_TEXAS * 100) + '% → 实得 <b>' + fmt(left) + '</b>'
-        : '净亏 <b class="lose">' + fmt(net) + '</b> → 带回 <b>' + fmt(left) + '</b>');
+        ? '净赢 <b class="win">+' + fmt(net) + '</b> × 回收 ' + Math.round(DECAY_TEXAS * 100) + '% → 实得 <b class="cu win" data-v="' + left + '">0</b>'
+        : '净亏 <b class="lose">' + fmt(net) + '</b> → 带回 <b class="cu" data-v="' + left + '">0</b>');
   }
   s.innerHTML = (detail ? detail + '<br>' : '') +
-    '池子币余额 <b>' + fmt(career.bank.bank) + '</b>' +
+    '池子币余额 <b class="cu" data-v="' + career.bank.bank + '">0</b>' +
     (capped ? '<br>已达自然封顶（只可赢走同桌真有的钱），超出 <b class="lose">' +
       fmt(Math.max(0, Math.floor(discarded || 0))) + '</b> 未入账' : '') +
     (career.bank.bank < MIN_BUYIN ? '<br>余额低于最低带入 ' + fmt(MIN_BUYIN) + '，暂无法上桌（可去其他游戏回血或领救济）' : '');
+  /* T3·数字滚动（2026-10-07）：rAF + easeOutCubic 700ms，零依赖（GSAP 明确不引） */
+  (function () {
+    var els = s.querySelectorAll('.cu');
+    var t0 = null, DUR = 700;
+    function step(ts) {
+      if (t0 == null) t0 = ts;
+      var k = Math.min(1, (ts - t0) / DUR);
+      var e = 1 - Math.pow(1 - k, 3);
+      for (var i = 0; i < els.length; i++) {
+        var v = Number(els[i].getAttribute('data-v')) || 0;
+        els[i].textContent = fmt(Math.round(v * e));
+      }
+      if (k < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  })();
+  /* T3·世界反馈一句（2026-10-07）：shell-world 桥取最新一条世界动态，只读渲染 */
+  try {
+    if (Bridge.active && Bridge.call) {
+      Bridge.call('shell-world', {}, function (ok, d) {
+        try {
+          if (!ok || !d || !d.news || !d.news.length) return;
+          var n0 = d.news[0];
+          var fb = document.createElement('div');
+          fb.className = 'sd-caption';
+          fb.style.marginTop = '6px';
+          fb.textContent = '世界反馈 · ' + n0.when + '：' + n0.text;
+          s.appendChild(fb);
+        } catch (eF) {}
+      }, 1500);
+    }
+  } catch (eW) {}
   row.innerHTML = '';
   /* ★ 2026-09-29：shell 内一场入场只对应一场对局（entryUsed 已在结算时置位），
      「再来一场」不再无费重开 —— 回大厅重新选带入入场，堵死免费重买漏洞。 */

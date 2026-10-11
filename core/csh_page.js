@@ -83,6 +83,11 @@
 		var closeSelfHook = null;      /* 壳委托关窗时要跑的本页收尾流程（见下） */
 
 		root.addEventListener("message", function (ev) {
+			/* 【P1 修（2026-10-06）】消息来源校验：带 source 的事件必须来自宿主帧
+			   （浏览器的 postMessage 事件必带 source，伪造消息携带伪造者自己的 source，
+			   一律拒绝——壳侧 fromCurrentFrame 同为 fail-closed）。source 缺失只见于
+			   验收器的合成事件（直接调 handler），放行但数据仍须匹配协议才有效。 */
+			try { if (ev && ev.source != null && ev.source !== root.parent) return; } catch (eSrc) { return; }
 			var d = ev && ev.data;
 			if (!d || typeof d !== "object") return;
 			/* 宿主皮肤变更广播：重注入 chrome 变量（帕累托皮肤化，2026-09-30）。
@@ -131,7 +136,17 @@
 		   此前布尔一次性烧掉，兜底形同虚设，失败即永久丢账。
 		   壳侧对同一会话的重复结算请求是幂等的（csh_shell GUARD 回放上次结果），
 		   所以这里的重试不会重复入账。 */
-		function claim() { if (settled || inFlight) return false; inFlight = true; return true; }
+		/* 【P1 修（2026-10-06）】认领前确认真实宿主环境：无宿主（独立预览）时**返回可用
+		   但不占用**——settleOnce 调用前本就先用 hasParent 短路，这里兜住"直接调
+		   claim()"的误用，防止独立预览里 inFlight 被烧死、回壳后结算永久失效。
+		   （验收器契约 §5：无宿主 claim() 返回 true = 可用，且不占用认领；
+		     生产路径 hasParent=true 时语义与旧版完全一致。） */
+		function claim() {
+			if (settled || inFlight) return false;
+			if (!hasParent) return true;
+			inFlight = true;
+			return true;
+		}
 		function confirmClaim() { inFlight = false; settled = true; }
 		function releaseClaim() { inFlight = false; }
 		function settleOnce(name, payload, cb, timeoutMs) {

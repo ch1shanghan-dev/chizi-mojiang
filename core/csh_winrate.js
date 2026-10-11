@@ -484,7 +484,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                 "#csh-wr-panel #csh-wr-table th:nth-child(1),#csh-wr-panel #csh-wr-table td:nth-child(1){position:sticky!important;left:0!important;z-index:2!important;background:#191309!important;}",
                 "#csh-wr-panel #csh-wr-table th:nth-child(2),#csh-wr-panel #csh-wr-table td:nth-child(2){position:sticky!important;left:34px!important;z-index:2!important;background:#191309!important;box-shadow:1px 0 0 rgba(216,180,106,.22)!important;}",
                 "#csh-wr-panel #csh-wr-table thead th:nth-child(1),#csh-wr-panel #csh-wr-table thead th:nth-child(2){z-index:4!important;}",
-                "#csh-wr-panel #csh-wr-table tbody tr:hover td:nth-child(1),#csh-wr-panel #csh-wr-table tbody tr:hover td:nth-child(2){background:#221a0e!important;}",
+                /* 【2026-10-05】触屏 hover 无意义，删除原「悬停时前两列变深」规则（避免窄屏出现框感） */
                 "}",
                 "#csh-wr-panel #csh-wr-table th:nth-child(1),#csh-wr-panel #csh-wr-table td:nth-child(1){width:40px!important;}",
                 "#csh-wr-panel #csh-wr-table th:nth-child(2),#csh-wr-panel #csh-wr-table td:nth-child(2){max-width:96px!important;}",
@@ -507,13 +507,16 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                 "#csh-wr-panel .csh-wr-note{display:block!important;margin:2px 0 12px!important;font-size:11.5px!important;line-height:1.7!important;color:#8b8271!important;letter-spacing:.2px!important;}",
                 "#csh-wr-panel tbody td{padding:7px 6px!important;font-size:13px!important;text-align:center!important;white-space:nowrap!important;",
                 "color:#ddd4c0!important;border-bottom:1px solid rgba(216,180,106,.09)!important;transition:background .14s ease!important;}",
-                "#csh-wr-panel tbody tr:hover td{background:rgba(216,180,106,.075)!important;}",
+                "#csh-wr-panel tbody tr:hover td{background:rgba(216,180,106,.055)!important;}",
                 "#csh-wr-panel tbody tr:last-child td{border-bottom:none!important;}",
                 "#csh-wr-panel td.wname{text-align:left!important;font-weight:600!important;color:#f0e3bd!important;letter-spacing:.3px!important;",
                 "overflow:hidden!important;text-overflow:ellipsis!important;}",
                 "#csh-wr-panel td.wname.ext{color:#ffd97a!important;}",
-                "#csh-wr-panel tr.myext td{background:rgba(216,180,106,.07)!important;}",
-                "#csh-wr-panel tr.myext:hover td{background:rgba(216,180,106,.13)!important;}",
+                /* 【2026-10-05 修复】原 tr.myext 整行金色背景（0.07 / hover 0.13）会在
+                   「非扩展行 → 扩展行」的边界处形成醒目的明暗横线——用户报「卡尔和界曹丕中间
+                   有一条金色的线」（卡尔恰夹在非扩展行与扩展行之间、又是唯一多场行，最显眼）。
+                   扩展武将的区分改由「金色名字 + ★」承担（td.wname.ext 已有规则），
+                   行背景一律均匀，不再使用整行底色。 */
                 "#csh-wr-panel tr.sub td{font-size:12.5px!important;color:#bfb59c!important;}",
                 "#csh-wr-panel tr.sub td.wname{padding-left:26px!important;font-weight:400!important;color:#cdc3a4!important;}",
                 "#csh-wr-panel .win{color:#7fe0a8!important;font-weight:600!important;}",

@@ -48,6 +48,29 @@
   --fs-2: clamp(11px, 1.6vh, 14px);   /* 二级：状态 */
   --fs-3: clamp(10px, 1.4vh, 12.5px); /* 三级：标签 / 说明 */
 
+  /* ---------- 字体三档（A1 · 2026-10-07）----------
+     与生涯大厅（games/career.html）**同一套字族名与同一套语义**：
+       --ff-title 宋体系 —— 标题字：页标题 / 区块标题 / 结算大字
+       --ff-body  黑体系 —— 正文：说明 / 按钮 / 标签
+       --ff-num   等宽数字 —— 数据：筹码 / 底池 / 计数，配 font-variant-numeric:tabular-nums
+     ★ 写法：整条字体栈**内联在 var() 的默认值里**，不引用别处的变量 ——
+       游戏页是自包含单文件（README 红线 #12），样式表加载顺序与是否被单独打开都不该影响它：
+       var(--ff-title) 即使没人定义，也会退回这里这份完整栈，永远拿得到字体。
+     ★ 本轮只加字族、不改字号：四页的 clamp(vh) 尺寸体系是**能用的**（矮屏收得下来、大屏放得开），
+       推倒重来是拿真实可玩性去换一致性。裸字号逐步收编，清单见 docs/art-direction.md §4.6。 */
+  --ff-title: "Noto Serif SC", "Source Han Serif SC", "Songti SC", "STSong", "SimSun", serif;
+  --ff-body: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+  --ff-num: ui-monospace, "Cascadia Mono", Consolas, "SF Mono", Menlo, monospace;
+
+  /* ---------- 材质光影（A2 · 2026-10-07）----------
+     与生涯大厅（games/career.html）同一套：发丝金线描边 + 金晕。同样**内联在 var() 默认值里**，
+     理由与字族一致：游戏页自包含，不该依赖谁先定义。只画不排（border/background/box-shadow），
+     不碰 padding/margin/尺寸 —— 材质永远不该改变布局。
+     · --edge-filament：一根「被光照到的金丝」（上缘亮 → 中段金 → 下缘收）
+     · --glow-card：顶缘金高光 + 底部压暗 = 卡片浮起 */
+  --edge-filament: linear-gradient(180deg, rgba(255,255,255,.22), rgba(216,180,106,.55) 38%, rgba(255,255,255,.16));
+  --glow-card: inset 0 1px 0 rgba(216,180,106,.20), inset 0 -18px 26px -20px rgba(0,0,0,.9);
+
   /* 主战区三段：HUD 行按内容高（grid auto），玩家区保底 --stage-player-min
      ⚠ 玩家区用 `minmax(min, auto)` 而不是写死百分比：手牌是**内容不是文本**
      （规范 §16），牌高由 --cw 决定；写死百分比会在矮屏把牌裁掉。
@@ -92,8 +115,10 @@
      （独立直开游戏页时右侧会空出同宽，代价可忽略。） */
   padding-right: clamp(148px, 19vw, 186px);
   overflow: hidden;
-  border-bottom: 1px solid var(--csh-line);
+  /* A2：同 Dock —— 渐隐金线替代通栏实线 */
   background: rgba(0, 0, 0, .18);
+  background-image: linear-gradient(90deg, transparent, rgba(216, 180, 106, .30) 18%, rgba(216, 180, 106, .30) 82%, transparent);
+  background-size: 100% 1px; background-position: bottom left; background-repeat: no-repeat;
 }
 .csh-topbar .tb-item {
   display: flex; align-items: baseline; gap: 4px;
@@ -103,6 +128,7 @@
 .csh-topbar .tb-v {
   font-size: var(--fs-2); font-weight: 800; color: var(--csh-gold-hi);
   font-variant-numeric: tabular-nums;
+  font-family: var(--ff-num, monospace);   /* A1：HUD 数值走等宽档，纵向对齐 */
   /* 规范 §15：数字永不被视口切掉 —— 允许省略号，绝不允许半个数字 */
   max-width: 100%; overflow: hidden; text-overflow: ellipsis;
 }
@@ -136,7 +162,8 @@
 }
 .csh-hudrow .tb-item { display: flex; align-items: baseline; gap: 4px; min-width: 0; white-space: nowrap; }
 .csh-hudrow .tb-k { font-size: var(--fs-3); color: var(--csh-text-dim); }
-.csh-hudrow .tb-v { font-size: var(--fs-2); font-weight: 700; color: var(--csh-text); font-variant-numeric: tabular-nums; }
+.csh-hudrow .tb-v { font-size: var(--fs-2); font-weight: 700; color: var(--csh-text); font-variant-numeric: tabular-nums;
+  font-family: var(--ff-num, monospace); }   /* A1：状态行数值走等宽档 */
 .csh-hudrow .tb-grow { flex: 1 1 auto; }
 
 /* ② 主战区：座位层覆盖左右边缘（§5.1），中心安全区承载公共牌/底池 */
@@ -176,8 +203,10 @@
   gap: var(--gap-sm);
   padding: 0 var(--game-pad);
   overflow: hidden;
-  border-top: 1px solid var(--csh-line);
+  /* A2：分隔线改为「中间实、两端收」的渐隐金线 —— 通栏 1px 实线太像表格边框 */
   background: rgba(0, 0, 0, .18);
+  background-image: linear-gradient(90deg, transparent, rgba(216, 180, 106, .34) 22%, rgba(216, 180, 106, .34) 78%, transparent);
+  background-size: 100% 1px; background-position: top left; background-repeat: no-repeat;
 }
 .csh-dock .btn,
 .csh-dock button {
@@ -209,10 +238,13 @@
   display: flex; flex-direction: column; align-items: stretch;
   gap: var(--gap-sm);
   padding: clamp(12px, 2vh, 22px) clamp(14px, 2.2vw, 26px);
-  border: 1px solid var(--csh-line);
+  border: 1px solid transparent;
   border-radius: 16px;
-  background: linear-gradient(180deg, rgba(34, 26, 17, .985), rgba(21, 17, 12, .985));
-  box-shadow: 0 20px 50px rgba(0, 0, 0, .75);
+  /* A2 材质：双背景——padding-box 出面、border-box 出一根发丝金线；
+     再叠金晕（顶缘金高光）+ 外投影（真正"离地"）。只画不排，不动任何尺寸。 */
+  background: linear-gradient(180deg, rgba(34, 26, 17, .985), rgba(21, 17, 12, .985)) padding-box,
+              var(--edge-filament, linear-gradient(180deg, rgba(255,255,255,.22), rgba(216,180,106,.55) 38%, rgba(255,255,255,.16))) border-box;
+  box-shadow: inset 0 1px 0 rgba(216, 180, 106, .20), 0 20px 50px rgba(0, 0, 0, .75), 0 0 34px -18px rgba(216, 180, 106, .45);
   animation: cshResultPanelIn .2s ease-out both;
 }
 @keyframes cshResultPanelIn {
@@ -228,11 +260,13 @@
   display: flex; flex-direction: column; gap: var(--gap-sm);
 }
 .csh-result .rs-foot { flex: 0 0 auto; display: flex; gap: var(--gap-sm); justify-content: center; flex-wrap: wrap; }
-.csh-result .rs-title { font-size: var(--fs-1); font-weight: 900; letter-spacing: 2px; }
+.csh-result .rs-title { font-size: var(--fs-1); font-weight: 900; letter-spacing: 2px;
+  font-family: var(--ff-title, serif); }   /* A1：结算标题走标题宋 */
 .csh-result .rs-title.win { color: var(--csh-gold-hi); }
 .csh-result .rs-title.lose { color: var(--danger, #d66e7c); }
 /* 「本手净变化 ±X」是全屏最大的一行数字：玩家唯一必须先看到的结论（方案 §11/§21） */
-.csh-result .rs-net { font-size: calc(var(--fs-1) * 1.35); font-weight: 900; letter-spacing: 1px; font-variant-numeric: tabular-nums; line-height: 1.2; }
+.csh-result .rs-net { font-size: calc(var(--fs-1) * 1.35); font-weight: 900; letter-spacing: 1px; font-variant-numeric: tabular-nums; line-height: 1.2;
+  font-family: var(--ff-num, monospace); }   /* A1：唯一主角数字走等宽档 */
 .csh-result .rs-net.plus { color: var(--ok, #7fd8c4); }
 .csh-result .rs-net.minus { color: var(--danger, #d66e7c); }
 .csh-result .rs-sec { display: flex; flex-direction: column; gap: 4px; }
@@ -242,7 +276,8 @@
 
 /* 对照表（规范 §13）：结算依据必须一眼可读 */
 .csh-result .rs-rows { width: 100%; display: flex; flex-direction: column; gap: 4px; }
-.csh-result .rs-cap { font-size: var(--fs-3); color: var(--csh-text-dim); letter-spacing: 1px; text-align: left; }
+.csh-result .rs-cap { font-size: var(--fs-3); color: var(--csh-text-dim); letter-spacing: 1px; text-align: left;
+  font-family: var(--ff-title, serif); }   /* A1：小节标题走标题宋，与逐行数据拉开层次 */
 .csh-result .rs-row {
   display: flex; align-items: center; gap: var(--gap-sm);
   padding: clamp(3px, .6vh, 7px) clamp(7px, 1vh, 12px);
@@ -254,8 +289,10 @@
 .csh-result .rs-row.win { border-color: var(--csh-gold-hi); box-shadow: 0 0 0 1px rgba(244, 223, 168, .3); }
 .csh-result .rs-name { flex: 0 0 auto; max-width: 6.5em; font-weight: 700; color: var(--csh-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .csh-result .rs-cards { flex: 0 0 auto; display: flex; gap: 3px; }
-.csh-result .rs-hand { flex: 1 1 auto; min-width: 0; font-weight: 700; color: var(--ok, #7fd8c4); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.csh-result .rs-gain { flex: 0 0 auto; font-weight: 900; color: var(--csh-gold-hi); font-variant-numeric: tabular-nums; }
+.csh-result .rs-hand { flex: 1 1 auto; min-width: 0; font-weight: 700; color: var(--ok, #7fd8c4); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font-family: var(--ff-num, monospace); }   /* A1：投入/获得/剩余明细是数据行 */
+.csh-result .rs-gain { flex: 0 0 auto; font-weight: 900; color: var(--csh-gold-hi); font-variant-numeric: tabular-nums;
+  font-family: var(--ff-num, monospace); }   /* A1：结算逐行盈亏走等宽档，数字竖列对齐 */
 .csh-result .rs-gain.zero { font-weight: 400; color: var(--csh-text-dim); }
 
 /* ---------- 7. 说明文字降级（规范 §22）：三级信息默认收起 ---------- */

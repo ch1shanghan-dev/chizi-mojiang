@@ -1,0 +1,38 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8">
+<title>德州结算层预览宿主（临时探针，不入包）</title>
+<style>html,body{margin:0;height:100%;background:#000;overflow:hidden}#frame{display:block;width:100%;height:100%;border:0}</style>
+</head><body>
+<!-- A2 材质实测用：把德州页关进 iframe 当"假壳"，应答桥协议让它能开局，
+     然后自动打到"收工结算"取出结算层（结算层样式由 csh_layout.css 提供，需要真实渲染才能验收）。
+     纯自动化编排：开局 → 每手弃牌 → 收工 → 截结算层。 -->
+<iframe id="frame" src="../games/texas/texas.html"></iframe>
+<script>
+var STEP = 0, log = [];
+function ack(src, req, name, data) { src.postMessage({ __csh: name + "-ack", req: req, ok: true, data: data }, "*"); }
+window.addEventListener("message", function (ev) {
+  var d = ev.data; if (!d || typeof d !== "object" || typeof d.__csh !== "string") return;
+  if (/-ack$/.test(d.__csh)) return;
+  var cmd = d.__csh;
+  if (cmd === "shell-wallet") {
+    /* 给一份"能开局 + 有生涯数据"的钱包：带入 2000，余额充足 */
+    return ack(ev.source, d.req, cmd, {
+      pc: 50000, pcPeak: 80000, streak: 3, signedToday: true, minTicket: 150,
+      buyIn: 2000, key: "texas", ticket: 0, tiers: [200, 2000, 20000], gamble: false,
+      rank: { rank: 5, merit: 1600, meritToday: 120, name: "都尉", meritDate: "2026-10-07" },
+      perks: { seg: 0, sign: 300, discount: 0, stakes: [200, 2000, 20000] },
+      tasks: { claimed: [] }
+    });
+  }
+  if (cmd === "shell-seat") return ack(ev.source, d.req, cmd, { seats: [], ai: [] });
+  if (cmd === "shell-task-add") return ack(ev.source, d.req, cmd, { done: [] });
+  if (cmd === "shell-merit") return ack(ev.source, d.req, cmd, { ok: true });
+  if (cmd === "shell-world-seat") return ack(ev.source, d.req, cmd, { ai: [] });
+  if (cmd === "shell-world-result") return ack(ev.source, d.req, cmd, { ok: true });
+  if (cmd === "shell-settle" || cmd === "shell-settle-session") return ack(ev.source, d.req, cmd, { ok: true, credited: 0 });
+  if (cmd === "shell-tasks") return ack(ev.source, d.req, cmd, { day: "2026-10-07", tier: 1, defs: [] });
+  if (cmd === "shell-stats") return ack(ev.source, d.req, cmd, {});
+});
+window.__log = function (s) { log.push(s); };
+window.__steps = log;
+</script>
+</body></html>

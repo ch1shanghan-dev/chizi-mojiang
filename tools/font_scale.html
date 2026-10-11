@@ -1,0 +1,80 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8">
+<title>池子魔将 · 字体与字号标尺（A1 参照页 · 工具，不入包）</title>
+<style>
+/* A1 规范的可视参照（docs/art-direction.md §四）。
+   这里的 token 与 games/career.html :root 逐字一致 —— 改一处要两处同改（本页是镜子，不是真值）。 */
+:root{
+  --ink-0:#08090b;--ink-1:#101216;--line:rgba(255,255,255,.08);
+  --gold:#c9a86a;--gold-hi:#e6cf9a;--text:#e8e6e1;--text-dim:#8d939c;
+  --ff-title:"Noto Serif SC","Source Han Serif SC","Songti SC","STSong","SimSun",serif;
+  --ff-body:"Noto Sans SC","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+  --ff-num:ui-monospace,"Cascadia Mono",Consolas,"SF Mono",Menlo,monospace;
+  --fs-base:12.5px;
+  --fs-tiny:calc(var(--fs-base) * .8);
+  --fs-cap:calc(var(--fs-base) * .92);
+  --fs-body:var(--fs-base);
+  --fs-lead:calc(var(--fs-base) * 1.2);
+  --fs-menu:calc(var(--fs-base) * 1.44);
+  --fs-title:calc(var(--fs-base) * 2.08);
+  --fs-display:calc(var(--fs-base) * 2.32);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--ink-0);color:var(--text);padding:18px;font-family:var(--ff-body)}
+h2{font-family:var(--ff-title);font-size:var(--fs-menu);color:var(--gold-hi);letter-spacing:.1em;
+  margin:18px 0 10px;padding-left:8px;border-left:2px solid var(--gold)}
+h2:first-child{margin-top:0}
+.row{display:flex;align-items:baseline;gap:12px;padding:8px 10px;border:1px solid var(--line);
+  border-radius:8px;background:var(--ink-1);margin-bottom:6px}
+.tag{flex:0 0 132px;font-size:var(--fs-tiny);font-family:var(--ff-num);color:var(--text-dim);letter-spacing:.02em}
+.spec{flex:1 1 auto;min-width:0}
+.f-title .spec{font-family:var(--ff-title)}
+.f-body .spec{font-family:var(--ff-body)}
+.f-num .spec{font-family:var(--ff-num);font-variant-numeric:tabular-nums}
+.t-tiny{font-size:var(--fs-tiny)}.t-cap{font-size:var(--fs-cap)}.t-body{font-size:var(--fs-body)}
+.t-lead{font-size:var(--fs-lead)}.t-menu{font-size:var(--fs-menu)}.t-title{font-size:var(--fs-title);font-weight:700}
+.t-display{font-size:var(--fs-display);font-weight:900;color:var(--gold-hi)}
+.note{font-size:var(--fs-cap);color:var(--text-dim);line-height:1.7;margin-top:10px}
+.hint{font-size:var(--fs-cap);color:var(--gold);margin-bottom:8px}
+</style></head><body>
+
+<h2>一 · 三档字体（按语义分档，不按大小）</h2>
+<div class="hint">同一句话，三种字族 —— 标题宋有骨、正文黑稳当、数字等宽对齐</div>
+<div class="row f-title"><div class="tag">--ff-title · 标题宋</div><div class="spec t-menu">抚军将军 · 总览 任务 成就 · 第 23 阶 / 共 50 阶</div></div>
+<div class="row f-body"><div class="tag">--ff-body · 正文黑</div><div class="spec t-body">抚军将军 · 总览 任务 成就 · 第 23 阶 / 共 50 阶</div></div>
+<div class="row f-num"><div class="tag">--ff-num · 数字牌</div><div class="spec t-body">2,845,600 · 41,200 · 169/443 · 01 02 03</div></div>
+<div class="note">等宽只在数字上成立：中文字形在等宽字族里会退化成方框字重不均 —— 所以中文永远走 ①②，只有数字走 ③。</div>
+
+<h2>二 · 字号标尺（单一基数 12.5px 派生）</h2>
+<div class="hint">七档；每行左侧是 token 与计算式</div>
+<div class="row f-title"><div class="tag">tiny · ×.80 = 10px</div><div class="spec t-tiny">角标：菜单编号 / 徽章刻度 01</div></div>
+<div class="row f-body"><div class="tag">cap · ×.92 = 11.5px</div><div class="spec t-cap">辅助：字段名 / 脚注 / 任务进度 2 / 3 · +600 CBY</div></div>
+<div class="row f-body"><div class="tag">body · ×1 = 12.5px</div><div class="spec t-body">正文：说明文字 / 按钮 / 列表行（默认字号，一切以它为准）</div></div>
+<div class="row f-body"><div class="tag">lead · ×1.2 = 15px</div><div class="spec t-lead">导语：卡片主标题</div></div>
+<div class="row f-title"><div class="tag">menu · ×1.44 = 18px</div><div class="spec t-menu">菜单：页签 / 区块标题</div></div>
+<div class="row f-title"><div class="tag">title · ×2.08 = 26px</div><div class="spec t-title">标题：官阶名 / 面板标题</div></div>
+<div class="row f-title"><div class="tag">display · ×2.32 = 29px</div><div class="spec t-display">2,845,600</div></div>
+
+<h2>三 · 搭配示例（真实页面片段）</h2>
+<div class="row"><div class="tag">官阶焦点卡</div><div class="spec">
+  <div class="t-title" style="font-family:var(--ff-title);color:var(--gold)">抚军将军</div>
+  <div class="t-cap" style="color:var(--text-dim)">第 23 阶 / 共 50 阶 · 功勋 41,200</div>
+  <div class="t-display" style="font-family:var(--ff-title)">2,845,600 <span class="t-cap" style="font-family:var(--ff-body);color:var(--text-dim)">池子币 CBY</span></div>
+</div></div>
+<div class="row"><div class="tag">排行榜行</div><div class="spec" style="display:flex;gap:10px;align-items:center">
+  <span class="t-tiny" style="font-family:var(--ff-num);color:var(--text-dim);flex:0 0 34px;text-align:center">2</span>
+  <span class="t-body" style="flex:1 1 auto">张飞 <span class="t-cap" style="color:var(--text-dim)">豪赌桌</span></span>
+  <span class="t-body" style="font-family:var(--ff-num);font-weight:700;color:var(--gold-hi);font-variant-numeric:tabular-nums">321,200</span>
+</div></div>
+<div class="row"><div class="tag">任务行</div><div class="spec">
+  <div class="t-body" style="font-weight:700">德州打满 3 手</div>
+  <div class="t-cap" style="font-family:var(--ff-num);color:var(--text-dim)">2 / 3</div>
+</div></div>
+
+<h2>四 · 断点与压缩口径</h2>
+<div class="note">
+① 紧凑断点用 <b>max-height</b>（手机横屏 915×412 比 900px 桌面断点更宽，按宽度判定会被绕过）；<br>
+② 压缩顺序：侧栏收窄 → 内距/间距收紧 → 网格自适应列数 → 最后才内部滚动；<br>
+③ 任何情况下不藏信息、不缩到标尺外（L-SHORT 口径）。
+</div>
+
+</body></html>

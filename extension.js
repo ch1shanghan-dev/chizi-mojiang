@@ -49,7 +49,7 @@ export default function(){
             ["csh_mlm_2", ["img:extension/池子魔将/image/csh_mlm_2.webp", "die:ext:池子魔将/audio/die/csh_mlm.mp3"]],
         ],
         "csh_maochao": [
-            ["csh_maochao_shen", ["img:extension/池子魔将/image/csh_maochao_shen.jpg", "die:ext:池子魔将/audio/die/csh_maochao.mp3"]],
+            ["csh_maochao_shen", ["img:extension/池子魔将/image/csh_maochao.webp", "die:ext:池子魔将/audio/die/csh_maochao.mp3"]],
         ],
         "csh_yangjian": [
             ["csh_yangjian_1", ["img:extension/池子魔将/image/csh_yangjian_1.jpg", "die:ext:池子魔将/audio/die/csh_yangjian.mp3"]],

@@ -106,7 +106,8 @@
     margin: auto 0;
     box-shadow: 0 20px 50px rgba(0, 0, 0, .6), inset 0 1px 0 rgba(216, 180, 106, .16);
   }
-  .sc-title { font-size: var(--fs-lg); font-weight: 900; letter-spacing: 6px; color: var(--gold-hi); text-align: center; }
+  .sc-title { font-size: var(--fs-lg); font-weight: 900; letter-spacing: 6px; color: var(--gold-hi); text-align: center;
+    font-family: var(--ff-title, serif); }   /* A1 标题宋 */
   .sc-sub { font-size: var(--fs-sm); color: var(--text-dim); text-align: center; line-height: 1.7; margin-top: calc(clamp(10px, 1.7vh, 20px) * -.55); }
   .sc-sec { display: flex; align-items: center; justify-content: space-between; gap: clamp(8px, 1.4vh, 16px); flex-wrap: wrap; }
   .sc-k { font-size: var(--fs-xs); color: var(--text-dim); letter-spacing: 2px; min-width: 4.2em; }
@@ -310,7 +311,8 @@
     animation: insIn .2s ease-out both;
   }
   @keyframes insIn { from { transform: translateY(14px); opacity: 0; } }
-  .ins-title { font-size: var(--fs-lg); font-weight: 900; letter-spacing: 4px; color: var(--gold); }
+  .ins-title { font-size: var(--fs-lg); font-weight: 900; letter-spacing: 4px; color: var(--gold);
+    font-family: var(--ff-title, serif); }   /* A1 标题宋 */
   .ins-sub { font-size: var(--fs-sm); color: var(--text-dim); line-height: 1.7; }
   .ins-sub b { color: var(--gold-hi); }
   .ins-prob { width: 100%; display: flex; flex-direction: column; gap: 6px; }
@@ -326,7 +328,8 @@
      现在：遮罩只压暗（骨架给 rgba(6,5,4,.46)），面板 .2s 从下方 6px 浮入，
           **动画结束完全不透明**（骨架已保证，本页不得覆写）。
      本页只补：标题字号、对照表里的迷你牌、以及一行说明的宽度。 */
-  #banner .rs-title { font-size: clamp(17px, 3.4vh, 30px); font-weight: 900; letter-spacing: 5px; line-height: 1.1; }
+  #banner .rs-title { font-size: clamp(17px, 3.4vh, 30px); font-weight: 900; letter-spacing: 5px; line-height: 1.1;
+    font-family: var(--ff-title, serif); }   /* A1 标题宋 */
   #banner .rs-sub { line-height: 1.65; }
   #banner .rs-sub b { color: var(--text); font-variant-numeric: tabular-nums; }
   #banner .rs-sub .gain { color: var(--ok); font-weight: 900; }
@@ -351,7 +354,8 @@
     box-shadow: 0 24px 60px rgba(0, 0, 0, .8);
     animation: bannerIn .26s ease-out both;
   }
-  .rules-title { font-size: var(--fs-md); font-weight: 900; letter-spacing: 3px; color: var(--gold); }
+  .rules-title { font-size: var(--fs-md); font-weight: 900; letter-spacing: 3px; color: var(--gold);
+    font-family: var(--ff-title, serif); }   /* A1 标题宋 */
   .rules-body { width: 100%; display: flex; flex-direction: column; gap: 7px; font-size: var(--fs-sm); color: var(--text-dim); line-height: 1.85; text-align: left; }
   .rules-body b { color: var(--text); }
   .rules-body em { font-style: normal; color: var(--gold-hi); font-weight: 700; }
@@ -758,10 +762,16 @@ try { CRD = (typeof window !== 'undefined' && window.CSH && window.CSH.cards) ? 
     return r === 14 ? 11 : Math.min(10, r);
   }
 
-  /* 庄家 S17：所有 17 点停牌；draw() 返回一张牌，返回最终手牌 */
+  /* 庄家规则随档（分级庄家 T5）：标准/豪赌 = S17（所有 17 点停牌）；
+     新手庄 = H17（软 17 也要牌，对玩家更差）。draw() 返回一张牌，返回最终手牌。 */
   function bjDealerPlay(cards, draw) {
     var guard = 0;
-    while (bjValue(cards).total < 17 && guard++ < 30) cards.push(draw());
+    var h17 = !!(state.tier && state.tier.h17);
+    while (guard++ < 30) {
+      var v = bjValue(cards);
+      if (v.total < 17 || (h17 && v.total === 17 && v.soft)) cards.push(draw());
+      else break;
+    }
     return cards;
   }
 
@@ -773,7 +783,9 @@ try { CRD = (typeof window !== 'undefined' && window.CSH && window.CSH.cards) ? 
     if (pv.total > 21) return { result: 'bust', ret: 0, delta: -w };
     if (bjIsBJ(hand.cards, hand.fromSplit)) {
       if (dealerBJ) return { result: 'push', ret: w, delta: 0 };
-      return { result: 'bj', ret: w * 2.5, delta: w * 1.5 };
+      /* 分级庄家（T5）：廿一点赔付随档 —— 新手庄 6:5（pay 1.2），标准/豪赌 3:2（pay 1.5） */
+      var bjPay = (state.tier && state.tier.bjPay) || 1.5;
+      return { result: 'bj', ret: w * (1 + bjPay), delta: w * bjPay };
     }
     if (dealerBJ) return { result: 'lose', ret: 0, delta: -w };
     var dv = bjValue(dealerCards);
@@ -994,6 +1006,21 @@ try { CRD = (typeof window !== 'undefined' && window.CSH && window.CSH.cards) ? 
      ============================================================ */
   var state = null;
 
+  /* 分级庄家（2026-10-07 · 方案 T5）：桌级规则变体按**带入额**自动定级 ——
+     与德州豪赌桌同构（门槛越高规则越善待玩家，但单注越大风险越大）。
+     经济红线：三档期望值全部为庄家占优（新手庄 H17 + 6:5 赔付更差），
+     只是"差多少"的区别；阈值与规则是纯数据，调整改这里。 */
+  var TABLE_TIERS = [
+    { name: "新手庄", min: 0, decks: 8, h17: true, bjPay: 1.2, note: "8 副牌 · 庄家软 17 要牌 · 廿一点赔 6:5" },
+    { name: "标准庄", min: 500, decks: 6, h17: false, bjPay: 1.5, note: "6 副牌 · 庄家软 17 停 · 廿一点赔 3:2" },
+    { name: "豪赌庄", min: 2000, decks: 4, h17: false, bjPay: 1.5, note: "4 副牌 · 庄家软 17 停 · 廿一点赔 3:2 · 牌靴消耗快" },
+  ];
+  function tierOf(buyInVal) {
+    var t = TABLE_TIERS[0];
+    for (var i = 0; i < TABLE_TIERS.length; i++) if (buyInVal >= TABLE_TIERS[i].min) t = TABLE_TIERS[i];
+    return t;
+  }
+
   function newState() {
     /* shell 内：本金来自宿主带入额，纯内存，不回写本地存档（避免双数据源 §G.6.6） */
     var startChips = Bridge.active ? Bridge.buyIn() : Math.round(best.chips);
@@ -1005,6 +1032,7 @@ try { CRD = (typeof window !== 'undefined' && window.CSH && window.CSH.cards) ? 
     var bank = (Bridge.active && dealerSeat) ? dealerBankInit() : 0;
     return {
       shoe: [], shoeSize: 312, cut: 0.25,
+      tier: tierOf(startChips),   /* 分级庄家（方案 T5）：由带入额定档，牌副/庄家规则/赔付随档 */
       hand: 0,
       chips: startChips,
       /* 庄家席 · 台面零和（2026-09-29）：
@@ -1029,10 +1057,11 @@ try { CRD = (typeof window !== 'undefined' && window.CSH && window.CSH.cards) ? 
 
   /* ---------- 牌靴 ---------- */
   function newShoe() {
+    var decks = (state.tier && state.tier.decks) || 6;   /* 分级庄家：牌副数随档（T5） */
     var s = [];
-    for (var d = 0; d < 6; d++) s = s.concat(newDeck());
+    for (var d = 0; d < decks; d++) s = s.concat(newDeck());
     state.shoe = shuffle(s);
-    state.shoeSize = s.length;   /* 312 */
+    state.shoeSize = s.length;
   }
   function draw() {
     if (!state.shoe.length) newShoe();
@@ -1273,6 +1302,10 @@ try { CRD = (typeof window !== 'undefined' && window.CSH && window.CSH.cards) ? 
   function renderStart() {
     var funds = startFunds();
     var opts = betOptionsOf(funds);
+    /* 分级庄家（T5）：开局页规则说明随带入档动态更新 */
+    var tierNow = tierOf(funds);
+    var subEl = document.querySelector('.sc-sub');
+    if (subEl) subEl.textContent = tierNow.note + " · 连胜倍率最高 ×3";
     /* 注额钳制：带入变了（例如从 200 换到豪赌桌 200,000），旧注额可能不在新档位里 */
     if (opts.indexOf(set.bet) < 0) {
       var p0 = 0;
@@ -1755,6 +1788,8 @@ try { CRD = (typeof window !== 'undefined' && window.CSH && window.CSH.cards) ? 
     }
     sub += '<br>连胜 <b>' + state.streak + '</b> · 倍率 <b>×' + bjMult(state.streak).toFixed(1) +
       '</b> · 筹码 <b>' + fmt(state.chips) + '</b>';
+    /* 分级庄家（T5）：结算页如实标注本桌规则档 */
+    if (state.tier) sub += '<br>本桌：' + state.tier.name + '（' + state.tier.note + '）';
     $('#banner-sub').innerHTML = sub;
 
     /* 逐手对照表：庄家一行 + 每手一行（分牌时多行），牌面 / 点数 / 这一手的进出全部摊开。

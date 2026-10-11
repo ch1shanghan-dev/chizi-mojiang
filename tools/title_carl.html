@@ -1,0 +1,36 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+body{margin:0;background:linear-gradient(160deg,#241c12,#151009 60%,#0c0906);color:#cbbf9f;
+ font-family:'Microsoft YaHei',sans-serif;padding:20px 24px;}
+.cell{padding:10px 0 2px;text-align:center;}
+.cap{font-size:12px;letter-spacing:2px;color:#8f8468;margin-top:4px;}
+.tt{display:flex;justify-content:center;align-items:center;height:118px;}
+.tt span{display:inline-block;line-height:1;font-family:'KaiTi',serif;font-weight:700;font-size:60px;letter-spacing:5px;transform:skew(-17deg);}
+
+/* A · 三元素珠：Quas 冰蓝 / Wex 雷紫 / Exort 火橙 / 霜白高光，逐字一色 */
+.ca span:nth-child(1){color:#8fd0ff;}
+.ca span:nth-child(2){color:#c08cff;translate:0 -8px;}
+.ca span:nth-child(3){color:#ffb066;translate:0 4px;}
+.ca span:nth-child(4){color:#efe6ff;translate:0 -4px;}
+.ca span{text-shadow:-3px 0 0 rgba(255,140,66,.7),3px 0 0 rgba(96,168,255,.65),4px 5px 0 rgba(0,0,0,.6),0 0 24px rgba(168,110,255,.5);}
+
+/* B · 冰雷共鸣：冰蓝→雷紫渐变字 + 紫/蓝双色错位光影 */
+.cb span{background:linear-gradient(120deg,#9fd8ff 0%,#c3a4ff 50%,#8fb0ff 100%);
+ -webkit-background-clip:text;background-clip:text;color:transparent;
+ filter:drop-shadow(-3px 0 0 rgba(178,110,255,.8)) drop-shadow(3px 0 0 rgba(96,180,255,.7))
+  drop-shadow(4px 5px 0 rgba(0,0,0,.6)) drop-shadow(0 0 22px rgba(150,130,255,.5));}
+.cb span:nth-child(2){translate:0 -8px;}
+.cb span:nth-child(3){translate:0 4px;}
+.cb span:nth-child(4){translate:0 -4px;}
+
+/* C · 紫罗兰血法：卡尔紫袍主色 + 火橙/冰蓝错位影 + 强紫辉光 */
+.cc span{color:#dfc2ff;
+ text-shadow:-3px 0 0 rgba(255,120,70,.65),3px 0 0 rgba(110,190,255,.6),4px 5px 0 rgba(0,0,0,.65),
+  0 0 26px rgba(190,110,255,.65),0 0 60px rgba(190,110,255,.3);}
+.cc span:nth-child(2){translate:0 -8px;}
+.cc span:nth-child(3){translate:0 4px;}
+.cc span:nth-child(4){translate:0 -4px;}
+</style></head><body>
+<div class="cell"><div class="tt ca"><span>除</span><span>客</span><span>皆</span><span>刀</span></div><div class="cap">A · 三元素珠 — 冰蓝 Quas / 雷紫 Wex / 火橙 Exort / 霜白，逐字一色（最"卡尔"）</div></div>
+<div class="cell"><div class="tt cb"><span>除</span><span>客</span><span>皆</span><span>刀</span></div><div class="cap">B · 冰雷共鸣 — 冰蓝至雷紫渐变 + 紫蓝错位光影（冷色魔法）</div></div>
+<div class="cell"><div class="tt cc"><span>除</span><span>客</span><span>皆</span><span>刀</span></div><div class="cap">C · 紫罗兰血法 — 紫袍主色 + 火橙冰蓝错位影（贴合卡尔原立绘）</div></div>
+</body></html>

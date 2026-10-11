@@ -1706,7 +1706,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                 "position:relative!important;z-index:3!important;}",
                 "#csh-dbg-head .csh-dbg-head-main{flex:1 1 auto!important;min-width:0!important;display:block!important;}",
                 /* ---------- 标题：字重 600 + 轻微负字距（现代紧凑，不用宽字距复古排印） ---------- */
-                "#csh-dbg-title{display:flex!important;align-items:center!important;gap:9px!important;text-align:left!important;font-size:16px!important;font-weight:600!important;letter-spacing:-.01em!important;",
+                "#csh-dbg-title{font-family:'Noto Serif SC','Source Han Serif SC','Songti SC','STSong','SimSun',serif!important;display:flex!important;align-items:center!important;gap:9px!important;text-align:left!important;font-size:16px!important;font-weight:600!important;letter-spacing:-.01em!important;",
                 "line-height:1.3!important;margin:0!important;padding:0!important;",
                 "font-family:system-ui,-apple-system,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif!important;",
                 "color:var(--csh-bg)!important;-webkit-text-fill-color:var(--csh-bg)!important;background:none!important;",
@@ -1843,6 +1843,15 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                 "transition:border-color .16s ease,background .16s ease,box-shadow .18s ease,transform .16s ease!important;}",
                 "button.csh-dbg-gamebtn:hover{border-color:rgba(var(--csh-accent-rgb),.55)!important;background:var(--csh-paper2)!important;",
                 "transform:translateY(-1px)!important;box-shadow:0 8px 20px -12px rgba(var(--csh-bg-rgb),.40)!important;}",
+                /* 生涯大厅非游戏（2026-10-07 · 作者反馈「与小游戏同按钮大小很奇怪」）：
+                   独占整行 + 横排 + 金染底 —— 总览入口与游戏入口在视觉层级上分开。 */
+                "button.csh-dbg-gamebtn.gb-career{background:linear-gradient(160deg,rgba(var(--csh-accent-rgb),.12),rgba(var(--csh-accent-rgb),.03) 60%)!important;border-color:rgba(var(--csh-accent-rgb),.42)!important;}",
+                "button.csh-dbg-gamebtn.gb-career .gb-name{font-size:16px!important;letter-spacing:.06em!important;}",
+                "button.csh-dbg-gamebtn.gb-career .gb-mid{font-size:12px!important;color:var(--csh-accent)!important;letter-spacing:.03em!important;opacity:.85!important;}",
+                "button.csh-dbg-gamebtn.gb-career .gb-desc{margin:0!important;text-align:left!important;opacity:.8!important;}",
+                "button.csh-dbg-gamebtn.gb-career .gb-top{margin-bottom:2px!important;}",
+                "button.csh-dbg-gamebtn.gb-career{position:relative!important;overflow:hidden!important;}",
+                "button.csh-dbg-gamebtn.gb-career::before{content:''!important;position:absolute!important;left:-4px!important;top:-6px!important;bottom:-6px!important;width:5px!important;background:linear-gradient(180deg,var(--csh-accent),rgba(var(--csh-accent-rgb),.12))!important;transform:skewY(-10deg)!important;}",
                 "button.csh-dbg-gamebtn:active{transform:translateY(0)!important;}",
                 "button.csh-dbg-gamebtn .gb-top{display:flex!important;align-items:center!important;gap:8px!important;width:100%!important;}",
                 "button.csh-dbg-gamebtn .gb-name{flex:0 1 auto!important;font-size:15px!important;font-weight:600!important;color:var(--csh-bg)!important;line-height:1.3!important;",
@@ -1916,6 +1925,11 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                 "#csh-redeem .csh-rdm-title{margin-bottom:10px!important;font-size:14px!important;}",
                 "#csh-redeem .csh-rdm-mirror-in,#csh-redeem .csh-rdm-inp{font-size:12px!important;letter-spacing:.03em!important;}",
                 "}",
+                /* ---------- 其他扩展安装面板的规则已迁出主 CSS ----------
+                   （2026-10-06）主 CSS（本函数）只在打开调试面板时注入，且其内容随代码版本——
+                   若玩家没打开过调试面板（或注入的旧版本不含这些规则），面板会以裸 DOM 出现
+                   （用户实机报告「点开是底部一条横幅」）。现改为 openExtStore 自带的
+                   ensureExtStoreStyle() 独立注入（无依赖、幂等），见该函数。 */
                 /* ---------- 内容区（body 本体规则见上方 §E.1 段） ---------- */
                 /* 每个页签的内容都应包一层 .csh-dbg-page，桌面端才限宽居中 */
                 ".csh-dbg-page{display:block!important;width:100%!important;position:static!important;}",
@@ -1938,13 +1952,13 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                    游戏卡开始键(1801) / 兑换行按钮(1855) / 壳各按钮(csh_shell 257·293·353)。
                    唯独 .csh-dbg-btn 是 padding:9px ⇒ 实测高 36px（<44），横跨 8 个页签共 60+ 个按钮。
                    padding 9→13px 使其达到 44px，与其同目录邻居保持一致。 */
-                "button.csh-dbg-btn{display:inline-block!important;cursor:pointer!important;padding:13px 14px!important;min-height:44px!important;border-radius:8px!important;font-size:13px!important;",
-                "color:var(--csh-bg)!important;background:var(--csh-fg)!important;font-weight:500!important;",
-                "border:1px solid rgba(var(--csh-bg-rgb),.12)!important;white-space:nowrap!important;font-family:inherit!important;line-height:1.25!important;margin:0!important;",
+                "button.csh-dbg-btn{display:inline-block!important;cursor:pointer!important;padding:13px 14px!important;min-height:44px!important;border-radius:10px!important;font-size:13px!important;letter-spacing:.02em!important;",
+                "color:var(--csh-bg)!important;background:linear-gradient(180deg,rgba(var(--csh-accent-rgb),.07),rgba(0,0,0,0) 62%),var(--csh-fg)!important;font-weight:500!important;",
+                "border:1px solid rgba(var(--csh-accent-rgb),.26)!important;white-space:nowrap!important;font-family:inherit!important;line-height:1.25!important;margin:0!important;",
                 "box-shadow:0 1px 1px rgba(var(--csh-bg-rgb),.03)!important;",
                 "transition:border-color .16s ease,box-shadow .16s ease,transform .16s ease,background .16s ease!important;}",
-                "button.csh-dbg-btn:hover{border-color:rgba(var(--csh-bg-rgb),.22)!important;transform:translateY(-1px)!important;",
-                "color:var(--csh-bg)!important;background:var(--csh-paper2)!important;box-shadow:0 3px 10px -4px rgba(var(--csh-bg-rgb),.20)!important;}",
+                "button.csh-dbg-btn:hover{border-color:rgba(var(--csh-accent-rgb),.60)!important;transform:translateY(-1px)!important;",
+                "color:var(--csh-bg)!important;background:var(--csh-paper2)!important;box-shadow:0 3px 12px -4px rgba(var(--csh-accent-rgb),.30)!important;}",
                 "button.csh-dbg-btn:active{transform:translateY(0)!important;}",
                 /* 主按钮（确定/开始/兑换/读取）：CBY 黄实底 + 墨字（黄只作底，绝不作纸白上的文字，对比度 1.6:1 不可读） */
                 "button.csh-dbg-btn.good{color:var(--csh-accent-ink)!important;border-color:var(--csh-accent)!important;background:var(--csh-accent)!important;font-weight:600!important;box-shadow:0 1px 2px rgba(var(--csh-accent-rgb),.38)!important;}",
@@ -2016,7 +2030,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                 "position:static!important;overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important;}",
                 ".csh-dbg-sk .csh-dbg-sk-info .src b{display:inline!important;position:static!important;font-weight:600!important;color:var(--csh-blue)!important;}",
                 ".csh-dbg-sk .csh-dbg-sk-info .src i{display:inline!important;position:static!important;font-style:normal!important;color:var(--csh-gray)!important;}",
-                ".csh-dbg-sk .csh-dbg-sk-acts{display:table-cell!important;vertical-align:middle!important;width:134px!important;text-align:right!important;",
+                ".csh-dbg-sk .csh-dbg-sk-acts{display:table-cell!important;vertical-align:middle!important;width:auto!important;text-align:right!important;",
                 "padding:10px 12px!important;white-space:nowrap!important;position:static!important;}",
                 ".csh-dbg-sk .csh-dbg-sk-acts button{display:inline-block!important;cursor:pointer!important;padding:6px 13px!important;margin-left:6px!important;",
                 "border-radius:8px!important;font-size:12px!important;font-weight:500!important;border:1px solid transparent!important;color:var(--csh-fg)!important;font-family:inherit!important;",
@@ -2025,8 +2039,8 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                 ".csh-dbg-sk .csh-dbg-sk-acts button:hover{filter:brightness(1.06)!important;transform:translateY(-1px)!important;box-shadow:0 4px 10px -4px rgba(var(--csh-bg-rgb),.28)!important;}",
                 ".csh-dbg-sk .csh-dbg-sk-acts button.add{color:var(--csh-color-ink)!important;background:var(--csh-blue)!important;border-color:var(--csh-blue)!important;}",
                 ".csh-dbg-sk .csh-dbg-sk-acts button.rm{color:var(--csh-color-ink)!important;background:var(--csh-red)!important;border-color:var(--csh-red)!important;}",
-                /* 窄屏：操作列收窄，按钮更紧凑 */
-                "@media (max-width:520px){.csh-dbg-sk .csh-dbg-sk-acts{width:112px!important;padding:10px 8px!important;}",
+                /* 窄屏：操作列按钮更紧凑（宽度已自适应，内容为准） */
+                "@media (max-width:520px){.csh-dbg-sk .csh-dbg-sk-acts{padding:10px 8px!important;}",
                 ".csh-dbg-sk .csh-dbg-sk-acts button{padding:6px 9px!important;margin-left:4px!important;font-size:11.5px!important;}}",
                 /* ---------- 技能详情层（§4.6.2）：同层替换，不弹窗套弹窗 ---------- */
                 ".csh-dbg-detail{display:block!important;width:100%!important;padding:2px 2px 6px!important;position:static!important;}",
@@ -2444,11 +2458,26 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
             if (!lib.skill || !lib.skill[sid]) return toast("技能不存在: " + sid);
             runAct(function () {
                 if (typeof p.addSkillLog === "function") p.addSkillLog(sid);
-                else if (typeof p.addSkills === "function") p.addSkills(sid);
+                else if (typeof p.addSkills === "function") p.addSkills([sid]);
                 else if (typeof p.addSkill === "function") p.addSkill(sid);
                 else throw new Error("无法添加");
                 toast((tr(p) || p.name) + " 获得 " + (tr(sid) || sid) + "（已提交）");
             }, { action: "addSkill", target: p, requested: { skill: sid }, before: { skills: (p.skills || []).slice() } });
+        }
+        /** 技能页目标解析（搜索列表 / 武将详情等处共用）：
+            读 skillTargetShared（本作用域 var，声明在后但提升可用），与页面顶部选择器同源，
+            避免详情层按钮各自解析出另一个目标。 */
+        function resolveSkillTabTarget() {
+            var st = skillTargetShared;
+            if (st && st.target != null) {
+                if (st.target === "me") return needMe();
+                var i = parseInt(st.target, 10);
+                if (!isNaN(i)) {
+                    var l = allPlayers();
+                    if (l[i]) return l[i];
+                }
+            }
+            return needMe();
         }
         function safeGain(names, targetPlayer) {
             var p = targetPlayer || needMe();
@@ -3280,20 +3309,41 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 
             /* 生涯大厅（§4.1.6）：总览入口，非游戏、免门票、不开收费屏。
                文案读 registry 单源（与 registry 的 career.desc 一致，不抄第二份）。 */
-            (function () {
-                var careerDesc = "战绩 / 官阶 / 成就 / AI 世界";
-                try {
-                    var rg = (typeof window !== "undefined" && window.CSH && window.CSH.registry) || null;
-                    var c0 = rg && typeof rg.get === "function" ? rg.get("career") : null;
-                    if (c0 && c0.desc) careerDesc = String(c0.desc);
-                } catch (eR) {}
-                list.appendChild(gameButton("生涯大厅", careerDesc, "总览", function () {
+                (function () {
+                    var careerDesc = "战绩 / 官阶 / 成就 / AI 世界";
                     try {
-                        if (lib.cshGames && lib.cshGames.openLobby) { lib.cshGames.openLobby(); return; }
-                    } catch (eL) {}
-                    toast("生涯大厅模块未加载（csh_games.js）");
-                }, false));
-            })();
+                        var rg = (typeof window !== "undefined" && window.CSH && window.CSH.registry) || null;
+                        var c0 = rg && typeof rg.get === "function" ? rg.get("career") : null;
+                        if (c0 && c0.desc) careerDesc = String(c0.desc);
+                    } catch (eR) {}
+                    var midTxt = "";
+                    try {
+                        var WS = lib.cshWorld && lib.cshWorld.stats ? lib.cshWorld.stats() : null;
+                        if (WS) midTxt = "在场 " + (WS.chars - WS.retired) + " 人 · 桌面资金 " + fmt(WS.fundSum);
+                    } catch (eW) {}
+                    var cb1 = gameButton("生涯大厅", careerDesc, "总览", function () {
+                        try {
+                            if (lib.cshGames && lib.cshGames.openLobby) { lib.cshGames.openLobby(); return; }
+                        } catch (eL) {}
+                        toast("生涯大厅模块未加载（csh_games.js）");
+                    }, false);
+                    /* 生涯大厅非游戏（T·UI）：独占整行 + 金染（与小游戏卡片分层） */
+                    cb1.classList.add("gb-career");
+                    /* 中部填世界实时数据（作者要求「中间大片空白」去掉）——所见即所得 */
+                    /* T·割裂重构（2026-10-07）：名+副题纵向一体（左），世界实时数据靠右缘——
+                       两个信息区，不是三个拼盘。desc 从右缘挪到名字下方，成为副题。 */
+                    if (midTxt) {
+                        var mid = document.createElement("span");
+                        mid.className = "gb-mid";
+                        mid.textContent = midTxt;
+                        var desc = cb1.querySelector(".gb-desc");
+                        if (desc && desc.parentNode === cb1) {
+                            cb1.insertBefore(mid, desc);
+                            desc.classList.add("gb-sub");
+                        }
+                    }
+                    list.appendChild(cb1);
+                })();
 
             games.forEach(function (g) {
                 list.appendChild(gameButton(
@@ -3309,6 +3359,110 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
             });
             body.appendChild(list);
 
+            /* —— CBY 兑换斗转星移道具（2026-10-05）——
+               依赖懒人包「斗转星移」扩展：其 api.js 对外暴露 window.dzxy.Props
+              （getCount/changeCount，库存持久化在它的 "package" 配置里）与
+               dzxy.propToast.addToast。这里只做「池子币 → 道具」的桥：
+               扣 CBY → 加它家库存 → 让它家弹原生提示；
+               手气卡/换将卡的使用界面（选将换将、开局换牌）仍由斗转星移自己负责。 */
+            (function () {
+                /* 【2026-10-05 定价】汇率锚点：1 CBY = 10 金票（用户拍板）。
+                   斗转星移内部比价 1000 金票 = 5 张 → 卡 200 金票 = 20 CBY；
+                   道具礼包 = 手气卡×2 + 换将卡×2 = 80 CBY（零溢价）；
+                   神秘宝箱 = 随机10抽，金票计期望约5000（换将卡10/手气卡10各2000金票、
+                   欢乐豆600≈1200金票、金票300，÷11结果×10抽）→ 500 CBY。
+                   要调价改这里即可 */
+                /* 【2026-10-06】只保留「整装」入口：手气卡/换将卡单卡兑换移除
+                   （道具礼包已含，重复入口）；兑换区版式改用面板标准构件
+                   （sec 分组标题 / .csh-dbg-btn / .csh-dbg-hint），与池子休闲其余区块同语言。 */
+                var PRICES = { daojulibao: 80, shenmibaoxiang: 500, jinpiao: 100 };
+                var NAMES = { daojulibao: "道具礼包", shenmibaoxiang: "神秘宝箱", jinpiao: "金票" };
+                /* 每次兑换到账数量（默认1）：金票 100 CBY 起换，一次到账 1000 金票（1 CBY = 10 金票） */
+                var AMOUNTS = { jinpiao: 1000 };
+                var dz = (typeof window !== "undefined" && window.dzxy && window.dzxy.Props) ? window.dzxy : null;
+                if (!dz) {
+                    hint(body, "未检测到「斗转星移」扩展，该功能不可用。");
+                    return;
+                }
+                /* 【2026-10-06 修复】钱包 API 路径：正确结构是 lib.cshWallet.**wallet**.{pc,spend,add,…}
+                   （顶层只有 KEYS/const/task/cdk 等；参照 csh_shell 的 W.wallet.ticketOf 用法）。
+                   此前误用顶层 lib.cshWallet.pc()/spend() —— pc() 取不到显示「余额 0」、
+                   spend() 不存在致调用异常被吞 ⇒ 恒提示「余额不足」无法兑换。 */
+                function walletAPI() {
+                    try { var W = lib.cshWallet; if (W && W.wallet) return W.wallet; } catch (e) {}
+                    return null;
+                }
+                function balOf() {
+                    try { var W = walletAPI(); if (W && typeof W.pc === "function") return W.pc() || 0; } catch (e) {}
+                    return 0;
+                }
+                function descOf(id) {
+                    var count = 0;
+                    try { count = dz.Props.getCount(id) || 0; } catch (eC) {}
+                    var unit = id === "jinpiao" ? "金票" : "张";
+                    return "库存 " + count + " " + unit + " · " + PRICES[id] + " CBY/次";
+                }
+                /* 【2026-10-06】版式：sec 分组标题 + 按钮/描述行；余额归并为独立提示行
+                   （每行重复余额既啰嗦又不随兑换刷新；统一一行更好维护）。 */
+                sec(body, "CBY 兑换", "斗转星移道具");
+                var shopWrap = document.createElement("div");
+                shopWrap.style.cssText = "display:flex;flex-direction:column;gap:8px;margin:8px 0 2px;";
+                var descs = {};
+                Object.keys(NAMES).forEach(function (id) {
+                    var row = document.createElement("div");
+                    row.className = "csh-dbg-tool";   /* 面板标准工具行：flex+换行+复位（主 CSS 统一维护） */
+                    var b = document.createElement("button");
+                    b.type = "button";
+                    b.className = "csh-dbg-btn";
+                    b.style.cssText = "min-width:128px;";
+                    b.textContent = "兑换" + NAMES[id];
+                    b.addEventListener("click", function () { exchangeOne(id); }, false);
+                    var info = document.createElement("span");
+                    info.className = "csh-dbg-hint";
+                    info.style.margin = "0";
+                    info.textContent = descOf(id);
+                    descs[id] = info;
+                    row.appendChild(b); row.appendChild(info);
+                    shopWrap.appendChild(row);
+                });
+                body.appendChild(shopWrap);
+                var balEl = document.createElement("div");
+                balEl.className = "csh-dbg-hint";
+                balEl.textContent = "当前余额 " + balOf() + " CBY";
+                body.appendChild(balEl);
+                function refreshAll() {
+                    Object.keys(descs).forEach(function (k) {
+                        if (descs[k]) descs[k].textContent = descOf(k);
+                    });
+                    balEl.textContent = "当前余额 " + balOf() + " CBY";
+                }
+                function exchangeOne(id) {
+                    var W = walletAPI();
+                    if (!W || typeof W.spend !== "function") { toast("钱包模块未加载（core/csh_wallet.js）"); return; }
+                    var ok = false;
+                    try { ok = W.spend(PRICES[id], "兑换" + NAMES[id] + "/斗转星移"); } catch (eS) {}
+                    if (!ok) { toast("CBY 余额不足（需要 " + PRICES[id] + " CBY，当前 " + balOf() + " CBY）"); return; }
+                    var amt = AMOUNTS[id] || 1;
+                    try {
+                        /* ★【2026-10-06】一次兑换入账双倍修复：斗转星移的 propToast.addToast
+                           语义是「加减数量 + 右下角提示」一体（其内部第 69 行已调 Props.changeCount），
+                           所以这里**只能二选一**：有 addToast 就只调 addToast，绝不再自行 changeCount。 */
+                        if (dz.propToast && typeof dz.propToast.addToast === "function") {
+                            dz.propToast.addToast(id, amt);
+                        } else {
+                            dz.Props.changeCount(id, amt);
+                        }
+                    } catch (eP) {
+                        /* changeCount 抛错则回滚 CBY，避免扣了币没到账 */
+                        try { if (typeof W.add === "function") W.add(PRICES[id], "兑换失败回滚/" + NAMES[id]); } catch (eR) {}
+                        toast("兑换异常已回滚：" + ((eP && eP.message) || eP));
+                        return;
+                    }
+                    toast("兑换成功：" + NAMES[id] + " +" + amt + "（-" + PRICES[id] + " CBY）");
+                    refreshAll();
+                }
+            })();
+
             /* —— 音效档位块已删（2026-09-28 用户反馈「音效选项这里多余了，描述也多余」）：
                音量是全扩展共用一个值（csh_sfx 内部状态），各游戏开屏页已有各自的开关，
                这里的档位按钮与长描述属于重复入口。仍保留「音效」提示一行方便排障。 —— */
@@ -3319,7 +3473,6 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 
             /* 【2026-10-01】原文提「按 Esc」——手机没有 Esc 键；「面板保持在后台/回到面板」表述绕。
                精简为一句全平台都成立的话。【2026-10-03】按钮已并入卡片，文案同步。 */
-            hint(body, "点卡片即开局；游戏内右上角 ✕ 随时返回。");
         }
 
         /** CDK 兑换面板（§4.5.7）——仅在唤起后构建 DOM，关闭即移除。
@@ -3376,6 +3529,28 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 
             var row = document.createElement("div");
             row.className = "csh-rdm-row";
+            var pasteB = document.createElement("button");
+            pasteB.type = "button";
+            pasteB.className = "csh-dbg-btn";
+            pasteB.textContent = "粘贴";
+            /* 【2026-10-05】快速粘贴：读系统剪贴板自动填入并过一遍 norm 清洗 */
+            pasteB.addEventListener("click", function () {
+                var fill = function (text) {
+                    var v = norm(text);
+                    if (!v) { msg.textContent = "剪贴板是空的"; return; }
+                    inp.value = v;
+                    try { highlight(); } catch (eH) {}
+                    msg.textContent = "已从剪贴板粘贴";
+                    inp.focus();
+                };
+                if (navigator.clipboard && navigator.clipboard.readText) {
+                    navigator.clipboard.readText().then(fill).catch(function () {
+                        msg.textContent = "读取剪贴板失败，请手动粘贴";
+                    });
+                } else {
+                    msg.textContent = "当前环境不支持读取剪贴板，请手动粘贴";
+                }
+            });
             var go = document.createElement("button");
             go.type = "button";
             go.className = "csh-dbg-btn good";
@@ -3384,6 +3559,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
             closeB.type = "button";
             closeB.className = "csh-dbg-btn";
             closeB.textContent = "关闭";
+            row.appendChild(pasteB);
             row.appendChild(go);
             row.appendChild(closeB);
 
@@ -3925,10 +4101,15 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
             }, false);
             wrap.appendChild(back);
 
-            /* ① 技能名：优先中文名，无中文名时退 id */
+            /* ① 技能名：优先中文名，无中文名时退 id。【2026-10-05】双击复制技能 ID */
             var nm = document.createElement("div");
             nm.className = "csh-dbg-dt-name";
             nm.textContent = it.name || it.id;
+            nm.title = "双击复制技能 ID";
+            nm.addEventListener("dblclick", function (e) {
+                e.preventDefault();
+                lib.cshDebug.copyText(it.id, function () { toast("技能 ID 已复制：" + it.id); }, function () { toast("复制失败"); });
+            }, false);
             wrap.appendChild(nm);
 
             /* ② 标签行：ID / 来源包 / 势力 */
@@ -3948,7 +4129,9 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
             else tag("势力 未知", "k-camp");
             wrap.appendChild(tags);
 
-            /* ③ 官方技能描述：lib.translate[id + "_info"]；缺失时显式说明，绝不显示空白 */
+            /* ③ 官方技能描述：lib.translate[id + "_info"]；缺失时显式说明，绝不显示空白。
+               【2026-10-05 融合全能搜索】① <li> 转「•」列表渲染（原本整段 HTML 被当纯文本裸显）；
+               ② 双击复制描述原文（排障/发帖直接贴）。 */
             var text = "";
             try {
                 var raw = lib.translate && lib.translate[it.id + "_info"];
@@ -3963,8 +4146,63 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
             }
             var bodyEl = document.createElement("div");
             bodyEl.className = "csh-dbg-dt-body" + (text ? "" : " none");
-            bodyEl.textContent = text || "（库中无描述）";
+            if (text) {
+                bodyEl.innerHTML = text.replace(/<\/li>/g, "").split(/<li>/).map(function (v, i) {
+                    return i ? "•" + v : v;
+                }).join("<br>");
+                bodyEl.title = "双击复制描述原文";
+                bodyEl.addEventListener("dblclick", function (e) {
+                    e.preventDefault();
+                    lib.cshDebug.copyText(text, function () { toast("技能描述已复制"); }, function () { toast("复制失败"); });
+                }, false);
+            } else {
+                bodyEl.textContent = "（库中无描述）";
+            }
             wrap.appendChild(bodyEl);
+
+            /* ③′ 衍生技（2026-10-05 融合自全能搜索）：主技声明 derivation 的衍生/获得技
+               一并列出，点击直接进入该技能详情；返回键回到本详情（详情 ⇄ 衍生技 链路）。 */
+            (function () {
+                var derivs = [];
+                try {
+                    var dinfo = lib.skill && lib.skill[it.id];
+                    var d = dinfo && dinfo.derivation;
+                    if (typeof d === "string") d = [d];
+                    if (d && typeof d.length === "number") {
+                        for (var di = 0; di < d.length; di++) {
+                            if (typeof d[di] === "string" && lib.skill[d[di]]) derivs.push(d[di]);
+                        }
+                    }
+                } catch (eDeriv) {}
+                if (!derivs.length) return;
+                var h3 = document.createElement("div");
+                h3.className = "csh-dbg-dt-h";
+                h3.textContent = "衍生技";
+                wrap.appendChild(h3);
+                var dl = document.createElement("div");
+                dl.className = "csh-dbg-dt-entries";
+                derivs.forEach(function (sid) {
+                    var dn = "";
+                    try { dn = (lib.translate && typeof lib.translate[sid] === "string") ? lib.translate[sid] : ""; } catch (eT) {}
+                    var e3 = document.createElement("span");
+                    e3.className = "csh-dbg-dt-entry";
+                    e3.style.cursor = "pointer";
+                    e3.title = "点击查看详情";
+                    var b3 = document.createElement("b");
+                    b3.textContent = (dn || sid) + " ";
+                    e3.appendChild(b3);
+                    e3.appendChild(document.createTextNode(sid));
+                    e3.addEventListener("click", function (ev) {
+                        ev.preventDefault();
+                        ev.stopPropagation();
+                        renderSkillDetail(box, { id: sid, name: dn || sid }, function () {
+                            renderSkillDetail(box, it, onBack);
+                        });
+                    }, false);
+                    dl.appendChild(e3);
+                });
+                wrap.appendChild(dl);
+            })();
 
             /* ④ 相关词条：该技能的额外字段（如 selectTarget/usable/source…）摘要 */
             var entries = [];
@@ -4019,7 +4257,12 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                 wrap.appendChild(codeBtn);
             })();
 
-            /* ⑤ 代表武将：帮玩家确认到底是哪个版本的技能 */
+            /* 【2026-10-06 精炼】此处原有一个「添加到目标／从目标移除」按钮行（同日早先加入），
+               按用户反馈移除：操作入口集中在列表行与武将行，详情页只负责「看」
+               （描述 / 代码 / 衍生技 / 持有武将），避免堆砌元素。 */
+
+            /* ⑤ 代表武将：帮玩家确认到底是哪个版本的技能。
+               【2026-10-05 融合】点击武将直接进入武将详情（武将 ⇄ 技能 双向跳）。 */
             if (meta.chars.length) {
                 var h2 = document.createElement("div");
                 h2.className = "csh-dbg-dt-h";
@@ -4027,6 +4270,10 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                 wrap.appendChild(h2);
                 var cl = document.createElement("div");
                 cl.className = "csh-dbg-dt-entries";
+                var byId = {};
+                try {
+                    buildCharacterIndex().forEach(function (c) { byId[c.id] = c; });
+                } catch (eIdx) {}
                 meta.chars.forEach(function (cid) {
                     var e2 = document.createElement("span");
                     e2.className = "csh-dbg-dt-entry";
@@ -4035,6 +4282,18 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                     e2.appendChild(b2);
                     var camp = campTextOf(cid);
                     if (camp) e2.appendChild(document.createTextNode(" " + camp));
+                    var centry = byId[cid];
+                    if (centry) {
+                        e2.style.cursor = "pointer";
+                        e2.title = "点击查看武将详情";
+                        e2.addEventListener("click", function (ev) {
+                            ev.preventDefault();
+                            ev.stopPropagation();
+                            renderCharacterDetail(box, centry, function () {
+                                renderSkillDetail(box, it, onBack);
+                            });
+                        }, false);
+                    }
                     cl.appendChild(e2);
                 });
                 wrap.appendChild(cl);
@@ -4082,6 +4341,45 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
             tag(ch.skills.length + " 个技能", "k-skill");
             wrap.appendChild(tags);
 
+            /* D1 补全：武将详情支持直接添加 —— 一键全加 + 单技能 添加/移除，
+               目标一律走 resolveSkillTabTarget()（与技能页顶部选择器同源） */
+            if (ch.skills.length) {
+                var bulk = document.createElement("div");
+                bulk.style.margin = "6px 0";
+                var addAll = document.createElement("button");
+                addAll.type = "button";
+                /* 【2026-10-06 精炼】大金块 → 中性标准按钮（功能不变，视觉让位于技能列表） */
+                addAll.className = "csh-dbg-btn";
+                addAll.textContent = "全部添加到目标";
+                addAll.addEventListener("click", function (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    var t = resolveSkillTabTarget();
+                    if (!t) return;
+                    var list = ch.skills.slice();
+                    runAct(function () {
+                        var okN = 0;
+                        for (var i = 0; i < list.length; i++) {
+                            var sid = list[i];
+                            if (!lib.skill || !lib.skill[sid]) continue;
+                            if (typeof t.addSkillLog === "function") t.addSkillLog(sid);
+                            else if (typeof t.addSkills === "function") t.addSkills([sid]);
+                            else if (typeof t.addSkill === "function") t.addSkill(sid);
+                            else continue;
+                            okN++;
+                        }
+                        toast("已为 " + (tr(t) || t.name) + " 添加 " + okN + "/" + list.length + " 个技能（已提交）");
+                    }, {
+                        action: "addSkill",
+                        target: t,
+                        requested: { from: ch.id, skills: list },
+                        before: { skills: (t.skills || []).slice() },
+                    });
+                }, false);
+                bulk.appendChild(addAll);
+                wrap.appendChild(bulk);
+            }
+
             var skillsWrap = document.createElement("div");
             skillsWrap.className = "csh-dbg-ch-skills";
             if (!ch.skills.length) {
@@ -4117,10 +4415,35 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 
                     var acts = document.createElement("div");
                     acts.className = "csh-dbg-sk-acts";
-                    var vb = document.createElement("button");
-                    vb.type = "button";
-                    vb.className = "add";
-                    vb.textContent = "详情";
+                    var ab = document.createElement("button");
+                    ab.type = "button";
+                    ab.className = "add";
+                    ab.textContent = "添加";
+                    ab.addEventListener("click", function (e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        addSkillTo(resolveSkillTabTarget(), sid);
+                    }, true);
+                    acts.appendChild(ab);
+                    var rb = document.createElement("button");
+                    rb.type = "button";
+                    rb.className = "rm";
+                    rb.textContent = "移除";
+                    rb.addEventListener("click", function (e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        var t = resolveSkillTabTarget();
+                        if (!t) return;
+                        runAct(function () {
+                            if (!t.hasSkill || !t.hasSkill(sid)) throw new Error("没有该技能");
+                            t.removeSkill(sid);
+                            toast("已移除 " + name + "（已提交）");
+                        }, { action: "removeSkill", target: t, requested: { skill: sid } });
+                    }, true);
+                    acts.appendChild(rb);
+                    /* 【2026-10-06 精炼】原第三个「详情」按钮删除：点技能行本身就是进详情
+                       （下方 row.click 已绑定同一 open）——按钮纯冗余，且三按钮超出操作列
+                       固定宽度导致溢出裁切（用户实机截图报告）。 */
                     var open = function (e) {
                         e.preventDefault();
                         e.stopPropagation();
@@ -4128,8 +4451,6 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                             renderCharacterDetail(box, ch, onBack);
                         });
                     };
-                    vb.addEventListener("click", open, true);
-                    acts.appendChild(vb);
                     row.appendChild(acts);
                     row.addEventListener("click", open, false);
                     row.addEventListener("keydown", function (e) {
@@ -4141,6 +4462,194 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
             wrap.appendChild(skillsWrap);
 
             box.appendChild(wrap);
+        }
+
+        /* ==================== 方案编辑视图 · §4.6.3 ====================
+           补齐流程：方案此前只能「整体快照 / 整体装载」，无法查看内容、无法增删单项。
+           本视图与武将详情同一套「同层替换 + 返回」模式：查看技能清单、移出单项、
+           从技能库搜索加入。所有变更即读即写（psRead→改→psWrite），不持有陈旧副本。 */
+        function renderPresetEditor(body, psName) {
+            while (body.firstChild) body.removeChild(body.firstChild);
+            var wrap = document.createElement("div");
+            wrap.className = "csh-dbg-detail";
+
+            var back = document.createElement("button");
+            back.type = "button";
+            back.className = "csh-dbg-dt-back";
+            back.textContent = "\u2039 返回方案列表";
+            back.addEventListener("click", function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                renderBody(body, "preset");
+            }, false);
+            wrap.appendChild(back);
+
+            var nm = document.createElement("div");
+            nm.className = "csh-dbg-dt-name";
+            nm.textContent = "编辑方案 · " + psName;
+            wrap.appendChild(nm);
+
+            var curSec = document.createElement("div");
+            wrap.appendChild(curSec);
+            var searchSec = document.createElement("div");
+            wrap.appendChild(searchSec);
+
+            function readPs() {
+                var arr = psRead();
+                var k = psFind(arr, psName);
+                return k === -1 ? null : arr[k];
+            }
+            function gone() {
+                toast("方案已不存在");
+                renderBody(body, "preset");
+            }
+
+            function renderCur() {
+                while (curSec.firstChild) curSec.removeChild(curSec.firstChild);
+                var ps = readPs();
+                if (!ps) return gone();
+                sec(curSec, "方案内技能", ps.skills.length + " 个");
+                if (!ps.skills.length) {
+                    hint(curSec, "方案为空。在下方搜索技能后点「加入」，返回后可「一键装载」到目标。");
+                    return;
+                }
+                var listBox = document.createElement("div");
+                listBox.className = "csh-dbg-pslist";
+                ps.skills.forEach(function (sid) {
+                    var name = sid;
+                    try {
+                        if (lib.translate && typeof lib.translate[sid] === "string") name = lib.translate[sid];
+                    } catch (eT) {}
+                    name = safeStr(name) || sid;
+                    var row = document.createElement("div");
+                    row.className = "csh-dbg-sk";
+                    var info = document.createElement("div");
+                    info.className = "csh-dbg-sk-info";
+                    var nEl = document.createElement("div");
+                    nEl.className = "n";
+                    nEl.textContent = name;
+                    var idEl = document.createElement("div");
+                    idEl.className = "id";
+                    idEl.textContent = sid;
+                    info.appendChild(nEl);
+                    info.appendChild(idEl);
+                    row.appendChild(info);
+                    var acts = document.createElement("div");
+                    acts.className = "csh-dbg-sk-acts";
+                    var rm = document.createElement("button");
+                    rm.type = "button";
+                    rm.className = "rm";
+                    rm.textContent = "移出";
+                    rm.addEventListener("click", function (e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        var arr = psRead();
+                        var k = psFind(arr, psName);
+                        if (k === -1) return gone();
+                        arr[k].skills = arr[k].skills.filter(function (s) { return s !== sid; });
+                        arr[k].ts = Date.now();
+                        if (!psWrite(arr)) return toast("保存失败");
+                        renderCur();
+                        renderSearch();
+                    }, false);
+                    acts.appendChild(rm);
+                    row.appendChild(acts);
+                    listBox.appendChild(row);
+                });
+                curSec.appendChild(listBox);
+            }
+
+            function renderSearch() {
+                while (searchSec.firstChild) searchSec.removeChild(searchSec.firstChild);
+                var ps = readPs();
+                if (!ps) return gone();
+                var inSet = {};
+                ps.skills.forEach(function (s) { inSet[s] = 1; });
+
+                sec(searchSec, "从技能库加入");
+                var tool = document.createElement("div");
+                tool.className = "csh-dbg-tool";
+                var inp = document.createElement("input");
+                inp.type = "text";
+                inp.placeholder = "搜索技能 · 中文名或 id";
+                tool.appendChild(inp);
+                searchSec.appendChild(tool);
+                var countBar = document.createElement("div");
+                countBar.className = "csh-dbg-count";
+                countBar.textContent = "输入关键词搜索库内技能";
+                searchSec.appendChild(countBar);
+                var listBox = document.createElement("div");
+                listBox.className = "csh-dbg-pslist";
+                searchSec.appendChild(listBox);
+
+                function renderResults() {
+                    while (listBox.firstChild) listBox.removeChild(listBox.firstChild);
+                    var q = (inp.value || "").trim();
+                    var psNow = readPs();
+                    var nowIn = {};
+                    if (psNow) psNow.skills.forEach(function (s) { nowIn[s] = 1; });
+                    if (!q) return;
+                    var list = searchSkills(q).slice(0, 60);
+                    countBar.textContent = "匹配 " + list.length + " 个技能" +
+                        (list.length >= 120 ? "（只显示前 60 条，请细化关键词）" : "");
+                    if (!list.length) {
+                        var empty = document.createElement("div");
+                        empty.className = "csh-dbg-empty";
+                        empty.textContent = "没有匹配的技能";
+                        listBox.appendChild(empty);
+                        return;
+                    }
+                    list.forEach(function (it) {
+                        var row = document.createElement("div");
+                        row.className = "csh-dbg-sk";
+                        var info = document.createElement("div");
+                        info.className = "csh-dbg-sk-info";
+                        var nEl = document.createElement("div");
+                        nEl.className = "n";
+                        nEl.textContent = it.name || it.id;
+                        var idEl = document.createElement("div");
+                        idEl.className = "id";
+                        idEl.textContent = it.id;
+                        info.appendChild(nEl);
+                        info.appendChild(idEl);
+                        row.appendChild(info);
+                        var acts = document.createElement("div");
+                        acts.className = "csh-dbg-sk-acts";
+                        var ab = document.createElement("button");
+                        ab.type = "button";
+                        ab.className = "add";
+                        if (nowIn[it.id]) {
+                            ab.textContent = "已加入";
+                            ab.disabled = true;
+                        } else {
+                            ab.textContent = "加入";
+                            ab.addEventListener("click", function (e) {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                var arr = psRead();
+                                var k = psFind(arr, psName);
+                                if (k === -1) return gone();
+                                if (arr[k].skills.indexOf(it.id) !== -1) return;
+                                arr[k].skills.push(it.id);
+                                arr[k].ts = Date.now();
+                                if (!psWrite(arr)) return toast("保存失败");
+                                toast("已加入方案：" + (it.name || it.id));
+                                renderCur();
+                                renderSearch();
+                            }, false);
+                        }
+                        acts.appendChild(ab);
+                        row.appendChild(acts);
+                        listBox.appendChild(row);
+                    });
+                }
+                inp.addEventListener("input", renderResults, false);
+                renderResults();
+            }
+
+            renderCur();
+            renderSearch();
+            body.appendChild(wrap);
         }
 
         /* ==================== 配置方案 · §4.6.3 ==================== */
@@ -4216,26 +4725,42 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
             }
 
             sec(body, "方案列表", list.length + " 套");
-            var newBtn = mkBtn("从当前选择新建", function () {
-                var t = resolveTarget();
-                if (!t) return;
-                var cur = psSkillsOf(t);
-                if (!cur.length) return toast("目标当前没有技能，无法新建方案");
-                var arr = psRead();
-                var defName = "方案 " + (arr.length + 1);
-                askText("新方案名称", defName, function (name) {
-                    if (name == null) return;
-                    name = String(name).trim();
-                    if (!name) return toast("名称不能为空");
-                    if (psFind(arr, name) !== -1) return toast("同名方案已存在");
-                    arr.push({ name: name, skills: cur, ts: Date.now() });
-                    if (!psWrite(arr)) return toast("保存失败（存储不可用）");
-                    toast("已新建「" + name + "」· " + cur.length + " 个技能");
-                    renderBody(body, "preset");
-                });
-            }, "good");
-            newBtn.style.cssText += "min-height:44px;";
-            body.appendChild(newBtn);
+            /* 两条创建路径：① 快照当前目标的技能（原）；② 新建空方案后进编辑视图逐个挑技能。
+               后者补齐了「不依赖某个玩家当前状态、自由组合一套方案」的流程。 */
+            grid(body, [
+                mkBtn("从当前选择新建", function () {
+                    var t = resolveTarget();
+                    if (!t) return;
+                    var cur = psSkillsOf(t);
+                    if (!cur.length) return toast("目标当前没有技能，无法新建方案");
+                    var arr = psRead();
+                    var defName = "方案 " + (arr.length + 1);
+                    askText("新方案名称", defName, function (name) {
+                        if (name == null) return;
+                        name = String(name).trim();
+                        if (!name) return toast("名称不能为空");
+                        if (psFind(arr, name) !== -1) return toast("同名方案已存在");
+                        arr.push({ name: name, skills: cur, ts: Date.now() });
+                        if (!psWrite(arr)) return toast("保存失败（存储不可用）");
+                        toast("已新建「" + name + "」· " + cur.length + " 个技能");
+                        renderBody(body, "preset");
+                    });
+                }, "good"),
+                mkBtn("新建空方案", function () {
+                    var arr = psRead();
+                    var defName = "方案 " + (arr.length + 1);
+                    askText("新方案名称", defName, function (name) {
+                        if (name == null) return;
+                        name = String(name).trim();
+                        if (!name) return toast("名称不能为空");
+                        if (psFind(arr, name) !== -1) return toast("同名方案已存在");
+                        arr.push({ name: name, skills: [], ts: Date.now() });
+                        if (!psWrite(arr)) return toast("保存失败（存储不可用）");
+                        renderBody(body, "preset");
+                        renderPresetEditor(body, name);
+                    });
+                }),
+            ]);
 
             if (!list.length) {
                 hint(body, "还没有方案。选中一个角色后点「从当前选择新建」，即可把它的技能存成一套方案。");
@@ -4263,6 +4788,18 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 
                 var acts = document.createElement("div");
                 acts.className = "ps-acts";
+
+                /* 编辑：进入方案编辑视图（查看清单 / 移出单项 / 搜索加入） */
+                var ed = document.createElement("button");
+                ed.type = "button";
+                ed.className = "csh-dbg-btn";
+                ed.textContent = "编辑";
+                ed.addEventListener("click", function (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    renderPresetEditor(body, ps.name);
+                }, false);
+                acts.appendChild(ed);
 
                 /* 一键装载（§4.6.3，红线 #12：动数据前必须先确认） */
                 var load = document.createElement("button");
@@ -4407,7 +4944,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
             /* —— 装载实现：先声明后使用（函数提升，但保持与调用点顺序一致便于阅读）—— */
             function doLoad(t, ps) {
                 var want = ps.skills;
-                var missing = [], existing = [], toAdd = [];
+                var missing = [], existing = [], toAdd = [], addFails = [];
                 for (var i = 0; i < want.length; i++) {
                     var sid = want[i];
                     if (!lib.skill || !lib.skill[sid]) { missing.push(sid); continue; }
@@ -4435,22 +4972,29 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                     for (var k = 0; k < toAdd.length; k++) {
                         try {
                             if (typeof t.addSkillLog === "function") t.addSkillLog(toAdd[k]);
-                            else if (typeof t.addSkills === "function") t.addSkills(toAdd[k]);
+                            else if (typeof t.addSkills === "function") t.addSkills([toAdd[k]]);
                             else if (typeof t.addSkill === "function") t.addSkill(toAdd[k]);
-                        } catch (eAdd) {}
+                            else addFails.push(toAdd[k]);
+                        } catch (eAdd) { addFails.push(toAdd[k]); }
                     }
-                    var fails = [];
+                    /* 「保留/补装」是幂等对齐的正常结果，不算异常（旧文案把它们计入「异常 N 项」，
+                       导致重复装载同一方案时提示"保留 N 个，异常 N 项"，自相矛盾）；
+                       只有库中缺失 / 添加失败才计异常。 */
+                    var fails = [], notes = [];
                     missing.forEach(function (m) { fails.push("库中不存在，已跳过：" + m); });
+                    addFails.forEach(function (m) { fails.push("添加失败：" + m); });
                     var kept = existing.filter(function (m) { return old.indexOf(m) !== -1; });
                     var reinstalled = existing.filter(function (m) { return old.indexOf(m) === -1; });
-                    kept.forEach(function (m) { fails.push("目标原本已持有（保留）：" + m); });
-                    reinstalled.forEach(function (m) { fails.push("目标已失去（已补装）：" + m); });
+                    kept.forEach(function (m) { notes.push("目标原本已持有（保留）：" + m); });
+                    reinstalled.forEach(function (m) { notes.push("目标已失去（已补装）：" + m); });
+                    var head = "装载完成：新增 " + toAdd.length + " 个 · 保留 " + kept.length + " 个 · 补装 " + reinstalled.length + " 个";
                     if (fails.length) {
-                        feedback("warn", "装载完成：已装 " + toAdd.length + " 个 · 保留 " + kept.length +
-                            " 个，异常 " + fails.length + " 项", fails);
+                        feedback("warn", head + "，异常 " + fails.length + " 项", fails.concat(notes));
                         toast("「" + ps.name + "」部分装载");
                     } else {
-                        feedback("ok", "装载完成：「" + ps.name + "」共 " + toAdd.length + " 个技能已作用于 " + (tr(t) || t.name), null);
+                        feedback("ok", "装载完成：「" + ps.name + "」已作用于 " + (tr(t) || t.name) +
+                            "（新增 " + toAdd.length + " · 保留 " + kept.length + " · 补装 " + reinstalled.length + "）",
+                            notes.length ? notes : null);
                         toast("「" + ps.name + "」装载完成");
                     }
                 }, {
@@ -4819,9 +5363,39 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 
                     var acts = document.createElement("div");
                     acts.className = "csh-dbg-sk-acts";
+                    var ab = document.createElement("button");
+                    ab.type = "button";
+                    ab.className = "add";
+                    ab.textContent = "添加";
+                    ab.addEventListener("click", function (e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        var t = resolveTarget();
+                        if (!t) return;
+                        var list = (ch.skills || []).filter(function (sid) { return lib.skill && lib.skill[sid]; });
+                        if (!list.length) return toast("该武将没有可添加的技能");
+                        runAct(function () {
+                            var okN = 0;
+                            for (var i = 0; i < list.length; i++) {
+                                var sid = list[i];
+                                if (typeof t.addSkillLog === "function") t.addSkillLog(sid);
+                                else if (typeof t.addSkills === "function") t.addSkills([sid]);
+                                else if (typeof t.addSkill === "function") t.addSkill(sid);
+                                else continue;
+                                okN++;
+                            }
+                            toast("已为 " + (tr(t) || t.name) + " 添加 " + okN + "/" + list.length + " 个技能（已提交）");
+                        }, {
+                            action: "addSkill",
+                            target: t,
+                            requested: { from: ch.id, skills: list },
+                            before: { skills: (t.skills || []).slice() },
+                        });
+                    }, true);
+                    acts.appendChild(ab);
                     var vb = document.createElement("button");
                     vb.type = "button";
-                    vb.className = "add";
+                    vb.className = "";   /* 【2026-10-06】中性样式（蓝色让位给「添加」） */
                     vb.textContent = "查看";
                     var open = function (e) {
                         e.preventDefault();
@@ -5559,7 +6133,39 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                                 skinRow.appendChild(ch);
                             })(skinList[si]);
                         }
-                        head.appendChild(skinBtn);
+                        /* BGM 音量滑杆（2026-10-07 · 作者指定位置：风格切换左侧）。
+                   0~100 连续取值（setVolume/volume 已平滑化），实时生效。 */
+                var bgmW = document.createElement("span");
+                bgmW.id = "csh-dbg-bgm";
+                var bgmLab = document.createElement("label");
+                bgmLab.setAttribute("for", "csh-dbg-bgm-rd");
+                bgmLab.textContent = "BGM";
+                var bgmRd = document.createElement("input");
+                bgmRd.type = "range";
+                bgmRd.id = "csh-dbg-bgm-rd";
+                bgmRd.min = "0"; bgmRd.max = "100"; bgmRd.step = "1";
+                var curBgm = 60;
+                try { if (lib.cshBgm && typeof lib.cshBgm.volume === "function") curBgm = lib.cshBgm.volume(); } catch (eB0) {}
+                var curIdx = Math.max(0, Math.min(100, curBgm));
+                bgmRd.value = String(curIdx);
+                var bgmPct = document.createElement("b");
+                bgmPct.textContent = curIdx + "%";
+                bgmRd.addEventListener("input", function () {
+                    var v = Number(bgmRd.value) || 0;
+                    bgmPct.textContent = v + "%";
+                    try { if (lib.cshBgm && typeof lib.cshBgm.setVolume === "function") lib.cshBgm.setVolume(v); } catch (eB1) {}
+                }, false);
+                bgmW.appendChild(bgmLab); bgmW.appendChild(bgmRd); bgmW.appendChild(bgmPct);
+                head.appendChild(bgmW);
+                try {
+                    var bgmSt = document.createElement("style");
+                    bgmSt.textContent = "#csh-dbg-bgm{display:inline-flex!important;align-items:center!important;gap:8px!important;margin-right:6px!important;}" +
+                        "#csh-dbg-bgm label{font-size:11.5px!important;color:var(--csh-gray-soft)!important;letter-spacing:.08em!important;}" +
+                        "#csh-dbg-bgm input[type=range]{width:96px!important;accent-color:var(--csh-accent)!important;height:22px!important;cursor:pointer!important;}" +
+                        "#csh-dbg-bgm b{font-size:11px!important;color:var(--csh-gray-soft)!important;min-width:34px!important;text-align:right!important;font-variant-numeric:tabular-nums!important;}";
+                    (document.head || document.documentElement).appendChild(bgmSt);
+                } catch (eB2) {}
+                head.appendChild(skinBtn);
                         /* skinRow 不在此追加 —— 必须晚于 close（见下方 head.appendChild(close) 之后），
                            否则 flex-wrap 会把 close 挤到第三行（2026-09-30 模拟器实机验证发现）。 */
                     }
@@ -5615,6 +6221,27 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                 ];
                 function setTab(id) {
                     TAB = id;
+                    /* 【2026-10-05】进入「池子休闲」页签时补算 AI 世界离线天数（原在
+                       csh_world.js 模块加载时结算，会变成每次打开无名杀都弹
+                       「你离开的这 N 天」，玩家要求只与池子休闲绑定、不影响正常对局）。
+                       heartbeat 内部有当日去重与单日桌数上限，反复切页签不会重复结算；
+                       仅离线天数 >0 才弹提示，同日再进不弹。 */
+                    if (id === "games") {
+                        try {
+                            /* 【P0-4.1 修（2026-10-06）】调用路径：csh_world 的导出是
+                               lib.cshWorld = CSH（heartbeat 直接挂在 CSH 上，没有 .world 这一层）。
+                               此前写的是 lib.cshWorld.world.heartbeat —— 守卫永远为假、
+                               心跳静默不跑，2026-10-05 上线以来世界从未随进页推进过。 */
+                            if (lib.cshWorld && typeof lib.cshWorld.heartbeat === "function") {
+                                var hbRes = lib.cshWorld.heartbeat();
+                                if (hbRes && hbRes.changed && hbRes.days > 0) {
+                                    toast("你离开的这 " + hbRes.days + " 天，牌桌上又有了新的输赢");
+                                }
+                            }
+                        } catch (eHb) {
+                            try { console.log("[池子休闲] 离线结算异常", eHb); } catch (e2) {}
+                        }
+                    }
                     for (var i = 0; i < tabs.children.length; i++) {
                         var el = tabs.children[i];
                         var cls = el.getAttribute("data-cls");
@@ -5770,6 +6397,202 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
         };
 
         var FLOAT_POS_KEY = "extension_池子魔将_csh_debug_float_pos";
+
+        /** 其他扩展（2026-10-05）：从 GitHub 在线安装精选扩展。
+            货单 = 仓库根 store.json（git push 即上架/下架）；离线兜底内置两条。
+            安装走引擎原生 game.importExtension：① entry.zip 直链（扁平 zip，单请求）；
+            ② repo 模式 —— GitHub API 取文件树 → raw 逐文件下载 → 以 {路径:内容} 对象形态交给
+            importExtension（引擎自会打包安装）。注意 GitHub API 未认证限 60 次/小时，仅树获取用 1 次。 */
+        /* 其他扩展面板的独立样式注入（2026-10-06）：与主 CSS（ensureStyle）解耦。
+           主 CSS 只在打开调试面板时注入、内容随代码版本——玩家直接点「其他扩展」时
+           （尤其没打开过调试面板）规则可能不存在，面板就以裸 DOM 出现
+           （用户实机：底部一条横幅）。本函数无任何依赖、幂等，打开面板即注入。 */
+        function ensureExtStoreStyle() {
+            if (document.getElementById("csh-extstore-css")) return;
+            var st = document.createElement("style");
+            st.id = "csh-extstore-css";
+            st.textContent = [
+                "@keyframes cshExtFade{from{opacity:0;}to{opacity:1;}}",
+                "#csh-extstore-bg{position:fixed!important;left:0!important;top:0!important;width:100%!important;height:100%!important;",
+                "z-index:2147482999!important;background:rgba(8,6,4,.52)!important;animation:cshExtFade .18s ease-out!important;",
+                "-webkit-backdrop-filter:blur(12px) saturate(130%)!important;backdrop-filter:blur(12px) saturate(130%)!important;}",
+                "#csh-extstore{display:block!important;position:fixed!important;left:50%!important;top:50%!important;",
+                "transform:translate(-50%,-50%)!important;z-index:2147483000!important;width:min(620px,92vw)!important;",
+                "max-height:calc(100dvh - 24px)!important;overflow-y:auto!important;-webkit-overflow-scrolling:touch!important;",
+                "padding:20px 20px 16px!important;border-radius:14px!important;box-sizing:border-box!important;",
+                "background:#f6f1e4!important;color:#2a2118!important;",
+                "border:1px solid rgba(60,48,28,.25)!important;box-shadow:0 10px 44px rgba(0,0,0,.45)!important;",
+                "font-family:system-ui,-apple-system,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif!important;}",
+                /* ★ 引擎全局给所有 div 设了 position:absolute;display:inline-block ——
+                   面板内子元素必须如实复位，否则绝对定位叠在一起、行内元素挤成一行。
+                   与 #csh-redeem * 同一范式（2026-09-30 / 10-06 两次同坑）：
+                   position 可通配复位；display 必须逐类给（通配会把按钮也变块级）。 */
+                "#csh-extstore *{position:static!important;box-sizing:border-box!important;}",
+                "#csh-extstore .csh-ext-title{display:block!important;font-weight:700!important;font-size:15px!important;letter-spacing:.06em!important;margin-bottom:4px!important;}",
+                "#csh-extstore .csh-ext-sub{display:block!important;font-size:11px!important;opacity:.62!important;margin-bottom:10px!important;}",
+                "#csh-extstore .csh-ext-loading{display:block!important;font-size:12px!important;opacity:.6!important;padding:10px 2px!important;}",
+                "#csh-extstore .csh-ext-row{display:flex!important;align-items:center!important;gap:10px!important;padding:9px 4px!important;border-bottom:1px dashed rgba(60,48,28,.25)!important;}",
+                "#csh-extstore .csh-ext-row:last-child{border-bottom:none!important;}",
+                "#csh-extstore .csh-ext-info{display:block!important;flex:1!important;min-width:0!important;}",
+                "#csh-extstore .csh-ext-name{display:block!important;font-weight:700!important;font-size:13px!important;}",
+                "#csh-extstore .csh-ext-desc{display:block!important;font-size:11px!important;opacity:.72!important;line-height:1.5!important;}",
+                "#csh-extstore .csh-ext-btn{flex:none!important;padding:7px 16px!important;cursor:pointer!important;border-radius:5px!important;",
+                "background:#c9a84c!important;color:#1d1608!important;font-weight:700!important;border:1px solid rgba(60,48,28,.2)!important;}",
+                "#csh-extstore .csh-ext-btn:disabled{opacity:.55!important;cursor:default!important;}",
+            ].join("");
+            (document.head || document.documentElement).appendChild(st);
+        }
+        lib.cshDebug.openExtStore = function () {
+            /* 【2026-10-06 修复】样式解耦：不再指望主 CSS（它可能尚未注入/是旧版本），
+               面板自带 ensureExtStoreStyle() 独立注入；同时清理残留实例（残留会让
+               再次点击变成「点不开」）。 */
+            try { ensureExtStoreStyle(); } catch (eSt) {}
+            var staleBg = document.getElementById("csh-extstore-bg");
+            if (staleBg && staleBg.parentNode) staleBg.parentNode.removeChild(staleBg);
+            var staleBox = document.getElementById("csh-extstore");
+            if (staleBox && staleBox.parentNode) staleBox.parentNode.removeChild(staleBox);
+            var REPO_RAW = "https://raw.githubusercontent.com/ch1shanghan-dev/chizi-mojiang/main/";
+            /* 三层货单：GitHub（最新） → 本地 store.json（随扩展打包，离线可用） → 内置兜底。
+               本地兜底文件在 package.js files 清单内，安装后必在扩展目录。 */
+            var FALLBACK = [
+                { name: "胜负统计", author: "PZ157", repo: "PZ157/noname_sftj", branch: "main", intro: "全模式武将胜负统计 · 胜率排行榜 · AI禁选" },
+                { name: "千幻聆音", author: "玄牡江湖工作室 & 雨", repo: "dragonJadeRan/qianhuan_mine", branch: "main", intro: "武将语音包 · 插件管理 · 制卡器" },
+                { name: "呼风唤雨", author: "shibaiderman096", repo: "shibaiderman096/noname-extension-hufenghuanyu", intro: "武将扩展《呼风唤雨》" },
+                { name: "舰R杀", author: "cvlunicorn", repo: "cvlunicorn/Rkill_heroes", intro: "舰娘主题武将扩展 · 皮肤系统 · 技能动画" },
+                { name: "东方Project", author: "WindySmile512", repo: "WindySmile512/Touhou-Project", intro: "东方 Project 主题武将扩展。⚠ 体积很大，安装耗时较长" },
+                { name: "少女乐队", author: "Antarctics", repo: "Antarctics/GirlsBand-Noname-Expansion", intro: "《少女乐队》主题武将扩展" },
+                { name: "温柔一刀", author: "QCXYLTJ", repo: "QCXYLTJ/The-Gentle-Slash", intro: "《温柔一刀》武将扩展" },
+                { name: "怒焰三国杀", author: "zhonghui1966", repo: "zhonghui1966/nyKill", intro: "还原《怒焰三国杀》玩法与武将" },
+                { name: "AI禁将", author: "nineMangos", repo: "nineMangos/AI-Prohibition", intro: "禁止 AI 选择指定武将" },
+                { name: "AI优化（已停更）", author: "PZ157", repo: "PZ157/noname_AIOptimization", intro: "用于优化 AI 出牌决策的扩展（作者已停更，仍可用）" },
+                { name: "皮肤切换", author: "Ysclmml（yscl）", repo: "Ysclmml/skinSwitch", intro: "武将皮肤切换器，支持联机" },
+                { name: "守林人", author: "VelopeVoice", repo: "VelopeVoice/noname_FirewatchExtension", intro: "明日方舟主题武将扩展《守林人》" },
+            ];
+            /* 【2026-10-05 修复】挂 documentElement（与 openRedeem 的 uiHost 同位），绝不挂 body：
+               引擎给 body 设 transform:scale 形成独立层叠上下文，挂 body 的浮层 z-index 再大也被压住
+               （见 openRedeem 处 2026-09-30 注释）；层级用 CDK 同款 2147483000 档，样式走 #csh-extstore 规则。 */
+            var host = document.documentElement;
+            var bg = document.createElement("div");
+            bg.id = "csh-extstore-bg";
+            var box = document.createElement("div");
+            box.id = "csh-extstore";
+            function killStore() {
+                try { document.removeEventListener("keydown", box.__esc, true); } catch (eEsc) {}
+                if (box.parentNode) box.parentNode.removeChild(box);
+                if (bg.parentNode) bg.parentNode.removeChild(bg);
+            }
+            box.__esc = function (e) {
+                if (e.key !== "Escape" && e.keyCode !== 27) return;
+                try { e.preventDefault(); e.stopPropagation(); } catch (_e) {}
+                killStore();
+            };
+            document.addEventListener("keydown", box.__esc, true);
+            bg.addEventListener("click", function () { killStore(); }, false);
+            host.appendChild(bg);
+            host.appendChild(box);
+            var t = document.createElement("div");
+            t.className = "csh-ext-title";
+            t.textContent = "其他扩展 · 在线安装";
+            box.appendChild(t);
+            var sub = document.createElement("div");
+            sub.className = "csh-ext-sub";
+            sub.textContent = "清单来自 github.com/ch1shanghan-dev/chizi-mojiang（store.json）；安装完成会自动重启游戏。Esc 或点击暗幕关闭。";
+            box.appendChild(sub);
+            var listBox = document.createElement("div");
+            listBox.className = "csh-ext-loading";
+            listBox.textContent = "载入中…";
+            box.appendChild(listBox);
+
+            function installEntry(entry, btn) {
+                btn.disabled = true;
+                btn.textContent = "获取中…";
+                var finish = function () {
+                    btn.textContent = "安装成功";
+                    toast("「" + entry.name + "」安装成功，3 秒后重启");
+                    setTimeout(function () { try { game.reload(); } catch (eR) { location.reload(); } }, 3000);
+                };
+                var fail = function (msg) {
+                    btn.disabled = false;
+                    btn.textContent = "重新安装";
+                    toast("「" + entry.name + "」安装失败：" + msg);
+                };
+                var promise;
+                if (entry.zip) {
+                    promise = fetch(entry.zip).then(function (r) {
+                        if (!r.ok) throw new Error("HTTP " + r.status);
+                        return r.arrayBuffer();
+                    });
+                } else if (entry.repo) {
+                    promise = (async function () {
+                        var branch = entry.branch;
+                        if (!branch) {
+                            var ri = await (await fetch("https://api.github.com/repos/" + entry.repo)).json();
+                            branch = ri.default_branch;
+                        }
+                        var tree = await (await fetch("https://api.github.com/repos/" + entry.repo + "/git/trees/" + branch + "?recursive=1")).json();
+                        if (!tree.tree) throw new Error(tree.message || "文件树获取失败");
+                        var blobs = tree.tree.filter(function (x) { return x.type === "blob" && (x.size || 0) < 8 * 1024 * 1024; });
+                        var total = blobs.reduce(function (n, x) { return n + (x.size || 0); }, 0);
+                        if (total > 400 * 1024 * 1024) throw new Error("体积过大（约 " + Math.round(total / 1048576) + "MB）");
+                        var data = {}, done = 0;
+                        for (var i = 0; i < blobs.length; i++) {
+                            var f = blobs[i];
+                            var r2 = await fetch("https://raw.githubusercontent.com/" + entry.repo + "/" + branch + "/" + f.path);
+                            if (!r2.ok) throw new Error("下载失败：" + f.path);
+                            data[f.path] = await r2.arrayBuffer();
+                            done++;
+                            btn.textContent = "下载中 " + done + "/" + blobs.length;
+                        }
+                        return data;
+                    })();
+                } else {
+                    promise = Promise.reject(new Error("货单条目缺少 zip/repo 字段"));
+                }
+                promise.then(function (data) {
+                    btn.textContent = "安装中…";
+                    return game.importExtension(data, finish);
+                }).catch(function (e) { fail((e && e.message) || String(e)); });
+            }
+
+            function render(list) {
+                listBox.textContent = "";
+                if (!list || !list.length) { listBox.textContent = "货单为空"; return; }
+                list.forEach(function (entry) {
+                    var row = document.createElement("div");
+                    row.className = "csh-ext-row";
+                    var info = document.createElement("div");
+                    info.className = "csh-ext-info";
+                    var nm = document.createElement("div");
+                    nm.className = "csh-ext-name";
+                    nm.textContent = entry.name + "　" + (entry.author ? "· " + entry.author : "");
+                    var dsc = document.createElement("div");
+                    dsc.className = "csh-ext-desc";
+                    dsc.textContent = entry.intro || "";
+                    info.appendChild(nm); info.appendChild(dsc);
+                    var btn = document.createElement("button");
+                    btn.type = "button";
+                    btn.className = "csh-ext-btn";
+                    btn.textContent = "安装";
+                    btn.addEventListener("click", function () { installEntry(entry, btn); }, false);
+                    row.appendChild(info); row.appendChild(btn);
+                    listBox.appendChild(row);
+                });
+            }
+            fetch(REPO_RAW + "store.json", { cache: "no-store" }).then(function (r) {
+                if (!r.ok) throw new Error("HTTP " + r.status);
+                return r.json();
+            }).catch(function () {
+                /* 本地兜底：随扩展打包的 store.json（file:// 或游戏内相对路径） */
+                var local = (typeof lib !== "undefined" && lib.assetURL ? lib.assetURL : "") + "extension/池子魔将/store.json";
+                return fetch(encodeURI(local)).then(function (r2) {
+                    if (!r2.ok) throw new Error("local " + r2.status);
+                    return r2.json();
+                });
+            }).then(function (j) {
+                render(j.extensions || []);
+            }).catch(function () { render(FALLBACK); });
+            return true;
+        };
 
         function loadFloatPos() {
             try {

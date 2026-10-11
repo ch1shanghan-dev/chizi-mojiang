@@ -5,6 +5,8 @@
  *       安装并启用了"十周年UI"扩展，并调用其官方对外 API 完成接入：
  *         1. 卡牌皮肤注册      —— window.registerDecadeCardSkin（官方自带排队机制）
  *         2. 武将前缀角标注册  —— window.decadeModule.prefixMark.registerPrefixes
+ *         3. 动态皮肤注册      —— decadeUI.dynamicSkin[武将key][皮肤名]，资源可留在本扩展
+ *                                   image/dynamic/ 下（相对路径逃逸），不依赖千幻聆音
  *       未安装十周年UI时一切静默跳过，对游戏零影响。
  *
  * 兼容：单机、联机均可使用。注册发生在扩展 precontent 阶段（联机同样执行），
@@ -182,6 +184,81 @@
 	 *        值为图片文件名（默认取 extension/<extensionName>/image/ 下）或含 "/" 的路径
 	 * @param {boolean} [options.debug] 控制台输出接入日志
 	 */
+	/**
+	 * 接入动态皮肤（Spine 骨骼立绘 + 攻击/技能动作）。
+	 * 资源仍放在本扩展 image/dynamic/<dir>/ 下；描述符的 name 用相对路径
+	 *   "../../../<extensionName>/image/dynamic/<dir>/<main>"
+	 * 从十周年UI的 assets/dynamic/ 逃逸回本扩展目录，播放器即可加载——
+	 * 无需把资源搬进十周年UI，也不依赖千幻聆音（千幻只是增强层）。
+	 *
+	 * 描述符写法（dir/main 为本扩展 image/dynamic 下的子目录与骨骼名，不含扩展名）：
+	 *   dynamicSkins: {
+	 *     "csh_ae": {                                   // lib 武将 key
+	 *       "默认": { dir:"305_1", main:"XingXiang",      // 主立绘骨骼
+	 *                 action:"DaiJi", scale:0.95, y:[0,0.45],
+	 *                 gongji:{action:"GongJi"},          // 攻击动作（复用主骨骼）
+	 *                 teshu:{action:"TeShu"} }           // 技能动作（复用主骨骼）
+	 *     }
+	 *   }
+	 * gongji/teshu/chuchang/beijing 可只写 {action}（复用主立绘骨骼），
+	 * 也可写 {dir,main,action}（独立骨骼）。x/y/scale 需按角色在游戏内目测微调。
+	 *
+	 * @param {string} extensionName 扩展文件夹名
+	 * @param {Object} dynamicSkins 见上
+	 */
+	function setupDynamicSkins(extensionName, dynamicSkins) {
+		if (!dynamicSkins || !Object.keys(dynamicSkins).length) return;
+		const prefix = `../../../${extensionName}/image/dynamic/`;
+
+		function buildName(ref) {
+			if (typeof ref === "string") return prefix + ref;
+			if (ref && ref.dir && ref.main) return prefix + ref.dir + "/" + ref.main;
+			return null;
+		}
+		function process(cfg) {
+			const out = Object.assign({}, cfg);
+			if (!out.name && out.dir && out.main) out.name = buildName(out);
+			["gongji", "teshu", "chuchang", "beijing"].forEach(function (k) {
+				const sub = out[k];
+				if (sub && typeof sub === "object") {
+					// 注意：这里不能覆盖 sub.main —— 背景骨骼名（BeiJing）与主骨骼不同名，
+					// 所以 sub 必须自带 dir（生成数据里已写全 dir/main）。
+					if (!sub.dir && !sub.name) { sub.dir = out.dir; sub.main = out.main; }
+					sub.name = buildName(sub);
+				}
+			});
+			// 第二形态：千幻变身态会 eval(transform[k]) 取整个配置对象，
+			// 所以 transform 里的每一项同样要补好逃逸 name，否则换形态后资源找不到。
+			if (out.transform && typeof out.transform === "object") {
+				const t = {};
+				for (const tk in out.transform) t[tk] = process(out.transform[tk]);
+				out.transform = t;
+			}
+			return out;
+		}
+
+		// 等十周年UI 把 decadeUI.dynamicSkin 真正填充好（首启/加载顺序不可控时靠轮询兜底），
+		// 并要求其非空，规避千幻聆音首启时短暂置空 registry 的竞态。
+		whenReady(
+			function () {
+				const d = window.decadeUI && window.decadeUI.dynamicSkin;
+				return (d && Object.keys(d).length) ? d : null;
+			},
+			function (dsReg) {
+				let count = 0;
+				for (const libKey in dynamicSkins) {
+					const skins = dynamicSkins[libKey];
+					if (!dsReg[libKey]) dsReg[libKey] = {};
+					for (const skinName in skins) {
+						dsReg[libKey][skinName] = process(skins[skinName]);
+						count++;
+					}
+				}
+				log(`已注册 ${count} 套动态皮肤到 decadeUI.dynamicSkin（资源前缀 ${prefix}）`);
+			}
+		);
+	}
+
 	function setup(options) {
 		options = options || {};
 		setup._debug = !!options.debug;
@@ -193,11 +270,13 @@
 		const cardSkins = options.cardSkins || [];
 		const prefixMarks = options.prefixMarks || {};
 		const markStyles = options.markStyles || null;
+		const dynamicSkins = options.dynamicSkins || null;
 
 		const hasAny =
 			cardSkins.length > 0 ||
 			Object.keys(prefixMarks).length > 0 ||
-			!!(markStyles && Object.keys(markStyles).length);
+			!!(markStyles && Object.keys(markStyles).length) ||
+			!!(dynamicSkins && Object.keys(dynamicSkins).length);
 		if (!hasAny) {
 			log("未配置任何接入项（cardSkins/prefixMarks/markStyles 均为空），跳过");
 			return;
@@ -213,6 +292,7 @@
 
 		if (cardSkins.length) setupCardSkins(extensionName, cardSkins);
 		setupPrefixMarks(extensionName, prefixMarks, markStyles);
+		if (dynamicSkins) setupDynamicSkins(extensionName, dynamicSkins);
 	}
 
 	setup._debug = false;

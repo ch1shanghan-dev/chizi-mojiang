@@ -233,27 +233,11 @@ export function cshContent(config, pack) { try {
                 showName: "池",
             });
         } catch (e) {}
-        // 额外 CSS：选将 / 牌面右下角前缀
-        try {
-            if (document.getElementById("csh-prefix-style")) return;
-            var st = document.createElement("style");
-            st.id = "csh-prefix-style";
-            st.textContent = [
-                /* 武将名上的前缀字 */
-                '.player .name .prefix, .character .name .prefix, .character.showplayer .name span.prefix, div.prefix',
-                '{ font-family: "STKaiti","KaiTi","楷体",serif !important; font-weight: bold !important; letter-spacing: 1px !important; }',
-                /* 池：青金水墨 */
-                '.prefix[data-prefix="池"], .name span[data-prefix="池"], span.prefix-池',
-                '{ color: #6ec9b8 !important; text-shadow: 0 0 6px rgba(80,200,180,.55), 0 1px 2px #000 !important; }',
-                '.prefix[data-prefix="星"], span.prefix-星',
-                '{ color: #7ec8e3 !important; text-shadow: 0 0 6px rgba(100,180,255,.5), 0 1px 2px #000 !important; }',
-                '.prefix[data-prefix="昭"], span.prefix-昭',
-                '{ color: #e8d5a3 !important; text-shadow: 0 0 6px rgba(220,190,100,.45), 0 1px 2px #000 !important; }',
-                '.prefix[data-prefix="界"], span.prefix-界',
-                '{ color: #c9a0e8 !important; text-shadow: 0 0 6px rgba(180,120,220,.5), 0 1px 2px #000 !important; }',
-            ].join("\\n");
-            (document.head || document.documentElement).appendChild(st);
-        } catch (e2) {}
+        /* 【2026-10-08 修复】此处原有第二份 csh-prefix-style 注入，实际从未生效：
+           ①precontent 已先注入同名 id，getElementById 守卫直接 return；
+           ②join("\\n") 是字面反斜杠+n、不是换行，拼出的 CSS 规则本就无效。
+           现收敛为单点真源——全部前缀规则（池/星/昭/界/童）都在 main/precontent.js 的
+           csh-prefix-style 里；这里保留上方 namePrefix 注册（幂等，兜底 precontent 未跑到的宿主）。 */
     })();
 
 
@@ -306,126 +290,9 @@ export function cshContent(config, pack) { try {
         }
     })();
 
-    // 手动合并 characterSubstitute 到 lib（loading.js 不自动处理此字段）
-    // 皮肤切换功能已移除（玩法核心换皮仍在下方独立启用）
-    if (false && pack.characterSubstitute) {
-        for (var key in pack.characterSubstitute) {
-            lib.characterSubstitute[key] = pack.characterSubstitute[key];
-        }
-        if (!lib.config.skin) lib.config.skin = {};
-
-        // 获取角色皮肤图片路径的辅助函数
-        var csh_getSkinImgPath = function(characterName, skinName) {
-            if (!characterName || !lib.characterSubstitute[characterName]) return null;
-            if (skinName === characterName) return null;
-            var skinList = lib.characterSubstitute[characterName];
-            for (var i = 0; i < skinList.length; i++) {
-                if (skinList[i][0] === skinName) {
-                    var skinData = skinList[i][1];
-                    for (var j = 0; j < skinData.length; j++) {
-                        if (typeof skinData[j] === 'string' && skinData[j].indexOf('img:') === 0) {
-                            return skinData[j].slice(4);
-                        }
-                    }
-                    break;
-                }
-            }
-            return null;
-        };
-
-        // 实时更新游戏中的玩家头像
-        var csh_updatePlayerAvatar = function(characterName, imgPath) {
-            if (!game.players) return;
-            for (var i = 0; i < game.players.length; i++) {
-                var p = game.players[i];
-                // 双将兼容：主将可能是 name / name1，副将是 name2
-                if ((p.name === characterName || p.name1 === characterName) && p.node && p.node.avatar) {
-                    if (imgPath) {
-                        p.node.avatar.style.backgroundImage = 'url("' + lib.assetURL + imgPath + '")';
-                    } else {
-                        p.node.avatar.setBackground(characterName, 'character');
-                    }
-                }
-                if (p.name2 === characterName && p.node && p.node.avatar2) {
-                    if (imgPath) {
-                        p.node.avatar2.style.backgroundImage = 'url("' + lib.assetURL + imgPath + '")';
-                    } else {
-                        p.node.avatar2.setBackground(characterName, 'character');
-                    }
-                }
-            }
-        };
-
-        // 方案1：通过 refreshSkin hook 保存皮肤选择
-        if (lib.hooks && lib.hooks.refreshSkin) {
-            lib.hooks.refreshSkin.push(function(characterName, skinName, sourcenode, avatar) {
-                if (!characterName || !lib.characterSubstitute[characterName]) return;
-                if (!lib.config.skin) lib.config.skin = {};
-                var imgPath = csh_getSkinImgPath(characterName, skinName);
-                if (imgPath) {
-                    lib.config.skin[characterName] = [skinName, imgPath];
-                    game.saveConfig('skin', lib.config.skin);
-                    if (avatar && avatar.style) {
-                        avatar.style.backgroundImage = 'url("' + lib.assetURL + imgPath + '")';
-                    }
-                    csh_updatePlayerAvatar(characterName, imgPath);
-                } else {
-                    delete lib.config.skin[characterName];
-                    game.saveConfig('skin', lib.config.skin);
-                    if (avatar && avatar.setBackground) {
-                        avatar.setBackground(characterName, 'character');
-                    }
-                    csh_updatePlayerAvatar(characterName, null);
-                }
-            });
-        }
-
-        // 方案2（双保险）：覆盖 game.callHook，确保 refreshSkin 一定能被捕获
-        var csh_original_callHook = game.callHook;
-        game.callHook = function(name, args) {
-            if (name === 'refreshSkin' && args && args.length >= 4) {
-                var characterName = args[0];
-                var skinName = args[1];
-                var avatar = args[3];
-                if (characterName && lib.characterSubstitute[characterName]) {
-                    if (!lib.config.skin) lib.config.skin = {};
-                    var imgPath = csh_getSkinImgPath(characterName, skinName);
-                    if (imgPath) {
-                        lib.config.skin[characterName] = [skinName, imgPath];
-                        game.saveConfig('skin', lib.config.skin);
-                        if (avatar && avatar.style) {
-                            avatar.style.backgroundImage = 'url("' + lib.assetURL + imgPath + '")';
-                        }
-                        csh_updatePlayerAvatar(characterName, imgPath);
-                    } else {
-                        delete lib.config.skin[characterName];
-                        game.saveConfig('skin', lib.config.skin);
-                        if (avatar && avatar.setBackground) {
-                            avatar.setBackground(characterName, 'character');
-                        }
-                        csh_updatePlayerAvatar(characterName, null);
-                    }
-                }
-            }
-            return csh_original_callHook.apply(this, arguments);
-        };
-
-        // 方案3（三保险）：覆盖 setBackground，让引擎读取 lib.config.skin 时使用我们的皮肤路径
-        // 只在游戏内生效，不影响简介面板
-        var csh_orig_setBackground = HTMLDivElement.prototype.setBackground;
-        HTMLDivElement.prototype.setBackground = function(name, type, ext, subfolder) {
-            if (type === "character" && name && lib.config.skin && lib.config.skin[name] && lib.config.skin[name][1]) {
-                // 只在有游戏玩家时才覆盖（避免影响简介面板）
-                if (typeof game !== 'undefined' && game.players && game.players.length > 0) {
-                    this.style.backgroundPositionX = "center";
-                    this.style.backgroundSize = "cover";
-                    this.setBackgroundImage(lib.config.skin[name][1]);
-                    return this;
-                }
-            }
-            return csh_orig_setBackground.apply(this, arguments);
-        };
-    }
+    /* 【2026-10-08 清理】原「皮肤切换」死代码块（if(false) 包裹，约 120 行）已删除——
+       内含 game.callHook 覆写与 HTMLDivElement.prototype.setBackground 猴补，从未执行过；
+       留着既误导读码、又常被误认成卡顿嫌疑。玩法核心换皮见 lib.cshPlaySkin（本文件下方）。 */
     // 杨间·鬼眼升层、钟会觉醒、马超神势力：换肤注册与升层特效独立于皮肤开关（玩法核心表现，始终启用）
 
             // 蓝染等角色卡面兜底：部分PC端/十周年UI会丢自定义img
@@ -1290,7 +1157,11 @@ export function cshContent(config, pack) { try {
     // 全部挂在 lib.cshShoushaFx 属性上，方法内不引用外部闭包，可随 game.broadcastAll 安全下发到联机各端
     lib.cshShoushaFx = {
         _cssOk: false,
-        _dur: { diankuang: 2500, wanjun: 3600, kill: { 1: 3500, 2: 3000, 3: 3500, 4: 3500, 5: 3500, 6: 3500, 7: 3500 }, recover: 2500, niliu: 23300, guilai: 3000, quedi: 2800 },
+        // paiyi 3100：素材裁掉头尾静止段后 91 帧 / 3.033s，留 ~70ms 余量
+        // 技能横幅时长：必须 ≥ 素材真实时长，否则 game.pause 会在视频播完前就放开
+        // （尾巴被下一段结算压掉）。quedi 69帧/2.300s、paiyi 91帧/3.033s、
+        // liegong 90帧/3.000s、luanwu 111帧/3.700s，各留 30~90ms 余量。
+        _dur: { diankuang: 2500, wanjun: 3600, kill: { 1: 3500, 2: 3000, 3: 3500, 4: 3500, 5: 3500, 6: 3500, 7: 3500 }, recover: 2500, niliu: 23300, guilai: 3000, quedi: 2800, paiyi: 3100, liegong: 3060, luanwu: 3760, duwu: 2060, pojun: 2060, yannv1: 1860 },
         _inject: function () {
             if (this._cssOk || document.getElementById("csh_shousha_css")) {
                 this._cssOk = true;
@@ -1354,6 +1225,12 @@ export function cshContent(config, pack) { try {
                 setTimeout(clear, (this._dur && (this._dur[type] || (type === "kill" ? 3500 : 3000))) || 3500);
                 if (type === "niliu") this._niliuVideo();
                 else if (type === "quedi") this._quediVideo();
+                else if (type === "paiyi") this._paiyiVideo();
+                else if (type === "liegong") this._liegongVideo();
+                else if (type === "luanwu") this._luanwuVideo();
+                else if (type === "duwu") this._duwuVideo();
+                else if (type === "pojun") this._pojunVideo();
+                else if (type === "yannv1") this._yannv1Video();
                 else if (type === "guilai") this._guilai();
                 else clear();
             } catch (e) { }
@@ -1380,6 +1257,99 @@ export function cshContent(config, pack) { try {
             if (dur) bg.style.animationDuration = dur + "ms";
             layer.appendChild(bg);
             return bg;
+        },
+        // 横幅四边羽化：把 video 元素缩到「contain 之后的实际绘制区」，遮罩挂在 video 自身。
+        //
+        // 为什么不能挂在铺满容器的 vbox 上（这是「只有上下羽化、左右没有」的根因）：
+        //   遮罩的百分比是按**元素盒子**算的。横幅容器是 16/7（2.286），素材是 1158x576（2.010），
+        //   object-fit:contain 会按高度贴合、左右各留约 6% 黑边；
+        //   挂在 vbox 时那 5% 的横向羽化整段落在黑边里，画面左右两边根本没被羽化。
+        //   纵向因为视频本来就填满高度，所以看得出羽化 —— 于是表现为「只有上下」。
+        // 把 video 按 contain 的实际绘制尺寸定死，再把遮罩挂上去，四边羽化才都落在画面上。
+        //
+        // fx / fy：左右 / 上下的羽化宽度，按**画面自身**的百分比给。
+        /**
+         * 羽化 v2 —— 三层 mask 叠加（intersect），替代旧版单层线性渐变。
+         *
+         * 旧版（fx=5, fy=8）：linear 两层、纯线性过渡，边缘生硬且力度偏弱 → 用户反馈「中庸」。
+         * 新版设计：
+         *   ① 横向 ease 多档过渡 —— 先急后缓的 S 曲线，边缘不再是一条死线；
+         *   ② 纵向同款，且**底部比顶部略重**（横幅下方更贴近结算信息，收得干净些）；
+         *   ③ 径向暗角层 —— 四角比边中点收得更狠，形成椭圆视场，把视线压向人物，
+         *      与影片黑边(letterbox)的柔和过渡是同一种语言。
+         * fx/fy 语义不变（开始羽化的百分比），调用方已加大到 13/18。
+         * 注意：大爱仙尊(niliu)走自己的内联代码，不经过本函数，不受影响。
+         */
+        _feather: function (video, box, fx, fy) {
+            var f = Math.max(0, Math.min(40, fx || 13));
+            var t = Math.max(0, Math.min(40, fy || 18));       // 顶部带宽
+            var b = Math.min(40, t * 1.2);                     // 底部比顶部重 20%
+            var pct = function (v) { return (+v).toFixed(2) + "%"; };
+            // 横向：0 →透明 / .12 / .45 / 1.0（fx% 处全实）→ …对称回收
+            var horiz = "linear-gradient(to right," +
+                "transparent 0%,rgba(0,0,0,.12) " + pct(f * .25) + "," +
+                "rgba(0,0,0,.45) " + pct(f * .6) + ",#000 " + pct(f) + "," +
+                "#000 " + pct(100 - f) + ",rgba(0,0,0,.45) " + pct(100 - f * .6) + "," +
+                "rgba(0,0,0,.12) " + pct(100 - f * .25) + ",transparent 100%)";
+            // 纵向：上 t 下 b
+            var vert = "linear-gradient(to bottom," +
+                "transparent 0%,rgba(0,0,0,.12) " + pct(t * .3) + "," +
+                "rgba(0,0,0,.5) " + pct(t * .65) + ",#000 " + pct(t) + "," +
+                "#000 " + pct(100 - b) + ",rgba(0,0,0,.5) " + pct(100 - b * .35) + "," +
+                "rgba(0,0,0,.12) " + pct(100 - b * .3) + ",transparent 100%)";
+            // 径向暗角：中段全实，四角渐进收黑
+            var radial = "radial-gradient(ellipse 80% 92% at 50% 50%," +
+                "#000 58%,rgba(0,0,0,.75) 76%,rgba(0,0,0,.32) 92%,transparent 100%)";
+            var mask = [horiz, vert, radial].join(",");
+            var apply = function () {
+                var vw = video.videoWidth, vh = video.videoHeight;
+                var cw = box.clientWidth, ch = box.clientHeight;
+                if (!vw || !vh || !cw || !ch) return false;
+                var s = Math.min(cw / vw, ch / vh);
+                video.style.width = Math.max(1, Math.round(vw * s)) + "px";
+                video.style.height = Math.max(1, Math.round(vh * s)) + "px";
+                video.style.objectFit = "fill";   // 尺寸已按 contain 算好，不再需要 contain
+                video.style.webkitMaskImage = mask;
+                video.style.maskImage = mask;
+                video.style.webkitMaskComposite = "source-in";
+                video.style.maskComposite = "intersect";
+                video.style.webkitMaskSize = "100% 100%";
+                video.style.maskSize = "100% 100%";
+                video.style.webkitMaskRepeat = "no-repeat";
+                video.style.maskRepeat = "no-repeat";
+                return true;
+            };
+            // 元数据没到 / 布局还没稳定时重试几帧；拿不到就保持原样（contain 铺满），不会更糟
+            var tries = 0;
+            var attempt = function () {
+                if (apply()) return;
+                if (++tries < 20) requestAnimationFrame(attempt);
+            };
+            try {
+                video.addEventListener("loadedmetadata", attempt);
+            } catch (e0) {}
+            attempt();
+        },
+        // 横幅淡入 + 收尾淡出，返回可直接挂到 "playing" 的处理器。
+        //
+        // 为什么结尾要淡出：横幅素材基本都不带自然衰减（文鸯那支亮度一路 ~70 到底，
+        // 末帧原本还是一帧硬切黑 —— 已在 effect 文件里裁掉）。若播完直接 remove，
+        // 会在亮帧上"啪"地消失。这里在结束前 lead 秒把**透明度**线性渐到 0，
+        // 注意不是渐到黑 —— 渐到黑等于把刚修掉的黑屏又换回来。
+        // 逆流护身印不需要这个：它的素材自带衰减（亮度从峰值 115 降到 31）。
+        _reveal: function (video, fallbackDur) {
+            return function () {
+                video.style.opacity = "1";
+                try {
+                    var lead = 0.22;
+                    var dur = (typeof video.duration === "number" && isFinite(video.duration) && video.duration > lead + 0.1)
+                        ? video.duration : fallbackDur;
+                    setTimeout(function () {
+                        video.style.transition = "opacity 220ms linear";
+                        video.style.opacity = "0";
+                    }, Math.max(0, (dur - lead) * 1000));
+                } catch (e) {}
+            };
         },
         _flash: function (layer, color, delay, dur) {
             var f = document.createElement("div");
@@ -1823,35 +1793,37 @@ export function cshContent(config, pack) { try {
         // 方源归来（3s档）—— 命海破晓：寒风褪去、金光柱升起、浪花向两侧分开、「方源归来」逐字砸出
         // 定场诗：春秋蝉鸣少年归 / 仙尊悔而我不悔 —— 归来与坚持
         
-        // 文鸯·却敌：横幅视频特效（与逆流护身印同管线，联机 broadcast 在技能侧）
-        _quediVideo: function (onDone) {
-            // 懒人包视口较矮：加高横幅 + contain 完整显示，避免 cover 裁切
-            var D = (this._dur && this._dur.quedi) || 2800;
+        /* ============ 技能横幅视频（全屏演出）============
+         * 文鸯却敌 / 钟会排异 / 谋谋黄忠烈弓 / 贾诩乱武 共用这一条管线。
+         *
+         * 历史：_quediVideo 与 _paiyiVideo 曾是两份 60 行的复制粘贴，加第三、四条时
+         * 必然继续复制——这里收敛成「一个通用播放器 + 若干一行包装」。
+         * 新加横幅：把 MP4 放进 effect/，在 _dur 里登记时长，再加一行包装函数即可。
+         *
+         * 联机：调用点在技能侧，走 game.broadcastAll + game.pause/resume 等放完再结算
+         * （见 skills/index.js 的 csh_xinpaiyi / csh_lieqiong 等）。
+         */
+        _bannerVideo: function (opts, onDone) {
+            var o = opts || {};
+            var D = (this._dur && o.durKey && this._dur[o.durKey]) || o.fallbackDur || 3000;
             try {
                 var layer = this._layer();
                 this._bg(layer, "radial-gradient(ellipse at 50% 50%,rgba(8,18,32,.18) 0%,rgba(3,8,16,.28) 100%)", Math.min(D, 1200));
+                // 懒人包视口较矮：加高横幅 + contain 完整显示，避免 cover 裁切
                 var wrap = document.createElement("div");
-                wrap.className = "csh-niliu-banner csh-quedi-banner";
+                wrap.className = "csh-niliu-banner " + (o.wrapClass || "");
                 wrap.style.cssText = [
                     "position:absolute","left:4%","right:4%","top:50%","transform:translateY(-50%)",
                     "width:92%","aspect-ratio:16/7","max-height:58vh","z-index:20",
                     "overflow:hidden","background:transparent","pointer-events:none"
                 ].join(";") + ";";
                 var vbox = document.createElement("div");
-                var waveMask = [
-                    "linear-gradient(to right, transparent 0%, #000 5%, #000 95%, transparent 100%)",
-                    "linear-gradient(to bottom, transparent 0%, #000 8%, #000 92%, transparent 100%)"
-                ].join(",");
                 vbox.style.cssText = [
-                    "position:absolute","inset:0","overflow:hidden","z-index:2",
-                    "-webkit-mask-image:" + waveMask,"mask-image:" + waveMask,
-                    "-webkit-mask-composite:source-in","mask-composite:intersect",
-                    "-webkit-mask-size:100% 100%","mask-size:100% 100%",
-                    "-webkit-mask-repeat:no-repeat","mask-repeat:no-repeat"
+                    "position:absolute","inset:0","overflow:hidden","z-index:2"
                 ].join(";") + ";";
                 var video = document.createElement("video");
                 var base = (typeof lib !== "undefined" && lib.assetURL) ? lib.assetURL : "";
-                video.src = base + "extension/池子魔将/effect/csh_wenyang_quedi_banner.mp4";
+                video.src = base + "extension/池子魔将/effect/" + o.file;
                 video.muted = true;
                 video.defaultMuted = true;
                 video.autoplay = true;
@@ -1864,14 +1836,16 @@ export function cshContent(config, pack) { try {
                 video.setAttribute("autoplay", "");
                 video.setAttribute("playsinline", "");
                 video.className = "csh-niliu-banner";
-                // 完整显示、不裁切；透明底避免额外黑边
-                video.style.cssText = "width:100%;height:100%;object-fit:contain;object-position:center;opacity:0;transition:opacity .25s ease;background:transparent;";
+                // 完整显示、不裁切；透明底避免额外黑边。
+                // 初始铺满 + contain 作兜底，_feather 拿到元数据后会改成真实画面尺寸并挂四边羽化。
+                video.style.cssText = "position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:100%;height:100%;object-fit:contain;object-position:center;opacity:0;transition:opacity .25s ease;background:transparent;";
+                // 羽化 v2：横向 13% / 纵向 18%（顶部）·21.6%（底部）+ 径向暗角，力度比旧版 5/8 明显加强
+                this._feather(video, vbox, 13, 18);
                 var finish = function () {
                     try { layer.remove(); } catch (e1) {}
                     if (typeof onDone === "function") onDone();
                 };
-                var reveal = function () { video.style.opacity = "1"; };
-                video.addEventListener("playing", reveal);
+                video.addEventListener("playing", this._reveal(video, o.revealDur || D / 1000));
                 video.addEventListener("ended", finish);
                 video.addEventListener("error", finish);
                 vbox.appendChild(video);
@@ -1890,6 +1864,62 @@ export function cshContent(config, pack) { try {
             } catch (e) {
                 if (typeof onDone === "function") onDone();
             }
+        },
+
+        // 文鸯·却敌：69 帧 / 2.300s（源片尾帧是硬切黑帧，已裁掉，见 tools/check_blackframe.py）
+        _quediVideo: function (onDone) {
+            this._bannerVideo({
+                file: "csh_wenyang_quedi_banner.mp4", durKey: "quedi",
+                fallbackDur: 2800, revealDur: 2.3, wrapClass: "csh-quedi-banner"
+            }, onDone);
+        },
+
+        // 钟会·排异：91 帧 / 3.033s（裁掉头 0~15 与尾 107~112 的静止段）
+        _paiyiVideo: function (onDone) {
+            this._bannerVideo({
+                file: "csh_zhonghui_paiyi_banner.mp4", durKey: "paiyi",
+                fallbackDur: 3100, revealDur: 3.03, wrapClass: "csh-paiyi-banner"
+            }, onDone);
+        },
+
+        // 谋谋黄忠·烈弓：90 帧 / 3.000s（完整动作循环）
+        _liegongVideo: function (onDone) {
+            this._bannerVideo({
+                file: "csh_mmhz_liegong_banner.mp4", durKey: "liegong",
+                fallbackDur: 3000, revealDur: 3.0, wrapClass: "csh-liegong-banner"
+            }, onDone);
+        },
+
+        // 贾诩·乱武：111 帧 / 3.700s（完整动作循环）
+        _luanwuVideo: function (onDone) {
+            this._bannerVideo({
+                file: "csh_qw_luanwu_banner.mp4", durKey: "luanwu",
+                fallbackDur: 3700, revealDur: 3.7, wrapClass: "csh-luanwu-banner"
+            }, onDone);
+        },
+
+        // 诸葛恪·黩武：60 帧 / 2.000s（Spine 11803_2 GongJi 渲染，1158x576 与既有横幅同规格）
+        _duwuVideo: function (onDone) {
+            this._bannerVideo({
+                file: "csh_zhugeke_duwu_banner.mp4", durKey: "duwu",
+                fallbackDur: 2000, revealDur: 2.0, wrapClass: "csh-duwu-banner"
+            }, onDone);
+        },
+
+        // 界界徐盛·破军：Spine 15803_1 GongJi 骨骼动作渲染（角色+自身BeiJing背景），1158x576 / 2.000s / 30fps，与黩武同规格
+        _pojunVideo: function (onDone) {
+            this._bannerVideo({
+                file: "csh_jjxs_pojun_banner.mp4", durKey: "pojun",
+                fallbackDur: 2000, revealDur: 2.0, wrapClass: "csh-pojun-banner"
+            }, onDone);
+        },
+
+        // 吕玲绮·焰女：源 GIF 438x316 原生分辨率/帧时长直转（60帧 1.80s），contain 展示
+        _yannv1Video: function (onDone) {
+            this._bannerVideo({
+                file: "csh_lvlingqi_yannv_banner.mp4", durKey: "yannv1",
+                fallbackDur: 1800, revealDur: 1.8, wrapClass: "csh-yannv1-banner"
+            }, onDone);
         },
 
         _guilai: function () {
@@ -2016,9 +2046,9 @@ export function cshContent(config, pack) { try {
 //精品
 if(lib.rank.rarity.rare) lib.rank.rarity.rare.addArray(["csh_yuangubafei","csh_guanyinping","csh_ae","csh_misida","csh_wlk","csh_zhangbao","csh_zhuzhi","csh_handang","csh_lidian","csh_weizheng","csh_ngwt","csh_caiyan","csh_zhaoxiang","csh_lukang","csh_lifeng","csh_pingfan"]);
 //史诗
-if(lib.rank.rarity.epic) lib.rank.rarity.epic.addArray(["csh_xingganning","csh_moteng","csh_huangyueying","csh_shanyuezhiyin","csh_chengyu","csh_zhugeke","csh_mzj","csh_gaogan","csh_shamoke","csh_yujin","csh_zhangning","csh_dongzhuo","csh_mmhz","csh_simahui","csh_bzt","csh_dz","csh_jjxs","csh_lf","csh_ls","csh_mlb","csh_mlm","csh_qw","csh_sj","csh_sq","csh_vxs","csh_wy","csh_xuchu","csh_yy","csh_liushan","csh_zhuran","csh_wenyang","csh_guansuo","csh_lvlingqi","csh_gy","csh_chengpu","csh_bfsm","csh_chendao","csh_jzh","csh_guohuai","csh_sx","csh_nailong_juexing","csh_gdsn","csh_jieluji","csh_lamosi","csh_zhouchu","csh_sunshangxiang","csh_diaochan","csh_huaman"]);
+if(lib.rank.rarity.epic) lib.rank.rarity.epic.addArray(["csh_xingganning","csh_moteng","csh_huangyueying","csh_shanyuezhiyin","csh_chengyu","csh_zhugeke","csh_mzj","csh_gaogan","csh_shamoke","csh_yujin","csh_zhangning","csh_dongzhuo","csh_mmhz","csh_simahui","csh_bzt","csh_dz","csh_jjxs","csh_ls","csh_mlb","csh_mlm","csh_qw","csh_sj","csh_sq","csh_vxs","csh_wy","csh_xuchu","csh_yy","csh_zhuran","csh_wenyang","csh_guansuo","csh_lvlingqi","csh_gy","csh_chengpu","csh_bfsm","csh_chendao","csh_jzh","csh_guohuai","csh_sx","csh_nailong_juexing","csh_gdsn","csh_jieluji","csh_lamosi","csh_zhouchu","csh_sunshangxiang","csh_diaochan","csh_huaman","csh_tongyuan"]);
 //传说
-if(lib.rank.rarity.legend) lib.rank.rarity.legend.addArray(["csh_mingrixiang","csh_liximing","csh_bin","csh_zywoo","csh_zhugeqing","csh_feibijiubi","csh_realityfanghao","csh_doudou","csh_xurong","csh_gjs","csh_msmy","csh_szc","csh_wn","csh_dengai","csh_caoang","csh_lr","csh_wolongzhuge","csh_zhonghui","csh_caochun","csh_youhabahe","csh_daaixianzun","csh_maochao","csh_xushu","csh_shenzhugeguo","csh_shencaozhi","csh_dabing","csh_zhangxingcai","csh_modekaisa","csh_donk","csh_yangjian","csh_sake","csh_kuisangti","csh_sailasi","csh_zuozhu"])
+if(lib.rank.rarity.legend) lib.rank.rarity.legend.addArray(["csh_mingrixiang","csh_liximing","csh_bin","csh_zywoo","csh_zhugeqing","csh_feibijiubi","csh_realityfanghao","csh_doudou","csh_xurong","csh_gjs","csh_msmy","csh_szc","csh_wn","csh_dengai","csh_caoang","csh_lr","csh_wolongzhuge","csh_zhonghui","csh_caochun","csh_youhabahe","csh_daaixianzun","csh_maochao","csh_xushu","csh_shenzhugeguo","csh_shencaozhi","csh_dabing","csh_zhangxingcai","csh_modekaisa","csh_donk","csh_yangjian","csh_sake","csh_kuisangti","csh_sailasi","csh_zuozhu","csh_karl"])
 }
 
   

@@ -6,8 +6,1263 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
      曾错写成 ../../ 导致「Failed to fetch dynamically imported module」（2026-10-04 修复）。
      改完务必跑 tools/check.js：自由变量扫描拦裸引用，import 路径校验拦失效路径。 */
 
+// ========== 卡尔·秘仪（2026-10-05 自「卡尔秘仪测试」v0.2.16 并入；辅助函数 cshKarl_* 前缀，勿与其它文件重复定义） ==========
+const KARL = "csh_karl";
+// 并入大扩展包时：只改这一处为你的大包文件夹名（与 extension/xxx/ 一致）
+const CSH_KARL_EXT = "卡尔秘仪测试";
+const RING = `${KARL}_ring`;
+const SPELLS = `${KARL}_spells`;
+const LAST_COMBO = `${KARL}_last_combo`;
+
+const ELEMENT = Object.freeze({
+    basic: "基本",
+    trick: "锦囊",
+    equip: "装备",
+});
+
+const COMBO_SKILLS = Object.freeze({
+    "basic-basic-basic": "csh_karl_chengxiang",
+    "basic-basic-trick": "csh_karl_junxing",
+    "basic-basic-equip": "csh_karl_qingzheng",
+    "basic-trick-trick": "csh_karl_saojian",
+    "basic-trick-equip": "csh_karl_qinyi",
+    "basic-equip-equip": "csh_karl_xiongtu",
+    "trick-trick-trick": "csh_karl_sigu",
+    "trick-trick-equip": "csh_karl_yongjian",
+    "trick-equip-equip": "csh_karl_hannan",
+    "equip-equip-equip": "csh_karl_juetao",
+});
+
+/* 秘术语音借用表（2026-10-08 修复「语音不全」）：
+   audio 字符串是「引用另一个技能」——被引用技能不存在时，引擎会 console.error 且无声
+   （get/audio.ts 的 SkillAudio 构造：isExist 为假 → 报错 + defaultInfo=false）。
+   十个秘术＝借用本地官方同类技能语音；本体无「勤艺/用间」两个技能，指向同效果/同族的官方技能：
+     清正→sbqingzheng（界陈宫·文本最接近）· 扫奸→jsrgsaojian · 勤艺→qice（奇策：视为使用锦囊）
+     雄图→mbxiongtu（谋刘繇·4 句）· 似故→sxrmsigu（文本与本版逐字一致）· 用间→fanjian（反间）
+     其余四个（称象/峻刑/扞难/决讨）同名官方技能自带音频，保持原引用。
+   改引用前先确认目标技能在 lib 内存在且其 audio 能解析出文件，别引入新的静默失效。 */
+
+function cshKarl_getRing(player) {
+    const ring = player.getStorage(RING);
+    return Array.isArray(ring) ? ring.slice(0, 3) : [];
+}
+
+function cshKarl_getSpellList(player) {
+    const list = player.getStorage(SPELLS);
+    return Array.isArray(list) ? list.slice(0, 2) : [];
+}
+
+function cshKarl_elementFromCard(card) {
+    if (!card) return null;
+    const type = get.type2(card);
+    if (type === "basic" || type === "trick" || type === "equip") return type;
+    return null;
+}
+
+function cshKarl_getCombo(ring) {
+    if (!Array.isArray(ring) || ring.length !== 3 || ring.some(i => !i)) return null;
+    return ring.slice().sort((a, b) => ["basic", "trick", "equip"].indexOf(a) - ["basic", "trick", "equip"].indexOf(b)).join("-");
+}
+
+function cshKarl_getComboLabel(combo) {
+    const labels = combo?.split("-").map(i => ELEMENT[i] || i);
+    return labels ? labels.join(" · ") : "未成式";
+}
+
+function cshKarl_getElementCounts(player) {
+    const ring = cshKarl_getRing(player);
+    return {
+        basic: ring.filter(i => i === "basic").length,
+        trick: ring.filter(i => i === "trick").length,
+        equip: ring.filter(i => i === "equip").length,
+    };
+}
+
+function cshKarl_refreshMark(player) {
+    if (player && player.hasSkill(KARL + "_miyihuan")) {
+        player.markSkill(KARL + "_miyihuan");
+    }
+}
+
+// ---------- 秘仪 AI 辅助（仅供各技能 ai 调用，非全局 hook）----------
+/** 由牌得到环元素 */
+function cshKarl_aiElementFromCard(card) {
+    if (!card) return null;
+    const t = get.type2(card);
+    if (t === "basic") return "basic";
+    if (t === "trick") return "trick";
+    if (t === "equip") return "equip";
+    return null;
+}
+
+/** 模拟打出某牌后的环 */
+function cshKarl_aiSimulateRing(player, card) {
+    const el = cshKarl_aiElementFromCard(card);
+    if (!el) return cshKarl_getRing(player);
+    const ring = cshKarl_getRing(player);
+    const next = ring.slice();
+    if (next.length >= 3) next.shift();
+    next.push(el);
+    return next;
+}
+
+/**
+ * 评估某秘术对当前局势的渴望度（越高越想要）
+ * 实战倾向：
+ * - 残血求稳：用间、称象、勤艺
+ * - 要斩杀：决讨、似故、峻刑、扫奸
+ * - 缺牌：雄图、称象、勤艺
+ * - 控场：清正、扫奸、放逐类似故
+ */
+function cshKarl_aiSpellDesire(player, skillId) {
+    if (!skillId || !player) return 0;
+    const hp = player.hp;
+    const maxHp = player.maxHp;
+    const nh = player.countCards("h");
+    const enemies = game.filterPlayer(c => c !== player && c.isIn() && get.attitude(player, c) < 0);
+    const lowHpEnemy = enemies.filter(c => c.hp + (c.hujia || 0) <= 2).length;
+    const richEnemy = enemies.filter(c => c.countCards("h") >= 3).length;
+    let s = 1;
+
+    switch (skillId) {
+        case KARL + "_chengxiang":
+            s = player.isDamaged() || nh < 3 ? 7 : 3;
+            break;
+        case KARL + "_junxing":
+            s = enemies.length ? 6 + (lowHpEnemy ? 2 : 0) : 1;
+            break;
+        case KARL + "_qingzheng":
+            s = richEnemy ? 7 : 3;
+            break;
+        case KARL + "_saojian":
+            s = richEnemy ? 8 : 2;
+            break;
+        case KARL + "_qinyi":
+            s = 6 + (nh < 2 ? 2 : 0);
+            break;
+        case KARL + "_xiongtu":
+            s = 5 + (nh < 3 ? 2 : 0);
+            break;
+        case KARL + "_sigu":
+            s = enemies.length ? 8 + (lowHpEnemy ? 3 : 0) : 1;
+            break;
+        case KARL + "_yongjian":
+            s = player.isDamaged() ? (hp <= 2 ? 10 : 7) : 0;
+            break;
+        case KARL + "_hannan":
+            s = enemies.length ? 5 : 1;
+            break;
+        case KARL + "_juetao":
+            s = enemies.length ? 9 + (lowHpEnemy ? 3 : 0) : 1;
+            break;
+        default:
+            s = 2;
+    }
+    // 已有该术则不再追求
+    if (cshKarl_getSpellList(player).includes(skillId)) s *= 0.15;
+    return s;
+}
+
+/** 打出该牌对「凝成想要的秘术 / 环加成」的额外价值 */
+function cshKarl_aiRingPlayBonus(card, player) {
+    if (get.itemtype(card) !== "card") return 0;
+    if (get.position(card) !== "h") return 0;
+    const el = cshKarl_aiElementFromCard(card);
+    if (!el) return 0;
+
+    const prev = cshKarl_getRing(player);
+    const next = cshKarl_aiSimulateRing(player, card);
+    const prevCombo = cshKarl_getCombo(prev);
+    const nextCombo = cshKarl_getCombo(next);
+    let bonus = 0;
+
+    // 环未满：鼓励填环
+    if (prev.length < 3) bonus += 0.35;
+
+    // 填环带来的常驻数值
+    if (el === "basic") bonus += 0.15;
+    if (el === "trick") bonus += 0.25;
+    if (el === "equip") bonus += 0.2;
+
+    // 凝成新秘术
+    if (nextCombo && nextCombo !== prevCombo) {
+        const skill = COMBO_SKILLS[nextCombo];
+        if (skill && !cshKarl_getSpellList(player).includes(skill)) {
+            const desire = cshKarl_aiSpellDesire(player, skill);
+            bonus += Math.min(2.2, desire * 0.22);
+            // 若会顶掉旧术，扣掉被顶者的残留价值
+            const spells = cshKarl_getSpellList(player);
+            if (spells.length >= 2) {
+                bonus -= Math.min(0.8, cshKarl_aiSpellDesire(player, spells[0]) * 0.08);
+            }
+            // 获得秘术还摸牌
+            bonus += 0.35;
+            if (spells.length >= 2) bonus += 0.35; // 失去也摸
+        }
+    }
+    return bonus;
+}
+
+function cshKarl_addElement(player, type) {
+    if (!type) return;
+    const ring = cshKarl_getRing(player);
+    if (ring.length >= 3) ring.shift();
+    ring.push(type);
+    player.storage[RING] = ring;
+
+    const combo = cshKarl_getCombo(ring);
+    if (combo) {
+        const skill = COMBO_SKILLS[combo];
+        const spells = cshKarl_getSpellList(player);
+        const previousCombo = player.storage[LAST_COMBO];
+
+        // 组合变化且目标秘术未持有时凝成；顶掉旧术视为失去，再获得新术
+        if (combo !== previousCombo && skill && !spells.includes(skill)) {
+            let drawNum = 0;
+            if (spells.length >= 2) {
+                const oldSkill = spells.shift();
+                if (player.hasSkill(oldSkill)) player.removeSkill(oldSkill);
+                game.log(player, "失去秘术", `#b【${get.translation(oldSkill)}】`);
+                drawNum += 1; // 失去秘术摸一张
+            }
+            spells.push(skill);
+            player.storage[SPELLS] = spells;
+            if (lib.skill[skill]) {
+                lib.skill[skill].fixed = false;
+            }
+            player.addSkill(skill);
+            game.log(player, "秘仪凝成", `#b【${get.translation(skill)}】`);
+            drawNum += 1; // 获得秘术摸一张
+            if (drawNum > 0) player.draw(drawNum);
+            cshKarl_refreshMark(player);
+        }
+        player.storage[LAST_COMBO] = combo;
+    } else {
+        player.storage[LAST_COMBO] = null;
+    }
+    cshKarl_refreshMark(player);
+}
+
+
+function cshKarl_cardWasSingleHandCard(event, player) {
+    if (!event || !player) return null;
+    const cards = Array.isArray(event.cards) ? event.cards : [];
+    if (cards.length !== 1) return null;
+    const card = cards[0];
+    if (!card || card.original !== "h") return null;
+    return card;
+}
+
+function cshKarl_getSiguSkillList() {
+    return [
+        "zhichi",
+        "reganglie",
+        "refankui",
+        "new_reyiji",
+        "oljieming",
+        "fangzhu",
+        "shibei",
+        "rechengxiang",
+        "zhiyu",
+        "jilei",
+        "benyu",
+        "chouce",
+        "new_wuhun",
+    ];
+}
+
+/* ========== 童渊 · 「鸟」资源管理器（2026-10-08 并入自独立扩展 extension/童渊，原样搬入） ==========
+   所有鸟的取得 / 离开 / 转换 / 归零都只走这一处（技能块里 22 处 tongyuanBird.* 引用依赖它）。
+   注意：当年独立扩展把它定义在模块作用域，而 skills/index.js 的技能块同样在模块作用域——
+   拆包时若只搬 package.skill 区块，就会留下未定义引用（tools/check.js 的自由变量扫描覆盖不到）。 */
+const tongyuanBird = {
+    TAG: "csh_qiangshen",
+    TARGET: 100,
+
+    get(player) {
+    	if (!player || typeof player.getExpansions !== "function") return [];
+    	return player.getExpansions(this.TAG) || [];
+    },
+    count(player) {
+    	return this.get(player).length;
+    },
+    has(player) {
+    	return this.count(player) > 0;
+    },
+
+    /** 清理单张牌上的鸟标记 */
+    clearTag(card) {
+    	if (card && typeof card.removeGaintag === "function") {
+    		card.removeGaintag(this.TAG);
+    	}
+    },
+    clearTags(cards) {
+    	if (!cards) return;
+    	for (const c of cards) this.clearTag(c);
+    },
+
+    /**
+     * 从牌堆+弃牌堆装填鸟。目标 TARGET 张。
+     * 不足时取尽并明确 log；空则 log 0 张。
+     * @returns {Promise<number>} 实际装填数量
+     */
+    async refill(player) {
+    	if (!player || !player.isIn()) return 0;
+    	const pool = [];
+    	if (ui.cardPile) {
+    		for (const c of Array.from(ui.cardPile.childNodes || [])) pool.push(c);
+    	}
+    	if (ui.discardPile) {
+    		for (const c of Array.from(ui.discardPile.childNodes || [])) pool.push(c);
+    	}
+    	if (!pool.length) {
+    		game.log(player, "【枪神】：牌堆与弃牌堆均为空，无法装填「鸟」（目标", this.TARGET, "张，实际0张）");
+    		return 0;
+    	}
+    	pool.randomSort();
+    	const take = pool.slice(0, Math.min(this.TARGET, pool.length));
+    	const next = player.addToExpansion(take, "giveAuto");
+    	next.gaintag.add(this.TAG);
+    	await next;
+    	player.markSkill(this.TAG);
+    	if (take.length < this.TARGET) {
+    		game.log(
+    			player,
+    			"因【枪神】将",
+    			get.cnNumber(take.length),
+    			"张牌置于武将牌上记作「鸟」（目标",
+    			this.TARGET,
+    			"张，牌堆+弃牌堆仅余",
+    			get.cnNumber(take.length),
+    			"张，已全部取尽）"
+    		);
+    	} else {
+    		game.log(player, "因【枪神】将", get.cnNumber(take.length), "张牌置于武将牌上，记作「鸟」");
+    	}
+    	if (typeof document !== "undefined") {
+    		player.classList.add("csh-tongyuan-glow");
+    		setTimeout(() => player.classList.remove("csh-tongyuan-glow"), 900);
+    	}
+    	return take.length;
+    },
+
+    /** 指定实体鸟离开扩展区进入手牌，并清标记 */
+    async takeToHand(player, card) {
+    	if (!card) return null;
+    	await player.gain(card, "gain2");
+    	this.clearTag(card);
+    	return card;
+    },
+
+    /** 随机一张鸟进入手牌；无鸟则返回 null */
+    async takeRandomToHand(player) {
+    	const birds = this.get(player);
+    	if (!birds.length) return null;
+    	return this.takeToHand(player, birds.randomGet());
+    },
+
+    /** 若干实体鸟置入弃牌堆并清标记 */
+    async discard(player, cards) {
+    	if (!cards || !cards.length) return;
+    	await player.loseToDiscardpile(cards);
+    	this.clearTags(cards);
+    },
+
+    /**
+     * 鸟归零检测：仅在资源操作完整结束后调用。
+     * 有三徒且无鸟 → 失三徒、得朝凤。
+     */
+    checkEmpty(player) {
+    	if (!player || !player.isIn()) return;
+    	if (!player.hasSkill("csh_qiangshen")) return;
+    	if (!player.hasSkill("csh_santu")) return;
+    	if (this.has(player)) return;
+    	player.removeSkill("csh_santu");
+    	player.addSkill("csh_chaofeng");
+    	game.log(player, "因没有「鸟」，失去【三徒】，获得【朝凤】");
+    },
+
+    /**
+     * 三徒转换一次：
+     * 状态+1 → 同步 → 有鸟则随机入手 → 最后 checkEmpty
+     * 不调用 changeZhuanhuanji。
+     */
+    async transition(player) {
+    	if (!player || !player.hasSkill("csh_santu")) return;
+    	const cur = typeof player.storage.csh_santu === "number" ? player.storage.csh_santu : 0;
+    	player.storage.csh_santu = (cur + 1) % 3;
+    	if (typeof player.syncStorage === "function") player.syncStorage("csh_santu");
+    	player.markSkill("csh_santu");
+    	// 三徒切换：引用官方童渊【传术】语音（童渊音色）
+    	try {
+    		if (typeof game.trySkillAudio === "function") game.trySkillAudio("chuanshu", player);
+    		else if (typeof player.playSkillAudio === "function") player.playSkillAudio("chuanshu");
+    		else if (typeof game.playAudio === "function") game.playAudio("skill", "chuanshu");
+    	} catch (e) {}
+    	if (this.has(player)) {
+    		await this.takeRandomToHand(player);
+    		game.log(player, "因【三徒】转换形态，将一张「鸟」置入了手牌");
+    	}
+    	this.checkEmpty(player);
+    },
+};
+
 const cshSkillPack = {
         skill: {
+
+            // ========== 卡尔·秘仪 csh_karl ==========
+        "csh_karl_miyihuan": {
+                mark: true,
+                locked: true,
+                marktext: "秘",
+                init(player) {
+                    player.markSkill(KARL + "_miyihuan");
+                    player.markSkill(KARL + "_tuji");
+                },
+                derivation: [
+                    KARL + "_chengxiang",
+                    KARL + "_junxing",
+                    KARL + "_qingzheng",
+                    KARL + "_saojian",
+                    KARL + "_qinyi",
+                    KARL + "_xiongtu",
+                    KARL + "_sigu",
+                    KARL + "_yongjian",
+                    KARL + "_hannan",
+                    KARL + "_juetao",
+                ],
+                intro: {
+                    markcount(storage, player) {
+                        return cshKarl_getRing(player).length;
+                    },
+                    content(storage, player) {
+                        const ring = cshKarl_getRing(player);
+                        const count = cshKarl_getElementCounts(player);
+                        const combo = cshKarl_getCombo(ring);
+                        const spells = cshKarl_getSpellList(player);
+                        const lab = "color:#e8c35a;font-weight:bold";
+                        const ringText = ring.length ? ring.map(i => ELEMENT[i]).join(" · ") : "空";
+                        const comboText = combo ? cshKarl_getComboLabel(combo) : "未成";
+                        const spellText = spells.length
+                            ? spells.map(i => "【" + get.translation(i) + "】").join("　")
+                            : "无";
+                        // 使用等宽感排版：标签列 + 内容列，态的三行名称补齐到四字宽
+                        return (
+                            `<span style="${lab}">环</span>　${ringText}<br>` +
+                            `<span style="${lab}">态</span>　手牌上限　+${count.basic}<br>` +
+                            `　　摸牌数　　+${count.trick}<br>` +
+                            `　　杀伤害　　+${count.equip}<br>` +
+                            `<span style="${lab}">式</span>　${comboText}<br>` +
+                            `<span style="${lab}">术</span>　${spellText}`
+                        );
+                    },
+                },
+                ai: {
+                    threaten(player) {
+                        const spells = cshKarl_getSpellList(player);
+                        return 1.2 + spells.length * 0.35 + cshKarl_getRing(player).length * 0.08;
+                    },
+                    effect: {
+                        // 引导出牌：优先打出能推进想要组合 / 填环的牌
+                        player(card, player, target) {
+                            const bonus = cshKarl_aiRingPlayBonus(card, player);
+                            if (!bonus) return;
+                            return [1, bonus];
+                        },
+                    },
+                },
+
+                group: [
+                    KARL + "_draw",
+                    KARL + "_damage",
+                    KARL + "_record",
+                    KARL + "_clear",
+                    KARL + "_tuji",
+                ],
+            },
+
+            "csh_karl_draw": {
+                charlotte: true,
+                forced: true,
+                popup: false,
+                trigger: { player: "phaseDrawBegin2" },
+                filter(event, player) {
+                    return !event.numFixed && cshKarl_getElementCounts(player).trick > 0;
+                },
+                async content(event, trigger, player) {
+                    trigger.num += cshKarl_getElementCounts(player).trick;
+                },
+            },
+
+            "csh_karl_damage": {
+                charlotte: true,
+                forced: true,
+                popup: false,
+                trigger: { source: "damageBegin1" },
+                filter(event, player) {
+                    return event.card && get.name(event.card) === "sha" && event.source === player && cshKarl_getElementCounts(player).equip > 0;
+                },
+                async content(event, trigger, player) {
+                    trigger.num += cshKarl_getElementCounts(player).equip;
+                },
+            },
+
+            "csh_karl_record": {
+                charlotte: true,
+                forced: true,
+                popup: false,
+                trigger: { player: ["useCardAfter", "respondAfter"] },
+                filter(event, player) {
+                    const card = cshKarl_cardWasSingleHandCard(event, player);
+                    if (!card) return false;
+                    return get.position(card, true) !== "h";
+                },
+                async content(event, trigger, player) {
+                    const card = cshKarl_cardWasSingleHandCard(trigger, player);
+                    if (card && get.position(card, true) !== "h") {
+                        cshKarl_addElement(player, cshKarl_elementFromCard(card));
+                    }
+                },
+            },
+
+            "csh_karl_clear": {
+                charlotte: true,
+                forced: true,
+                popup: false,
+                trigger: { player: "dieBegin" },
+                async content(event, trigger, player) {
+                    delete player.storage[RING];
+                    delete player.storage[SPELLS];
+                    delete player.storage[LAST_COMBO];
+                    cshKarl_refreshMark(player);
+                },
+            },
+
+
+            // ==================== 秘仪图谱（常驻对照） ====================
+            "csh_karl_tuji": {
+                charlotte: true,
+                locked: true,
+                mark: true,
+                marktext: "谱",
+                intro: {
+                    name: "秘仪图谱",
+                    content() {
+                        const dim = "color:#b8b0a0";
+                        const row = (combo, skillId) =>
+                            `<span style="${dim}">${combo}</span>　${get.poptip(skillId)}`;
+                        const lines = [
+                            row("基本基本基本", KARL + "_chengxiang"),
+                            row("基本基本锦囊", KARL + "_junxing"),
+                            row("基本基本装备", KARL + "_qingzheng"),
+                            row("基本锦囊锦囊", KARL + "_saojian"),
+                            row("基本锦囊装备", KARL + "_qinyi"),
+                            row("基本装备装备", KARL + "_xiongtu"),
+                            row("锦囊锦囊锦囊", KARL + "_sigu"),
+                            row("锦囊锦囊装备", KARL + "_yongjian"),
+                            row("锦囊装备装备", KARL + "_hannan"),
+                            row("装备装备装备", KARL + "_juetao"),
+                        ];
+                        return `<span style="display:block;text-align:center;line-height:1.7">${lines.join("<br>")}</span>`;
+                    },
+                },
+            },
+
+            // ==================== AAA：称象 ====================
+            "csh_karl_chengxiang": {
+                audio: "chengxiang",
+                trigger: { player: "damageEnd" },
+                filter(event) {
+                    return event.num > 0;
+                },
+                async content(event, trigger, player) {
+                    const cards = get.cards(4);
+                    await game.cardsGotoOrdering(cards);
+                    await player.showCards(cards, `${get.translation(player)}发动了【称象】`, true);
+                    const result = await player
+                        .chooseCardButton(cards, "称象：选择任意张点数之和不大于13的牌", [1, Infinity], true)
+                        .set("filterButton", button => {
+                            const sum = ui.selected.buttons.reduce((n, b) => n + (get.number(b.link) || 0), 0);
+                            return sum + (get.number(button.link) || 0) <= 13;
+                        })
+                        .set("ai", button => {
+                            // 在点数约束下尽量拿高价值牌
+                            const num = get.number(button.link) || 0;
+                            return get.value(button.link, player) + (num <= 5 ? 0.2 : 0);
+                        })
+                        .forResult();
+                    if (result?.links?.length) {
+                        await player.gain(result.links, "gain2");
+                    }
+                },
+                check(event, player) {
+                    // 受伤后几乎总该发动，牌差时更要
+                    return true;
+                },
+                ai: {
+                    maixie: true,
+                    maixie_hp: true,
+                    effect: {
+                        target(card, player, target) {
+                            if (get.tag(card, "damage")) {
+                                if (target.hp + (target.hujia || 0) < 2) return 0.85;
+                                return [1, 1.15];
+                            }
+                        },
+                    },
+                    threaten: 1.35,
+                },
+        },
+
+            // ==================== AAB：峻刑 ====================
+            "csh_karl_junxing": {
+                audio: "junxing",
+                enable: "phaseUse",
+                usable: 1,
+                filter(event, player) {
+                    return player.countCards("h") > 0;
+                },
+                filterCard: lib.filter.cardDiscardable,
+                selectCard: [1, Infinity],
+                position: "h",
+                check(card) {
+                    // 优先弃低价值手牌，默认弃1张；牌差时再多弃
+                    return 5.5 - get.value(card);
+                },
+                filterTarget(card, player, target) {
+                    return target !== player;
+                },
+                allowChooseAll: true,
+                async content(event, trigger, player) {
+                    const { target, cards } = event;
+                    const result = await target
+                        .chooseToDiscard(
+                            cards.length,
+                            `弃置${get.cnNumber(cards.length)}张牌并失去1点体力，或点取消将武将牌翻面并摸${get.cnNumber(cards.length)}张牌`,
+                            "he"
+                        )
+                        .set("cardsx", cards)
+                        .set("ai", card => {
+                            const target = get.player();
+                            if (target.isTurnedOver() || target.hp <= 1) return -1;
+                            return 20 - get.value(card, target) - cards.length * 5;
+                        })
+                        .forResult();
+                    if (!result.bool) {
+                        await target.turnOver();
+                        await target.draw(cards.length);
+                    } else {
+                        await target.loseHp();
+                    }
+                },
+                ai: {
+                    order: 9,
+                    result: {
+                        player(player, target) {
+                            return 0.3;
+                        },
+                        target(player, target) {
+                            const att = get.attitude(player, target);
+                            if (att >= 0) return 0;
+                            let eff = get.damageEffect(target, player, player) * 0.35;
+                            // 手牌少 / 残血更痛；已翻面则翻面收益低
+                            if (target.countCards("h") <= 2) eff -= 0.9;
+                            if (target.hp <= 2) eff -= 0.7;
+                            if (target.isTurnedOver()) eff += 0.6;
+                            return eff - 1.2;
+                        },
+                    },
+                },
+            },
+
+            // ==================== AAC：清正 ====================
+            "csh_karl_qingzheng": {
+                audio: "sbqingzheng",
+                charlotte: true,
+                enable: "phaseUse",
+                usable: 1,
+                filter(event, player) {
+                    return player.countCards("h") > 0 && game.hasPlayer(current => current !== player && current.countCards("h") > 0);
+                },
+                async content(event, trigger, player) {
+                    // —— ① 看自己的手牌（中央常驻）→ 选一种花色（可取消）——
+                    const myCards = player.getCards("h", card => lib.filter.cardDiscardable(card, player, event.name));
+                    if (!myCards.length) return;
+
+                    let suit1 = null;
+                    if (typeof get.addNewRowList === "function") {
+                        const list = get.addNewRowList(myCards, "suit", player);
+                        const myRes = await player
+                            .chooseButton([
+                                [
+                                    [[`###清正###<div class="text center">选择一种花色，弃置该花色的所有手牌</div>`], "addNewRow"],
+                                    [
+                                        dialog => {
+                                            dialog.classList.add("fullheight");
+                                            dialog.forcebutton = false;
+                                            dialog._scrollset = false;
+                                        },
+                                        "handle",
+                                    ],
+                                    ...list.map(item => [Array.isArray(item) ? item : [item], "addNewRow"]),
+                                ],
+                            ])
+                            .set("filterButton", button => {
+                                // addNewRow 自定义按钮的 link 就是花色字符串（见 get.addNewRowList / 族·拾昔），空花色组不可选
+                                if (typeof button.link !== "string") return false;
+                                const p = get.player();
+                                return p.countCards("h", card => get.suit(card, p) === button.link && lib.filter.cardDiscardable(card, p, get.event().getParent().name)) > 0;
+                            })
+                            .set("ai", button => {
+                                const player = get.player();
+                                const cs = player.getCards("h", card => get.suit(card, player) === button.link);
+                                if (!cs.length) return 0;
+                                const values = cs.reduce((n, c) => n + get.value(c, player), 0) / cs.length;
+                                // 张数多、均价值低的花色优先（为压过对方留本钱）
+                                if (cs.length >= 4 && values > 5.5) return 0.1;
+                                return cs.length * 2.4 - values;
+                            })
+                            .forResult();
+                        if (!myRes?.bool || !myRes.links?.length) return;
+                        suit1 = myRes.links[0];   // ★ link 即花色，不能再拿去 get.suit
+                    } else {
+                        const mySuits = lib.suit.filter(suit => myCards.some(c => get.suit(c, player) === suit));
+                        const myChoice = await player
+                            .chooseControl(mySuits, "cancel2")
+                            .set("dialog", ["清正：选择一种花色，弃置该花色的所有手牌", myCards])
+                            .set("ai", () => {
+                                const player = get.player();
+                                const controls = get.event().controls.filter(s => s !== "cancel2");
+                                return controls.slice().sort((a, b) => {
+                                    const score = s => {
+                                        const cs = player.getCards("h", c => get.suit(c, player) === s);
+                                        const avg = cs.reduce((n, c) => n + get.value(c, player), 0) / Math.max(1, cs.length);
+                                        return cs.length * 2 - avg;
+                                    };
+                                    return score(b) - score(a);
+                                })[0];
+                            })
+                            .forResult();
+                        if (!myChoice?.control || myChoice.control === "cancel2") return;
+                        suit1 = myChoice.control;
+                    }
+
+                    const cards1 = player.getCards("h", card => get.suit(card, player) === suit1 && lib.filter.cardDiscardable(card, player, event.name));
+                    if (!cards1.length) return;
+                    await player.showCards(cards1, get.translation(player) + "发动了【清正】");   // 信息里的「展示」
+
+                    // —— ② 再选一名有手牌的其他角色（可取消）——
+                    const tRes = await player
+                        .chooseTarget(
+                            "清正：选择一名有手牌的其他角色",
+                            (card, player, target) => target !== player && target.countCards("h") > 0
+                        )
+                        .set("ai", target => {
+                            const player = get.player();
+                            if (get.attitude(player, target) >= 0) return 0;
+                            // 手牌多、残血、无护甲优先
+                            let s = -get.attitude(player, target) * (1 + target.countCards("h") * 0.55);
+                            if (target.hp <= 2) s += 1.2;
+                            if (!target.hujia) s += 0.3;
+                            return s;
+                        })
+                        .forResult();
+                    if (!tRes?.bool || !tRes.targets?.length) return;
+                    const target = tRes.targets[0];
+
+                    // —— ③ 弃置自己该花色 ——
+                    await player.discard(cards1);
+                    const selfCount = cards1.length;
+
+                    // —— ④ 对方手牌中央常驻 → 选一种花色弃置 ——
+                    if (!target.isIn() || !target.countCards("h")) return;
+                    const tCards = target.getCards("h");
+                    const tDiscardable = tCards.filter(card => lib.filter.cardDiscardable(card, target, event.name));
+                    if (!tDiscardable.length) {
+                        await player
+                            .chooseControl("ok")
+                            .set("dialog", [
+                                `###清正###<div class="text center">${get.translation(target)}的手牌（无法弃置）</div>`,
+                                tCards,
+                            ])
+                            .forResult();
+                        return;
+                    }
+
+                    let cards2 = [];
+                    if (typeof get.addNewRowList === "function") {
+                        const list2 = get.addNewRowList(tCards, "suit", target);
+                        const tRes2 = await player
+                            .chooseButton(
+                                [
+                                    [
+                                        [[`清正：弃置${get.translation(target)}一种花色的所有牌`], "addNewRow"],
+                                        [
+                                            dialog => {
+                                                dialog.classList.add("fullheight");
+                                                dialog.forcebutton = false;
+                                                dialog._scrollset = false;
+                                            },
+                                            "handle",
+                                        ],
+                                        ...list2.map(item => [Array.isArray(item) ? item : [item], "addNewRow"]),
+                                    ],
+                                ],
+                                true
+                            )
+                            .set("filterButton", button => {
+                                // link 即花色字符串；只允许选目标手上确有可弃牌的花色
+                                if (typeof button.link !== "string") return false;
+                                const target = get.event().cshQingzhengTarget;
+                                return target.countCards("h", card => get.suit(card, target) === button.link && lib.filter.cardDiscardable(card, target, get.event().getParent().name)) > 0;
+                            })
+                            .set("cshQingzhengTarget", target)
+                            .set("ai", button => {
+                                // 自己已弃 selfCount 张：让目标弃得越少越好（少于 selfCount 才吃伤害）
+                                const target = get.event().cshQingzhengTarget;
+                                return target ? -target.countCards("h", card => get.suit(card, target) === button.link) : 0;
+                            })
+                            .forResult();
+                        if (!tRes2?.bool || !tRes2.links?.length) return;
+                        const suit2 = tRes2.links[0];   // ★ link 即花色
+                        cards2 = target.getCards(
+                            "h",
+                            card => get.suit(card, target) === suit2 && lib.filter.cardDiscardable(card, target, event.name)
+                        );
+                    } else {
+                        const tSuits = lib.suit.filter(suit =>
+                            tCards.some(c => get.suit(c, target) === suit && lib.filter.cardDiscardable(c, target, event.name))
+                        );
+                        const tChoice = await player
+                            .chooseControl(tSuits)
+                            .set("dialog", [`清正：选择一种花色，弃置${get.translation(target)}该花色的所有手牌`, tCards])
+                            .set("ai", () => {
+                                const target = get.event().cshQingzhengTarget;
+                                return get
+                                    .event()
+                                    .controls.slice()
+                                    .sort(
+                                        (a, b) =>
+                                            target.countCards("h", c => get.suit(c, target) === b) -
+                                            target.countCards("h", c => get.suit(c, target) === a)
+                                    )[0];
+                            })
+                            .set("cshQingzhengTarget", target)
+                            .forResult();
+                        if (!tChoice?.control) return;
+                        cards2 = target.getCards(
+                            "h",
+                            card => get.suit(card, target) === tChoice.control && lib.filter.cardDiscardable(card, target, event.name)
+                        );
+                    }
+
+                    // —— ⑤ 结算 ——
+                    if (cards2.length) await target.discard(cards2);
+                    if (selfCount > cards2.length && target.isIn()) await target.damage({ source: player });
+                },
+                ai: {
+                    order: 8.2,
+                    result: {
+                        player(player) {
+                            if (player.countCards("h") <= 1) return 0;
+                            if (game.hasPlayer(c => c !== player && c.countCards("h") > 0 && get.attitude(player, c) < 0)) {
+                                return 1.1;
+                            }
+                            return 0.15;
+                        },
+                    },
+                },
+            },
+
+            // ==================== ABB：扫奸 ====================
+            "csh_karl_saojian": {
+                audio: "jsrgsaojian",
+                enable: "phaseUse",
+                usable: 1,
+                filterTarget(card, player, target) {
+                    return target !== player && target.countCards("h") > 0;
+                },
+                async content(event, trigger, player) {
+                    const target = event.target;
+                    const result = await player
+                        .choosePlayerCard(target, "h", true)
+                        .set("visible", true)
+                        .set("prompt", "扫奸：选择其一张手牌作为标记（仅你可见）")
+                        .set("ai", button => get.value(button.link, target))
+                        .forResult();
+                    if (!result?.cards?.length) return;
+                    const chosen = result.cards[0];
+                    game.log(player, "选择了", target, "的一张手牌作为扫奸标记");
+
+                    // 重复弃牌直至弃掉标记牌或没有手牌（无五张上限）
+                    while (target.isIn() && target.countCards("h") > 0) {
+                        const discardResult = await target
+                            .chooseToDiscard("h", true, "扫奸：弃置一张手牌")
+                            .set("ai", card => 7 - get.value(card, get.player()))
+                            .forResult();
+                        if (!discardResult?.cards?.length) break;
+                        if (discardResult.cards.some(card => card === chosen)) break;
+                    }
+                },
+                ai: {
+                    order: 8.6,
+                    result: {
+                        target(player, target) {
+                            if (get.attitude(player, target) >= 0) return 0;
+                            const nh = target.countCards("h");
+                            if (nh <= 0) return 0;
+                            // 手牌越多越赚（标记保密，期望多弃）
+                            return -Math.min(5, nh) * 1.05;
+                        },
+                    },
+                },
+        },
+
+            // ==================== ABC：勤艺 ====================
+            "csh_karl_qinyi": {
+                audio: "qice",
+                trigger: {
+                    source: "damageSource",
+                    player: "damageEnd",
+                },
+                filter(event, player, name) {
+                    const evt = name === "damageSource" ? "sourceDamage" : "damage";
+                    return player.getRoundHistory(evt).indexOf(event) === 0;
+                },
+                check(event, player) {
+                    return true;
+                },
+                async content(event, trigger, player) {
+                    const list = get.inpileVCardList(info => {
+                        if (!["basic", "trick"].includes(info[0])) return false;
+                        const card = get.autoViewAs({ name: info[2], nature: info[3] }, "unsure");
+                        return player.hasUseTarget(card) || (get.info(card).notarget && lib.filter.cardEnabled(card, player));
+                    });
+                    if (!list.length) return;
+                    const result = await player
+                        .chooseButton(["勤艺：选择一张基本牌或普通锦囊牌视为使用", [list, "vcard"]])
+                        .set("ai", button => player.getUseValue(get.autoViewAs({ name: button.link[2], nature: button.link[3] }, "unsure")) + 1)
+                        .forResult();
+                    if (result?.links?.length) {
+                        const link = result.links[0];
+                        const card = get.autoViewAs({ name: link[2], nature: link[3] }, "unsure");
+                        if (player.hasUseTarget(card) || (get.info(card).notarget && lib.filter.cardEnabled(card, player))) {
+                            await player.chooseUseTarget(card, true, false);
+                        }
+                    }
+                },
+                check(event, player) {
+                    // 有可打的虚牌才发动
+                    const list = get.inpileVCardList(info => {
+                        if (!["basic", "trick"].includes(info[0])) return false;
+                        const card = get.autoViewAs({ name: info[2], nature: info[3] }, "unsure");
+                        return player.hasUseTarget(card) || (get.info(card).notarget && lib.filter.cardEnabled(card, player));
+                    });
+                    if (!list.length) return false;
+                    return list.some(info => {
+                        const card = get.autoViewAs({ name: info[2], nature: info[3] }, "unsure");
+                        return player.getUseValue(card) > 0;
+                    });
+                },
+                ai: {
+                    threaten: 1.95,
+                    effect: {
+                        target(card, player, target) {
+                            if (get.tag(card, "damage")) return [1, 0.35];
+                        },
+                    },
+                },
+        },
+
+            // ==================== ACC：雄图 ====================
+            "csh_karl_xiongtu": {
+                audio: "mbxiongtu",
+                trigger: { player: "changeHpAfter" },
+                filter(event) {
+                    return event.changedHp !== 0;
+                },
+                check(event, player) {
+                    return true;
+                },
+                async content(event, trigger, player) {
+                    const list = [];
+                    const pileMap = { c: "cardPile", d: "discardPile", ej: "field" };
+                    for (const position of ["c", "d", "ej"]) {
+                        const card = get.cardPile(
+                            card => get.is.damageCard(card) && position.includes(get.position(card, true)),
+                            pileMap[position],
+                            "random"
+                        );
+                        if (card) {
+                            if (position === "ej") {
+                                const owner = get.owner(card);
+                                if (owner) {
+                                    player.line(owner, "green");
+                                    owner.$give(card, player, false);
+                                    await game.delayx();
+                                }
+                            }
+                            list.push(card);
+                        }
+                    }
+                    const ordering = Array.from(ui.ordering.childNodes).filter(
+                        card => card && get.tag(card, "damage") && get.position(card, true) === "o"
+                    );
+                    if (ordering.length) list.push(ordering.randomGet());
+                    if (list.length) await player.gain(list, "gain2");
+                },
+                check(event, player) {
+                    return true;
+                },
+                ai: {
+                    threaten: 1.65,
+                    effect: {
+                        target(card, player, target) {
+                            if (get.tag(card, "damage") || get.name(card) === "tao" || get.name(card) === "jiu") {
+                                return [1, 0.7];
+                            }
+                        },
+                    },
+                },
+        },
+
+            // ==================== BBB：似故 ====================
+            "csh_karl_sigu": {
+                audio: "sxrmsigu",
+                enable: "phaseUse",
+                usable: 1,
+                filterTarget(card, player, target) {
+                    return target !== player;
+                },
+                // 判定点数 1~13 对应下列技能（与参考似故一致）
+                derivation: [
+                    "zhichi",
+                    "reganglie",
+                    "refankui",
+                    "new_reyiji",
+                    "oljieming",
+                    "fangzhu",
+                    "shibei",
+                    "rechengxiang",
+                    "zhiyu",
+                    "jilei",
+                    "benyu",
+                    "chouce",
+                    "new_wuhun",
+                ],
+                async content(event, trigger, player) {
+                    const target = event.targets?.[0] || event.target;
+                    if (!target) return;
+                    const judgeResult = await target.judge(card => {
+                        const n = get.number(card) || 0;
+                        return n > 0 ? 1 : -1;
+                    }).forResult();
+                    const num = judgeResult?.number || (judgeResult?.card ? get.number(judgeResult.card) : 0);
+                    if (!num || num < 1) return;
+
+                    const list = get.info(event.name).derivation || [];
+                    const skill = list[num - 1];
+                    const mark = `${event.name}_${player.playerid}`;
+
+                    if (skill && lib.skill[skill]) {
+                        await target.addAdditionalSkills(mark, [skill], true);
+                        if (typeof target.addTip === "function") {
+                            target.addTip(mark, `似故 ${get.translation(skill)}`);
+                        }
+                        game.log(target, "因【似故】获得", `#g【${get.translation(skill)}】`);
+                    } else {
+                        game.log(target, "因【似故】判定点数为", num, "，未匹配到可用技能");
+                    }
+
+                    if (target.isIn()) await target.damage({ source: player });
+                    if (target.isIn()) await target.damage({ source: player });
+
+                    if (skill && lib.skill[skill]) {
+                        target.removeAdditionalSkills(mark);
+                        if (typeof target.removeTip === "function") {
+                            target.removeTip(mark);
+                        }
+                        game.log(target, "失去了因【似故】获得的", `#g【${get.translation(skill)}】`);
+                    }
+                },
+                ai: {
+                    order: 7.8,
+                    result: {
+                        target(player, target) {
+                            const att = get.attitude(player, target);
+                            if (att >= 0) return 0;
+                            let eff = get.damageEffect(target, player, player);
+                            if (eff <= 0) return 0;
+                            // 两次伤害 + 临时技能干扰
+                            let score = -eff * 1.65;
+                            if (target.hp + (target.hujia || 0) <= 2) score -= 1.2;
+                            if (target.countCards("h") >= 4) score -= 0.3;
+                            return score;
+                        },
+                    },
+                    tag: { damage: 2 },
+                },
+        },
+
+
+
+
+            // ==================== BBC：用间 ====================
+            "csh_karl_yongjian": {
+                audio: "fanjian",
+                charlotte: true,
+                enable: "phaseUse",
+                usable: 1,
+                filter(event, player) {
+                    return player.isDamaged();
+                },
+                async content(event, trigger, player) {
+                    await player.recover();
+                    const creates = [
+                        ["du", "heart", 1],
+                        ["guaguliaodu", "club", 5],
+                    ].filter(info => lib.card[info[0]]);
+                    if (!creates.length) {
+                        game.log(player, "当前未启用【用间篇】牌堆，【用间】无法洗入新牌");
+                        return;
+                    }
+                    const cards = creates.map(info => game.createCard(...info));
+                    if (ui.cardPile.childNodes.length) {
+                        await game.cardsGotoPile(cards, () => ui.cardPile.childNodes[get.rand(0, ui.cardPile.childNodes.length - 1)]);
+                    } else {
+                        await game.cardsGotoPile(cards, "insert");
+                    }
+                    game.log(player, `将${cards.map(card => `【${get.translation(card)}】`).join("与")}洗入了牌堆`);
+                },
+                ai: {
+                    order: 8.4,
+                    result: {
+                        player(player) {
+                            if (!player.isDamaged()) return 0;
+                            let v = get.recoverEffect(player, player, player) / 8;
+                            if (player.hp <= 1) v += 3;
+                            else if (player.hp <= 2) v += 1.5;
+                            // 牌少时更想回血过回合
+                            if (player.countCards("h") < 2) v += 0.4;
+                            return v;
+                        },
+                    },
+                },
+        },
+
+            // ==================== BCC：扞难 ====================
+            "csh_karl_hannan": {
+                audio: "hannan",
+                enable: "phaseUse",
+                usable: 1,
+                filter(event, player) {
+                    return !player.hasSkillTag("noCompareSource");
+                },
+                filterTarget(card, player, target) {
+                    return player.canCompare(target);
+                },
+                async content(event, trigger, player) {
+                    const target = event.target;
+                    const result = await player.chooseToCompare(target).forResult();
+                    if (!result.tie) {
+                        const players = [player, target];
+                        if (result.bool) players.reverse();
+                        players[1].line(players[0], "thunder");
+                        await players[0].damage(players[1], 1);
+
+                        // 拼点使用者的单张手牌完成结算后进入秘环；目标牌不属于卡尔，不记录。
+                        const ownCard = result.card1 && result.card1.owner === player ? result.card1 : (result.card1 && result.card1.original === "h" ? result.card1 : null);
+                        if (ownCard?.original === "h") cshKarl_addElement(player, cshKarl_elementFromCard(ownCard));
+                    } else {
+                        // 平局没有输赢伤害，但拼点牌本身已离开手牌，不满足“完成拼点后记录”的单张逻辑也不再重复处理。
+                    }
+                },
+                ai: {
+                    order: 7.2,
+                    result: {
+                        target(player, target) {
+                            const att = get.attitude(player, target);
+                            if (att >= 0) return 0;
+                            const nums = player.getCards("h").map(c => get.number(c) || 0);
+                            if (!nums.length) return 0;
+                            const maxN = Math.max(...nums);
+                            let teff = get.damageEffect(target, player, player);
+                            if (teff > 0) teff = -teff;
+                            // 有大点才拼
+                            if (maxN >= 11) teff -= 0.6;
+                            else if (maxN >= 8) teff -= 0.2;
+                            else teff += 0.5; // 点小数不拼
+                            if (target.hp <= 2) teff -= 0.5;
+                            return teff;
+                        },
+                    },
+                    tag: { damage: 1 },
+                },
+        },
+
+            // ==================== CCC：决讨（魔改版） ====================
+            "csh_karl_juetao": {
+                audio: "juetao",
+                charlotte: true,
+                enable: "phaseUse",
+                usable: 1,
+                filter(event, player) {
+                    return player.isIn() && game.hasPlayer(current => current !== player);
+                },
+                async content(event, trigger, player) {
+                    const result = await player
+                        .chooseTarget("决讨：选择一名目标", true, (card, player, target) => target !== player)
+                        .set("ai", target => {
+                            const player = get.player();
+                            if (get.attitude(player, target) >= 0) return 0;
+                            let s = -get.attitude(player, target) * 1.4;
+                            const def = target.hp + (target.hujia || 0);
+                            if (def <= 2) s += 3;
+                            else if (def <= 3) s += 1.2;
+                            if (target.countCards("h") === 0) s += 0.8;
+                            return s;
+                        })
+                        .forResult();
+                    if (!result?.targets?.length) return;
+                    const target = result.targets[0];
+                    player.logSkill(event.name, target);
+                    while (player.isIn() && target.isIn()) {
+                        const card = get.bottomCards(1, true)[0];
+                        if (!card) break;
+                        await player.showCards(card, `${get.translation(player)}对${get.translation(target)}发动了【决讨】`, true);
+                        const useResult = await player
+                            .chooseUseTarget(card, true, false, "nodistance")
+                            .set("filterTarget", (card, player, current) => {
+                                let evt = _status.event;
+                                if (evt.name === "chooseTarget") evt = evt.getParent();
+                                if (current !== player && current !== evt.juetao_target) return false;
+                                return lib.filter.targetEnabledx(card, player, current);
+                            })
+                            .set("juetao_target", target)
+                            .forResult();
+                        if (!useResult?.bool) break;
+                    }
+                },
+                ai: {
+                    order: 9.6,
+                    result: {
+                        target(player, target) {
+                            if (get.attitude(player, target) >= 0) return 0;
+                            let score = -2.2;
+                            const def = target.hp + (target.hujia || 0);
+                            if (def <= 1) score -= 2.5;
+                            else if (def <= 2) score -= 1.4;
+                            else if (def <= 3) score -= 0.6;
+                            // 空手牌更难活
+                            if (target.countCards("h") === 0) score -= 0.5;
+                            // 已有高伤环加成时更想开
+                            const eq = cshKarl_getElementCounts(player).equip || 0;
+                            score -= eq * 0.25;
+                            return score;
+                        },
+                    },
+                },
+        },
 
             // ========== 载物 csh_zywoo（联机安全 + AI） ==========
 
@@ -731,7 +1986,7 @@ const cshSkillPack = {
                         player.markSkill("csh_goute");
                 },
                 mark: true,
-                marktext: "结构",
+                marktext: "弹药",
                 intro: {
                     name: "构特",
                     markcount(storage) {
@@ -972,7 +2227,7 @@ const cshSkillPack = {
                     used: {
                         charlotte: true,
                         mark: true,
-                        marktext: "背叛",
+                        marktext: "钢背",
                         intro: { content: "本回合已发动过〖钢背〗" },
                     },
                     guess: {
@@ -1104,7 +2359,7 @@ const cshSkillPack = {
                     },
                 },
                 mark: true,
-                marktext: "背叛",
+                marktext: "钢背",
                 intro: {
                     markcount(storage, player) {
                         return (player.getExpansions("csh_gangbei_tag") || []).length;
@@ -1725,7 +2980,7 @@ const cshSkillPack = {
             "csh_damie_sha": {
                 charlotte: true,
                 mark: true,
-                marktext: "灭杀",
+                marktext: "暗裔",
                 intro: {
                     content(storage, player) {
                         return "本回合【杀】可使用次数+" + (player.storage.csh_damie_sha || 0);
@@ -2747,7 +4002,7 @@ const cshSkillPack = {
                             },
                         },
                         mark: true,
-                        marktext: "距离",
+                        marktext: "无距",
                         intro: {
                             content: "本回合使用牌无距离限制",
                         },
@@ -2786,7 +4041,7 @@ const cshSkillPack = {
                             }
                         },
                         mark: true,
-                        marktext: "根基",
+                        marktext: "无次",
                         intro: {
                             content: "使用下一张基本牌无次数限制",
                         },
@@ -2810,7 +4065,7 @@ const cshSkillPack = {
                             trigger.directHit.addArray(game.players);
                         },
                         mark: true,
-                        marktext: "锦帆",
+                        marktext: "无应",
                         intro: {
                             content: "使用下一张锦囊牌不可响应",
                         },
@@ -2960,7 +4215,7 @@ const cshSkillPack = {
                     used: {
                         charlotte: true,
                         silent: true,
-                        marktext: "恃勇",
+                        marktext: "恃才",
                         intro: {
                             name: "恃才③计数",
                             name2: "恃才③计数",
@@ -3127,7 +4382,13 @@ const cshSkillPack = {
                 forced: true,
                 async content(event, trigger, player) {
                     const card = player.getEquip("csh_huntianyi");
-                    await player.lose(card, "visible", ui.ordering);
+                    /* 【2026-10-05】按官方：受伤挡伤时「销毁此牌并防止之」。
+                       原实现在 onLose 里用 event.getParent(2).name 反猜事件链，实机判不中
+                       （玩家实测浑天仪进了弃牌堆）——现改为在 lose 事件上打 _csh_hty_destroy
+                       标记，onLose 见标记即销毁，与事件链深度/调用路径无关。 */
+                    const loseEvent = player.lose(card, "visible", ui.ordering);
+                    loseEvent._csh_hty_destroy = true;
+                    await loseEvent;
                     trigger.cancel();
                 },
                 subSkill: {
@@ -3154,12 +4415,16 @@ const cshSkillPack = {
                         },
                         async content(event, trigger, player) {
                             const num = get.number(event.indexedData, false), cards = [];
-                            while (cards.length < 2) {
-                                const cardx = get.cardPile2(function (card) {
-                                    return get.number(card, false) == num && !cards.includes(card) && get.type2(card, false) == "trick";
-                                });
-                                if (cardx) cards.push(cardx);
-                                else break;
+                            /* 【2026-10-05】对齐官方「随机获得两张与此牌点数相同的锦囊牌」：
+                               先收集牌堆里全部同点数普通锦囊，再随机抽两张（不足则全摸）。
+                               原实现从牌堆顶顺取，与官方「随机」不符。 */
+                            const pool = [];
+                            for (let i = 0; i < ui.cardPile.childNodes.length; i++) {
+                                const cardx = ui.cardPile.childNodes[i];
+                                if (get.number(cardx, false) == num && get.type2(cardx, false) == "trick") pool.push(cardx);
+                            }
+                            while (cards.length < 2 && pool.length) {
+                                cards.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
                             }
                             if (cards.length) await player.gain(cards, "gain2");
                         },
@@ -3547,10 +4812,12 @@ const cshSkillPack = {
                 "skill_id": "csh_pyzhuren_shandian_skill",
             },
             "csh_tiejiliguduo_skill": {
+                /* 错峰用 priority（不改触发阶段，阶段语义不动）：同【陷阵蛮勇】在准备阶段开始
+                   触发，31 先于 30 执行；【跋扈】62+lastDo 收尾，三者互不挤在同一执行点 */
+                priority: 31,
                 trigger: {
                     player: "phaseZhunbeiBegin",
                 },
-                priority: 22,
                 equipSkill: true,
                 intro: {
                     content: function (storage, player) {
@@ -4615,7 +5882,7 @@ const cshSkillPack = {
                         },
                     },
                 },
-                marktext: "忍意",
+                marktext: "忍神",
                 "skill_id": "csh_renshen",
                 "_priority": 999900,
             },
@@ -4641,7 +5908,7 @@ const cshSkillPack = {
                     maixie: true,
                     "maixie_hp": true,
                 },
-                marktext: "忍意",
+                marktext: "忍戒",
                 "skill_id": "csh_renjie",
                 "_priority": 0,
             },
@@ -5215,7 +6482,7 @@ const cshSkillPack = {
                 subSkill: {
                     limit: {
                         mark: true,
-                        marktext: "奢靡",
+                        marktext: "极奢",
                         intro: {
                             content: "本回合手牌上限-#",
                         },
@@ -5289,164 +6556,6 @@ const cshSkillPack = {
                 },
                 "skill_id": "csh_jishe",
                 "_priority": 0,
-            },
-            "csh_cixiongshuanggujian": {
-                trigger: {
-                    player: "phaseZhunbeiBegin",
-                },
-                filter: function(event,player){
-                    var players=game.filterPlayer();
-                    for(var i=0;i<players.length;i++){
-                        if(players[i]!=player&&players[i].getEquips('cixiong').length>0){
-                            return true;
-                        }
-                    }
-                },
-                content: function(){
-                    var players=game.filterPlayer();
-                    for(var i=0;i<players.length;i++){
-                        if(players[i]!=player){
-                            var e=players[i].getEquips('cixiong');
-                            if(e.length>0){
-                                player.line(players[i],'green');
-                                player.gain(e,players[i],'give','bySelf');
-                            }
-                        }
-                    }
-                },
-                "_priority": 0,
-                "skill_id": "csh_cixiongshuanggujian",
-            },
-            "csh_bushouyingxiang": {
-                trigger: {
-                    player: "loseHpBefore",
-                },
-                hiddenSkill: true,
-                silent: true,
-                forced: true,
-                content: function(){
-                    trigger.cancel();
-                },
-                popup: false,
-                "skill_id": "csh_bushouyingxiang",
-                "_priority": 1,
-            },
-            "csh_huoxin": {
-                audio: ["huoxin", 2],
-                enable: "phaseUse",
-                usable: 2,
-                filter: function(event,player){
-                    if(game.countPlayer()<3) return false;
-                    for(var i of lib.suit){
-                        if(player.countCards('h',{suit:i})>1) return true;
-                    }
-                    return false;
-                },
-                complexCard: true,
-                position: "h",
-                filterCard: function(card,player){
-                    if(!ui.selected.cards.length){
-                        var suit=get.suit(card);
-                        return player.countCards('h',function(card2){
-                            return card!=card2&&get.suit(card2,player)==suit;
-                        })>0;
-                    }
-                    return get.suit(card,player)==get.suit(ui.selected.cards[0],player);
-                },
-                selectCard: 2,
-                selectTarget: 2,
-                filterTarget: function(card,player,target){
-                    return player!=target;
-                },
-                multitarget: true,
-                multiline: true,
-                delay: false,
-                discard: false,
-                lose: false,
-                check: function(card){
-                    return 6-get.value(card);
-                },
-                targetprompt: ["拼点发起人","拼点目标"],
-                content: function(){
-                    'step 0'
-                    var list=[];
-                    for(var i=0;i<targets.length;i++){
-                        list.push([targets[i],cards[i]]);
-                    }
-                    game.loseAsync({
-                        gain_list:list,
-                        player:player,
-                        cards:cards,
-                        giver:player,
-                        animate:'giveAuto',
-                    }).setContent('gaincardMultiple');
-                    'step 1'
-                    game.delayx();
-                    if(targets[0].canCompare(targets[1])){
-                        // 双方都不想拿标记：都倾向出大点硬刚
-                        targets[0].chooseToCompare(targets[1]).set("ai", function (card) {
-                            return (get.number(card) || 0) + (get.value(card) < 6 ? 0.15 : 0);
-                        });
-                    }
-                    else event.finish();
-                    'step 2'
-                    if(result.winner!==targets[0]) targets[0].addMark('huoxin',1);
-                    if(result.winner!==targets[1]) targets[1].addMark('huoxin',1);
-                },
-                marktext: "🤺",
-                intro: {
-                    name: "魅惑",
-                    "name2": "魅惑",
-                    content: "mark",
-                },
-                group: "csh_huoxin_control",
-                subSkill: {
-                    // 魅惑支配：目标回合开始时移去所有“魅惑”并跳过此回合
-                    // （镜像引擎翻面跳过回合的官方写法：phaseBeforeEnd 时 cancel 回合事件）
-                    control: {
-                        trigger: { global: "phaseBeforeEnd" },
-                        forced: true,
-                        silent: true,
-                        popup: false,
-                        filter(event, player) {
-                            return event.player != player && event.player.isIn() && event.player.countMark("huoxin") >= 2;
-                        },
-                        async content(event, trigger, player) {
-                            const target = trigger.player;
-                            target.removeMark("huoxin", target.countMark("huoxin"));
-                            target.phaseSkipped = true;
-                            game.log(target, "被", player, "的", "#g【惑心】", "魅惑，跳过了此回合");
-                            trigger.cancel();
-                        },
-                        sub: true,
-                        sourceSkill: "csh_huoxin",
-                        "skill_id": "csh_huoxin_control",
-                        "_priority": 0,
-                    },
-                },
-                ai: {
-                    threaten: 2,
-                    order: 4,
-                    expose: 0.4,
-                    result: {
-                        // 优先选两个敌人；避免把牌送给强敌同时放过队友
-                        target: function(player,target){
-                            var att = get.attitude(player, target);
-                            var base = target.hasMark('huoxin') ? -4 : -2;
-                            if (att > 0) return base + 3; // 友军拿牌+标记：大幅降优先级（仍可为负因标记）
-                            if (att < 0) return base - 1.5; // 敌人更优先
-                            return base;
-                        },
-                        player: function(player){
-                            var enemies = game.filterPlayer(function(c){
-                                return c !== player && get.attitude(player, c) < 0;
-                            });
-                            return enemies.length >= 2 ? 1.5 : (enemies.length === 1 ? 0.4 : -1);
-                        },
-                    },
-                },
-                "_priority": 0,
-                "skill_id": "csh_huoxin",
             },
             "csh_yiyuan": {
                 audio: "ext:池子魔将/audio/skill:1",
@@ -6713,6 +7822,27 @@ const cshSkillPack = {
                         event.targets.length = 0;
                         event.targets.addArray(ordered);
                     }
+                    // 发动动画：effect/csh_qw_luanwu_banner.mp4（文鸯却敌同管线）
+                    // 放在 step1 结算之后、逐人逼杀之前 —— 特效先放完，再开始全场结算，
+                    // 避免「第一个人都结算完了横幅还在放」。
+                    try {
+                        game.broadcastAll(function () {
+                            try {
+                                if (lib.cshShoushaFx) lib.cshShoushaFx.play("luanwu", null);
+                            } catch (eFx0) {}
+                        });
+                    } catch (eFx1) {}
+                    var waitMs = 3760;
+                    try {
+                        if (lib.cshShoushaFx && lib.cshShoushaFx._dur && lib.cshShoushaFx._dur.luanwu) {
+                            waitMs = lib.cshShoushaFx._dur.luanwu;
+                        }
+                    } catch (eFx2) {}
+                    try {
+                        game.pause();
+                        event.wait(waitMs);
+                        game.resume();
+                    } catch (eFx3) {}
                 },
                 content: function(){
                     "step 0"
@@ -10224,6 +11354,30 @@ const cshSkillPack = {
                   next.setHiddenSkill(event.name);
                   const result = await next.forResult();
                   if (result.bool) {
+                    // 技能演出：玩家确认置牌（=发动破军）后才播放，播完再置牌结算
+                    try {
+                      game.broadcastAll(function () {
+                        try {
+                          if (lib.cshShoushaFx) lib.cshShoushaFx.play("pojun", null);
+                        } catch (eFx0) {}
+                      });
+                    } catch (eFx1) {}
+                    var waitMs = 2000;
+                    try {
+                      if (lib.cshShoushaFx && lib.cshShoushaFx._dur && lib.cshShoushaFx._dur.pojun) {
+                        waitMs = lib.cshShoushaFx._dur.pojun;
+                      }
+                    } catch (eFx2) {}
+                    try {
+                      game.pause();
+                      await new Promise(function (resolve) {
+                        setTimeout(function () {
+                          try { game.resume(); } catch (eRs) {}
+                          resolve();
+                        }, waitMs);
+                      });
+                    } catch (eFx3) {}
+
                     const target = trigger.target;
                     player.logSkill("csh_pojun12", target);
                     target.addSkill("csh_repojun2");
@@ -10349,6 +11503,31 @@ const cshSkillPack = {
                     const evt = trigger.getParent();
                     const target = trigger.target;
                     game.log(player, "释放了", "#y" + num + "点弦");
+                    // 发动动画：effect/csh_mmhz_liegong_banner.mp4（文鸯却敌同管线）
+                    // 放在所有弦数效果结算**之前** —— 先放完横幅再逐条生效，
+                    // 避免「伤害都打完了横幅才出来」。本 content 是 async，可直接 await。
+                    try {
+                        game.broadcastAll(function () {
+                            try {
+                                if (lib.cshShoushaFx) lib.cshShoushaFx.play("liegong", null);
+                            } catch (eFx0) {}
+                        });
+                    } catch (eFx1) {}
+                    var waitMs = 3060;
+                    try {
+                        if (lib.cshShoushaFx && lib.cshShoushaFx._dur && lib.cshShoushaFx._dur.liegong) {
+                            waitMs = lib.cshShoushaFx._dur.liegong;
+                        }
+                    } catch (eFx2) {}
+                    try {
+                        game.pause();
+                        await new Promise(function (resolve) {
+                            setTimeout(function () {
+                                try { game.resume(); } catch (eRs) {}
+                                resolve();
+                            }, waitMs);
+                        });
+                    } catch (eFx3) {}
                     const gainByType = async (type) => {
                         const card = get.cardPile((card) => get.type(card) == type);
                         if (card) await player.gain(card, "gain2");
@@ -10442,7 +11621,7 @@ const cshSkillPack = {
                         },
                     },
                     xian: {
-                        marktext: "琴弦",
+                        marktext: "蓄弦",
                         intro: {
                             name: "弦",
                             content(storage, player) {
@@ -10478,7 +11657,7 @@ const cshSkillPack = {
                     extrashot: {
                         charlotte: true,
                         mark: true,
-                        marktext: "琴弦",
+                        marktext: "蓄弦",
                         intro: {
                             name: "弦",
                             content: "本回合可额外出一次【杀】",
@@ -12889,18 +14068,28 @@ const cshSkillPack = {
                 },
                 ai: {
                     expose: 0.25,
-                    order: 7,
+                    /* AI 发动修复：出牌候选按 get.order 排序，恒定 7 会被高序牌长期插队；
+                       场上有残血/空手牌的敌人时提到 11，让平讨稳定进入 AI 行动队列 */
+                    order: function (item, player) {
+                        var juicy = player && game.hasPlayer(function (cur) {
+                            return cur != player && get.attitude(player, cur) < 0 &&
+                                (cur.hp <= 2 || cur.countCards("h") <= 1);
+                        });
+                        return juicy ? 11 : 7;
+                    },
                     result: {
                         target: function (player, target) {
                             var att = get.attitude(player, target);
                             if (att >= 0) return 0;
-                            // 敌方：残血或牌少时逼杀收益高
+                            // 敌方：残血或牌少时逼杀收益高（分值取负，目标态度为 -1 后即为正收益）
                             var shaEff = get.effect(target, { name: "sha" }, player, player);
-                            if (target.hp <= 2 || target.countCards("h") <= 1) return shaEff * 0.9 - 0.5;
+                            if (target.hp <= 2 || target.countCards("h") <= 1) return shaEff * 1.1 - 0.8;
                             // 牌多则逼交收益
-                            return -1.2 - Math.min(1.5, target.countCards("he") * 0.2);
+                            return -1.6 - Math.min(2, target.countCards("he") * 0.25);
                         },
                         player: function (player, target) {
+                            // 场上没有敌人时不给正分，避免 AI 把平讨浪费在友方身上
+                            if (!game.hasPlayer(function (cur) { return cur != player && get.attitude(player, cur) < 0; })) return 0;
                             return 1.2;
                         },
                     },
@@ -12948,8 +14137,14 @@ const cshSkillPack = {
                         },
                         ai: {
                             expose: 0.2,
-                            // 觉醒后平讨更强：略提前，仍留在出杀前
-                            order: 7.2,
+                            /* 觉醒后平讨更强：略提前，仍留在出杀前；同基础版，有残血/空手牌敌人时提前进队列 */
+                            order: function (item, player) {
+                                var juicy = player && game.hasPlayer(function (cur) {
+                                    return cur != player && get.attitude(player, cur) < 0 &&
+                                        (cur.hp <= 2 || cur.countCards("h") <= 1);
+                                });
+                                return juicy ? 11.2 : 7.2;
+                            },
                             result: {
                                 target(player, target) {
                                     const att = get.attitude(player, target);
@@ -12957,13 +14152,13 @@ const cshSkillPack = {
                                     const shaEff = get.effect(target, { name: "sha" }, player, player);
                                     // 残血/少牌：逼杀收益
                                     if (target.hp <= 2 || target.countCards("h") <= 1) {
-                                        return shaEff * 1.0 - 0.3;
+                                        return shaEff * 1.2 - 0.6;
                                     }
                                     // 牌多：逼交牌 + 己方摸1 + 杀次数+1，比未觉醒更赚
-                                    return -1.5 - Math.min(1.8, target.countCards("he") * 0.25);
+                                    return -1.9 - Math.min(2.2, target.countCards("he") * 0.3);
                                 },
                                 player(player, target) {
-                                    if (!target) {
+                                    if (!target || !game.hasPlayer(c => c !== player && get.attitude(player, c) < 0)) {
                                         return game.hasPlayer(c => c !== player && get.attitude(player, c) < 0) ? 1.4 : 0;
                                     }
                                     if (get.attitude(player, target) >= 0) return 0;
@@ -13287,9 +14482,12 @@ const cshSkillPack = {
                 "skill_id": "csh_gzjili",
             },
             "csh_xianxiamanyong": {
-                priority: 5,
+                priority: 30,
                 audio: ["gzjili",2],
                 onremove: true,
+                /* 错峰用 priority（不改触发阶段，阶段语义不动）：与【铁蒺藜骨朵】装备技同在
+                   准备阶段开始触发，30/31 一对先后固定，整对早于默认优先级的常规技能；
+                   【跋扈】62+lastDo 在本触发点收尾，互不挤在同一执行点 */
                 trigger: {
                     player: ["phaseZhunbeiBegin","phaseJieshuBegin"],
                 },
@@ -13687,8 +14885,32 @@ const cshSkillPack = {
                     expose: 0.2,
                     threaten: 1.8,
                 },
-                content: function () {
-                    trigger.player.damage("fire");
+                async content(event, trigger, player) {
+                    // 技能演出：effect/csh_lvlingqi_yannv_banner.mp4（横幅管线，参照黩武/排异）
+                    // 本技能为发动型触发（引擎弹"是否发动焰女"询问），确认后进 content → 横幅放开头即"发动时演出"
+                    try {
+                        game.broadcastAll(function () {
+                            try {
+                                if (lib.cshShoushaFx) lib.cshShoushaFx.play("yannv1", null);
+                            } catch (eFx0) {}
+                        });
+                    } catch (eFx1) {}
+                    var waitMs = 1800;
+                    try {
+                        if (lib.cshShoushaFx && lib.cshShoushaFx._dur && lib.cshShoushaFx._dur.yannv1) {
+                            waitMs = lib.cshShoushaFx._dur.yannv1;
+                        }
+                    } catch (eFx2) {}
+                    try {
+                        game.pause();
+                        await new Promise(function (resolve) {
+                            setTimeout(function () {
+                                try { game.resume(); } catch (eRs) {}
+                                resolve();
+                            }, waitMs);
+                        });
+                    } catch (eFx3) {}
+                    await trigger.player.damage("fire");
                 },
                 "_priority": 0,
                 group: ["csh_yannv1_roundcount"],
@@ -17357,6 +18579,30 @@ const cshSkillPack = {
                             async content(event, trigger, player) {
                                 const target = event.target;
                                 const card = lib.skill.csh_xinpaiyi_backup.card;
+                                // 发动动画：effect/csh_zhonghui_paiyi_banner.mp4（文鸯却敌同管线）
+                                // 先播完再结算，避免「牌都摸完了特效还在放」
+                                try {
+                                    game.broadcastAll(function () {
+                                        try {
+                                            if (lib.cshShoushaFx) lib.cshShoushaFx.play("paiyi", null);
+                                        } catch (eFx0) {}
+                                    });
+                                } catch (eFx1) {}
+                                var waitMs = 3100;
+                                try {
+                                    if (lib.cshShoushaFx && lib.cshShoushaFx._dur && lib.cshShoushaFx._dur.paiyi) {
+                                        waitMs = lib.cshShoushaFx._dur.paiyi;
+                                    }
+                                } catch (eFx2) {}
+                                try {
+                                    game.pause();
+                                    await new Promise(function (resolve) {
+                                        setTimeout(function () {
+                                            try { game.resume(); } catch (eRs) {}
+                                            resolve();
+                                        }, waitMs);
+                                    });
+                                } catch (eFx3) {}
                                 // 必须await：loseToDiscardpile走事件队列，不等待则getExpansions读到移去前的数量
                                 await player.loseToDiscardpile(card);
                                 const num = player.getExpansions("xinquanji").length;
@@ -17537,7 +18783,7 @@ const cshSkillPack = {
                     jieshu: {
                         audio: ["olchengxiang",1],
                         mark: true,
-                        marktext: "怀古",
+                        marktext: "千古",
                         intro: {
                             name: "千古",
                             content: "结束阶段摸一张牌；受到伤害后移去此标记，令拥有【千古】使命的角色摸两张牌",
@@ -20005,7 +21251,7 @@ const cshSkillPack = {
             "csh_renjin": {
                 zhuanhuanji: true,
                 mark: true,
-                marktext: "忍意",
+                marktext: "忍禁",
                 intro: {
                     name: "忍禁",
                     content: function (storage) {
@@ -22398,7 +23644,9 @@ const cshSkillPack = {
                         popup: false,
                         mark: true,
                         marktext: "摸牌",
-                        intro: { content: "结束阶段摸三张牌" },
+                        /* nocount：隐藏角标数字（引擎 updateMark 会把 storage 数量画在 marktext 旁，
+                           表现为「摸三1」）；层数仍存于 storage 供结算用，仅显示层不画 */
+                        intro: { nocount: true, content: "结束阶段摸三张牌" },
                         trigger: { player: "phaseJieshuBegin" },
                         async content(event, trigger, player) {
                             const n = player.countMark("csh_shie_draw") || 1;
@@ -23365,7 +24613,7 @@ const cshSkillPack = {
                     // 不入 group（不会因获得陀斧而常驻显示），仅由 addMark/removeMark 驱动：计数>0 时显示
                     yinxue: {
                         mark: "auto",
-                        marktext: "痛饮",
+                        marktext: "饮血",
                         intro: {
                             name: "饮血",
                             content(storage) {
@@ -24037,7 +25285,7 @@ const cshSkillPack = {
                     limit: {
                         charlotte: true,
                         mark: true,
-                        marktext: "锋芒",
+                        marktext: "辟锋",
                         intro: {
                             name: "辟锋",
                             content: "你只能以实体牌【闪】响应奎桑提的【杀】（转化或视为使用的【闪】无效）",
@@ -25762,11 +27010,41 @@ const cshSkillPack = {
 			return 3 - val;
 		},
 
-		content() {
+		async content(event, trigger, player) {
+
+			// ⚠ async content 只有 (event,trigger,player,result) 四个显式参数，
+			//   引擎不会像同步 content 那样把 event 的属性注入作用域，
+			//   所以 target 必须从 event.target 取（排异同款第一行）。
+			const target = event.target;
+
+			// 发动动画：effect/csh_zhugeke_duwu_banner.mp4（贾诩乱武/钟会排异同管线）
+			// 先播完横幅再结算伤害，避免「伤害都跳完了横幅还在放」
+			try {
+				game.broadcastAll(function () {
+					try {
+						if (lib.cshShoushaFx) lib.cshShoushaFx.play("duwu", null);
+					} catch (eFx0) {}
+				});
+			} catch (eFx1) {}
+			var waitMs = 2000;
+			try {
+				if (lib.cshShoushaFx && lib.cshShoushaFx._dur && lib.cshShoushaFx._dur.duwu) {
+					waitMs = lib.cshShoushaFx._dur.duwu;
+				}
+			} catch (eFx2) {}
+			try {
+				game.pause();
+				await new Promise(function (resolve) {
+					setTimeout(function () {
+						try { game.resume(); } catch (eRs) {}
+						resolve();
+					}, waitMs);
+				});
+			} catch (eFx3) {}
 
 			player.addTempSkill("csh_duwu2");
 
-			target.damage("nocard");
+			await target.damage("nocard");
 
 		},
 
@@ -26970,7 +28248,7 @@ const cshSkillPack = {
             "_csh_theshy_chang": {
                 charlotte: true,
                 mark: true,
-                marktext: "长短",
+                marktext: "短",
                 // 来源阵亡时，被标记者自己清掉“短”（双保险，不依赖来源 skill 是否还在）
                 trigger: { global: "dieAfter" },
                 forced: true,
@@ -28097,13 +29375,18 @@ const cshSkillPack = {
                     player.markSkill("csh_jinfan");
                 },
                 group: ["csh_jinfan_gain", "csh_jinfan_clear"],
-                marktext: "铃印",
+                marktext: "铃",
                 intro: {
+                    /* 【2026-10-08 修复】标记里的「铃」恒定按小卡横排展示，对齐本体 gnjinfan 观感：
+                       ①不用 addAuto —— 它在 ≤4 张时按大卡渲染（dialog.js：length>4 才 addSmall）；
+                       ②不返回字符串 —— 引擎会把 intro.mark 的字符串返回值当纯文本渲染
+                         （get/index.js nodeintro：uiintro.add('<div class="text">'+stint+'</div>')），
+                         此前 else 分支的 cards.map(...).join("<br>") 正是"竖排文字"的来源。 */
                     mark(dialog, storage, player) {
                         const cards = player.getCards("s", card => card.hasGaintag && card.hasGaintag("csh_jinfan"));
-                        if (!cards.length) return "没有“铃”";
-                        if (dialog && dialog.addAuto) dialog.addAuto(cards);
-                        else return cards.map(c => get.translation(c)).join("<br>");
+                        if (!cards.length) return;
+                        if (dialog && typeof dialog.addSmall === "function") dialog.addSmall(cards);
+                        else if (dialog) dialog.add(cards);
                     },
                     markcount(storage, player) {
                         return player.getCards("s", card => card.hasGaintag && card.hasGaintag("csh_jinfan")).length;
@@ -28816,7 +30099,7 @@ const cshSkillPack = {
             "csh_hyy_jizhi_hand": {
                 charlotte: true,
                 onremove: true,
-                marktext: "智限",
+                        marktext: "集智",
                 intro: {
                     name: "集智",
                     content(storage, player) {
@@ -29727,10 +31010,485 @@ const cshSkillPack = {
                     }
                 },
             },
+            // ========== 童渊 · 枪神 / 三徒（公义→佑维→子龙）/ 朝凤（2026-10-08 并入自独立扩展 extension/童渊） ==========
+            // 原样搬入，仅两处改动：①csh_santu_youwei_perm 的标记名「维」→「佑维」；②键补引号 + 缩进转空格。
+            // 语音全部借用本地官方音频：chuanshu / chuanyun / ocongjian_tongyuan / longdan_tongyuan / chaofeng / tongyuan(die)。
+            "csh_qiangshen": {
+                audio: true,
+                forced: true,
+                locked: true,
+                mod: {
+                    attackRange(player, num) {
+                        return (typeof num === "number" ? num : 1) + 1;
+                    },
+                    cardUsable(card, player, num) {
+                        if (!card) return;
+                        const name = typeof card === "string" ? card : get.name(card);
+                        if (name === "sha") return num + 1;
+                    },
+                },
+                group: ["csh_qiangshen_gameStart", "csh_qiangshen_loseChaofeng"],
+                mark: true,
+                marktext: "鸟",
+                intro: {
+                    content: "expansion",
+                    markcount: "expansion",
+                },
+                onremove(player, skill) {
+                    const cards = player.getExpansions(skill);
+                    if (cards && cards.length) player.loseToDiscardpile(cards);
+                },
+            },
+
+            /** 游戏开始装填 */
+            "csh_qiangshen_gameStart": {
+                audio: "csh_qiangshen",
+                trigger: {
+                    global: "gameStart",
+                    player: "enterGame",
+                },
+                forced: true,
+                locked: true,
+                filter(event, player) {
+                    return player.hasSkill("csh_qiangshen") && !tongyuanBird.has(player);
+                },
+                async content(event, trigger, player) {
+                    await tongyuanBird.refill(player);
+                },
+            },
+
+            /**
+             * 外部效果直接失去朝凤时的兼容路径（朝凤自身 content 会直接 refill，不依赖此监听）。
+             * 仅响应朝凤被移除。
+             */
+            "csh_qiangshen_loseChaofeng": {
+                audio: "csh_qiangshen",
+                trigger: {
+                    player: ["loseSkill", "removeSkill"],
+                },
+                forced: true,
+                locked: true,
+                filter(event, player) {
+                    if (!player.hasSkill("csh_qiangshen")) return false;
+                    // 朝凤 content 内会自行 refill 并打标，避免重复
+                    if (player._csh_chaofeng_refilling) return false;
+                    const sk = event.skill;
+                    if (typeof sk === "string") return sk === "csh_chaofeng";
+                    if (Array.isArray(sk)) return sk.includes("csh_chaofeng");
+                    if (event.skills && Array.isArray(event.skills)) return event.skills.includes("csh_chaofeng");
+                    return event.name === "csh_chaofeng";
+                },
+                async content(event, trigger, player) {
+                    await tongyuanBird.refill(player);
+                    // 若补鸟后仍无鸟且持有三徒，归零
+                    tongyuanBird.checkEmpty(player);
+                },
+            },
+
+            /* ============================================================
+             * 三徒（0公义 → 1佑维 → 2子龙 → 0）
+             * ============================================================ */
+            "csh_santu": {
+                audio: "chuanshu",
+                zhuanhuanji: true,
+                mark: true,
+                marktext: "☯",
+                init(player, skill) {
+                    if (typeof player.storage[skill] !== "number") {
+                        player.storage[skill] = 0;
+                        if (typeof player.syncStorage === "function") player.syncStorage(skill);
+                    }
+                },
+                intro: {
+                    name: "三徒",
+                    content(storage) {
+                        const names = ["公义", "佑维", "子龙"];
+                        const idx = typeof storage === "number" ? ((storage % 3) + 3) % 3 : 0;
+                        return "当前形态：" + names[idx] + "（公义 → 佑维 → 子龙 → 公义）";
+                    },
+                },
+                group: ["csh_santu_gongyi", "csh_santu_youwei", "csh_santu_zilong", "csh_santu_zilong_effect"],
+            },
+
+            /* ---------- 公义 ---------- */
+            "csh_santu_gongyi": {
+                audio: "chuanyun",
+                trigger: { global: "phaseJieshuBegin" },
+                direct: true,
+                filter(event, player) {
+                    if (event.player === player) return false;
+                    if (!event.player || !event.player.isIn()) return false;
+                    if (!player.hasSkill("csh_santu")) return false;
+                    if ((player.storage.csh_santu || 0) % 3 !== 0) return false;
+                    if (!tongyuanBird.has(player)) return false;
+                    return event.player.countCards("h") > 0;
+                },
+                async content(event, trigger, player) {
+                    const target = trigger.player;
+                    const birds = tongyuanBird.get(player);
+                    if (!birds.length) return;
+
+                    const choose = player.chooseCardButton(
+                        birds,
+                        1,
+                        get.prompt("csh_santu_gongyi", target),
+                        "用一张「鸟」与" + get.translation(target) + "拼点。赢：其受1点伤害；没赢：其获得此「鸟」，你获得1点护甲"
+                    );
+                    choose.set("ai", function (button) {
+                        const p = _status.event.player;
+                        const t = _status.event.target;
+                        const att = get.attitude(p, t);
+                        if (att >= 0) return -1;
+                        const num = get.number(button.link) || 0;
+                        // 高点优先；对低血敌人更想拼
+                        let score = num + 0.5;
+                        if (t.hp <= 1) score += 4;
+                        else if (t.hp === 2) score += 1.5;
+                        return score;
+                    });
+                    choose.set("target", target);
+                    const result = await choose.forResult();
+                    if (!result.bool || !result.links || !result.links.length) return;
+
+                    const bird = result.links[0];
+                    player.logSkill("csh_santu_gongyi", target);
+
+                    // 实体鸟离开扩展区 → 入手 → 作为拼点牌
+                    await tongyuanBird.takeToHand(player, bird);
+
+                    const pd = player.chooseToCompare(target);
+                    if (!pd.fixedResult) pd.fixedResult = {};
+                    pd.fixedResult[player.playerid] = bird;
+                    pd.set("ai", function (card) {
+                        return get.number(card) || 0;
+                    });
+                    const pdResult = await pd.forResult();
+
+                    if (pdResult && pdResult.bool === true) {
+                        // 赢：鸟走正常拼点弃牌流程
+                        await target.damage(1, player);
+                    } else {
+                        // 没赢（含平局）：对方获得该实体鸟
+                        const giveCard = (pdResult && pdResult.player) || bird;
+                        if (giveCard) {
+                            if (get.owner(giveCard) === player) {
+                                await target.gain(giveCard, player, "give");
+                            } else {
+                                await target.gain(giveCard, "gain2");
+                            }
+                            tongyuanBird.clearTag(giveCard);
+                        }
+                        await player.changeHujia(1);
+                    }
+
+                    await tongyuanBird.transition(player);
+                },
+                ai: { expose: 0.25, threaten: 1.2 },
+            },
+
+            /* ---------- 佑维（无次数限制） ---------- */
+            "csh_santu_youwei": {
+                // 官方传术 derivation 获得的是技能 drlt_congjian，
+                // 但童渊专属音是 ocongjian_tongyuan（sp2/skill.js 占位 + longdan 同理）。
+                // 音频: ocongjian_tongyuan.mp3  台词:「察言纳谏，安身立命之道也。」
+                audio: "ocongjian_tongyuan",
+                enable: "phaseUse",
+                filter(event, player) {
+                    if (!player.hasSkill("csh_santu")) return false;
+                    if ((player.storage.csh_santu || 0) % 3 !== 1) return false;
+                    return tongyuanBird.has(player);
+                },
+                async content(event, trigger, player) {
+                    const birds = tongyuanBird.get(player);
+                    if (!birds.length) return;
+                    const max = Math.min(3, birds.length);
+
+                    const choose = player.chooseCardButton(birds, [1, max], "佑维：将一至三张「鸟」置入弃牌堆，摸等量张牌");
+                    choose.set("ai", function (button) {
+                        const selected = ui.selected.buttons
+                            ? ui.selected.buttons.map((b) => get.type2(b.link, false))
+                            : [];
+                        const t = get.type2(button.link, false);
+                        // 三色齐备权重显著提高
+                        if (selected.length === 2 && !selected.includes(t)) return 20 - get.value(button.link);
+                        if (!selected.includes(t)) return 10 - get.value(button.link);
+                        return 4 - get.value(button.link);
+                    });
+                    const result = await choose.forResult();
+                    if (!result.bool || !result.links || !result.links.length) return;
+
+                    const cards = result.links.slice();
+                    player.logSkill("csh_santu_youwei");
+
+                    await tongyuanBird.discard(player, cards);
+                    await player.draw(cards.length);
+
+                    if (cards.length === 3) {
+                        const types = cards.map((c) => get.type2(c, false));
+                        const unique = [...new Set(types.filter(Boolean))];
+                        if (unique.length === 3) {
+                            player.storage.csh_santu_youwei_bonus = (player.storage.csh_santu_youwei_bonus || 0) + 1;
+                            if (typeof player.syncStorage === "function") {
+                                player.syncStorage("csh_santu_youwei_bonus");
+                            }
+                            player.addSkill("csh_santu_youwei_perm");
+                            game.log(
+                                player,
+                                "因【佑维】弃置三张不同类别的「鸟」，额定摸牌数与手牌上限永久+1（当前+" +
+                                    player.storage.csh_santu_youwei_bonus +
+                                    "）"
+                            );
+                        }
+                    }
+
+                    await tongyuanBird.transition(player);
+                },
+                ai: {
+                    order: 7,
+                    result: {
+                        player(player) {
+                            const n = tongyuanBird.count(player);
+                            if (n <= 0) return 0;
+                            if (n >= 3) return 2;
+                            return 1;
+                        },
+                    },
+                },
+            },
+
+            /** 佑维永久加成（与三徒解耦） */
+            "csh_santu_youwei_perm": {
+                charlotte: true,
+                mark: true,
+                marktext: "佑维",
+                intro: {
+                    name: "佑维",
+                    content(storage, player) {
+                        return "额定摸牌数与手牌上限+" + (player.storage.csh_santu_youwei_bonus || 0);
+                    },
+                },
+                mod: {
+                    maxHandcard(player, num) {
+                        return num + (player.storage.csh_santu_youwei_bonus || 0);
+                    },
+                },
+                trigger: { player: "phaseDrawBegin2" },
+                forced: true,
+                popup: false,
+                filter(event, player) {
+                    return !event.numFixed && (player.storage.csh_santu_youwei_bonus || 0) > 0;
+                },
+                async content(event, trigger, player) {
+                    trigger.num += player.storage.csh_santu_youwei_bonus || 0;
+                },
+            },
+
+            /* ---------- 子龙：chooseButton 弹出鸟区实体牌 ----------
+             * 原因：position:"x" 不会在手牌栏展示扩展区牌，94张鸟必须弹窗选择。
+             * 仍遵守：无 storage 队列、无 busy、实体牌消耗、event.skill 驱动转换。
+             * backup 返回值由引擎写入 csh_santu_zilong_backup（含 card 字段），
+             * 同时闭包持有 chosen，双重保证实体牌关联。
+             */
+            "csh_santu_zilong": {
+                // 官方 refresh/skill.js 中 ollongdan:
+                //   audioname2: { tongyuan: "longdan_tongyuan" }
+                // 音频文件: apps/core/audio/skill/longdan_tongyuan.mp3
+                // 台词: #longdan_tongyuan「能进能退，方显名将本色。」
+                // 本扩展角色非 tongyuan，直接引用专属音技能 id。
+                audio: "longdan_tongyuan",
+                enable: ["chooseToUse", "chooseToRespond"],
+                filter(event, player) {
+                    if (!player.hasSkill("csh_santu")) return false;
+                    if ((player.storage.csh_santu || 0) % 3 !== 2) return false;
+                    return tongyuanBird.get(player).some((card) => {
+                        return event.filterCard(get.autoViewAs(card, [card], player), player, event);
+                    });
+                },
+                chooseButton: {
+                    dialog(event, player) {
+                        const list = tongyuanBird.get(player).filter((card) => {
+                            return event.filterCard(get.autoViewAs(card, [card], player), player, event);
+                        });
+                        return ui.create.dialog("子龙：选择一张「鸟」使用或打出", list);
+                    },
+                    filter(button, player) {
+                        const evt = _status.event.getParent();
+                        const card = button.link;
+                        return evt.filterCard(get.autoViewAs(card, [card], player), player, evt);
+                    },
+                    check(button) {
+                        const player = _status.event.player;
+                        const evt = _status.event.getParent();
+                        if (evt && (evt.name === "chooseToRespond" || evt.type === "respond" || evt.type === "dying")) {
+                            return 1 / (get.value(button.link) || 0.5);
+                        }
+                        return get.value(button.link, player);
+                    },
+                    backup(links, player) {
+                        const chosen = links[0];
+                        const vcard = get.autoViewAs(chosen, [chosen], player);
+                        return {
+                            audio: "longdan_tongyuan",
+                            // 引擎会把整个返回对象赋给 csh_santu_zilong_backup
+                            card: chosen,
+                            selectCard: -1,
+                            position: "x",
+                            filterCard(card) {
+                                // 闭包 chosen + backup.card 双保险
+                                const target = (lib.skill.csh_santu_zilong_backup && lib.skill.csh_santu_zilong_backup.card) || chosen;
+                                return card === target;
+                            },
+                            viewAs: vcard,
+                            popname: true,
+                            async precontent(event, trigger, player) {
+                                const card =
+                                        (lib.skill.csh_santu_zilong_backup && lib.skill.csh_santu_zilong_backup.card) || chosen;
+                                // 强制 result 指向扩展区实体牌
+                                if (event.result) {
+                                    event.result.cards = [card];
+                                    event.result.card = get.autoViewAs(card, [card], player);
+                                }
+                            },
+                        };
+                    },
+                    prompt(links) {
+                        return "选择" + get.translation(links[0]) + "使用或打出";
+                    },
+                },
+                hiddenCard(player, name) {
+                    if (!player.hasSkill("csh_santu")) return false;
+                    if ((player.storage.csh_santu || 0) % 3 !== 2) return false;
+                    return tongyuanBird.get(player).some((c) => get.name(c, player) === name);
+                },
+                ai: {
+                    order: 8.5,
+                    respondSha: true,
+                    respondShan: true,
+                    save: true,
+                    respondWuxie: true,
+                    skillTagFilter(player, tag) {
+                        if (!player.hasSkill("csh_santu")) return false;
+                        if ((player.storage.csh_santu || 0) % 3 !== 2) return false;
+                        const birds = tongyuanBird.get(player);
+                        if (!birds.length) return false;
+                        const names = birds.map((c) => get.name(c, player));
+                        if (tag === "respondSha") return names.includes("sha");
+                        if (tag === "respondShan") return names.includes("shan");
+                        if (tag === "save") return names.includes("tao") || names.includes("jiu");
+                        if (tag === "respondWuxie") return names.includes("wuxie");
+                    },
+                    result: { player: 1 },
+                },
+            },
+            // 占位：引擎运行时会用 backup() 返回值覆盖
+            "csh_santu_zilong_backup": {},
+
+            /**
+             * 子龙成功使用/打出后转换一次。
+             * chooseButton 路径下 event.skill 为 csh_santu_zilong_backup。
+             * 取消选牌不会触发 useCard/respond，故不会误转。
+             */
+            "csh_santu_zilong_effect": {
+                audio: false,
+                trigger: {
+                    player: ["useCard", "respond"],
+                },
+                forced: true,
+                popup: false,
+                filter(event, player) {
+                    const sk = event.skill;
+                    return sk === "csh_santu_zilong_backup" || sk === "csh_santu_zilong";
+                },
+                async content(event, trigger, player) {
+                    if (trigger.cards) tongyuanBird.clearTags(trigger.cards);
+                    await tongyuanBird.transition(player);
+                },
+            },
+
+            /* ============================================================
+             * 朝凤
+             * ============================================================ */
+            "csh_chaofeng": {
+                audio: "chaofeng",
+                forced: true,
+                locked: true,
+                skillAnimation: true,
+                animationColor: "fire",
+                trigger: { player: "dying" },
+                filter(event, player) {
+                    return player.hp <= 0;
+                },
+                async content(event, trigger, player) {
+                    // 1) 回复至 1
+                    if (player.hp < 1) {
+                        await player.recover(1 - player.hp);
+                    }
+                    if (player.hp < 1) {
+                        game.log(player, "【朝凤】回复未能使体力达到1点，保留【朝凤】");
+                        return;
+                    }
+                    // 2) 失去朝凤（打标避免 loseChaofeng 监听重复 refill）
+                    player._csh_chaofeng_refilling = true;
+                    try {
+                        player.removeSkill("csh_chaofeng");
+                        // 3) 获得三徒，形态重置为公义
+                        player.addSkill("csh_santu");
+                        player.storage.csh_santu = 0;
+                        if (typeof player.syncStorage === "function") player.syncStorage("csh_santu");
+                        player.markSkill("csh_santu");
+                        game.log(player, "发动【朝凤】，回复体力至1，失去【朝凤】并获得【三徒】");
+                        // 4) 直接装填 100 鸟（不依赖监听猜测）
+                        const n = await tongyuanBird.refill(player);
+                        // 5) 若装填失败 → 立刻归零回朝凤，禁止「三徒+0鸟」
+                        if (!n) {
+                            tongyuanBird.checkEmpty(player);
+                        }
+                    } finally {
+                        delete player._csh_chaofeng_refilling;
+                    }
+                },
+                ai: {
+                    save: true,
+                    skillTagFilter(player, tag, arg) {
+                        return player === arg;
+                    },
+                },
+            },
         },
         translate: {
-            
-            
+
+            // ========== 卡尔·秘仪 ==========
+        "csh_karl_miyihuan": "秘仪",
+            "csh_karl_draw": "秘仪",
+            "csh_karl_damage": "秘仪",
+            "csh_karl_record": "秘仪",
+            "csh_karl_clear": "秘仪",
+            "csh_karl_tuji": "图谱",
+            "csh_karl_tuji_info": "记录十种牌型组合与对应秘术的对照关系。",
+            "csh_karl_miyihuan_info": "持恒技。你使用或打出的单张实体手牌结算后，将其牌型记入秘仪环；环至多三枚，新入则旧出。<br>环中的基本、锦囊、装备每枚分别令你的手牌上限、摸牌数、【杀】伤害+1。<br>三枚齐备且牌型组合变为你未持有的秘术时，你凝成该秘术。秘术可同时保有两种，再获得时失去最早凝成的一种。<br>你获得或失去秘术时，摸一张牌。",
+            "csh_karl_chengxiang": "称象",
+            "csh_karl_chengxiang_info": "当你受到伤害后，你可亮出牌堆顶的四张牌，然后获得其中任意数量点数之和不大于13的牌。",
+            "csh_karl_junxing": "峻刑",
+            "csh_karl_junxing_info": "出牌阶段限一次，你可弃置任意张手牌并选择一名其他角色，令其选择一项：弃置等量的牌并失去1点体力；或翻面并摸等量的牌。",
+            "csh_karl_qingzheng": "清正",
+            "csh_karl_qingzheng_info": "出牌阶段限一次，你可展示并弃置手牌中的一种花色，再展示一名其他角色的手牌并弃置其中一种花色。若你弃置的牌数较多，对其造成1点伤害。",
+            "csh_karl_saojian": "扫奸",
+            "csh_karl_saojian_info": "出牌阶段限一次，你可观看一名其他角色的手牌并选择其中一张作为标记（仅你知道），令其重复弃置手牌，直至弃掉该标记牌。",
+            "csh_karl_qinyi": "勤艺",
+            "csh_karl_qinyi_info": "每回合首次造成或受到伤害后，你可视为使用一张基本牌或普通锦囊牌。",
+            "csh_karl_xiongtu": "雄图",
+            "csh_karl_xiongtu_info": "当你的体力值变化后，你可从场上、牌堆、弃牌堆与处理区各获得一张伤害牌。",
+            "csh_karl_sigu": "似故",
+            "csh_karl_sigu_info": `出牌阶段限一次，你可令一名其他角色进行判定，令其获得${get.poptip("zhichi")}${get.poptip("reganglie")}${get.poptip("refankui")}${get.poptip("new_reyiji")}${get.poptip("oljieming")}${get.poptip("fangzhu")}${get.poptip("shibei")}${get.poptip("rechengxiang")}${get.poptip("zhiyu")}${get.poptip("jilei")}${get.poptip("benyu")}${get.poptip("chouce")}${get.poptip("new_wuhun")}中的第X个技能（X为判定点数）。若如此做，你对其造成两次1点伤害，然后其失去以此法获得的技能。`,
+            "csh_karl_yongjian": "用间",
+            "csh_karl_yongjian_info": "出牌阶段限一次，若你已受伤，你可回复1点体力，然后将一张【毒】与一张【刮骨疗毒】洗入牌堆。",
+            "csh_karl_hannan": "扞难",
+            "csh_karl_hannan_info": "出牌阶段限一次，你可与一名角色拼点，赢的角色对没赢的角色造成1点伤害。",
+            "csh_karl_juetao": "决讨",
+            "csh_karl_juetao_info": "出牌阶段限一次，你可选择一名其他角色，依次亮出牌堆底的牌。若当前牌可对该角色使用，则使用之并继续，直至不能使用或其死亡。",
+
+
+
             "csh_yuangubafei": "远古八废",
             "csh_xingganning": "星星甘宁",
             "csh_liximing": "李曦明",
@@ -30072,12 +31830,6 @@ const cshSkillPack = {
             "csh_rechunlao_info": "出牌阶段结束时，你可以将【杀】置于你的武将牌上，称为“醇”。<br>当一名角色处于濒死状态时，你可以移去一张“醇”，视为该角色对自己使用一张【酒】。",
             "csh_jishe": "极奢",
             "csh_jishe_info": "①若你的手牌上限大于0，你可以摸一张牌，然后你本回合的手牌上限-1。<br>②结束阶段开始时，若你没有手牌，你可以横置至多X名角色的武将牌（X为你的<span style='color:#eb7a33'>体力</span>值）。<br>③已横置角色的手牌上限-2。",
-            "csh_cixiongshuanggujian": "合剑",
-            "csh_cixiongshuanggujian_info": "准备阶段开始时，若其他角色的装备区内有【雌雄双股剑】，你可以获得之。",
-            "csh_bushouyingxiang": "逆邪",
-            "csh_bushouyingxiang_info": "",
-            "csh_huoxin": "惑心",
-            "csh_huoxin_info": "出牌阶段限两次，你可以展示两张花色相同的手牌并分别交给两名其他角色，然后令这两名角色拼点，没赢的角色获得1枚“魅惑”标记。<br>拥有2枚或更多“魅惑”的角色的回合开始时，该角色移去其所有“魅惑”，跳过此回合。",
             "csh_yiyuan": "一亓",
             "csh_yiyuan_info": "当你受到<span style='color:#e74c3c'>伤害</span>时，你可以亮出牌堆顶的一张牌。若其是本回合未被使用过的牌的类型，你防止此伤害并摸一张牌。",
             "csh_daoyan1": "换弹",
@@ -30474,6 +32226,9 @@ const cshSkillPack = {
             "csh_suijiyingbian_skill": "随机应变",
             "csh_huntianyi_skill": "浑天仪",
             "csh_huntianyi_skill_lose": "浑天仪",
+            /* 【2026-10-05】牌面 gaintag 翻译补缺：缺了会把 id 原样印在牌上（如 csh_xiantu_tag） */
+            "csh_xiantu_tag": "仙途",
+            "csh_gangbei_tag": "钢背",
             "csh_pyzhuren_shandian_skill": "天雷刃",
             "csh_pyzhuren_shandian_skill_info": "当你使用【杀】指定目标后，可令其进行判定，若结果为：黑桃，其受到1点雷属性<span style='color:#e74c3c'>伤害</span>；梅花，其弃置两张牌；方片，你摸三张牌；红桃，你<span style='color:#34d17b'>回复</span>1点<span style='color:#eb7a33'>体力</span>。",
             "csh_tiejiliguduo_skill": "铁蒺藜骨朵",
@@ -30690,7 +32445,35 @@ const cshSkillPack = {
             "csh_jsrgfeiyang_info": "判定阶段开始时，若你的判定区里有牌，你可以<span style='color:#bd7ce0'>弃置</span>两张手牌并<span style='color:#bd7ce0'>弃置</span>你判定区里的一张牌。",
             "csh_jsrgbahu": "跋扈",
             "csh_jsrgbahu_info": "锁定技。①准备阶段，你摸一张牌。②你使用【杀】的次数上限+1。",
+            "csh_qiangshen": "枪神",
+            "csh_qiangshen_info":
+                "锁定技。<br>" +
+                "①你的攻击范围和出【杀】次数+1；<br>" +
+                "②游戏开始时和失去<noname-poptip poptip = csh_chaofeng>朝凤</noname-poptip>时，从牌堆和弃牌堆里随机选择100张牌置于你的武将牌上，记作「鸟」。<br>" +
+                "③当你没有「鸟」时，你失去<noname-poptip poptip = csh_santu>三徒</noname-poptip>，获得<noname-poptip poptip = csh_chaofeng>朝凤</noname-poptip>。",
+            "csh_qiangshen_gameStart": "枪神",
+            "csh_qiangshen_loseChaofeng": "枪神",
+
+            "csh_santu": "三徒",
+            "csh_santu_info":
+                "转换技。此技能转换形态时，将一张随机「鸟」置入你的手牌。<br>" +
+                "<span style='text-decoration:underline;color:#c9a84c'>公义</span>：其他角色的结束阶段，你可以用一张「鸟」与其拼点。若你赢，其受到1点伤害；若你没赢，其获得此「鸟」，你获得1点护甲。<br>" +
+                "<span style='text-decoration:underline;color:#c9a84c'>佑维</span>：出牌阶段，你可以将一至三张「鸟」置入弃牌堆，摸等数量张牌；若你弃置了三张「鸟」且类别各不同，则你的额定摸牌数和手牌上限永久+1。<br>" +
+                "<span style='text-decoration:underline;color:#c9a84c'>子龙</span>：当你需要使用或打出一张牌时，可以从「鸟」中选择之。",
+            "csh_santu_gongyi": "公义",
+            "csh_santu_youwei": "佑维",
+            "csh_santu_youwei_perm": "佑维",
+            "csh_santu_zilong": "子龙",
+            "csh_santu_zilong_backup": "子龙",
+            "csh_santu_zilong_effect": "子龙",
+
+            "csh_chaofeng": "朝凤",
+            "csh_chaofeng_info":
+                "当你进入濒死时，你将体力值回复至1点，失去此技能，获得<noname-poptip poptip = csh_santu>三徒</noname-poptip>。",
         }
 };
+
+/* 暴露给调试 / 外部扩展（独立扩展在 content() 里挂的 lib.tongyuanBird，这里在模块作用域挂上） */
+try { if (typeof lib !== "undefined") lib.tongyuanBird = tongyuanBird; } catch (e) {}
 
 export default cshSkillPack;

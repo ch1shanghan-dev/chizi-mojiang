@@ -1,6 +1,12 @@
 import { lib, game, ui, get, ai, _status } from "../../../noname.js";
+import { injectCshTitlesStyle } from "../core/csh_titles_style.js";
 
 export function cshPrecontent() {
+    // 称号版式系统 CSS（2026-10-08）：characterTitle 已改为 class 化短标签，样式全部由本表提供。
+    try { injectCshTitlesStyle(); } catch (eTitlesCss) {}
+    // 【2026-10-05】「开发者日志」设置项已按需求移除；历史上开启过的存档一并复位，
+    // 相关 console 守卫（main/content.js 等）读不到该键后自然静默。
+    try { if (lib.config.extension_池子魔将_csh_dev_log) game.saveConfig("extension_池子魔将_csh_dev_log", false); } catch (eDevLogReset) {}
     // 联机兼容：扩展声明 connect:true + package.character.connect:true
     // 由引擎在 connect 模式下正常加载 content 与武将包，并注册进 lib.connectCharacterPack
     // —— 前缀「池」：precontent 尽早注册，避免选将界面读不到 namePrefix / _prefix ——
@@ -19,6 +25,11 @@ export function cshPrecontent() {
                 } catch (e1) {}
             };
             setPrefix("池", { color: "#6ec9b8", nature: "watermm", showName: "池" });
+            /* 童：童渊（2026-10-08 并入自独立扩展 extension/童渊）。必须显式注册——
+               下面的 ensure 循环只补缺失的 csh_*_prefix 且一律填「池」，
+               不先注册的话 csh_tongyuan_prefix 会被改成「池」。 */
+            setPrefix("童", { showName: "童", color: "#c9a84c", nature: "soil" });
+            if (!lib.translate.csh_tongyuan_prefix) lib.translate.csh_tongyuan_prefix = "童";
             // 从已合并的 translate / character 表补全 csh_*_prefix
             var ensure = function (id) {
                 if (!id || id.indexOf("csh_") !== 0) return;
@@ -43,7 +54,7 @@ export function cshPrecontent() {
                     if (lib.character && lib.character[k]) ensure(k);
                 }
             }
-            // CSS 前缀样式
+            // CSS 前缀样式（单点真源：池/星/昭/界/童；content.js 的同名副本 2026-10-08 已收敛到这里）
             if (typeof document !== "undefined" && !document.getElementById("csh-prefix-style")) {
                 var st = document.createElement("style");
                 st.id = "csh-prefix-style";
@@ -52,8 +63,42 @@ export function cshPrecontent() {
                     '{ font-family: "STKaiti","KaiTi","楷体",serif !important; font-weight: bold !important; letter-spacing: 1px !important; }',
                     '.prefix[data-prefix="池"], .name span[data-prefix="池"], span.prefix-池',
                     '{ color: #6ec9b8 !important; text-shadow: 0 0 6px rgba(80,200,180,.55), 0 1px 2px #000 !important; }',
+                    '.prefix[data-prefix="星"], span.prefix-星',
+                    '{ color: #7ec8e3 !important; text-shadow: 0 0 6px rgba(100,180,255,.5), 0 1px 2px #000 !important; }',
+                    '.prefix[data-prefix="昭"], span.prefix-昭',
+                    '{ color: #e8d5a3 !important; text-shadow: 0 0 6px rgba(220,190,100,.45), 0 1px 2px #000 !important; }',
+                    '.prefix[data-prefix="界"], span.prefix-界',
+                    '{ color: #c9a0e8 !important; text-shadow: 0 0 6px rgba(180,120,220,.5), 0 1px 2px #000 !important; }',
+                    /* 童：鎏金楷体印字（并入自独立扩展童渊，样式原样保留） */
+                    '.prefix[data-prefix="童"], .name span[data-prefix="童"], span.prefix-童, .player .name .prefix[data-prefix="童"]',
+                    '{ font-family: "STKaiti","KaiTi","楷体","SimKai",serif !important; font-weight: 900 !important; letter-spacing: 2px !important;',
+                    'background: linear-gradient(165deg, #e8d48b 0%, #c9a84c 40%, #8b6914 100%); -webkit-background-clip: text; background-clip: text;',
+                    '-webkit-text-fill-color: transparent; color: transparent !important;',
+                    'filter: drop-shadow(0 0 5px rgba(201,168,76,0.55)) drop-shadow(0 1px 1px rgba(0,0,0,0.9)); }',
                 ].join("\n");
                 (document.head || document.documentElement).appendChild(st);
+            }
+            /* 童渊专用表现（并入自独立扩展）：称号「蓬莱散人」呼吸 keyframes + 枪神装填光晕。
+               原扩展里那两条 .markitem 选择器已删——该类名在本体/十周年UI 全仓不存在（死选择器）。 */
+            if (typeof document !== "undefined" && !document.getElementById("csh-tongyuan-style")) {
+                var stTy = document.createElement("style");
+                stTy.id = "csh-tongyuan-style";
+                stTy.textContent = [
+                    "@keyframes cshPenglaiBreath {",
+                    "0%,100% { box-shadow: 0 0 8px rgba(201,168,76,0.35), inset 0 0 12px rgba(255,240,200,0.08); }",
+                    "50% { box-shadow: 0 0 16px rgba(201,168,76,0.6), inset 0 0 18px rgba(255,240,200,0.15); }",
+                    "}",
+                    "@keyframes cshTyCardGlow {",
+                    "0% { box-shadow: 0 0 0 rgba(201,168,76,0); }",
+                    "30% { box-shadow: 0 0 20px rgba(201,168,76,0.7), 0 0 40px rgba(180,140,40,0.3); }",
+                    "100% { box-shadow: 0 0 0 rgba(201,168,76,0); }",
+                    "}",
+                    ".player.csh-tongyuan-glow .avatar,",
+                    ".player.csh-tongyuan-glow .avatar2 {",
+                    "animation: cshTyCardGlow 0.85s ease-out forwards;",
+                    "}",
+                ].join("\n");
+                (document.head || document.documentElement).appendChild(stTy);
             }
             // 扩展设置里两个面板入口：做成「可按的金色按钮」，而不是一行普通文字。
             // 引擎对 clear:true 的条目渲染为 .config.pointerspan > span，这里把内层做成居中的胶囊按钮；
@@ -93,11 +138,22 @@ export function cshPrecontent() {
                     'transform:translateY(-1px)!important;}',
                     '.config.pointerspan:active .csh-cfg-btn{transform:translateY(1px)!important;',
                     'box-shadow:inset 0 0 0 1px rgba(255,226,160,.16),0 1px 3px rgba(0,0,0,.6)!important;}',
-                    '.csh-cfg-sep{display:block!important;height:20px!important;line-height:20px!important;text-align:center!important;',
-                    'color:#6f6757!important;font-size:11px!important;letter-spacing:3px!important;}',
+                    '.csh-cfg-sep{display:block!important;height:22px!important;line-height:22px!important;text-align:center!important;',
+                    'color:#e9b949!important;font-size:12.5px!important;font-weight:700!important;letter-spacing:3px!important;',
+                    'text-shadow:0 0 10px rgba(233,185,73,.4)!important;}',
                     // 引擎的 nopointer 只去掉鼠标手型，仍会给 clear 项挂 clickToggle（menu/index.js:207、:292）。
                     // 分隔条本身不该有点击态，这里直接断掉指针事件；不支持 :has() 的宿主会忽略该条，行为退回原样。
                     '.config:has(>span>.csh-cfg-sep){pointer-events:none!important;}',
+                    /* 「删除此扩展」（引擎自绘，分隔条之后的最后一行）= 危险操作按钮化：
+                       红框红字居中胶囊，悬停加深。分隔条之后仅此一行带纯文本 span
+                       （「其他扩展」有自己的 .csh-cfg-btn 样式，不受影响）。 */
+                    '.config:has(>span>.csh-cfg-sep)~.config:last-child>span{display:block!important;box-sizing:border-box!important;',
+                    'width:min(74%,260px)!important;margin:6px auto 12px!important;padding:8px 0!important;text-align:center!important;',
+                    'border-radius:9px!important;border:1px solid rgba(216,106,120,.45)!important;background:rgba(216,106,120,.10)!important;',
+                    'color:#f2a9b4!important;font-size:12.5px!important;font-weight:600!important;letter-spacing:2px!important;',
+                    'transition:background .16s ease,color .16s ease,border-color .16s ease!important;}',
+                    '.config:has(>span>.csh-cfg-sep)~.config:last-child:hover>span{background:rgba(216,106,120,.24)!important;',
+                    'color:#ffd9df!important;border-color:rgba(230,120,140,.85)!important;}',
                 ].join("\n");
                 (document.head || document.documentElement).appendChild(st2);
             }
@@ -106,7 +162,9 @@ export function cshPrecontent() {
         }
     })();
     // —— 十周年UI接入兼容：装了十周年UI就注册「池」前缀角标，没装则静默跳过（单机联机均生效）——
-    // 角标样式 chi 的图片在 image/mark_chi.png（22x34，可自行替换美术）；
+    // 角标样式 chi 的图片在 image/mark_chi.png（31x48，官方十周年UI 同规格，CSS 再缩到 22x34）；
+    // 要换成别的字或重新生成：python tools/gen-mark.py 池 mark_chi.png
+    // （该脚本从十周年UI 官方角标重建无字底版，用楷体按官方实测标尺合成字形）；
     // 卡牌皮肤待 image/card-skins/<风格>/ 资源就绪后，在 cardSkins 里按官方API补充即可。
     (function () {
         try {
@@ -117,11 +175,152 @@ export function cshPrecontent() {
                     markStyles: { chi: "mark_chi.png" },
                     // cardSkins: [{ skinKey: "decade", cardNames: ["csh_qiangbao"] }],
                     cardSkins: [],
+                    // —— 动态皮肤 ——
+                    // 唯一常驻版本（基础版）不带动皮资源，一律传 null：
+                    // 这里的 decadeUI 兼容层本身保留（前缀角标还要用），只是不注册 dynamicSkin。
+                    // （历史：曾经三档分发，动皮档才把 main/dynamic-skins.js 的表传进来；
+                    //   现在只保留那张表供 tools/check-dynamic-integrity.mjs 做资源审计。）
+                    dynamicSkins: null,
                     debug: false,
                 });
             }
         } catch (eDui) {
             try { console.log("[池子魔将] 十周年UI接入异常", eDui); } catch (e2) {}
+        }
+    })();
+    // —— 【2026-10-05】联机手气卡：联机开局允许玩家更换初始手牌（设置里可选 1/2/3/5/7/10 次或关闭）——
+    // 方案移植自懒人包（云中守望扩展）：不覆盖 gameDraw，而是注册全局规则技 _csh_swReplaceHandCards，
+    // 在 gameDrawAfter 之后逐人并发询问“是否更换初始手牌”；换牌为整手替换并同步 _start_cards，
+    // 联机时远端玩家经 player.send/wait 同步，AI 一律不换。
+    // 优先级（按需求：本功能为最高）：
+    //   · 十周年UI 的手气卡只在单机生效（其 gameDraw 覆写在 connectMode 下自行禁用），与联机互不重叠；
+    //   · 懒人包/云中守望的 _swReplaceHandCards 与本功能同台时会双重询问，这里在其注册后
+    //     改写其 filter 使其停用（precontent 立即改写一次 + arenaReady 兜底一次，覆盖任意加载顺序）；
+    //     本功能在设置里选「关闭」时不抢优先级，对方的照常生效。
+    //   · 事件与内容用 cshSwReplaceHandcards 独立命名，不与懒人包的 game.swReplaceHandcards 撞名。
+    (function () {
+        try {
+            const disableRivalSwReplace = function () {
+                try {
+                    if (lib.config.extension_池子魔将_csh_lucky_card === "off") return;
+                    const rival = lib.skill._swReplaceHandCards;
+                    if (rival && !rival._csh_disabledByMojiang) {
+                        rival._csh_disabledByMojiang = true;
+                        rival.filter = function () { return false; };
+                    }
+                } catch (eRival) {}
+            };
+            disableRivalSwReplace();
+            // arenaReady 在首个对局创建时执行，此时所有扩展模块都已加载完毕，可兜底覆盖任意加载顺序
+            if (lib.arenaReady && typeof lib.arenaReady.push === "function") lib.arenaReady.push(disableRivalSwReplace);
+            if (lib.skill._csh_swReplaceHandCards) return;
+            game.cshSwReplaceHandcards = function (...args) {
+                const next = game.createEvent("cshSwReplaceHandcards");
+                for (let i = 0; i < args.length; i++) {
+                    if (Array.isArray(args[i])) next.players = args[i];
+                    else if (typeof args[i] === "number") next.num = args[i];
+                }
+                if (!next.num) next.num = 1;
+                next.setContent("cshSwReplaceHandcards");
+                return next;
+            };
+            lib.element.content.cshSwReplaceHandcards = async function (event, trigger, player) {
+                const players = event.players;
+                const prompt = "是否更换初始手牌？";
+                const singlePromise = function (player) {
+                    const choose = function (player) {
+                        return player.chooseBool().set("ai", () => false).set("prompt", prompt).set("prompt2", `剩余${player.swReplaceHandcards || 0}次更换机会`);
+                    };
+                    const send = function (player, prompt2) {
+                        player.chooseBool().set("ai", () => false).set("prompt", prompt).set("prompt2", prompt2);
+                        game.resume();
+                    };
+                    const sendback = function (result, player) {
+                        if (result && result.bool) {
+                            /* otherPile：专属牌堆角色（如陈寿）的定制摸牌/弃牌入口，普通对局为空。
+                               gaintag：开局带标记摸牌的同步口，函数或 [[cards, tag], ...]。 */
+                            const hs = player.getCards("h"), cards = [];
+                            const otherGetCards = event.otherPile?.[player.playerid]?.getCards;
+                            const otherDiscard = event.otherPile?.[player.playerid]?.discard;
+                            game.broadcastAll(function (player, hs, otherDiscard) {
+                                game.addVideo("lose", player, [get.cardsInfo(hs), [], [], []]);
+                                for (let i = 0; i < hs.length; i++) {
+                                    hs[i].removeGaintag(true);
+                                    if (otherDiscard) otherDiscard(hs[i]);
+                                    else hs[i].discard(false);
+                                }
+                            }, player, hs, otherDiscard);
+                            if (otherGetCards) cards.addArray(otherGetCards(hs.length));
+                            else cards.addArray(get.cards(hs.length));
+                            if (event.gaintag?.[player.playerid]) {
+                                const gaintag = event.gaintag[player.playerid];
+                                const list = typeof gaintag == "function" ? gaintag(hs.length, cards) : [[cards, gaintag]];
+                                game.broadcastAll(function (player, list) {
+                                    for (let i = list.length - 1; i >= 0; i--) player.directgain(list[i][0], null, list[i][1]);
+                                }, player, list);
+                            } else {
+                                player.directgain(cards);
+                            }
+                            player._start_cards = cards;
+                        }
+                    };
+                    const { promise, resolve } = Promise.withResolvers();
+                    if (player.isOnline()) {
+                        player.send(send, player, `剩余${player.swReplaceHandcards || 0}次更换机会`);
+                        player.wait(function (result, player) { sendback(result, player); resolve(result?.bool); });
+                    } else if (player.isMine()) {
+                        const next = choose(player);
+                        const solver = function (result, player) { sendback(result, player); resolve(result?.bool); };
+                        if (_status.connectMode) game.me.wait(solver);
+                        next.forResult().then(function (result) {
+                            if (_status.connectMode) game.me.unwait(result, player);
+                            else solver(result, player);
+                        });
+                    } else {
+                        const next = choose(player);
+                        next.forResult().then(function (result) { sendback(result, player); resolve(result?.bool); });
+                    }
+                    return promise;
+                };
+                const num = event.num;
+                players.forEach(function (p) { p.swReplaceHandcards = num; });
+                let active = players.map(function (p) { return { player: p, promise: singlePromise(p) }; });
+                while (active.length > 0) {
+                    const { result, current, index } = await Promise.race(
+                        active.map(function (t, i) { return t.promise.then(function (bool) { return { result: bool, current: t.player, index: i }; }); })
+                    );
+                    active.splice(index, 1);
+                    if (result && current.swReplaceHandcards > 1) {
+                        current.swReplaceHandcards--;
+                        active.push({ player: current, promise: singlePromise(current) });
+                    }
+                }
+                players.forEach(function (p) { delete p.swReplaceHandcards; });
+            };
+            lib.skill._csh_swReplaceHandCards = {
+                ruleSkill: true,
+                direct: true,
+                lastDo: true,
+                priority: -99999,
+                superCharlotte: true,
+                trigger: { player: "gameDrawAfter" },
+                filter(event, player, name) {
+                    return _status.connectMode
+                        && lib.config.extension_池子魔将_csh_lucky_card !== "off";
+                },
+                async content(event, trigger, player) {
+                    // 全局规则技会按人数派发多个触发条目，同一局 gameDraw 只允许跑一轮询问
+                    if (trigger._csh_swHandled) return;
+                    trigger._csh_swHandled = true;
+                    if (get.event()?.getParent("game")?.next?.lastItem?.name === "replaceHandcards") {
+                        get.event().getParent("game").next.lastItem.finish();
+                    }
+                    const num = Math.max(1, parseInt(lib.config.extension_池子魔将_csh_lucky_card) || 3);
+                    await game.cshSwReplaceHandcards(game.filterPlayer(), num);
+                },
+            };
+        } catch (eLucky) {
+            try { console.log("[池子魔将] 联机手气卡初始化异常", eLucky); } catch (e2) {}
         }
     })();
     // —— 拆包加载：胜负统计 / 池子调试 ——

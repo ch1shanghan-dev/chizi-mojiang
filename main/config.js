@@ -36,8 +36,13 @@ export const cshConfig = {
             "csh_interact_panel":{"name":"<span class=\"csh-cfg-btn\">局内互动</span>","intro":"打开互动设置卡片：总开关 / 互动频率 / 附带台词。联机一律禁用。","clear":true,"onclick":function(){ if(!lib.cshInteract||typeof lib.cshInteract.openPanel!=="function"){ alert("AI 互动未初始化：请确认 csh_interact.js 已随扩展加载，然后重启游戏"); return false; } lib.cshInteract.openPanel(); return false; }},
             /* ===== 功能开关 ===== */
             "csh_effect_announce":{"name":"伤害/击杀/回复播报","intro":"默认关闭。开启后播放伤害/连杀/回复播报（手游位图特效 + 手游原声）。逆流/却敌/归来仍为毛笔字特效。与其他扩展effect冲突时请关闭。","init":false},
-            "csh_debug_menu":{"name":"启用池子调试（悬浮球）","intro":"默认开启。联机一律禁用。单机对局显示悬浮球，短按打开调试面板，F1 同效。","init":true},
-            "csh_dev_log":{"name":"开发者日志（console）","intro":"开启后控制台输出启动/就绪等诊断日志，普通玩家无需开启。","init":false},
+            /* 【2026-10-05】默认关闭化：调试悬浮球默认不再开启（老玩家已保存的选择不受影响）。 */
+            "csh_debug_menu":{"name":"启用池子调试（悬浮球）","intro":"默认关闭。联机一律禁用。单机对局显示悬浮球，短按打开调试面板，F1 同效。","init":false},
+            /* 【2026-10-05】「开发者日志」设置项按需求移除；precontent 会把历史开启的存档一并复位。 */
+            /* 【2026-10-05】联机手气卡：仅联机（connectMode）生效；实现见 main/precontent.js 的
+               _csh_swReplaceHandCards 全局规则技。本功能为最高优先级：与懒人包/云中守望同类开局
+               换牌同时安装时对方自动停用；十周年UI的手气卡仅单机生效，与联机互不重叠。 */
+            "csh_lucky_card":{"name":"联机手气卡","intro":"联机开局每人最多可免费更换初始手牌若干次（AI不更换，换的是整手牌）。与懒人包/云中守望等同类开局换牌功能同时安装时，以本设置为准（对方自动停用）；十周年UI的手气卡仅单机生效，互不影响。","init":"3","item":{"off":"关闭","1":"1次","2":"2次","3":"3次","5":"5次","7":"7次","10":"10次"}},
             /* ===== 武将相关 ===== */
             "csh_enable_pingxing":{"name":"启用平行时空武将","intro":"默认关闭。开启后注册平行时空·上/下/阴间镜像武将。","init":false},
             "disEnableCharacter":{"name":"禁选其他扩展武将","intro":"开启后，禁止AI选择其他扩展的武将。","init":false},
@@ -45,7 +50,15 @@ export const cshConfig = {
                改为彩蛋：调试面板内 2.5 秒内连点「池子休闲」页签 10 次唤起兑换面板。
                （曾改挂设置按钮，但 lib.cshDebug.openRedeem 的懒回填方案落地前按钮先
                  引用了跨 IIFE 不可见函数，导致整扩展加载失败，故回归彩蛋方案。） */
-            /* 分隔条：把下方引擎自带的「编辑此扩展 / 删除此扩展」与上方功能项隔开，避免误触。
+            /* 分隔条：把下方扩展安装 / 引擎自带的「编辑此扩展 / 删除此扩展」与上方功能项隔开，避免误触。
              * clear:true + nopointer：纯占位不响应点击；内容长度 >= 15 使引擎把该行高度置为 auto。 */
-            "csh_danger_sep":{"name":"<span class=\"csh-cfg-sep\">—— 危险操作 ——</span>","clear":true,"nopointer":true,"intro":"以下为扩展编辑与删除操作","onclick":function(){ return false; }}
+            "csh_danger_sep":{"name":"<span class=\"csh-cfg-sep\">—— ⚠ 谨慎操作 ——</span>","clear":true,"nopointer":true,"intro":"以下为扩展安装、编辑与删除操作","onclick":function(){ return false; }},
+            "csh_extstore":{"name":"<span class=\"csh-cfg-btn\">其他扩展</span>","intro":"从 GitHub 在线安装精选扩展（武将包 / 功能扩展，清单由池子魔将维护，随版本更新上架新货）。","clear":true,"onclick":function(){
+                if(lib.cshDebug && typeof lib.cshDebug.openExtStore==="function"){ lib.cshDebug.openExtStore(); return false; }
+                if(typeof lib.__cshLoadDebug==="function"){
+                    lib.__cshLoadDebug().then(function(){ try{ lib.cshDebug.openExtStore(); }catch(e){ alert("其他扩展打开失败："+((e&&e.message)||e)); } }).catch(function(e){ alert("其他扩展未初始化："+((e&&e.message)||e)); });
+                    return false;
+                }
+                alert("其他扩展未初始化：请确认 csh_debug.js 已随扩展加载，然后重启游戏"); return false;
+            }}
         };

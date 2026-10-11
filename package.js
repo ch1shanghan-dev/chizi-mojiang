@@ -4,6 +4,6 @@ extension["池子魔将"]={
 	netdisk:"",
 	forum:"",
 	version:"4.0.5",
-	files:["LICENSE","audio","effect","font","image","extension.js","decadeUI-compat.js","info.json","package.js","core","main","character","card","skills","games","README.md","mobilefx"],
-	size:"72.1MB"
+	files:["LICENSE","audio","effect","font","image","extension.js","decadeUI-compat.js","info.json","package.js","core","main","character","card","skills","games","README.md","mobilefx","store.json"],
+	size:"160MB"
 };

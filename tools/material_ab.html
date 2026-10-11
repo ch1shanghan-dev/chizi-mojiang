@@ -1,0 +1,154 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8">
+<title>池子魔将 · 材质光影对照（A2 选样页 · 工具，不入包）</title>
+<style>
+/* ============================================================================
+   A2 材质光影三件套 · 选样页
+   ----------------------------------------------------------------------------
+   三个工件各给 2~4 个候选，用**同一块底、同一套间距**排在一起 —— 只比材质本身，
+   不比配色（配色是各页既有的）。选中的方案再进生涯大厅/调试面板落地。
+   零外部资源：所有纹理都是 CSS 渐变或内联 SVG data URI（不引任何文件）。
+   ============================================================================ */
+:root{
+  --ink-0:#08090b;--ink-1:#101216;--ink-2:#171a1f;
+  --gold:#c9a86a;--gold-hi:#e6cf9a;--gold-dark:#8f7136;
+  --gold-line:rgba(201,168,106,.26);
+  --text:#e8e6e1;--text-dim:#8d939c;
+  --line:rgba(255,255,255,.08);
+  --ff-title:"Noto Serif SC","Source Han Serif SC","Songti SC","STSong","SimSun",serif;
+  --ff-num:ui-monospace,"Cascadia Mono",Consolas,monospace;
+  --r:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--ink-0);color:var(--text);padding:16px 18px;
+  font-family:"Noto Sans SC","PingFang SC","Microsoft YaHei",system-ui,sans-serif}
+h2{font-family:var(--ff-title);font-size:17px;color:var(--gold-hi);letter-spacing:.12em;font-weight:400;
+  margin:20px 0 10px;padding-left:9px;border-left:2px solid var(--gold)}
+h2:first-child{margin-top:0}
+.hint{font-size:11px;color:var(--text-dim);margin:-4px 0 10px 11px;letter-spacing:.03em}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(228px,1fr));gap:12px}
+.cell{padding:12px}
+.cap{font-size:11px;font-family:var(--ff-num);color:var(--gold);letter-spacing:.06em;margin-top:9px}
+.capn{font-size:10px;color:var(--text-dim);margin-top:3px;line-height:1.5}
+.demo{height:86px;border-radius:10px;border:1px solid var(--line);background:var(--ink-1);
+  display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}
+.demo .num{font-family:var(--ff-num);font-weight:900;font-size:23px;color:var(--gold-hi);font-variant-numeric:tabular-nums}
+.demo .lbl{position:absolute;left:10px;top:8px;font-size:10px;color:var(--text-dim);letter-spacing:.08em}
+
+/* ---------- 一 · 金线纹理（四条候选） ---------- */
+/* 1. 素面：现状（只有 1px 实线描边） */
+.t0{border:1px solid var(--gold-line)}
+/* 2. 发丝金线：白→金→白的 1px 渐变描边（假装有金属反光） */
+.t1{border:1px solid transparent;
+  background:linear-gradient(var(--ink-1),var(--ink-1)) padding-box,
+             linear-gradient(180deg,rgba(255,255,255,.22),rgba(201,168,106,.55) 38%,rgba(255,255,255,.16)) border-box}
+/* 3. 斜切金杠 + 细密发丝（把侧栏那条斜杠做成通用件） */
+.t2{border:1px solid var(--gold-line);position:relative}
+.t2::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;
+  background:linear-gradient(180deg,rgba(255,255,255,.30),var(--gold) 40%,rgba(0,0,0,.35))}
+/* 4. 噪点金箔：内联 SVG feTurbulence 纹理叠在金线上（有"纸/金箔"颗粒） */
+.t3{border:1px solid var(--gold-line);background-image:url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)' opacity='.14'/%3E%3C/svg%3E")}
+
+/* ---------- 二 · 卡片微光（四个候选） ---------- */
+/* 1. 现状：无 */
+.g0{}
+/* 2. 顶缘微光：inset 高光贴顶 + 底部压暗（最标准的"浮起"暗示） */
+.g1{box-shadow:inset 0 1px 0 rgba(255,255,255,.07),inset 0 -14px 22px -18px rgba(0,0,0,.9)}
+/* 3. 金晕：顶缘微光 + 极淡金雾（卡片像被金光照到） */
+.g2{box-shadow:inset 0 1px 0 rgba(201,168,106,.20),inset 0 -18px 26px -20px rgba(0,0,0,.9),
+  0 0 0 1px rgba(201,168,106,.05)}
+/* 4. 金晕 + 外投影（卡片真正"离地"） */
+.g3{box-shadow:inset 0 1px 0 rgba(201,168,106,.22),inset 0 -18px 26px -20px rgba(0,0,0,.9),
+  0 6px 18px -10px rgba(0,0,0,.95),0 0 22px -14px rgba(201,168,106,.35)}
+
+/* ---------- 三 · 三档金 ---------- */
+.goldrow{display:flex;gap:10px;flex-wrap:wrap}
+.gt{flex:1 1 140px;min-width:132px}
+.gt .bar{height:44px;border-radius:9px;display:flex;align-items:center;justify-content:center;
+  font-family:var(--ff-num);font-size:11px;font-weight:700;color:#1a130a;letter-spacing:.04em}
+.gt .dot{height:44px;border-radius:9px;display:flex;align-items:center;justify-content:center;
+  color:var(--gold-hi);font-size:16px;font-weight:900}
+/* 当前页面的三档：暗金 / 主金 / 亮金 */
+.gold-a .b1{background:#8f7136}.gold-a .b2{background:var(--gold)}.gold-a .b3{background:var(--gold-hi)}
+/* 加光影：从亮到暗的垂直渐变 + 内高光（金属感来自"光在同一方向"） */
+.gold-b .b1{background:linear-gradient(180deg,#a9883f,#6f5526);box-shadow:inset 0 1px 0 rgba(255,255,255,.12)}
+.gold-b .b2{background:linear-gradient(180deg,#e2be7c,#a67f3a);box-shadow:inset 0 1px 0 rgba(255,255,255,.22),inset 0 -1px 0 rgba(0,0,0,.35)}
+.gold-b .b3{background:linear-gradient(180deg,#fbeec4,#d8b46a);box-shadow:inset 0 1px 0 rgba(255,255,255,.5),inset 0 -1px 0 rgba(0,0,0,.25)}
+/* 金属拉丝：再加一条斜向拉丝纹理 */
+.gold-c .b1,.gold-c .b2,.gold-c .b3{position:relative;overflow:hidden}
+.gold-c .b1{background:linear-gradient(180deg,#a9883f,#6f5526)}
+.gold-c .b2{background:linear-gradient(180deg,#e2be7c,#a67f3a)}
+.gold-c .b3{background:linear-gradient(180deg,#fbeec4,#d8b46a)}
+.gold-c .bar::after,.gold-c .dot::after{content:"";position:absolute;inset:0;opacity:.28;
+  background:repeating-linear-gradient(115deg,rgba(255,255,255,.5) 0 1px,transparent 1px 4px)}
+/* 当前各页实际用法（对照基线） */
+.cur{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px}
+.cur .c{padding:5px 11px;border-radius:999px;font-size:11px;font-family:var(--ff-num)}
+</style></head><body>
+
+<h2>一 · 金线纹理（边框这一层）</h2>
+<div class="hint">同一块底、同一尺寸，只换边框材质 —— 金线是"池子"最直观的记号</div>
+<div class="grid">
+  <div class="cell"><div class="demo t0"><span class="lbl">金线 0</span><span class="num">2,845,600</span></div>
+    <div class="cap">T0 · 素面（现状）</div><div class="capn">一条 1px 半透明金线。干净，但没有材质。</div></div>
+  <div class="cell"><div class="demo t1"><span class="lbl">金线 1</span><span class="num">2,845,600</span></div>
+    <div class="cap">T1 · 发丝金线 ★推荐</div><div class="capn">白→金→白渐变描边：上缘亮、下缘收，像一根被光照到的金丝。零成本、任何尺寸都成立。</div></div>
+  <div class="cell"><div class="demo t2"><span class="lbl">金线 2</span><span class="num">2,845,600</span></div>
+    <div class="cap">T2 · 斜切金杠 + 素线</div><div class="capn">把侧栏那条斜切金杠抽成通用件（左缘 3px 立体金条）。适合"重点卡"。</div></div>
+  <div class="cell"><div class="demo t3"><span class="lbl">金线 3</span><span class="num">2,845,600</span></div>
+    <div class="cap">T3 · 金箔噪点</div><div class="capn">内联 SVG 噪点叠在底上（有金箔颗粒）。质感最重，慎用于密集列表。</div></div>
+</div>
+
+<h2>二 · 卡片微光（卡片这一层）</h2>
+<div class="hint">顶缘一道高光 + 底部压暗 = 「这张卡浮在底上」，是最便宜的层次手段</div>
+<div class="grid">
+  <div class="cell"><div class="demo g0"><span class="lbl">微光 0</span><span class="num">2,845,600</span></div>
+    <div class="cap">G0 · 无（现状）</div><div class="capn">纯色块 + 描边，扁平。</div></div>
+  <div class="cell"><div class="demo g1"><span class="lbl">微光 1</span><span class="num">2,845,600</span></div>
+    <div class="cap">G1 · 顶缘微光 ★推荐</div><div class="capn">白色 7% 顶部内高光 + 底部内阴影。中性，不抢金色。</div></div>
+  <div class="cell"><div class="demo g2"><span class="lbl">微光 2</span><span class="num">2,845,600</span></div>
+    <div class="cap">G2 · 金晕 ★推荐（重点卡）</div><div class="capn">顶缘金高光 + 底部压暗，整卡像被金光照到。给官阶卡/结算主卡。</div></div>
+  <div class="cell"><div class="demo g3"><span class="lbl">微光 3</span><span class="num">2,845,600</span></div>
+    <div class="cap">G3 · 金晕 + 外投影</div><div class="capn">再加一层外投影，卡片真正"离地"。给浮层/弹窗。</div></div>
+</div>
+
+<h2>三 · 三档金</h2>
+<div class="hint">暗金 / 主金 / 亮金 —— 明度阶梯用于「层级」而不是「配色」（越重要越亮）</div>
+<div class="goldrow gold-a" style="margin-bottom:10px">
+  <div class="gt"><div class="bar b1">暗金 #8f7136</div><div class="cap">A · 纯色（现状）</div></div>
+  <div class="gt"><div class="bar b2">主金 #c9a86a</div><div class="cap">A · 纯色</div></div>
+  <div class="gt"><div class="bar b3">亮金 #e6cf9a</div><div class="cap">A · 纯色</div></div>
+</div>
+<div class="goldrow gold-b" style="margin-bottom:10px">
+  <div class="gt"><div class="bar b1">暗金</div><div class="cap">B · 光影渐变 ★推荐</div><div class="capn">垂直渐变 + 顶缘内高光：光在同一方向下来，金属感就出来了。</div></div>
+  <div class="gt"><div class="bar b2">主金</div><div class="cap">B · 光影渐变 ★推荐</div><div class="capn">用于主按钮 / 选中态 / 金 chip。</div></div>
+  <div class="gt"><div class="bar b3">亮金</div><div class="cap">B · 光影渐变 ★推荐</div><div class="capn">用于大数字 / 标题字。</div></div>
+</div>
+<div class="goldrow gold-c">
+  <div class="gt"><div class="bar b1">暗金</div><div class="cap">C · 渐变 + 拉丝</div><div class="capn">叠加 115° 斜向拉丝纹理。面积大时才看得出（按钮可用，文字禁用）。</div></div>
+  <div class="gt"><div class="bar b2">主金</div><div class="cap">C · 渐变 + 拉丝</div><div class="capn">拉丝在 44px 高度下几乎不可见 —— 属于"有更好、没有也行"。</div></div>
+  <div class="gt"><div class="bar b3">亮金</div><div class="cap">C · 渐变 + 拉丝</div><div class="capn">同上。</div></div>
+</div>
+<div class="cur">
+  <span class="c" style="border:1px solid var(--gold-line);color:var(--gold-hi)">现有用法：胶囊金底（余额）</span>
+  <span class="c" style="border:1px solid var(--gold-line);background:rgba(201,168,106,.07);color:var(--gold-hi)">金染底（选中态）</span>
+  <span class="c" style="border:1px solid var(--gold-line);color:var(--text-dim)">金线（分隔）</span>
+</div>
+
+<h2>四 · 组合预览（推荐组合落到真实卡片上）</h2>
+<div class="hint">T1 发丝金线 + G2 金晕 + B 光影金 —— 这是我要落地的默认组合</div>
+<div class="grid">
+  <div class="cell"><div class="demo t1 g2"><span class="lbl">组合 · 数据卡</span><span class="num">3,120,000</span></div>
+    <div class="cap">卡面：金晕 + 发丝金线</div><div class="capn">用于资历/资产/数据槽这类"读数卡"。</div></div>
+  <div class="cell"><div class="demo t2 g3"><span class="lbl">组合 · 重点卡</span><span class="num">抚军将军</span></div>
+    <div class="cap">重点卡：斜切金杠 + 金晕 + 外投影</div><div class="capn">用于官阶焦点卡 / 结算主卡这类"主角位"。</div></div>
+  <div class="cell" style="display:flex;align-items:center">
+    <div style="width:100%">
+      <div class="bar" style="height:40px;border-radius:9px;background:linear-gradient(180deg,#e2be7c,#a67f3a);
+        box-shadow:inset 0 1px 0 rgba(255,255,255,.22),inset 0 -1px 0 rgba(0,0,0,.35);
+        display:flex;align-items:center;justify-content:center;color:#1a130a;font-weight:700;font-size:13px">开始生涯</div>
+      <div class="cap">主按钮：B 光影金</div><div class="capn">金色实底只留给主操作与危险操作（既有纪律不变）。</div>
+    </div>
+  </div>
+</div>
+
+</body></html>

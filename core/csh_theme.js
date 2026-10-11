@@ -251,6 +251,37 @@ import { lib } from "../../../noname.js";
         return ":root {\n" + lines.join("\n") + "\n}";
     }
 
+    /* —— 作用域皮肤覆写（2026-10-07 · T2）：为单个浮层/页面提供「局部皮肤」——
+       输出 `selector { --csh-*: ...; }` 覆写块，挂独立 style 节点（幂等，可指定 id）。
+       用途：资料卡双风格（Dossier 两套外观**并存于同一全局皮肤下**）——
+       消费方照常 var(--csh-*) 引用，覆写后该作用域内自动换装，全局不动。
+       注意与 setSkin 的区别：setSkin 是全局换肤（:root），本函数只覆写选择器作用域。 */
+    function scopeStyle(name, scopeSelector, styleId) {
+        try {
+            if (typeof document === "undefined" || !has(name) || !scopeSelector) return false;
+            var set = SKINS[name].colors;
+            var lines = [];
+            for (var k in set) {
+                if (!set.hasOwnProperty(k)) continue;
+                var c = set[k];
+                lines.push("  --csh-" + toKebab(k) + ": " + c.hex + ";");
+                lines.push("  --csh-" + toKebab(k) + "-rgb: " + c.rgb + ";");
+            }
+            var id = styleId || ("csh-theme-scope-" + name);
+            var el = document.getElementById(id);
+            if (!el) {
+                el = document.createElement("style");
+                el.id = id;
+                el.setAttribute("data-csh", "theme-scope");
+                (document.head || document.documentElement).appendChild(el);
+            }
+            el.textContent = scopeSelector + " {\n" + lines.join("\n") + "\n}";
+            return true;
+        } catch (e) {
+            return false;
+        }
+    }
+
     /* 记忆选择（宿主 localStorage；读不到就用默认皮肤） */
     function load() {
         try {
@@ -301,6 +332,7 @@ import { lib } from "../../../noname.js";
         DEFAULT_SKIN: DEFAULT_SKIN,
         cssText: cssText,
         inject: inject,
+        scopeStyle: scopeStyle,
         setSkin: setSkin,
         currentSkin: currentSkin,
         skinList: skinList,
