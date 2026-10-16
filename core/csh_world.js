@@ -1,15 +1,19 @@
 import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 import cshCharacter from "../character/index.js";
+import { MINIONS } from "./csh_bossdata.js";
 // 池子魔将 · AI 角色世界（§I · 2026-09-29 重构版）
 //
-// 定位：名册规模（真值 = character/index.js，当前 97 人）的「真实世界」——
+// 定位：名册规模（真值 = character/index.js 的 99 位武将 **+** csh_bossdata.js 的 50 位妖灵，
+//   当前 149 人）的「真实世界」——
 //   名字、性格、**资金**与**牌技**会随输赢演化，离线也在动。
 //   存储 `csh_world`：{ ai:[n], lastTick, gambles, relations, records,
 //                       heartbeatDay, heartbeatMatches }，只存当前状态，不存牌局历史（§I.2）。
 //
 // ★ 2026-09-29 重构要点（用户 2026-09-29 需求）：
 //   1. **新增 `skill` 字段**（此前完全不存在，B10 六条要求有五条无法满足）
-//      skill = 0.62 ~ 1.00，由资金对数映射而来：越有钱越聪明，
+//      skill = 0.58 ~ 1.00（v6.3 起 = 资金分量 0.30 + 牌风位移 -0.06~+0.12 + 个人偏差 ±0.06；
+//      作者 2026-10-15：「把牌技重新打乱设计一下，资金不变」——资金仍是主要变量，
+//      但**不再唯一决定**牌技，牌技榜因此与资金榜不同序），
 //      但**穷 AI 永不被降智**（下限 0.62，不是 0）。
 //      关键纪律：skill **只影响决策质量**（赔率估计精度 / 阈值纪律 / 诈唬选择），
 //      **绝不读牌堆**——发牌函数与 skill 零耦合（有断言守护）。
@@ -51,7 +55,8 @@ import cshCharacter from "../character/index.js";
 	var OFFLINE_PER_DAY = 1;         // 离线每天模拟 1 轮（§I.2）
 
 	/* 牌技区间（2026-09-29 新增）：BASE 是硬下限——**穷 AI 不许是傻子**（B10 #6） */
-	var SKILL_BASE = 0.62;
+	var SKILL_BASE = 0.58;           /* v6.3：0.62 → 0.58（牌风位移可下探，但下限仍是 0.58） */
+	var SKILL_MIN = 0.58;            /* 硬下限：穷 AI 不许是傻子（B10 #6） */
 	var SKILL_TOP = 1.00;
 	var SKILL_CURVE = 0.70;          // 对数映射的幂次：>0 保证单调递增
 	var FUND_LO = 50000;             // skill 映射下锚（穷桌起点）
@@ -67,15 +72,102 @@ import cshCharacter from "../character/index.js";
 	   （csh_migrate 清洗时读同一个常量，避免两处手写字符串漂移）。 */
 	var PLAYER_GRUDGE_KEY = "player";
 
-	/* 五种性格（§I.1）：影响 AI 打法参数（§I.5 性格参数化） */
+	/* ---------- 十二种牌风（v6.3：5 → 12 · 作者「把牌技重新打乱设计一下」） ----------
+	   每条牌风 = 参数（门槛/诈唬率/方差）+ 一句"人设" + **牌技位移 skillShift**。
+	   skillShift 是"牌技与资金解耦"的关键旋钮：
+	     · 技术流（读牌师 +0.12 / 数学家 +0.10 / 埋伏者 +0.08）→ 穷也能爬到中上游
+	     · 情绪流（疯子 -0.06 / 莽夫 -0.04）→ 有钱也压不住波动
+	   参数口径（§I.5 性格参数化）：
+	     raiseThreshold 加注门槛（越低越爱加注）/ bluffRate 诈唬率 / variance 结算方差 */
 	var PERSONAS = {
-		aggro: { key: "aggro", name: "激进", raiseThreshold: 0.42, bluffRate: 0.18, variance: 0.20 },
-		tight: { key: "tight", name: "保守", raiseThreshold: 0.70, bluffRate: 0.05, variance: 0.10 },
-		bluff: { key: "bluff", name: "诈唬", raiseThreshold: 0.52, bluffRate: 0.38, variance: 0.26 },
-		math: { key: "math", name: "数学家", raiseThreshold: 0.58, bluffRate: 0.06, variance: 0.06 },
-		wild: { key: "wild", name: "莽夫", raiseThreshold: 0.46, bluffRate: 0.24, variance: 0.40 },
+		aggro: { key: "aggro", name: "激进", raiseThreshold: 0.42, bluffRate: 0.20, variance: 0.22, skillShift: 0.00,
+			desc: "上来就压，把桌子当战场。" },
+		tight: { key: "tight", name: "保守", raiseThreshold: 0.72, bluffRate: 0.04, variance: 0.09, skillShift: 0.02,
+			desc: "只玩好牌，等得起。" },
+		bluff: { key: "bluff", name: "诈唬", raiseThreshold: 0.50, bluffRate: 0.42, variance: 0.28, skillShift: 0.04,
+			desc: "牌不好，也要让你以为很好。" },
+		math: { key: "math", name: "数学家", raiseThreshold: 0.58, bluffRate: 0.05, variance: 0.05, skillShift: 0.10,
+			desc: "只算赔率，不赌运气。" },
+		wild: { key: "wild", name: "莽夫", raiseThreshold: 0.44, bluffRate: 0.26, variance: 0.44, skillShift: -0.04,
+			desc: "凭感觉下注，输了再来。" },
+		chaser: { key: "chaser", name: "追梦人", raiseThreshold: 0.38, bluffRate: 0.10, variance: 0.36, skillShift: -0.02,
+			desc: "总在等那张能翻盘的牌。" },
+		trapper: { key: "trapper", name: "埋伏者", raiseThreshold: 0.64, bluffRate: 0.28, variance: 0.16, skillShift: 0.08,
+			desc: "让出去，只为最后那一刀。" },
+		grinder: { key: "grinder", name: "削石匠", raiseThreshold: 0.55, bluffRate: 0.03, variance: 0.07, skillShift: 0.05,
+			desc: "一分一分地磨，从不失控。" },
+		bull: { key: "bull", name: "铁壁", raiseThreshold: 0.80, bluffRate: 0.02, variance: 0.06, skillShift: 0.06,
+			desc: "十手只动一手，动就是命。" },
+		maniac: { key: "maniac", name: "疯子", raiseThreshold: 0.26, bluffRate: 0.36, variance: 0.52, skillShift: -0.06,
+			desc: "钱是拿来推的，不是拿来看的。" },
+		reader: { key: "reader", name: "读牌师", raiseThreshold: 0.60, bluffRate: 0.16, variance: 0.11, skillShift: 0.12,
+			desc: "他看你的手，比看自己的牌还仔细。" },
+		lucky: { key: "lucky", name: "天选者", raiseThreshold: 0.48, bluffRate: 0.12, variance: 0.60, skillShift: 0.00,
+			desc: "谈不上技巧——只是总在赢。" },
 	};
-	var PERSONA_KEYS = ["aggro", "tight", "bluff", "math", "wild"];
+	var PERSONA_KEYS = ["aggro", "tight", "bluff", "math", "wild", "chaser",
+		"trapper", "grinder", "bull", "maniac", "reader", "lucky"];
+
+	/* ---------- 50 只妖灵的牌风（**手工指定**：每个角色一套属于她自己的打法，
+	   而不是"按 id 哈希撞一个" —— 作者要求"每个角色都要差异化"） ---------- */
+	var MINION_PERSONA = {
+		csh_boss_minion_eve: "bull",          /* 伊芙：剑不出鞘则已 */
+		csh_boss_minion_ada: "trapper",       /* 艾达王：先观察，后出手 */
+		csh_boss_minion_tenten: "chaser",     /* 天天：总在追下一件忍具 */
+		csh_boss_minion_empress: "aggro",     /* 女帝：从不低头 */
+		csh_boss_minion_triss: "bluff",       /* 特莉丝：热情又狡猾 */
+		csh_boss_minion_fubuki: "math",       /* 吹雪：用努力算赢天才 */
+		csh_boss_minion_ciri: "wild",         /* 希里：来去于各个时空 */
+		csh_boss_minion_catherine: "reader",  /* 凯瑟琳：看人比看牌准 */
+		csh_boss_minion_kaguya: "math",       /* 四宫辉夜：从不输给任何人 */
+		csh_boss_minion_zelda: "grinder",     /* 塞尔达：每一次判断都有考证 */
+		csh_boss_minion_angel: "grinder",     /* 天使：跌了不要紧，还在场就有救 */
+		csh_boss_minion_chunli: "aggro",      /* 春丽：没有放弃，只有再踢一脚 */
+		csh_boss_minion_makima: "bull",       /* 玛琪玛：从不追价，价格会来找她 */
+		csh_boss_minion_ayasato: "lucky",     /* 绫里姐妹：与灵对话 */
+		csh_boss_minion_robin: "reader",      /* 罗宾：从历史里读价格 */
+		csh_boss_minion_emilia: "tight",      /* 艾米莉亚：认真得可爱 */
+		csh_boss_minion_ashe: "aggro",        /* 艾什：报价从来不二价 */
+		csh_boss_minion_frieren: "bull",      /* 芙莉莲：一天的涨跌和一分钟没区别 */
+		csh_boss_minion_tifa: "grinder",      /* 蒂法：明天照常开门 */
+		csh_boss_minion_sakura: "wild",       /* 春野樱：一拳碎地 */
+		csh_boss_minion_mai: "bluff",         /* 不知火舞：舞步惑心 */
+		csh_boss_minion_android: "grinder",   /* 人造人：持续运转本身就是答案 */
+		csh_boss_minion_ishtar: "wild",       /* 伊什塔尔：珍宝像沙砾一样撒 */
+		csh_boss_minion_sarada: "reader",     /* 佐良娜：一眼看穿 */
+		csh_boss_minion_perona: "lucky",      /* 佩罗娜：爱捉弄，也总有好运 */
+		csh_boss_minion_guangxi: "maniac",    /* 光熙：焚尽一切 */
+		csh_boss_minion_hachikuji: "chaser",  /* 八九寺真宵：动不动就迷路 */
+		csh_boss_minion_megumi: "tight",      /* 加藤惠：不起眼的邻座 */
+		csh_boss_minion_yoruichi: "trapper",  /* 四枫院夜一：一瞬之影 */
+		csh_boss_minion_fortune: "aggro",      /* 好运姐（LoL 赏金猎人）：悬赏是我的 */
+		csh_boss_minion_nilou: "lucky",       /* 妮露：花下起舞，脚步像风 */
+		csh_boss_minion_nami: "math",         /* 娜美：脑子里全是天气和账本 */
+		csh_boss_minion_konan: "trapper",     /* 小南：安静得像一幅画 */
+		csh_boss_minion_temari: "aggro",      /* 手鞠：一扇风起 */
+		csh_boss_minion_tsukihi: "maniac",    /* 月火：怎么受伤都能爬起来 */
+		csh_boss_minion_liulibei: "tight",    /* 柳离悲：总是站在人群之外 */
+		csh_boss_minion_maisakura: "trapper", /* 樱岛麻衣：隐身 */
+		csh_boss_minion_ran: "reader",        /* 毛利兰：空手夺白刃 */
+		csh_boss_minion_mui: "maniac",        /* 生志摩妄：谁欠她的都别想走 */
+		csh_boss_minion_tayama: "trapper",    /* 田山：总在山雾里出现又消失 */
+		csh_boss_minion_wonder: "bull",       /* 神奇女侠：护腕挡得住雷霆 */
+		csh_boss_minion_yui: "chaser",        /* 结衣：从数据里醒来，好奇得像小鸟 */
+		csh_boss_minion_momo: "lucky",        /* 绫濑桃：总想把自己的好分出去 */
+		csh_boss_minion_fern: "math",         /* 菲伦：冷不防的凉 */
+		csh_boss_minion_valentine: "bluff",   /* 菲瓦伦汀：一靠近就让人忘不掉 */
+		csh_boss_minion_shinobu: "trapper",   /* 蝴蝶忍：袖里藏着谁都想不到的东西 */
+		csh_boss_minion_yukino: "tight",      /* 雪之下雪乃：不讨好任何人 */
+		csh_boss_minion_luna: "reader",       /* 露娜：立在中，看别人退 */
+		csh_boss_minion_anne: "aggro",        /* 高卷杏：活得张扬 */
+		csh_boss_minion_guiku: "wild",        /* 鬼の子：从鬼门关被拉回来的人 */
+	};
+	/* 牌风归属：妖灵查手工表；武将用**与资金不同的哈希**取 —— 于是
+	   「牌技榜」与「资金榜」的排序被打乱（作者：「把牌技重新打乱设计一下」）。 */
+	function personaOf(id, kind) {
+		if (kind === "minion" && MINION_PERSONA[id]) return MINION_PERSONA[id];
+		return PERSONA_KEYS[stableHash(String(id) + "|persona") % PERSONA_KEYS.length];
+	}
 
 	/* ============================================================
 	   名册（单一真值 · 2026-10-01 由 36 人硬编码 → 派生）
@@ -129,13 +221,82 @@ import cshCharacter from "../character/index.js";
 	/* 四层等差资金（按排序后 index，从富到穷），保证两两不等且 tierOfFund 判定一致。
 	   人数由 tierCountsFor 按名册规模派生 —— 见上方名册段落说明。
 	   单层只有 1 人时（只可能出现在极小的测试名册上）直接取该层锚点，避免除以 0。 */
-	function fundForIndex(idx) {
+	function fundForIndexRaw(idx) {
 		var t3 = TIER_COUNTS.t3, t2 = TIER_COUNTS.t2, t1 = TIER_COUNTS.t1, t0 = TIER_COUNTS.t0;
 		if (idx < t3) return t3 <= 1 ? AI_FUND_CAP : AI_FUND_CAP - Math.floor((AI_FUND_CAP - 20000000) * idx / (t3 - 1));
 		if (idx < t3 + t2) return t2 <= 1 ? 19999999 : 19999999 - Math.floor(17999999 * (idx - t3) / (t2 - 1));
 		if (idx < t3 + t2 + t1) return t1 <= 1 ? 1999999 : 1999999 - Math.floor(1889999 * (idx - t3 - t2) / (t1 - 1));
 		return t0 <= 1 ? 109999 : 109999 - Math.floor(59999 * (idx - t3 - t2 - t1) / (t0 - 1));
 	}
+	/* ---------- 妖灵名册（v6.1 · 2026-10-15 作者定案：「把 50 个妖灵也做进 AI 世界」）----------
+	   ★ 真值 = core/csh_bossdata.js 的 MINIONS —— 与 BOSS 模式妖灵、金鳞市挂牌、
+	     妖灵图鉴**同源同一份 50 位**。不在 character/index.js 再抄一份名单：
+	     那 99 位是「武将名册」，妖灵是 BOSS 模式的召唤物，抄第二份必然漂移。
+	   ★ 叙事定位：妖灵是**新入场的散户** —— 起始资金全部落在「穷桌 ~ 富桌」，
+	     没有一位天生坐豪赌席（资金是活的：打赢了自己爬上去）。
+	   ★ 主键 = csh_boss_minion_*，与武将名册 csh_* 前缀隔离，不可能撞 id。
+	   ★ 接入后 3 款牌桌（德州 / 斗地主 / UNO）**自动**能抽到妖灵同桌——
+	     它们都走同一个 shell-seat → CSH.world.seat()，无需改任何游戏页。 */
+	var MINION_IDS = Object.keys(MINIONS || {}).sort();
+	/* 妖灵起始资金：50 位铺满 富桌 5 / 中桌 15 / 穷桌 30，步长远大于 0（两两不等）。
+	   ★ 波段整体**偏移 500**（…,500 结尾）：武将资金的档位锚点恰好是 19,999,999 /
+	     1,999,999 / 110,000 / 109,999 / 50,000 —— 妖灵若取整齐的 1,999,999 / 109,999 /
+	     50,000 就会与武将同值，并把"世界最穷 = 50,000"这一设计值顶下去（实测 49,999）。
+	     偏移后波段天然落在武将网格之外；余下零星同值再由 minionFunds() 逐值让位兜底。 */
+	function minionBandFund(j) {
+		if (j < 5) return 18999500 - Math.floor(8999000 * j / 4);            /* 富桌 1900万 → 1000万 */
+		if (j < 20) return 1999499 - Math.floor(1888999 * (j - 5) / 14);      /* 中桌 200万 → 11.05万 */
+		return 109499 - Math.floor(58999 * (j - 20) / 29);                    /* 穷桌 10.95万 → 5.05万 */
+	}
+	var CITIZEN_FUND_USED = null;
+	function citizenFundUsed() {
+		if (!CITIZEN_FUND_USED) {
+			CITIZEN_FUND_USED = {};
+			for (var ci = 0; ci < ROSTER_ENTRY_IDS.length; ci++) CITIZEN_FUND_USED[fundForIndexRaw(ci)] = 1;
+		}
+		return CITIZEN_FUND_USED;
+	}
+	/* 妖灵资金表（惰性 + 缓存）：逐个让位时**同时避开武将资金与已派出的妖灵资金**——
+	   只避开武将是不够的：中桌末位 110,000 与穷桌首位 109,999 会连续让位到同一个
+	   109,998，反而制造新的重复（实测"两两不等"由 149 掉到 148）。 */
+	var MINION_FUNDS = null;
+	function minionFunds() {
+		if (MINION_FUNDS) return MINION_FUNDS;
+		var used = {};
+		var civ = citizenFundUsed();
+		for (var k in civ) if (Object.prototype.hasOwnProperty.call(civ, k)) used[k] = 1;
+		var out = [];
+		for (var j = 0; j < MINION_IDS.length; j++) {
+			var f = minionBandFund(j);
+			while (f > 1 && used[f]) f--;
+			used[f] = 1;
+			out.push(f);
+		}
+		MINION_FUNDS = out;
+		return out;
+	}
+	function minionFundFor(j) {
+		var arr = minionFunds();
+		return (arr[j] != null) ? arr[j] : minionBandFund(j);
+	}
+	/* 统一入口（v6.1）：0 .. 名册数-1 = 武将；其后 = 妖灵。
+	   保持"给一个下标就得到一份起始资金"的纯函数语义不变——simulate_world 会
+	   对 0..AI_COUNT-1 全量断言"为正且两两不等"。 */
+	function fundForIndex(idx) {
+		idx = Math.max(0, Math.floor(Number(idx) || 0));
+		if (idx >= ROSTER_ENTRY_IDS.length) return minionFundFor(idx - ROSTER_ENTRY_IDS.length);
+		return fundForIndexRaw(idx);
+	}
+	var MINION_ROSTER = MINION_IDS.map(function (id, j) {
+		var m = (MINIONS && MINIONS[id]) || {};
+		var name = m.name || id;
+		return {
+			id: id, name: name, surname: surnameOf(name),
+			persona: personaOf(id, "minion"),
+			fund: minionFundFor(j), kind: "minion",
+		};
+	});
+
 	function buildRoster() {
 		var ids = ROSTER_ENTRY_IDS;
 		var tr = (cshCharacter && cshCharacter.translate) || {};
@@ -146,14 +307,20 @@ import cshCharacter from "../character/index.js";
 			out.push({
 				id: id, name: name,
 				surname: surnameOf(name),
-				persona: PERSONA_KEYS[stableHash(id) % PERSONA_KEYS.length],
+				persona: personaOf(id, "citizen"),
 				fund: fundForIndex(i),
+				kind: "citizen",
 			});
 		}
-		return out;
+		return out.concat(MINION_ROSTER);
 	}
 	var ROSTER = buildRoster();
 	var AI_COUNT = ROSTER.length;
+	/* v6.1：名册 = 武将 + 妖灵两层（真源分别 character/index.js 与 csh_bossdata.js）。
+	   两个分量都对外暴露，验收器才能断言"AI 总数 = 武将数 + 妖灵数"而不是把
+	   AI_COUNT 当成武将数（此前 AI_COUNT 恒等于武将数，妖灵接入后该等式不再成立）。 */
+	var CITIZEN_COUNT = ROSTER_ENTRY_IDS.length;
+	var MINION_COUNT = MINION_ROSTER.length;
 	var ROSTER_IDS = {};
 	for (var ri = 0; ri < ROSTER.length; ri++) ROSTER_IDS[ROSTER[ri].id] = 1;
 	function idInRoster(id) { return !!ROSTER_IDS[id]; }
@@ -182,16 +349,21 @@ import cshCharacter from "../character/index.js";
 	function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 	function round05(v) { return Math.round(v * 2) / 2; }
 
-	/* 牌技：资金的对数映射（单调递增，穷 AI 不降智）
-	   fund = 50,000   → 0.62（下限）
-	   fund = 784,000  → ≈ 0.81
-	   fund = 2,100,000→ ≈ 0.87
-	   fund = 92,600,000→ 1.00（上限） */
-	function skillOf(fund) {
+	/* 牌技（v6.3 重设计）：不再由资金唯一决定。三条分量：
+	     ① 资金分量   0.30 × (对数映射)^0.70 —— 有钱的牌手更稳（保留原设计意图）
+	     ② 牌风位移   -0.06 ~ +0.12        —— 技术流向上、情绪流向下
+	     ③ 个人偏差   ±0.06（由 id 确定性哈希）—— 同样牌风的人也不完全一样
+	   下限 0.58（"穷 AI 不许是傻子"这条设计不变），上限 1.00。
+	   效果：资金榜与牌技榜**不同序**；穷的读牌师能排到富的疯子前面。 */
+	function skillOf(fund, persona, id) {
 		fund = Math.max(1, Number(fund) || 0);
 		var lo = Math.log(FUND_LO), hi = Math.log(FUND_HI);
 		var x = clampNum((Math.log(fund) - lo) / (hi - lo), 0, 1);
-		return SKILL_BASE + (SKILL_TOP - SKILL_BASE) * Math.pow(x, SKILL_CURVE);
+		var fundPart = Math.pow(x, SKILL_CURVE);
+		var P = PERSONAS[persona] || PERSONAS.math;
+		var jit = (stableHash(String(id == null ? "$" : id) + "|skill") % 2001) / 1000 - 1;
+		return clampNum(SKILL_BASE + 0.30 * fundPart + (P.skillShift || 0) + 0.06 * jit,
+			SKILL_MIN, SKILL_TOP);
 	}
 	/* 豪赌桌带入倍数：资金的对数映射到 [2, 5]，越有钱带得越多（用户需求原文） */
 	function multOf(fund) {
@@ -250,8 +422,11 @@ import cshCharacter from "../character/index.js";
 	function freshAI(r) {
 		return {
 			id: r.id, name: r.name, surname: r.surname, persona: r.persona,
+			/* v6.1：名册来源标记 —— "citizen"=武将名册 / "minion"=妖灵。
+			   仅供 UI 打标签与统计（牌桌抽人、资金、性格、战绩一律同一套规则）。 */
+			kind: r.kind || "citizen",
 			fund: r.fund,
-			skill: skillOf(r.fund),            // 牌技随资金（2026-09-29 新增）
+			skill: skillOf(r.fund, r.persona, r.id),   // 牌技 = 资金 + 牌风 + 个人偏差（v6.3）
 			hands: 0, wins: 0, biggestPot: 0, streak: 0, bestStreak: 0,
 			grudges: {},                       // 成对仇恨表（§5.1 #12 · 2026-10-03 由标量改表）
 			retired: false, retireDay: 0,      // 退隐态
@@ -351,6 +526,7 @@ import cshCharacter from "../character/index.js";
 			if (!cur) { out.push(freshAI(meta)); _normChanged = true; continue; }
 			setIf(cur, "name", meta.name);              // 名字以代码为准（防改名）
 			setIf(cur, "surname", meta.surname);
+			setIf(cur, "kind", meta.kind || "citizen");  // v6.1：旧档补 kind（citizen/minion）
 			if (PERSONA_KEYS.indexOf(cur.persona) < 0) setIf(cur, "persona", meta.persona);
 			setIf(cur, "fund", clampNum(cur.fund, 0, AI_FUND_CAP));
 			["hands", "wins", "biggestPot", "streak", "bestStreak", "retireCount", "drew"].forEach(function (k) {
@@ -552,7 +728,7 @@ import cshCharacter from "../character/index.js";
 	   供「打穿世界首富」统计使用（此前那项统计借用 retireCount，口径完全不对）。 */
 	function refreshSkill(a) {
 		if (!a) return;
-		a.skill = skillOf(a.fund);
+		a.skill = skillOf(a.fund, a.persona, a.id);
 		/* 里程碑置位只在**首次**发生：顺手写一条世界动态（旧档已富的不补记，避免刷屏） */
 		if (a.fund >= TIER3_FUND && !a.everTier3) {
 			a.everTier3 = true;
@@ -947,12 +1123,16 @@ import cshCharacter from "../character/index.js";
 			if (!ev || !ev.kind) return;
 			if (!world.history || !Array.isArray(world.history)) world.history = [];
 			ev.day = dayIndex();
-			/* 日报合并（2026-10-03）：同一天的 kind="day" 只保留一条 —— 反复进出休闲页会
-			   触发多次心跳，每次都往环里塞一条"今天打了 N 桌"会把有意义的事件挤掉。
-			   合并后它长这样：今天打了 12 桌，最大一笔 34 万。 */
+			/* 日报合并（2026-10-03；2026-10-13 修扫描范围）：同一天的 kind="day" 只保留一条 ——
+			   反复进出休闲页会触发多次心跳，每次都往环里塞一条"今天打了 N 桌"会把有意义的事件挤掉。
+			   合并后它长这样：今天打了 12 桌，最大一笔 34 万。
+			   ⚠ 旧实现只看**尾元素**：同日的退隐/复出/破纪录/宿敌事件在两次心跳之间入环时，
+			   尾元素不是日报 ⇒ 同日会再塞第二条（验收器 5c「同日日报合并为一条」抓到的失败）。
+			   现在从新到旧扫描同日日报。 */
 			if (ev.kind === "day") {
-				var last = world.history.length ? world.history[world.history.length - 1] : null;
-				if (last && last.kind === "day" && last.day === ev.day) {
+				for (var hi = world.history.length - 1; hi >= 0; hi--) {
+					var last = world.history[hi];
+					if (!last || last.kind !== "day" || last.day !== ev.day) continue;
 					last.m = (last.m || 0) + (ev.m || 0);
 					if ((ev.pot || 0) > (last.pot || 0)) last.pot = ev.pot || 0;
 					return;
@@ -1188,6 +1368,8 @@ import cshCharacter from "../character/index.js";
 			var stake = gamble ? g.stake : Math.min(buyIn, Math.floor(a.fund * 0.3));
 			return {
 				id: a.id, name: a.name, surname: a.surname,
+				/* v6.1：来源标记（"citizen" 武将 / "minion" 妖灵）——游戏页可据此打「妖」标签 */
+				kind: a.kind || "citizen",
 				/* 头像 seed（2026-10-01）：97 人下同姓 6 人，游戏页头像必须带 seed 才不撞脸
 				   （与 avatar() 同款 stableHash，§9.5 五处复用）。 */
 				seed: stableHash(String(a.id)),
@@ -1271,7 +1453,9 @@ import cshCharacter from "../character/index.js";
 	function publicOf(a, full) {
 		var o = {
 			id: a.id, name: a.name, surname: a.surname, persona: a.persona,
-			personaName: PERSONAS[a.persona].name,
+			personaName: (PERSONAS[a.persona] || PERSONAS.math).name,
+			personaDesc: (PERSONAS[a.persona] || PERSONAS.math).desc,   /* v6.3：牌风一句话人设 */
+			kind: a.kind || "citizen",
 			fund: a.fund, skill: a.skill,
 			tier: tierOfFund(a.fund), tierName: TIER_NAMES[tierOfFund(a.fund)],
 			hands: a.hands, wins: a.wins,
@@ -1389,7 +1573,8 @@ import cshCharacter from "../character/index.js";
 		PLAYER_GRUDGE_KEY: PLAYER_GRUDGE_KEY,
 		const: {
 			AI_COUNT: AI_COUNT, AI_MIN_STAKE: AI_MIN_STAKE, AI_FUND_CAP: AI_FUND_CAP,
-			SKILL_BASE: SKILL_BASE, SKILL_TOP: SKILL_TOP,
+			CITIZEN_COUNT: CITIZEN_COUNT, MINION_COUNT: MINION_COUNT,
+			SKILL_BASE: SKILL_BASE, SKILL_TOP: SKILL_TOP, SKILL_MIN: SKILL_MIN,
 			FUND_LO: FUND_LO, FUND_HI: FUND_HI,
 			GAMBLE_FROM: GAMBLE_FROM, MULT_LO: MULT_LO, MULT_HI: MULT_HI,
 		},

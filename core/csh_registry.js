@@ -49,7 +49,7 @@
 
 	/* ---------- 目录（唯一真值） ----------
 	   decay 仅对 settle="chips" 有意义：本金之外的净赢按此比例回收，差额视为台费。 */
-	var ORDER = ["texas", "doudizhu", "blackjack", "uno"];
+	var ORDER = ["texas", "doudizhu", "blackjack", "uno", "goldfish", "codex"];
 	var LOBBY = "career";
 
 	var CATALOG = {
@@ -87,13 +87,59 @@
 			lobby: true,
 			landscape: false, settle: "none", needBuyIn: false, ticket: 0, decay: 0,
 		},
+		/* 讨伐录（2026-10-13 · 批次 4a）：BOSS 模式击破手记——与生涯大厅平级的
+		   非游戏页（lobby:true 免收费屏直开）。不进 ORDER（keys() 保持纯游戏卡，
+		   入口卡在 csh_debug 手写、朱砂意象）；all() 单独并入 → shell META 可开。 */
+		bossbook: {
+			key: "bossbook", title: "讨伐录", dir: "", file: "bossbook.html",
+			tag: "手记", desc: "魔王的击破实录",
+			lobby: true,
+			landscape: false, settle: "none", needBuyIn: false, ticket: 0, decay: 0,
+		},
+		/* 金鳞市（2026-10-14 批次 B）：股市小游戏——五十位妖灵挂牌，持仓吃分红。
+		   settle "none"：经济自管（买卖走 csh_wallet 单一账本），不走牌桌结算链。 */
+		goldfish: {
+			key: "goldfish", title: "金鳞市", dir: "", file: "goldfish.html",
+			tag: "市集", desc: "五十位妖灵挂牌 · 持仓吃分红",
+			landscape: false, settle: "none", needBuyIn: false, ticket: 0, decay: 0,
+		},
+		/* 妖灵图鉴（2026-10-14 批次 C）：讨伐录平级的档案页——五十位妖灵的大图档案
+		   （主立绘 + 人设简介 + 台词全集 + 讨伐次数/金鳞市热度）。纯展示、无写操作，
+		   人设读金鳞市 GIRLS、统计读讨伐记录 summary().minions。 */
+		/* 天下榜（v6.9）：联机成绩榜——池子币 / 功勋 同页切换，与生涯大厅、讨伐录同级
+		   （lobby:true 免收费屏直开）。数据来自作者自己的服务器；服务器地址只写在
+		   rank.html 的 NET_BASE 常量里，**不渲染给玩家**。通信走 Node 原生 http
+		   （游戏窗口是 file:// 安全上下文，明文 http 的 fetch 会被拦）。 */
+		rank: {
+			key: "rank", title: "天下榜", dir: "", file: "rank.html",
+			tag: "联机", desc: "天下英雄的池子币与功勋",
+			lobby: true,
+			landscape: false, settle: "none", needBuyIn: false, ticket: 0, decay: 0,
+		},
+		codex: {
+			key: "codex", title: "妖灵图鉴", dir: "", file: "codex.html",
+			tag: "档案", desc: "五十位妖灵的大图档案",
+			landscape: false, settle: "none", needBuyIn: false, ticket: 0, decay: 0,
+		},
+		/* 行囊（v6.10 · 2026-10-15）：存档总口 —— 与生涯大厅 / 讨伐录 / 天下榜同级
+		   （lobby:true 免收费屏直开）。为什么单开一页：导入导出原先塞在生涯大厅右栏，
+		   覆盖面只有 19 键且**战绩那一域因为读错存储后端从来没生效**；
+		   作者定案「这次做的导入导出要涵盖全部的玩家数据，做成跟生涯大厅、讨伐录平级」。
+		   数据读写全走宿主桥（shell-mig-*）——PC 是 file://、安卓是 https://localhost，
+		   两侧的 localStorage 是否同源不能赌，桥是唯一稳的路。 */
+		save: {
+			key: "save", title: "行囊", dir: "", file: "save.html",
+			tag: "存档", desc: "一身家当，随身可带",
+			lobby: true,
+			landscape: false, settle: "none", needBuyIn: false, ticket: 0, decay: 0,
+		},
 	};
 
 	function get(key) {
 		return (key && Object.prototype.hasOwnProperty.call(CATALOG, key)) ? CATALOG[key] : null;
 	}
 	function all() {
-		return ORDER.concat([LOBBY]).filter(function (k) { return !!CATALOG[k]; });
+		return ORDER.concat([LOBBY, "bossbook", "rank", "save"]).filter(function (k) { return !!CATALOG[k]; });
 	}
 	function keys() { return ORDER.slice(); }
 	function has(key) { return !!get(key); }
@@ -150,7 +196,10 @@
 			if (g.key !== k) errs.push("key 不一致: " + k + " vs " + g.key);
 			if (!g.title) errs.push(k + " 缺标题");
 			if (!g.file) errs.push(k + " 缺 file");
-			if (!g.lobby && !g.dir) errs.push(k + " 非大厅却无 dir");
+			/* dir 为空 = 文件直接放 games/ 下（bossbook / goldfish / codex 先例，urlOf 已兼容
+			   空 dir）；此时 file 必须是纯文件名（含路径分隔就会拼错 URL）。
+			   ——2026-10-14 放宽：原规则"非大厅必须给 dir"把空 dir 误判为错误。 */
+			if (!g.dir && /[\/\\]/.test(String(g.file || ""))) errs.push(k + " 无 dir 时 file 不得含路径分隔");
 			if (g.lobby && g.dir) errs.push(k + " 大厅 dir 必须为空（拼 URL 时会多一个斜杠）");
 			if (["chips", "rank", "none"].indexOf(g.settle) < 0) errs.push(k + " 结算方式非法: " + g.settle);
 			if (g.settle === "chips" && !(g.decay > 0 && g.decay <= 1)) errs.push(k + " 回收率非法: " + g.decay);

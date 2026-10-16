@@ -65,7 +65,7 @@ div { display: inline-block; position: absolute; }   /* 无 !important */
 
 1. **单一真源**：样式统一放 CSS 文件或单一注入块；行内样式只做**动态值**（位置/大小），不写重复的静态样式（postmortem #11：源头 CSS 的 `!important` 会压掉一切行内样式——改视觉前先查源头）。
 2. **幂等注入**：功能可能从多个入口打开时，**打开动作本身**要调注入函数，注入函数内部判重（`if (document.getElementById('csh-panel-style')) return;`）并清理残留实例（postmortem #10）。观星美化反例：主样式只随"调试面板打开"注入，从扩展设置直接打开时整个裸 DOM（#10 原型）。
-3. **联机同步**：样式注入包 `game.broadcastAll`（幻梦 xms.js:145-177 实证）——但注意内容必须是**纯数据**，不得序列化函数（红线；幻梦往 broadcastAll 里塞函数是错的）。
+3. **联机同步**：样式注入包 `game.broadcastAll`（幻梦 xms.js:145-177 实证）——**本内核语义已于 2026-10-16 审计逐行核实**（`noname/game/index.js:1723-1734`）：`broadcastAll` 在**房主端**＝本地执行一次 + 经 `game.broadcast` 逐个 `client.send` 下发；在**客户端**端＝直接 `return`（因为 `createroom` 置 `game.online = false`、进房/大厅置 `true`，见 `noname/library/index.js:12469 / 12483 / 12740`）⇒ **联机同步只有"房主端那一次调用"算数**，客户端重复调用是空操作（这正是它天然幂等的原因）。**函数可以传**（引擎自身在 `game/index.js:6774`、`ui/click/index.js:4236` 等处大量这么用，先前"不得序列化函数"的绝对说法有误），但**函数体内禁止引用闭包/外层变量**——引擎官方注释（`game/index.js:1715-1716`）：数据必须经 `args` 显式传入。
 4. **作用域**：一切选择器挂在自家根类名下（`.csh-panel-root …`）。观星美化的"借宿主类名 `.yijiang_confirm-box` + 自家子类"做法可临时借用，但**依赖他人类名是脆弱依赖**（对方改名即碎），自有面板一律用自己的根类。
 5. **Vue/SFC 特别条款**（若学一将成名上 Vue）：`<style>` 块内出现反引号会炸掉 SW 编译、**整游戏启动失败**（一将成名 TopBar.vue:31 原注释）；浮层组件用 `<Teleport to="body">` 防父级 scoped 样式复位规则压扁（CharacterDetail.vue:52-56 注释）。
 
@@ -124,7 +124,7 @@ div { display: inline-block; position: absolute; }   /* 无 !important */
 5. 滚动区 `max-height + overflow-y:auto` + `lib.setScroll`？触屏可滚？
 6. 手机横屏 `max-height` 断点过了吗？触摸目标 ≥44px？悬浮件预留带留了吗？
 7. 动画/视频：`canplay` 门控？超时回退？看门狗？清理句柄（含定时器与监听器）？**监听器有泄漏吗**（点绛唇 keydown 泄漏教训）？
-8. 联机：功能 no-op 了吗？样式注入广播了吗（且广播内容无函数）？
+8. 联机：功能 no-op 了吗？样式注入广播了吗（**只在房主端调用有效**，客户端是空操作；函数体内不引用闭包，数据经 `args` 传）？
 9. 共存：探测他人 API 都有守卫？没写别人配置键？演出与在场播放器错峰了吗？
 10. 灰度判定：整图转灰度后层级仍可辨（调试面板既有判定标准）？密集列表没有整行底色横带（#12）？
 

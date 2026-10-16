@@ -1,0 +1,1156 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
+<title>池子魔将 · 天下榜</title>
+<!-- 天下榜 v3（2026-10-15）：留名机制沿用 v2（一个出口网络只占一个位置；机器指纹参与身份识别），
+     本轮三处体验返工：
+       ① 榜单列表此前是"死"的——五十行只看得见八行。改全高 flex 布局，列表区自带滚动。
+       ② 页面文案全部收进脚本顶部的文案表 T（一条真源），内部词一律换成世界观用语。
+       ③ 题壁（旧称签名）此前是独立一行、只在更名时连带上送，容易被当成没保存——
+          改为与名字一起落榜，并在界面上说明、留名后行内即见。
+     花榜增强 v3.1（2026-10-15 · 作者口径"v2.2 三项"）：
+       ① 每日首次免缠头：宿主（shell-cheer）按日键判定，第一次不扣池子币、只计 +1；
+          判定与扣费都在宿主单一账本，页面只如实上报宿主给的量。
+       ② 魁首题壁档案：榜行内显示「魁首 <名> · 壁上：xxx」金线签名条（服务端回 chief_name/chief_sig）；
+          图鉴（codex.html）同款待另一侧接线（本页不碰 codex，避免文件冲突）。
+       ③ 贡献称号：按"我对某只妖灵的累计缠头"分档随行显示（服务端回 me_amt/tier 档位键，
+          来客可见的字只从文案表 T.tier 取）。
+     ★ 通信走 Node 原生 http：游戏窗口是 file://（Chromium 安全上下文），
+       fetch 明文 http 会被拦；本项目 app/main.js 开了
+       nodeIntegration / nodeIntegrationInSubFrames / webSecurity:false
+       ⇒ 渲染进程与 iframe 都能 require("http")，裸 socket 不受浏览器策略限制。
+     ★ 失败一律**中性文案**：不弹错、不指责、不阻塞页面 —— 作者："不能让来玩的人感觉不适"。 -->
+<script src="../core/csh_selftest.js" data-csh-selftest="auto"></script>
+<script src="../core/csh_page.js"></script>
+<style>
+:root{
+  --gold:#b08d3e; --gold-hi:#d8bd7a; --ink:#2f2a22; --ink-dim:#7a7264;
+  --paper:#f5efe0; --paper-2:#efe8d7; --line:rgba(176,141,62,.30);
+  --ff-body:"PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+  --fs-base:15px; --fs-cap:12.5px;
+}
+*{box-sizing:border-box}
+/* 全高 flex 列：#wrap 撑满 iframe 视口（iframe 是替换元素、由壳保证 100% 高，
+   ⇒ 这里用 % 而不是 vw/vh，符合"页面禁 vh"红线），列表卡吸收剩余高度并内部滚动。 */
+html,body{margin:0;padding:0;height:100%;background:var(--paper);color:var(--ink);font-family:var(--ff-body);font-size:var(--fs-base)}
+#wrap{max-width:760px;margin:0 auto;height:100%;display:flex;flex-direction:column;padding:18px 16px 20px}
+#wrap>*{flex:0 0 auto}
+h1{margin:0 0 2px;font-size:26px;letter-spacing:.10em;color:var(--ink)}
+h1 small{display:block;font-size:var(--fs-cap);font-weight:400;letter-spacing:.16em;color:var(--gold);margin-top:5px}
+.hr{height:1px;background:linear-gradient(90deg,var(--line),transparent);margin:14px 0 16px}
+/* ============================================================
+   花魁三席（2026-10-16 · 作者："花魁不用把 50 个美女全列出来，
+   只需要列前三名的详细情况，比如打赏最高的几个人就行了"）
+   ------------------------------------------------------------
+   因此**废掉独立的主推位**（它与第一席是同一只妖灵，一屏里出现两次是重复），
+   把"大立绘 + 文案"直接做进第一席卡；三席各自给出**打赏最高的几位**。
+   50 位全表仍在（花榜页签的「照片墙 / 名录」两个版式）—— 不是为了"列出来看"，
+   而是因为**打赏必须能覆盖到每一位**：只留三席的话，其余 47 位就再也没人能应援了。
+   ============================================================ */
+/* 三席网格：**auto-fit**（不是 auto-fill）—— auto-fill 会保留空轨，三席到头来
+   可能被摊成"两席一行 + 独苗一行"（760 宽实测就是），殿堂感全没了；
+   auto-fit 让空轨塌缩、三席均分整行。min 200px：760 宽能三席一行，412 宽自动竖排。 */
+.chiefs{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;padding:1px 1px 3px}
+.chief{display:flex;flex-direction:column;gap:7px;background:#fffdf7;border:1px solid var(--line);
+  border-radius:12px;padding:10px 11px;min-width:0}
+/* 第一席：金边 + 极淡金底 —— "殿堂"与后两席一眼分开，但不是靠更大的字号堆出来的 */
+.chief.c1{border-color:rgba(176,141,62,.62);
+  background:linear-gradient(160deg,rgba(216,189,122,.18),rgba(255,253,247,0) 62%),#fffdf7;
+  box-shadow:0 1px 0 rgba(0,0,0,.02),0 6px 18px -14px rgba(176,141,62,.85)}
+.chd{display:flex;gap:9px;min-width:0}
+.chpic{flex:0 0 74px;height:92px;border-radius:9px;background-position:center 12%;
+  background-size:cover;background-repeat:no-repeat;background-color:#efe7d6;
+  border:1px solid rgba(176,141,62,.34)}
+.chief.c1 .chpic{flex-basis:86px;height:107px;border-color:rgba(176,141,62,.55)}
+.chmeta{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:2px;justify-content:center}
+.chrk{font-size:10.5px;letter-spacing:.18em;color:var(--gold)}
+.chief.c1 .chrk{color:#9b2234;font-weight:600}
+.chnm{font-size:17px;font-weight:600;color:var(--ink);letter-spacing:.05em;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chief.c1 .chnm{font-size:19px}
+.chtot{font-size:13px;color:#8a6b1e;font-variant-numeric:tabular-nums;font-weight:600}
+.chtot .u{font-size:10.5px;font-weight:400;color:#a0958a;margin-left:3px}
+.chsub{font-size:10.5px;color:#a0958a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chsub .tier{color:#9b2234;font-weight:600}
+/* 打赏榜（该席"详细情况"的正体） */
+.chpat{border-top:1px dashed rgba(176,141,62,.28);padding-top:6px;display:flex;flex-direction:column;gap:2px}
+.chph{font-size:10.5px;color:#a0958a;letter-spacing:.06em;margin-bottom:1px}
+.chpr{display:flex;align-items:baseline;gap:6px;font-size:11.5px;min-width:0}
+.chpr .prk{flex:0 0 13px;text-align:center;font-size:10px;font-weight:700;color:#fff;border-radius:999px;
+  background:rgba(176,141,62,.55);line-height:1.5}
+.chpr.p1 .prk{background:linear-gradient(160deg,#d8bd7a,#b08d3e)}
+.chpr b{flex:0 0 auto;font-weight:600;color:var(--ink);max-width:44%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chpr i{flex:1 1 auto;min-width:0;font-style:normal;color:#a0958a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chpr em{flex:0 0 auto;font-style:normal;font-variant-numeric:tabular-nums;color:#8a6b1e;font-weight:600}
+.chpr.me b{color:#9b2234}
+.chpr.me b::after{content:"你";margin-left:5px;font-size:9.5px;font-weight:400;color:#9b2234;
+  border:1px solid rgba(155,34,52,.45);border-radius:999px;padding:0 4px;vertical-align:1px}
+.chpr.more{color:#a0958a;font-size:10.5px}
+.chempty{font-size:11.5px;color:#b3a998;font-style:normal}
+.chbtn{margin-top:auto;align-self:flex-start;padding:4px 13px;border-radius:8px;border:1px solid var(--gold);
+  background:#fff;color:#8a6b1e;font-size:12px;font-family:var(--ff-body);cursor:pointer}
+.chbtn:hover{background:rgba(176,141,62,.10)}
+.chieftip{font-size:11px;color:#a0958a;margin:8px 1px 0;line-height:1.6}
+.card{background:#fffdf7;border:1px solid var(--line);border-radius:12px;padding:13px 14px;margin:0 0 12px;
+  box-shadow:0 1px 0 rgba(0,0,0,.02)}
+.me{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.me input{flex:1 1 130px;min-width:100px;padding:8px 10px;border-radius:9px;border:1px solid var(--line);
+  background:#fff;color:var(--ink);font-family:var(--ff-body);font-size:var(--fs-base)}
+.me button{flex:0 0 auto;padding:8px 14px;border-radius:9px;border:1px solid var(--gold);background:transparent;
+  color:#8a6b1e;font-family:var(--ff-body);font-size:var(--fs-base);cursor:pointer}
+.me button:hover{background:rgba(176,141,62,.10)}
+/* 名字框短一点：名号本就 5 字上限，不该与题壁框等长（作者 2026-10-15） */
+#nm{flex:0 1 34%;min-width:92px}
+.hint{font-size:11px;color:#a0958a;margin-top:7px;letter-spacing:.02em}
+.tabs{display:flex;gap:6px;margin:0 0 10px}
+.tabs button{flex:1 1 auto;padding:9px 6px;border-radius:9px;border:1px solid var(--line);
+  background:var(--paper-2);color:var(--ink-dim);font-family:var(--ff-body);font-size:var(--fs-base);cursor:pointer}
+.tabs button.on{background:var(--gold);border-color:var(--gold);color:#fff;font-weight:600}
+/* ---------- 榜单列表：可滚动区（README 红线 #5 / cookbook §9）----------
+   铁律：可滚动容器必须显式 max-height + overflow-y:auto。此处 max-height:100% 取自
+   flex 列中列表卡的确定高度（卡片吸收剩余视口高度），触屏再叠 -webkit-overflow-scrolling:touch。
+   ★ 桌面与手机**同一套规则**，不写手机专属分支。 */
+.card.sheet{display:flex;flex-direction:column;margin:0 0 6px}
+#wrap>.card.sheet{flex:1 1 auto;min-height:0}
+#rows{flex:1 1 auto;min-height:0;max-height:100%;overflow-y:auto;overflow-x:hidden;
+  -webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding-right:2px}
+.row{display:flex;align-items:baseline;gap:8px;padding:7px 4px;border-bottom:1px dashed rgba(176,141,62,.20)}
+.row:last-child{border-bottom:0}
+.row.me{background:rgba(176,141,62,.09);border-radius:8px}
+.rk{width:2.8em;text-align:right;color:var(--ink-dim);font-variant-numeric:tabular-nums;font-size:var(--fs-cap)}
+.rk.top{color:#9b2234;font-weight:700}
+.nm{flex:1 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.seg{flex:0 0 auto;font-size:10.5px;color:#8a6b1e;background:rgba(176,141,62,.12);
+  border-radius:999px;padding:1px 7px;letter-spacing:.04em}
+/* 贡献称号胶囊（v2.2）：与官阶 seg 同形不同色 —— 暗红，一眼区分"我的位分"和"她的挂牌" */
+.seg.tier{color:#9b2234;background:rgba(155,34,52,.10)}
+.tm{flex:0 0 auto;font-size:10.5px;color:#a0958a}
+.vl{font-variant-numeric:tabular-nums;color:#8a6b1e;font-weight:600}
+.stat{font-size:var(--fs-cap);color:var(--ink-dim);min-height:1.3em;margin:2px 0 0}
+.stat.bad{color:#a33}
+.empty{color:var(--ink-dim);font-size:var(--fs-cap);padding:14px 2px;text-align:center}
+/* 我自己的那条（哪怕不在前 N 名也常驻可见 —— v2 补齐的体验缺口） */
+.mebar{background:linear-gradient(160deg,rgba(176,141,62,.13),rgba(176,141,62,.04));
+  border:1px solid rgba(176,141,62,.34);border-radius:10px;padding:9px 12px;margin:0 0 12px;
+  font-size:var(--fs-cap);color:#6d5a2c;display:flex;flex-wrap:wrap;gap:4px 14px;align-items:baseline}
+.mebar b{font-size:var(--fs-base);color:#8a6b1e}
+.mebar .myv{font-variant-numeric:tabular-nums;font-weight:600;color:#8a6b1e}
+/* 没轮到"我"的时候（无名次数据）这条横带是空的 —— 空盒子不该占掉一整行高度 */
+#mebar:empty{display:none}
+/* 题壁（旧称签名，v2.1 引入 / v3 改与名字同批落榜） */
+.sgr{display:block;font-size:11px;color:#a0958a;font-weight:400;margin-top:1px;letter-spacing:.02em}
+.sgr.ct{color:#b08d3e}
+.cheerbtn{flex:0 0 auto;padding:3px 9px;border-radius:8px;border:1px solid var(--gold);background:#fff;
+  color:#8a6b1e;font-size:11.5px;cursor:pointer}
+.cheerbtn:hover{background:rgba(176,141,62,.10)}
+.ctop{color:#9b2234;font-size:11px}
+.ctotal{font-variant-numeric:tabular-nums;color:#8a6b1e;font-weight:600}
+.foot{font-size:var(--fs-cap);color:var(--ink-dim);line-height:1.7;margin-top:14px}
+
+/* ============================================================
+   v3 视觉层（2026-10-15）—— 只加表现，不改结构、不改逻辑。
+   学的成熟做法（榜单类产品的通行经验）：
+     · **名次分级徽记**：前三名用金/银/铜的圆形徽记，一眼分出"殿堂"，而不是把数字变红；
+     · **斑马纹 + 悬停**：长列表横向扫读不串行（本项目列表最多 50 行，收益明显）；
+     · **"我"的那条要一眼可见**：金色左缘竖线 + 极淡金底 + 尾部「你」小签；
+     · **数字层级**：主数字加粗等宽，单位（池子币/缠头）压小压淡，避免满屏同权重；
+     · **过渡统一**：非交互元素不加过渡，交互元素给 120~160ms（手机端不追求花哨）。
+   纪律：全部字号由 --fs-base/--fs-cap 派生；无 vw/vh；不用 !important；不动滚动实现。
+   ============================================================ */
+/* 卡片顶部一层极淡金晕，让"纸面"有层次（纯装饰） */
+.card.sheet{background:linear-gradient(180deg,rgba(216,189,122,.10),rgba(255,253,247,0) 42px),#fffdf7}
+/* 斑马纹：偶数行极淡，长列表扫读更稳 */
+#rows>.row:nth-child(even){background:rgba(176,141,62,.035)}
+/* 名次徽记：1~3 名给"殿堂"感（金/银/铜），4 名以后回到朴素的右对齐数字 */
+.rk{border-radius:999px;padding:1px 0;transition:background 140ms ease,color 140ms ease}
+#rows>.row:nth-child(1) .rk,#rows>.row:nth-child(2) .rk,#rows>.row:nth-child(3) .rk{
+  width:1.9em;text-align:center;font-weight:700;color:#fff;font-size:11px;line-height:1.55em;
+  box-shadow:0 1px 2px rgba(0,0,0,.10)}
+#rows>.row:nth-child(1) .rk{background:linear-gradient(160deg,#d8bd7a,#b08d3e)}
+#rows>.row:nth-child(2) .rk{background:linear-gradient(160deg,#c9c9c4,#9a9a92)}
+#rows>.row:nth-child(3) .rk{background:linear-gradient(160deg,#cf9a72,#a97048)}
+/* 我自己的那条：金色左缘 + 更实的底 + 尾部「你」签（不新占列宽） */
+.row.me{background:linear-gradient(90deg,rgba(216,189,122,.20),rgba(176,141,62,.07));
+  box-shadow:inset 3px 0 0 var(--gold)}
+.row.me .nm{font-weight:600}
+.row.me .nm::after{content:"你";margin-left:6px;font-size:10px;font-weight:400;color:#8a6b1e;
+  border:1px solid rgba(176,141,62,.55);border-radius:999px;padding:0 5px;vertical-align:1px}
+/* 悬停（桌面）：只提示"这一行可读"，不做点击态承诺 */
+.row{transition:background 120ms ease}
+.row:hover{background:rgba(176,141,62,.07)}
+/* 数字层级：主值加粗等宽、单位压小压淡 */
+.vl,.ctotal{font-variant-numeric:tabular-nums;font-weight:700;color:#8a6b1e;letter-spacing:.01em}
+.vl .u,.ctotal .u{font-size:10.5px;font-weight:400;color:#a0958a;margin-left:3px;letter-spacing:.04em}
+/* 行内第二行（壁上/魁首）给它固定的行高与呼吸感，避免和名字挤在一起 */
+.sgr{margin-top:2px;line-height:1.35;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* 状态行：成功偏金、失败偏赭，都是低饱和（不刺眼） */
+.stat{transition:color 160ms ease}
+.stat.bad{color:#a2564c}
+/* 空态：给一条细金线做"留白也有设计"的收束 */
+.empty{padding:20px 2px}
+.empty::before{content:"";display:block;width:54px;height:1px;margin:0 auto 10px;
+  background:linear-gradient(90deg,transparent,var(--line),transparent)}
+/* 页签：选中态加一层极淡投影，手机上也看得出"当前在哪一栏" */
+.tabs button{transition:background 140ms ease,color 140ms ease,border-color 140ms ease}
+.tabs button.on{box-shadow:0 2px 6px -3px rgba(176,141,62,.75)}
+
+/* ============================================================
+   P6 观赏性第二批（2026-10-15）：行头像 / 花榜照片墙 / 懒加载
+   ------------------------------------------------------------
+   · **行头像**：花榜行用该妖灵头像（image/csh_face_<ascii>.webp，素材名已 ASCII 化）；
+     币/功勋榜行**没有图可用** —— 玩家不上传头像，作者口径又是"不加交互"，
+     ⇒ 改用**姓氏印章圆标**：名字首字 + 由名字哈希定出的稳定金色深浅（同名恒同色）。
+     这是榜单类产品的通行降级做法，比摆一个空灰圈体面。
+   · **照片墙**：花榜一张网格版式（立绘铺满 + 缠头数压图上），比纯列表可看。
+   · **性能**：头像/立绘一律 IntersectionObserver **懒加载**（进视口才设 background-image）；
+     照片墙**分批渲染**（首批 12 格，滚到底再追加）。理由：安卓端"图片加载半天"的真因是
+     一次解码几十张 webp，而不是 50 行文本（50 行 DOM 做窗口化收益为负，故不做）；
+     也不用大面积 drop-shadow（移动端昂贵）。
+   · 双兼容：不加手机专属分支；紧凑档仍按 max-height 判定。
+   ============================================================ */
+.av{flex:0 0 auto;align-self:center;width:26px;height:26px;border-radius:50%;
+  background-position:center 18%;background-size:cover;background-repeat:no-repeat;
+  border:1px solid rgba(176,141,62,.45);box-shadow:inset 0 0 0 1px rgba(255,255,255,.22);
+  background-color:#efe7d6}
+/* 印章圆标：币/功勋榜的常态（花榜行改用真头像，不加这个 class） */
+.av.seal{display:flex;align-items:center;justify-content:center;background-image:none;
+  color:#fbf6ea;font-size:12.5px;font-weight:600;line-height:1;
+  text-shadow:0 1px 1px rgba(0,0,0,.20);border-color:rgba(255,255,255,.34)}
+#rows>.row:nth-child(1) .av,#rows>.row:nth-child(2) .av,#rows>.row:nth-child(3) .av{
+  border-color:rgba(176,141,62,.78);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.30),0 0 0 2px rgba(216,189,122,.20)}
+/* 视图切换：只在花榜出现的小分段控件（不新增语义，不加新数据） */
+.viewbar{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:5px;margin:-3px 0 8px}
+.viewbar[hidden]{display:none}
+.viewbar button{padding:4px 11px;border-radius:999px;border:1px solid var(--line);
+  background:var(--paper-2);color:var(--ink-dim);font-family:var(--ff-body);font-size:11.5px;cursor:pointer}
+.viewbar button.on{background:var(--gold);border-color:var(--gold);color:#fff;font-weight:600}
+/* 打赏数额（2026-10-16 晚）：与三版式同排；窄屏随 flex-wrap 落到第二行 */
+.viewbar .vamt{display:flex;align-items:center;gap:4px;margin-left:4px;padding-left:8px;
+  border-left:1px solid var(--line);font-size:11.5px;color:var(--ink-dim);white-space:nowrap}
+.viewbar .vamt input{width:82px;padding:3px 7px;border-radius:8px;border:1px solid var(--line);
+  background:#fff;color:var(--ink);font-family:var(--ff-num);font-size:11.5px;text-align:right}
+/* ---------- 花榜照片墙 ---------- */
+.wall{display:grid;grid-template-columns:repeat(auto-fill,minmax(108px,1fr));gap:8px;padding:2px 2px 4px}
+.wall-cell{position:relative;display:block;border-radius:10px;overflow:hidden;
+  border:1px solid rgba(176,141,62,.32);background:#efe7d6}
+/* 用 padding-top 撑高（**不用 aspect-ratio**：老 WebView 不认，安卓端会塌成一条缝）。
+   128% 贴着素材比例（面像一律 4:5 = 125%，实测 616×770 / 372×465 …）—— 差 2.4%，
+   cover 只裁掉左右各 1.2%，脸不会被切。 */
+.wall-cell::before{content:"";display:block;padding-top:128%}
+.wall-cell .pic{position:absolute;left:0;right:0;top:0;bottom:0;
+  background-position:center 16%;background-size:cover;background-repeat:no-repeat}
+.wall-cell .info{position:absolute;left:0;right:0;bottom:0;padding:18px 7px 6px;
+  background:linear-gradient(180deg,rgba(24,18,10,0),rgba(24,18,10,.80))}
+.wall-cell .wn{display:block;color:#f6eeda;font-size:12px;font-weight:600;letter-spacing:.04em;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wall-cell .wt{display:block;font-size:11px;color:#e8d6aa;font-variant-numeric:tabular-nums;margin-top:1px}
+.wall-cell .wt .u{font-size:9.5px;color:rgba(232,214,170,.72);margin-left:3px}
+.wall-cell .wm{float:right;font-style:normal;font-size:9.5px;color:#f0d79a;letter-spacing:.02em}
+.wall-cell .wc{display:block;font-style:normal;font-size:10px;color:#cbb387;margin-top:1px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wall-cell .wb{position:absolute;top:5px;right:5px;padding:2px 8px;border-radius:999px;
+  border:1px solid rgba(216,189,122,.80);background:rgba(24,18,10,.52);color:#f2e5c4;
+  font-family:var(--ff-body);font-size:10.5px;line-height:1.5;letter-spacing:.04em;cursor:pointer;
+  -webkit-appearance:none;appearance:none}
+.wall-cell .wb:hover{background:rgba(24,18,10,.76)}
+.wall-cell .wk{position:absolute;top:5px;left:5px;min-width:19px;height:19px;padding:0 5px;
+  border-radius:999px;display:flex;align-items:center;justify-content:center;
+  font-size:10px;font-weight:700;color:#fff;background:rgba(24,18,10,.48);font-variant-numeric:tabular-nums}
+.wall-cell.k1 .wk{background:linear-gradient(160deg,#d8bd7a,#b08d3e)}
+.wall-cell.k2 .wk{background:linear-gradient(160deg,#c9c9c4,#9a9a92)}
+.wall-cell.k3 .wk{background:linear-gradient(160deg,#cf9a72,#a97048)}
+@media (max-height:640px),(max-width:899px){#wrap{padding:12px 12px 16px} h1{font-size:22px}
+  .card{padding:10px 12px;margin:0 0 9px} .hr{margin:10px 0 12px} .mebar{margin:0 0 9px} .foot{margin-top:10px}}
+/* 极矮窗（**实机 915×412**，历史量测同此）：固定件必须整体收窄，
+   否则列表区被挤成一条缝（P6 实测：未收窄时列表只剩 ~30px）。
+   纪律：只压字号/间距/装饰，**不藏关键信息**；一律按 max-height 判定（无宽度分支）。
+   预算（412 高）：16 外框 + 80 主推位 + 24 标题 + 11 分隔 + 74 留名卡 + 34 页签 + 25 版式 = 264
+   ⇒ 列表得 ~148px（名录约 6 行，照片墙约 1 行）。
+   正因为照片墙在 148px 里只能看见一行，**短屏默认版式由脚本按视口高度选名录**（见 setView）。 */
+@media (max-height:520px){
+  #wrap{padding:8px 10px 9px}
+  /* 标题压成一行：副题改同行内联，省掉一整行（约 20px） */
+  h1{font-size:17px;letter-spacing:.06em}
+  h1 small{display:inline;font-size:10.5px;letter-spacing:.10em;margin:0 0 0 8px}
+  .hr{margin:4px 0 6px}
+  .card{padding:6px 9px;margin:0 0 6px}
+  .me{gap:6px} .me input{padding:5px 8px;font-size:12.5px} .me button{padding:5px 11px;font-size:12.5px}
+  .hint{font-size:10px;margin-top:3px}
+  .stat{font-size:10.5px;min-height:1em;margin-top:1px}
+  .tabs{gap:5px;margin:0 0 5px} .tabs button{padding:5px 4px;font-size:12.5px}
+  .mebar{padding:5px 9px;margin:0 0 5px;font-size:11px} .mebar b{font-size:12.5px}
+  /* 页脚在矮窗直接收掉：它是"更名规则"的补充说明，不是操作必需，
+     而这一行值 ~22px —— 换算成名录就是整整一行内容。 */
+  .foot{display:none}
+  .row{padding:4px 3px}
+  .av{width:22px;height:22px} .av.seal{font-size:11px}
+  .chiefs{gap:7px;grid-template-columns:repeat(auto-fit,minmax(178px,1fr))}
+  .chief{padding:8px 9px;gap:5px;border-radius:10px}
+  .chpic{flex-basis:56px;height:70px}
+  .chief.c1 .chpic{flex-basis:64px;height:80px}
+  .chnm{font-size:15px} .chief.c1 .chnm{font-size:16px}
+  .chtot{font-size:12px} .chsub,.chph,.chempty,.chpr.more{font-size:10px}
+  .chpr{font-size:11px;gap:5px}
+  .chbtn{padding:2px 10px;font-size:11.5px}
+  .chieftip{font-size:10.5px;margin-top:5px}
+  .viewbar{margin:0 0 5px}
+  .viewbar button{padding:2px 9px;font-size:10.5px}
+  .viewbar .vamt{font-size:10.5px}
+  .viewbar .vamt input{width:68px;padding:2px 6px;font-size:10.5px}
+  .wall{gap:6px;grid-template-columns:repeat(auto-fill,minmax(92px,1fr))}
+  .wall-cell .info{padding:14px 6px 5px}
+  .wall-cell .wn{font-size:11px} .wall-cell .wt{font-size:10px}
+  .wall-cell .wb{padding:1px 6px;font-size:10px}
+}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <h1><span id="ttl">天下榜</span><small id="sub">一曲既罢 · 名姓自留</small></h1>
+  <div class="hr"></div>
+
+  <div class="card">
+    <div class="me">
+      <input id="nm" type="text" maxlength="5" placeholder="题个名，五个字以内" autocomplete="off" spellcheck="false">
+      <input id="sg" type="text" maxlength="10" placeholder="题壁一句（十字以内）" autocomplete="off" spellcheck="false">
+      <button id="save" type="button">题名</button>
+    </div>
+    <div class="hint" id="hint"></div>
+    <div class="stat" id="stat"></div>
+  </div>
+
+  <div id="mebar" class="mebar"></div>
+
+  <div class="tabs">
+    <button id="t-cby" class="on" type="button">池子币</button>
+    <button id="t-merit" type="button">功勋</button>
+    <button id="t-cheer" type="button">花榜</button>
+  </div>
+  <!-- 花榜专属三版式（2026-10-16）：**花魁三席**（默认）· 照片墙 · 名录。
+       后两个是"全榜"，留着不是为了列出来看，而是因为打赏必须能覆盖到每一位。 -->
+  <div class="viewbar" id="viewbar" hidden>
+    <button id="v-chief" type="button">花魁三席</button>
+    <button id="v-wall" type="button">照片墙</button>
+    <button id="v-list" type="button">名录</button>
+    <!-- 打赏数额（2026-10-16 晚 · 作者："打赏改为具体数额"）：缠头从"写死 1000"改为
+         可指定具体数额（100 ~ 100 万，与宿主 shell-cheer 的校验区间同口径）；
+         存 localStorage 进页回填。三席 / 照片墙 / 名录三种入口共用这一个数额。 -->
+    <span class="vamt"><span id="chAmtLab">缠头数额</span>
+      <input id="chAmt" type="number" min="100" max="1000000" step="100" inputmode="numeric" autocomplete="off" spellcheck="false">
+      <span id="chAmtUnit">池子币 / 次</span></span>
+  </div>
+  <div class="card sheet"><div id="rows"><div class="empty">正在联网…</div></div></div>
+
+  <div class="foot" id="foot"></div>
+</div>
+
+<script>
+/* ============================================================
+   天下榜 · 客户端（v3 · 2026-10-15）
+   ------------------------------------------------------------
+   ★ 文案表 T：**页面上一切对外可见的字，都只从这张表里取** ——
+     以后改话术只改下面这一处，不再满文件找散落的中文字面量。
+   ★ 服务器地址只写在这一个常量里，**不渲染到界面**（作者要求"端口都不用让来玩的人看到"）。
+     以后加域名/HTTPS 时只改这一行。
+   ★ 传输：优先 Node 原生 http（Electron 渲染进程/子框架都有），
+     拿不到 Node 才退回 fetch（非 Electron 环境 / 将来的 HTTPS 部署）。
+   ============================================================ */
+
+/* ---------- 文案表（唯一真源）----------
+   世界观口径：勾栏听曲 —— 给唱曲的姑娘赏钱叫**缠头**，姑娘们的榜单叫**花榜**，
+   榜首支持者叫**魁首**，留名 / 更名叫**题名 / 更名**，个性题壁句（旧称签名）行内显示为「壁上：…」。
+   规则：一切内部口径（打分、送东西、谁第一、还有什么用来度量人的数字）都不写进这里；
+   失败提示保持中性（不指责、不弹错）。 {x} 为运行时插值位。 */
+var T = {
+  /* 标题区 */
+  title:      "天下榜",
+  subtitle:   "一曲既罢 · 名姓自留",
+  /* 页签 */
+  tabCby:     "池子币",
+  tabMerit:   "功勋",
+  tabCheer:   "花榜",
+  /* 花榜版式切换（P6 / 2026-10-16 三版式） */
+  vChief:     "花魁三席",
+  vWall:      "照片墙",
+  vList:      "名录",
+  /* 花魁三席（作者 2026-10-16："只需要列前三名的详细情况，比如打赏最高的几个人"） */
+  seat:       ["第一席", "第二席", "第三席"],
+  seatShort:  "魁首",
+  chiefPeople: "{n} 人缠头",
+  chiefPatrons: "打赏最高的几位",
+  chiefNone:  "虚位以待 · 头一份缠头由你起",
+  chiefMore:  "另有 {n} 位",
+  chiefTip:   "花魁只列前三席 · 要看全部五十位、或给别位缠头，切到上面「照片墙 / 名录」。",
+  /* 计量单位 / 占位 */
+  cbyUnit:    "池子币",
+  meritUnit:  "功勋",
+  cheerUnit:  "缠头",
+  /* 打赏数额（2026-10-16 晚 · 作者："打赏改为具体数额"）：花榜页的"每次缠头数额"输入框 */
+  cheerAmtLab:  "缠头数额",
+  cheerAmtPh:   "100~100万",
+  cheerAmtUnit: "池子币 / 次",
+  cheerAmtTip:  "每次缠头的池子币数额（100 ~ 1,000,000）。每日首次缠头不扣费。",
+  /* 主推位（P6）：花榜第一 = 花魁（勾栏口径，不是"榜首"这种大白话） */
+  heroTag:    "本期花魁",
+  noName:     "佚名",
+  unitYi:     "亿",
+  unitWan:    "万",
+  /* 花榜行内 */
+  cheerBtn:   "缠头",
+  cheerEcho:  "魁首 {name} · {amt}",          /* 魁首那一行（未题壁时） */
+  cheerChief: "魁首 {name} · {sig}",           /* 魁首那一行（有题壁，金线签名条；不再写"壁上："前缀） */
+  cheerOk:    "已为「{g}」缠头 {amt} 池子币",
+  cheerFree:  "今日第一次缠头不费池子币 · 已为「{g}」缠头",
+  cheerPoor:  "池子币不够",
+  cheerFail:  "这次没成，稍后再试",
+  girlsEmpty: "花名册还没读到（要从大厅进入才有）",
+  /* 贡献称号（按我对某只妖灵的累计缠头分档 · 服务端给档位键，字从这里取） */
+  tier: {
+    fresh:   "初来",
+    regular: "常客",
+    guest:   "贵客",
+    honored: "座上宾",
+    chief:   "魁首"
+  },
+  tierTitle:  "你为「{g}」缠头 {amt}",
+  tierMine:   "我的位分 · {t}",
+  /* 留名区（名字 + 题壁一起落榜） */
+  namePh:     "题个名，留榜用",
+  sigPh:      "题壁一句（十字以内）",
+  submitNew:  "题名",
+  submitEdit: "更名",
+  hint:       "名字与题壁一起落榜，落榜后可随时更名。",
+  reading:    "正在读取…",
+  rowsLoading:"正在联网…",
+  /* 名次条 / 榜单统计 */
+  meRank:     "你的位置 第 {n} 位",
+  boardStat:  "已有 {n} 人留名 · 前列 {m} 席",
+  boardEmpty: "榜上还空着 · 你可以第一个留名",
+  rowsEmpty:  "榜上还空着",
+  /* 中性提示（失败一律不指责） */
+  needNameList:  "先题个名，就能留名",
+  needNameAuto:  "题个名就能留名",
+  needNameCheer: "先题个名，才能缠头",
+  noScore:       "还没有成绩可上传（先去池子休闲玩两局？）",
+  failManual:    "这次没送出去，稍后再试一次",
+  debounceManual:"稍候片刻再试",
+  nameTaken:     "这个名字已经有人用了，换一个吧",
+  offline:       "未连接（不影响游戏）",
+  savedOk:       "已留名：{line}",
+  savedSig:      " · {sig}",
+  adoptedFp:     "认出你这台机器的留名了 · {line}",
+  adoptedIp:     "这个网络已经有留名，这次更新到：{name} · {line}",
+  /* 页脚 */
+  foot: [
+    /* ★ 2026-10-15 作者：此前三行属冗余（"未连接"与状态行重复、更名规则一行足矣）⇒ 收成一行 */
+    "曲终人未散 · 更名只更新原位，不另占一席。"
+  ],
+};
+function tt(k, v) {
+  var s = (T[k] == null) ? "" : String(T[k]);
+  if (v) for (var p in v) if (Object.prototype.hasOwnProperty.call(v, p)) s = s.split("{" + p + "}").join(v[p]);
+  return s;
+}
+/* 贡献称号：服务端只回档位键（fresh/regular/guest/honored/chief），
+   来客可见的字一律从文案表 T.tier 取 —— 页面不另写一份话术。未知键回空串。 */
+function tierWord(key) {
+  var k = String(key == null ? "" : key);
+  return (T.tier && T.tier[k]) ? T.tier[k] : "";
+}
+
+var NET_BASE = "https://chishanghan.duckdns.org";
+var NET = { uid: "", name: "", sig: "", fp: "", kind: "cby", busing: false, rows: [], me: null, seg: "", last: null };
+
+/* ---------- 桥（与 Game Shell 通信） ----------
+   ★ 2026-10-15 修：**这一页此前根本没有建桥** —— 全文只有 `Bridge.call(...)` 的引用，
+     没有 `var Bridge = CSHPage.transport(...)`（对比 career.html / goldfish.html 都在页内建）。
+     于是 `typeof Bridge !== "undefined"` 恒假 ⇒ 永远走本地兜底 ⇒ 上传上去的池子币恒为 0
+     （作者截图里「势魏延 0 池子币」就是这个，不是没打游戏，是这一页读不到钱包）。
+     ★ 不传 closeName：本页没有自关逻辑（关闭由壳的 ✕ 负责），而 "rank-close"
+       也不在 shell 的旧协议白名单里（LEGACY_CLOSE 只到 codex），传了反而没用。 */
+var Bridge = (typeof CSHPage !== "undefined" && CSHPage && CSHPage.transport)
+  ? CSHPage.transport({ timeout: 2500 })
+  : null;
+
+function ls(k, v) {
+  try { if (v === undefined) return localStorage.getItem(k) || ""; localStorage.setItem(k, v); } catch (e) {}
+  return "";
+}
+function el(id) { return document.getElementById(id); }
+
+/* ---------- ★ 机器指纹（v2）：清了浏览器数据也认得出是同一台 ----------
+   只对 Electron 生效：渲染进程/子框架都能 require("os") / require("crypto")。
+   取 MAC 列表 + 主机名 + CPU 型号 + 平台 + 内存档位 → SHA-256 摘要。
+   ★ 只上传摘要（原始 MAC / 主机名一个字节都不离开本机）；拿不到 Node 就留空，
+     服务端自动退化成"按网络认人"，功能不残。 */
+function machineFp() {
+  try {
+    var req = (typeof window !== "undefined" && window.require) ? window.require : null;
+    if (!req) return "";
+    var os = req("os"), crypto = req("crypto");
+    var macs = [], nis = os.networkInterfaces ? os.networkInterfaces() : {};
+    for (var k in nis) {
+      var arr = nis[k] || [];
+      for (var i = 0; i < arr.length; i++) {
+        var m = arr[i].mac;
+        if (m && m !== "00:00:00:00:00:00" && !arr[i].internal) macs.push(m);
+      }
+    }
+    macs.sort();
+    var cpu = (os.cpus && os.cpus()[0] && os.cpus()[0].model) ? os.cpus()[0].model : "";
+    var gb = (os.totalmem && os.totalmem() > 0) ? Math.round(os.totalmem() / 1073741824) : 0;
+    var raw = [os.platform ? os.platform() : "", os.arch ? os.arch() : "", String(gb),
+      cpu, os.hostname ? os.hostname() : "", macs.join(",")].join("|");
+    if (!raw.replace(/[|,]/g, "").replace(/0/g, "")) return "";
+    return "m-" + crypto.createHash("sha256").update(raw).digest("hex").slice(0, 24);
+  } catch (e) { return ""; }
+}
+
+function netInit() {
+  NET.uid = ls("csh_net_uid");
+  if (!NET.uid) {
+    NET.uid = "csh-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 12);
+    ls("csh_net_uid", NET.uid);
+  }
+  NET.fp = machineFp();
+  NET.name = ls("csh_net_name");
+  NET.sig = ls("csh_net_sig");
+  /* 缠头数额（2026-10-16 晚）：进页回填上次使用的数额（缺省 1000） */
+  CH.amt = clampAmt(ls("csh_rank_cheer_amt") || 1000);
+  if (el("chAmt")) el("chAmt").value = String(CH.amt);
+  if (el("nm")) el("nm").value = NET.name;
+  if (el("sg")) el("sg").value = NET.sig;
+}
+function netStat(msg, bad) {
+  var e = el("stat");
+  if (e) { e.textContent = msg; e.className = "stat" + (bad ? " bad" : ""); }
+}
+
+/* 静态文案落位：把表里的字写进 DOM。**独立于 boot**（离线冒烟也会跑到），
+   确保即使网络流程不启动，页面上的字也全部来自文案表。 */
+function applyStaticCopy() {
+  try { if (typeof document !== "undefined" && document) document.title = "池子魔将 · " + T.title; } catch (e) {}
+  var t1 = el("ttl"); if (t1) t1.textContent = T.title;
+  var t2 = el("sub"); if (t2) t2.textContent = T.subtitle;
+  var tc = el("t-cby"); if (tc) tc.textContent = T.tabCby;
+  var tm = el("t-merit"); if (tm) tm.textContent = T.tabMerit;
+  var th = el("t-cheer"); if (th) th.textContent = T.tabCheer;
+  var vc = el("v-chief"); if (vc) vc.textContent = T.vChief;
+  var vw = el("v-wall"); if (vw) vw.textContent = T.vWall;
+  var vl = el("v-list"); if (vl) vl.textContent = T.vList;
+  var cl = el("chAmtLab"); if (cl) cl.textContent = T.cheerAmtLab;
+  var cu = el("chAmtUnit"); if (cu) cu.textContent = T.cheerAmtUnit;
+  var ci = el("chAmt");
+  if (ci) { ci.setAttribute("placeholder", T.cheerAmtPh); ci.setAttribute("title", T.cheerAmtTip); }
+  var nm = el("nm"); if (nm) nm.setAttribute("placeholder", T.namePh);
+  var sg = el("sg"); if (sg) sg.setAttribute("placeholder", T.sigPh);
+  var sv = el("save"); if (sv) sv.textContent = NET.name ? T.submitEdit : T.submitNew;
+  var hi = el("hint"); if (hi) hi.textContent = T.hint;
+  var f = el("foot"); if (f) f.innerHTML = T.foot.join("<br>");
+  var rw = el("rows"); if (rw) rw.innerHTML = '<div class="empty">' + T.rowsLoading + '</div>';
+  netStat(T.reading);
+}
+applyStaticCopy();
+
+/* 一次请求：path / method / body(对象) → cb(ok, jsonObj) */
+function netReq(path, method, body, cb) {
+  var done = false;
+  function fin(ok, o) { if (done) return; done = true; cb(ok, o); }
+  var payload = body ? JSON.stringify(body) : "";
+  var req = null;
+  try { req = (typeof window !== "undefined" && window.require) ? window.require : null; } catch (e0) {}
+  if (req) {
+    try {
+      var http = req(/^https:/.test(NET_BASE) ? "https" : "http"), url = req("url");
+      var u = url.parse(NET_BASE + path);
+      var r = http.request({
+        hostname: u.hostname, port: u.port || (/^https:/.test(NET_BASE) ? 443 : 80), path: u.path, method: method, timeout: 8000,
+        headers: payload ? { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(payload) } : {},
+      }, function (res) {
+        var buf = "";
+        res.setEncoding("utf8");
+        res.on("data", function (d) { buf += d; });
+        res.on("end", function () { try { fin(res.statusCode >= 200 && res.statusCode < 300, JSON.parse(buf)); } catch (e) { fin(false, null); } });
+      });
+      r.on("error", function () { fin(false, null); });
+      r.on("timeout", function () { try { r.destroy(); } catch (e) {} fin(false, null); });
+      if (payload) r.write(payload);
+      r.end();
+      return;
+    } catch (eN) {}
+  }
+  /* 兜底 fetch：手机端（Android 客户端）没有 Node，fetch 是**唯一通道**。
+     ★ 2026-10-15 改：不再"明文 http 直接放弃"—— Electron 的 file:// 下被安全上下文拦掉
+       也只是静默失败（与不试一个效果），但 Android 的 WebView 允许明文 http，
+       提前 return 等于永远掐断手机端联机（作者实机：手机端一直"未连接"）。
+       现在统一"试一下，失败按未连接处理"（E31 纪律：失败静默、提示中性）。 */
+  try {
+    var to = setTimeout(function () { fin(false, null); }, 8000);
+    fetch(NET_BASE + path, {
+      method: method, cache: "no-store",
+      headers: payload ? { "Content-Type": "application/json" } : undefined, body: payload || undefined,
+    }).then(function (res) {
+      return res.text().then(function (t) { clearTimeout(to); try { fin(res.ok, JSON.parse(t)); } catch (e) { fin(false, null); } });
+    }).catch(function () { clearTimeout(to); fin(false, null); });
+  } catch (e2) { fin(false, null); }
+}
+
+/* 本机成绩：优先问宿主（shell-stats 快照），拿不到就用本地兜底。
+   ★ 兜底此前读的是 `csh_wallet_pc` —— 这个键**全扩展无人写入**（真键是 `csh_wallet`，
+     钱包对象里的 pc 字段；功勋在 `csh_rank`）。读一个没人写的键 = 恒 0 = 白兜底。 */
+function netSnapshot(cb) {
+  var v = { cby: 0, merit: 0, seg: "" };
+  function local() {
+    try {
+      var w = JSON.parse(localStorage.getItem("csh_wallet") || "{}");
+      v.cby = Math.max(0, Math.floor(Number(w && w.pc) || 0));
+    } catch (e) {}
+    try {
+      var r = JSON.parse(localStorage.getItem("csh_rank") || "{}");
+      v.merit = Math.max(0, Math.floor(Number(r && r.merit) || 0));
+    } catch (e) {}
+    cb(v);
+  }
+  try {
+    if (typeof Bridge !== "undefined" && Bridge && Bridge.call) {
+      Bridge.call("shell-stats", null, function (ok, s) {
+        if (ok && s) {
+          var c = (s.pc != null) ? s.pc : s.cby;
+          var m = (s.merit != null) ? s.merit : (s.rank && s.rank.merit);
+          v.cby = Math.max(0, Math.floor(Number(c) || 0));
+          v.merit = Math.max(0, Math.floor(Number(m) || 0));
+          /* 官阶名由钱包给出（唯一真源），页面只负责显示，不另抄一份表 */
+          v.seg = String(s.segName || (s.rank && s.rank.segName) || "").slice(0, 12);
+          cb(v); return;
+        }
+        local();
+      });
+      return;
+    }
+  } catch (e) {}
+  local();
+}
+
+function netPush(manual) {
+  netSnapshot(function (v) {
+    if (!manual && v.cby <= 0 && v.merit <= 0) { netStat(T.noScore); return; }
+    if (!NET.name) { netStat(T.needNameList); return; }
+    NET.seg = v.seg || NET.seg;
+    netReq("/submit", "POST", {
+      uid: NET.uid, name: NET.name, sig: NET.sig, cby: v.cby, merit: v.merit, fp: NET.fp, seg: NET.seg
+    }, function (ok, r) {
+      if (!ok) {
+        /* 服务端 400 且带原因时，只处理"名字已被占用"这一种；其余照旧给中性文案 */
+        if (r && r.error === "name-taken") { netStat(T.nameTaken, true); return; }
+        if (r && r.error === "name-blocked") { netStat(T.nameBlocked || "换个名字试试", true); return; }
+        if (r && r.error === "rename-limited") { netStat(T.renameLimited || "今日已更名，明日再来", true); return; }
+        netStat(manual ? T.failManual : T.offline, true);
+        return;
+      }
+      if (r && r.ignored) {
+        /* 静默拦截（刚提交过 / 已被服务端跳过）：自动上传什么都不说，手动点给一句交代 */
+        if (manual) netStat(T.debounceManual);
+        return;
+      }
+      /* ★ 服务端可能把这次提交"认领"到已有记录上（同一台机器 / 同一个网络），
+         并把最终归属的 uid 回给我们 —— 存下来，之后"我的那条"高亮才对得上。 */
+      if (r && r.uid) { NET.uid = r.uid; ls("csh_net_uid", r.uid); }
+      NET.last = { cby: v.cby, merit: v.merit };
+      var line = fmt(v.cby) + " " + T.cbyUnit + " · " + v.merit + " " + T.meritUnit + (v.seg ? " · " + v.seg : "");
+      /* 留名成功后把这一句题壁也回显出来 —— 让"题壁确实落榜了"当场可见。 */
+      if (NET.sig) line += tt("savedSig", { sig: NET.sig });
+      if (r && r.adopted === "fp") netStat(tt("adoptedFp", { line: line }));
+      else if (r && r.adopted === "ip") netStat(tt("adoptedIp", { name: String((r && r.name) || NET.name), line: line }));
+      else netStat(tt("savedOk", { line: line }));
+      netLoad();
+    });
+  });
+}
+
+function netLoad() {
+  if (NET.busing) return;
+  NET.busing = true;
+  /* 带上 uid：服务端会额外把"我"的全局名次算出来（哪怕不在前 N 名也能显示） */
+  netReq("/board?type=" + NET.kind + "&limit=50&uid=" + encodeURIComponent(NET.uid), "GET", null, function (ok, r) {
+    NET.busing = false;
+    if (!ok || !r || !r.ok) {
+      NET.rows = []; NET.me = null;
+      netStat(T.offline, true);
+      netRender();
+      return;
+    }
+    NET.rows = r.list || [];
+    NET.me = r.me || null;
+    netStat(NET.rows.length
+      ? tt("boardStat", { n: r.n, m: NET.rows.length })
+      : T.boardEmpty);
+    netRender();
+  });
+}
+
+function fmt(n) {
+  n = Math.floor(Number(n) || 0);
+  if (n >= 100000000) return (n / 100000000).toFixed(2) + " " + T.unitYi;
+  if (n >= 10000) return (n / 10000).toFixed(2) + " " + T.unitWan;
+  return String(n);
+}
+function esc(s) {
+  return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+    return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c];
+  });
+}
+/* ---------- P6 行头像工具 ----------
+   妖灵 id → 素材主名：名单真源是宿主（shell-cheer-list 给 csh_boss_minion_<ascii>），
+   素材是 image/csh_face_<ascii>.webp ⇒ 去前缀即得（与花魁三席用的是同一套规则，不再写第二份）。 */
+function asciiOf(id) { return String(id == null ? "" : id).replace("csh_boss_minion_", ""); }
+/* 姓氏印章圆标：无图玩家的降级头像。
+   首字 + 由名字哈希定出的**稳定**金色深浅 —— 同一名字任何设备任何时候都同色；
+   色相锁在 30~52 的金色邻域内，整榜统一不花（五颜六色最容易显土）。 */
+function sealOf(name) {
+  var s = String(name == null ? "" : name).trim() || "?";
+  var h = 0;
+  for (var i = 0; i < s.length; i++) h = (h * 131 + s.charCodeAt(i)) >>> 0;
+  var hue = 30 + (h % 22), sat = 32 + ((h >>> 3) % 20), lit = 37 + ((h >>> 7) % 13);
+  return { ch: s.slice(0, 1), bg: "hsl(" + hue + "," + sat + "%," + lit + "%)" };
+}
+/* ---------- 懒加载（P6 性能）----------
+   进视口才把 data-bg 落成真背景图（安卓端一次性解码几十张 webp 就是"图片加载半天"的真因）。
+   root 用 #rows（真正的滚动容器），rootMargin 预取 180px，滚动时不闪白。
+   不支持 IntersectionObserver 的极老环境直接全量落位 —— 功能不残，只是不省流量。 */
+var LAZY_IO = null;
+function lazyBg(scope) {
+  if (!scope || !scope.querySelectorAll) return;
+  var nodes = scope.querySelectorAll("[data-bg]");
+  if (!nodes.length) return;
+  var apply = function (n) {
+    var src = n.getAttribute("data-bg");
+    if (src) { n.style.backgroundImage = src; n.removeAttribute("data-bg"); }
+  };
+  if (typeof IntersectionObserver === "undefined") {
+    for (var i = 0; i < nodes.length; i++) apply(nodes[i]);
+    return;
+  }
+  if (!LAZY_IO) LAZY_IO = new IntersectionObserver(function (ents) {
+    for (var j = 0; j < ents.length; j++) {
+      if (!ents[j].isIntersecting) continue;
+      apply(ents[j].target);
+      LAZY_IO.unobserve(ents[j].target);
+    }
+  }, { root: el("rows") || null, rootMargin: "180px 0px", threshold: 0.01 });
+  for (var k = 0; k < nodes.length; k++) LAZY_IO.observe(nodes[k]);
+}
+/* ---------- 我自己的那条（不在前 N 也常驻可见） ---------- */
+function renderMeBar() {
+  var box = el("mebar");
+  if (!box) return;
+  var m = NET.me;
+  if (!m) { box.innerHTML = ""; return; }
+  var val = (NET.kind === "merit") ? (fmt(m.merit) + " " + T.meritUnit) : (fmt(m.cby) + " " + T.cbyUnit);
+  box.innerHTML = '<div>' + tt("meRank", { n: m.rank }) + '</div>'
+    + '<div>' + esc(m.name) + (m.seg ? ' · <span class="seg">' + esc(m.seg) + '</span>' : '') + '</div>'
+    + (m.sig ? '<div>壁上：' + esc(m.sig) + '</div>' : '')
+    + '<div><span class="myv">' + val + '</span></div>'
+    + '<div>' + esc(m.ago || "") + '</div>';
+}
+function netRender() {
+  renderMeBar();
+  var box = el("rows");
+  if (!box) return;
+  if (!NET.rows.length) { box.innerHTML = '<div class="empty">' + T.rowsEmpty + '</div>'; return; }
+  var h = "";
+  for (var i = 0; i < NET.rows.length; i++) {
+    var row = NET.rows[i];
+    /* v3：数字与单位拆开渲染 —— 主值加粗等宽、单位压小压淡（层级分明，不是满屏同权重） */
+    var valNum = (NET.kind === "merit") ? row.merit : row.cby;
+    var valUnit = (NET.kind === "merit") ? T.meritUnit : T.cbyUnit;
+    /* P6 行头像：玩家不上传头像 ⇒ 姓氏印章圆标（首字 + 稳定金色深浅） */
+    var sl = sealOf(row.name || T.noName);
+    h += '<div class="row' + (row.uid === NET.uid ? " me" : "") + '">'
+      + '<span class="rk' + (row.rank <= 3 ? " top" : "") + '">' + row.rank + '</span>'
+      + '<span class="av seal" style="background:' + sl.bg + '">' + esc(sl.ch) + '</span>'
+      + '<span class="nm">' + esc(row.name || T.noName)
+      + (row.sig ? '<i class="sgr">壁上：' + esc(row.sig) + '</i>' : '') + '</span>'
+      + (row.seg ? '<span class="seg">' + esc(row.seg) + '</span>' : '')
+      + '<span class="tm">' + esc(row.ago || "") + '</span>'
+      + '<span class="vl">' + fmt(valNum) + '<span class="u">' + esc(valUnit) + '</span></span></div>';
+  }
+  box.innerHTML = h;
+}
+
+/* ---------- 花榜（v2.1 立 · v3 换世界观口径）：花 CBY 给唱曲的姑娘缠头 ——
+   扣费走宿主单一账本（shell-cheer），服务端只做聚合与展示；
+   两边各管各的真源（名单问宿主，缠头数问服务端）。 ---------- */
+var CHEER = { list: [], girls: {} };
+/* 花榜版式状态（2026-10-16 三版式）：
+     "chief" = 花魁三席（**默认** · 作者定案：只列前三名的详细情况）
+     "wall"  = 照片墙（全 50 位）· "list" = 名录（全 50 位）
+   WALL.shown 是**已渲染格数**（分批渲染的游标），WALL.batch 为每批格数。 */
+var WALL = { rows: [], shown: 0, batch: 12, io: null, mode: "chief" };
+function setView(m) {
+  WALL.mode = (m === "wall" || m === "list") ? m : "chief";
+  var vc = el("v-chief"), vw = el("v-wall"), vl = el("v-list");
+  if (vc) vc.className = (WALL.mode === "chief") ? "on" : "";
+  if (vw) vw.className = (WALL.mode === "wall") ? "on" : "";
+  if (vl) vl.className = (WALL.mode === "list") ? "on" : "";
+}
+function showViewbar(on) { var vb = el("viewbar"); if (vb) vb.hidden = !on; }
+/* 默认版式：**花魁三席**。
+   （P6 时这里按视口高度在"照片墙/名录"之间自适应；2026-10-16 起三席是默认与主体，
+     矮窗也一样能看 —— 三席一排在 915 宽只占一行，不再有"一格就 138px"的问题。） */
+function preferView() { return "chief"; }
+
+function netGirls() {
+  flushCheer();   /* 进花榜先补欠账（钱已扣、榜未记的队列；幂等 cid 安全重发） */
+  var ask = function (cb) {
+    if (Bridge && Bridge.call) Bridge.call("shell-cheer-list", null, cb);
+    else cb(false, null);
+  };
+  ask(function (okL, l) {
+    /* ★ 名册真源是宿主（50 只恒定的花名册），**空的应答不覆盖已有的那份**：
+       宿主应答超时/失败会回空，若照着清，刚拿到的族名会被自己人清掉
+       （P6 实测：boot 期那次问名册的超时回调在 2.5s 后把名册清空，
+        主推位当场从族名变回「佚名」）。 */
+    var arr = (okL && l && l.list) ? l.list : [];
+    if (arr.length) CHEER.list = arr;
+    /* 带 uid：服务端据此回「我在这只投了多少」（me_amt）与贡献称号档位（tier） */
+    netReq("/girls?uid=" + encodeURIComponent(NET.uid), "GET", null, function (ok, r) {
+      CHEER.girls = {};
+      if (ok && r && r.ok) for (var i = 0; i < (r.girls || []).length; i++) CHEER.girls[r.girls[i].girl] = r.girls[i];
+      netRenderGirls();
+    });
+  });
+}
+/* 花榜行数据：名单来自宿主（唯一真源），缠头数来自服务端（唯一真源），这里只做装配与排序 */
+function girlsRows() {
+  var rows = [];
+  for (var i = 0; i < CHEER.list.length; i++) {
+    var c = CHEER.girls[CHEER.list[i].id];
+    rows.push({ id: CHEER.list[i].id, name: CHEER.list[i].name,
+                total: c ? c.total : 0,
+                n: c ? c.n : 0,
+                tops: (c && c.tops) ? c.tops : [],
+                chief: c ? c.chief_name : "", chiefSig: c ? c.chief_sig : "", chiefAmt: c ? c.chief_amt : 0,
+                top: c ? c.top_name : "", topAmt: c ? c.top_amt : 0,
+                meAmt: c ? c.me_amt : 0, tier: c ? c.tier : "" });
+  }
+  rows.sort(function (a, b) { return b.total - a.total; });
+  return rows;
+}
+/* 魁首题壁档案（v2.2）：一行金线签名条。返回值**已是可插入 HTML**（内部已 esc）。 */
+function chiefLineHtml(r2) {
+  if (r2.chief && r2.chiefSig) return tt("cheerChief", { name: esc(r2.chief), sig: esc(r2.chiefSig) });
+  if (r2.chief) return tt("cheerEcho", { name: esc(r2.chief), amt: fmt(r2.chiefAmt) });
+  if (r2.top) return tt("cheerEcho", { name: esc(r2.top), amt: fmt(r2.topAmt) });
+  return "";
+}
+/* 贡献称号胶囊（v2.2）：我在这一只投过（me_amt>0）才显示，免得整榜都挂「初来」 */
+function tierChipHtml(r2) {
+  var tw = tierWord(r2.tier);
+  if (!(r2.meAmt > 0 && tw)) return "";
+  return '<span class="seg tier" title="' + esc(tt("tierTitle", { g: r2.name, amt: fmt(r2.meAmt) })) + '">'
+    + esc(tt("tierMine", { t: tw })) + '</span>';
+}
+function netRenderGirls() {
+  renderMeBar();
+  var box = el("rows");
+  if (!box) return;
+  WALL.rows = girlsRows();
+  if (!WALL.rows.length) { box.innerHTML = '<div class="empty">' + T.girlsEmpty + '</div>'; return; }
+  if (WALL.mode === "chief") renderChiefs();
+  else if (WALL.mode === "list") renderCheerList();
+  else renderWall(0);
+}
+/* ---------- 版式零：花魁三席（默认 · 2026-10-16）----------
+   作者："花魁不用把 50 个美女全列出来，只需要列前三名的详细情况，
+   比如打赏最高的几个人就行了。"
+   ⇒ 三席 = 榜单前三位（**可能还没人缠头**，那时给一句"虚位以待"，
+     否则新服上花榜全空、连第一个人都没法起头）。
+   每席的"详细情况" = 打赏最高的几位（服务端 tops，含题壁与 uid 用于标出"我"）。
+   某席的打赏榜里如果有我，那一行加红并挂「你」签 —— 炫耀机制要让人一眼找到自己。 */
+function patronRowsHtml(r2, seat) {
+  var tops = r2.tops || [];
+  if (!r2.total || !tops.length) {
+    /* 老服务端没有 tops、或这一席还没人缠头：给一句中性提示，不摆空行 */
+    if (!r2.total) return '<div class="chpr more chempty">' + esc(T.chiefNone) + '</div>';
+  }
+  var h = "";
+  for (var i = 0; i < tops.length; i++) {
+    var p = tops[i];
+    var isMe = NET.uid && p.uid === NET.uid;
+    h += '<div class="chpr' + (i === 0 ? " p1" : "") + (isMe ? " me" : "") + '">'
+      + '<span class="prk">' + (i + 1) + '</span>'
+      + '<b>' + esc(p.name || T.noName) + '</b>'
+      + '<i>' + esc(p.sig || "") + '</i>'
+      + '<em>' + fmt(p.amt) + '</em></div>';
+  }
+  /* 只列前几位；还有更多就说一句"另有 N 位"，不把整张榜塞进一张卡 */
+  var more = (r2.n || 0) - tops.length;
+  if (more > 0) h += '<div class="chpr more">' + esc(tt("chiefMore", { n: more })) + '</div>';
+  return h || '<div class="chpr more chempty">' + esc(T.chiefNone) + '</div>';
+}
+function seatCardHtml(r2, idx) {
+  var key = asciiOf(r2.id);
+  var tw = (r2.meAmt > 0) ? tierWord(r2.tier) : "";
+  var sub = (r2.total ? tt("chiefPeople", { n: r2.n || 0 }) : "")
+    + (tw ? (r2.total ? " · " : "") + '<span class="tier">' + esc(tt("tierMine", { t: tw })) + '</span>' : "");
+  return '<div class="chief' + (idx === 0 ? " c1" : "") + '">'
+    + '<div class="chd">'
+    +   '<span class="chpic" data-bg="url(../image/csh_face_' + esc(key) + '.webp)"></span>'
+    +   '<span class="chmeta">'
+    +     '<span class="chrk">' + esc(T.seat[idx] || "") + '</span>'
+    +     '<span class="chnm">' + esc(r2.name) + '</span>'
+    +     '<span class="chtot">' + fmt(r2.total) + '<span class="u">' + esc(T.cheerUnit) + '</span></span>'
+    +     (sub ? '<span class="chsub">' + sub + '</span>' : '')
+    +   '</span>'
+    + '</div>'
+    + '<div class="chpat"><span class="chph">' + esc(T.chiefPatrons) + '</span>'
+    +   patronRowsHtml(r2, idx) + '</div>'
+    + '<button class="chbtn" type="button" data-g="' + esc(r2.id) + '" data-n="' + esc(r2.name) + '">'
+    +   esc(T.cheerBtn) + '</button>'
+    + '</div>';
+}
+function renderChiefs() {
+  var box = el("rows");
+  if (!box) return;
+  var top3 = WALL.rows.slice(0, 3);
+  var h = '<div class="chiefs">';
+  for (var i = 0; i < top3.length; i++) h += seatCardHtml(top3[i], i);
+  h += '</div><div class="chieftip">' + esc(T.chiefTip) + '</div>';
+  box.innerHTML = h;
+  lazyBg(box);
+  bindCheer(box);
+}
+/* ---------- 版式一：名录（原列表；P6 补行头像） ---------- */
+function renderCheerList() {
+  var box = el("rows");
+  if (!box) return;
+  var h = "";
+  for (var j = 0; j < WALL.rows.length; j++) {
+    var r2 = WALL.rows[j];
+    var line = chiefLineHtml(r2);
+    /* P6 行头像：花榜行**直接用该妖灵头像**（名单 id 去前缀 = 素材主名） */
+    var key = asciiOf(r2.id);
+    h += '<div class="row"><span class="rk' + (j < 3 ? " top" : "") + '">' + (j + 1) + '</span>'
+      + '<span class="av" data-bg="url(../image/csh_face_' + esc(key) + '.webp)"></span>'
+      + '<span class="nm">' + esc(r2.name)
+      + (line ? '<i class="sgr ct">' + line + '</i>' : '') + '</span>'
+      + tierChipHtml(r2)
+      + '<span class="ctotal">' + fmt(r2.total) + '<span class="u">' + esc(T.cheerUnit || T.cheerBtn) + '</span></span>'
+      + '<button class="cheerbtn" type="button" data-g="' + esc(r2.id) + '" data-n="' + esc(r2.name) + '">' + T.cheerBtn + '</button></div>';
+  }
+  box.innerHTML = h;
+  lazyBg(box);
+  bindCheer(box);
+}
+/* ---------- 版式二：照片墙（P6 新）----------
+   立绘铺满 + 底部渐隐压「族名 / 缠头数 / 魁首」，右上角一枚「+」直接缠头（不加别的交互）。
+   **分批渲染**：首批 12 格，把最后一格当哨兵，进视口再放下一批 —— 一次不铺 50 张图。 */
+function wallCellHtml(r2, idx) {
+  var key = asciiOf(r2.id);
+  var tw = (r2.meAmt > 0) ? tierWord(r2.tier) : "";
+  var line = chiefLineHtml(r2);
+  return '<div class="wall-cell' + (idx < 3 ? " k" + (idx + 1) : "") + '">'
+    + '<span class="wk">' + (idx + 1) + '</span>'
+    + '<span class="pic" data-bg="url(../image/csh_face_' + esc(key) + '.webp)"></span>'
+    + '<span class="info">'
+    +   '<span class="wn">' + esc(r2.name) + '</span>'
+    +   '<span class="wt">' + fmt(r2.total) + '<span class="u">' + esc(T.cheerUnit) + '</span>'
+    +     (tw ? '<em class="wm">' + esc(tw) + '</em>' : '') + '</span>'
+    +   (line ? '<i class="wc">' + line + '</i>' : '')
+    + '</span>'
+    + '<button class="wb" type="button" data-g="' + esc(r2.id) + '" data-n="' + esc(r2.name)
+    + '" title="' + esc(T.cheerBtn) + '" aria-label="' + esc(T.cheerBtn) + '">' + esc(T.cheerBtn) + '</button>'
+    + '</div>';
+}
+function renderWall(from) {
+  var box = el("rows");
+  if (!box) return;
+  if (!from) {
+    box.innerHTML = '<div class="wall" id="wall"></div>';
+    WALL.shown = 0;
+    if (WALL.io) { try { WALL.io.disconnect(); } catch (e) {} WALL.io = null; }
+  }
+  var wall = el("wall");
+  if (!wall) return;
+  var end = Math.min(WALL.rows.length, WALL.shown + WALL.batch);
+  var h = "";
+  for (var i = WALL.shown; i < end; i++) h += wallCellHtml(WALL.rows[i], i);
+  wall.insertAdjacentHTML("beforeend", h);
+  WALL.shown = end;
+  lazyBg(wall);
+  bindCheer(wall);
+  if (WALL.shown < WALL.rows.length) {
+    var cells = wall.children, last = cells[cells.length - 1];
+    if (!last) return;
+    if (typeof IntersectionObserver === "undefined") { renderWall(WALL.shown); return; }
+    if (!WALL.io) WALL.io = new IntersectionObserver(function (ents) {
+      for (var j = 0; j < ents.length; j++) {
+        if (!ents[j].isIntersecting) continue;
+        try { WALL.io.unobserve(ents[j].target); } catch (e) {}
+        renderWall(WALL.shown);
+        return;
+      }
+    }, { root: el("rows") || null, rootMargin: "240px 0px" });
+    WALL.io.observe(last);
+  }
+}
+/* 缠头按钮绑定（三席的 .chbtn / 列表的 .cheerbtn / 照片墙的 .wb 同一处理；
+   data-bound 防止分批追加时重复绑定） */
+function bindCheer(scope) {
+  var root = scope || el("rows");
+  if (!root || !root.querySelectorAll) return;
+  var btns = root.querySelectorAll(".cheerbtn,.wb,.chbtn");
+  for (var k = 0; k < btns.length; k++) {
+    if (btns[k].getAttribute("data-bound")) continue;
+    btns[k].setAttribute("data-bound", "1");
+    (function (b) {
+      b.addEventListener("click", function (ev) {
+        if (ev && ev.stopPropagation) ev.stopPropagation();
+        doCheer(b.getAttribute("data-g"), b.getAttribute("data-n"), readCheerAmt());
+      }, false);
+    })(btns[k]);
+  }
+}
+/* 缠头数额（2026-10-16 晚 · 作者："打赏改为具体数额"）：页面级单点。
+   区间 = 宿主 shell-cheer 的校验区间（100 ~ 1,000,000）；存 localStorage 进页回填。
+   三席 / 照片墙 / 名录三种入口的缠头按钮共用这一个数额（点按钮时现读现钳）。 */
+var CH = { amt: 1000 };
+function clampAmt(v) {
+  v = Math.floor(Number(v) || 0);
+  if (!(v >= 100)) v = 100;
+  if (v > 1000000) v = 1000000;
+  return v;
+}
+function readCheerAmt() {
+  var inp = el("chAmt");
+  CH.amt = clampAmt((inp && inp.value) || CH.amt);
+  if (inp) inp.value = String(CH.amt);
+  ls("csh_rank_cheer_amt", String(CH.amt));
+  return CH.amt;
+}
+/* 缠头待上报队列（2026-10-16 晚 · 作者："缠头没有生效"的治本件之一）：
+   宿主扣费成功后，若 /cheer 被限流（ignored）或请求失败 —— **钱已扣、榜未记**。
+   把这一笔入队（本地存），凭**幂等 cid** 事后补报：服务端按 cid 去重，
+   重发绝不会重复计数（配合服务端 v2.4 的频率闸拆分，被吞的概率已大幅下降）。 */
+var CHEERPEND = [];
+try { CHEERPEND = JSON.parse(ls("csh_rank_pending") || "[]") || []; } catch (eP0) { CHEERPEND = []; }
+if (!Array.isArray(CHEERPEND)) CHEERPEND = [];
+function pendPush(entry) {
+  CHEERPEND.push(entry);
+  if (CHEERPEND.length > 20) CHEERPEND = CHEERPEND.slice(-20);
+  ls("csh_rank_pending", JSON.stringify(CHEERPEND));
+}
+function pendShift() {
+  CHEERPEND.shift();
+  ls("csh_rank_pending", JSON.stringify(CHEERPEND));
+}
+function flushCheer() {
+  if (!NET.uid || !CHEERPEND.length) return;
+  var one = CHEERPEND[0];
+  netReq("/cheer", "POST", { uid: NET.uid, name: NET.name, sig: NET.sig, girl: one.girl, amt: one.amt, cid: one.cid }, function (ok, r) {
+    if (ok && r && r.ok) {
+      pendShift();
+      if (CHEERPEND.length) flushCheer();
+    }
+    /* 失败/被限：留在队列，下次进页继续补（幂等 cid 保证安全） */
+  });
+}
+function doCheer(gid, gname, amt) {
+  if (!NET.name) { netStat(T.needNameCheer, true); return; }
+  if (!(Bridge && Bridge.call)) { netStat(T.offline, true); return; }
+  var cid = "c-" + String(NET.uid || "x").slice(-8) + "-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 7);
+  Bridge.call("shell-cheer", { girl: gid, gname: gname, amt: amt }, function (ok, s) {
+    if (!ok) { netStat(s && s.reason === "poor" ? T.cheerPoor : T.cheerFail, true); return; }
+    /* 每日首次免缠头（v2.2）：宿主判定并回传 free + 实际计入的缠头量（免费 = +1）。
+       页面**不自己扣**，只如实把宿主给的量上报服务端做聚合。 */
+    var gotFree = !!(s && s.free);
+    var credited = (s && s.amt != null) ? Math.max(1, Math.floor(Number(s.amt) || 1)) : amt;
+    netReq("/cheer", "POST", { uid: NET.uid, name: NET.name, sig: NET.sig, girl: gid, amt: credited, cid: cid }, function (ok2, r2) {
+      if (ok2 && r2 && r2.ok && !r2.ignored) {
+        netStat(gotFree ? tt("cheerFree", { g: gname }) : tt("cheerOk", { g: gname, amt: fmt(credited) }));
+        flushCheer();   /* 顺带把之前的欠账一起补 */
+      } else {
+        /* 被限流（ignored）或请求失败：钱已扣、榜未记 —— 入队补报 + 一句中性提示 */
+        pendPush({ cid: cid, girl: gid, amt: credited, t: Date.now() });
+        netStat(T.cheerFail, true);
+      }
+      netGirls();
+    });
+  });
+}
+
+(function boot() {
+  /* ★ 只在**真实页面**里启动：离线冒烟测试 / 无 location 的沙箱环境里
+     window.location.protocol 不存在 ⇒ 直接 return，不发任何网络请求。
+     （否则 CI 沙箱会真的往外发请求，属于无意义的噪音。） */
+  var real = false;
+  try {
+    real = (typeof window !== "undefined") && (typeof document !== "undefined")
+      && !!(window.location && window.location.protocol)
+      && /^(https?|file):$/.test(window.location.protocol);
+  } catch (e0) { real = false; }
+  if (!real) return;
+  netInit();
+  applyStaticCopy();   /* 名字读出来后，按钮文案再定一次（题名 / 更名） */
+  var inp = el("nm");
+  var sgIn = el("sg");
+  var sv = el("save");
+  function takeSig() {
+    if (!sgIn) return;
+    NET.sig = String(sgIn.value || "").trim().slice(0, 10);
+    ls("csh_net_sig", NET.sig);
+  }
+  if (sgIn) {
+    sgIn.addEventListener("input", takeSig, false);
+    sgIn.addEventListener("change", takeSig, false);
+  }
+  if (sv) sv.addEventListener("click", function () {
+    var nn = String((inp && inp.value) || "").trim().slice(0, 5);
+    if (!nn) { netStat(T.needNameList, true); return; }
+    NET.name = nn;
+    ls("csh_net_name", nn);
+    takeSig();
+    if (sv) sv.textContent = T.submitEdit;
+    netPush(true);
+  }, false);
+  if (inp) {
+    inp.addEventListener("keydown", function (e) { if (e.key === "Enter" && sv) sv.click(); }, false);
+    inp.addEventListener("input", function () {
+      if (!sv) return;
+      sv.textContent = NET.name ? T.submitEdit : T.submitNew;
+    }, false);
+  }
+  /* 缠头数额输入（2026-10-16 晚）：change / 回车即钳制并落盘 */
+  var ca = el("chAmt");
+  if (ca) {
+    ca.addEventListener("change", function () { readCheerAmt(); }, false);
+    ca.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") { readCheerAmt(); try { ca.blur(); } catch (e2) {} }
+    }, false);
+  }
+  var tc = el("t-cby"), tm = el("t-merit"), tch = el("t-cheer");
+  function tab(x) {
+    if (tc) tc.className = x === "cby" ? "on" : "";
+    if (tm) tm.className = x === "merit" ? "on" : "";
+    if (tch) tch.className = x === "cheer" ? "on" : "";
+  }
+  if (tc) tc.addEventListener("click", function () { NET.kind = "cby"; tab("cby"); showViewbar(false); netLoad(); }, false);
+  if (tm) tm.addEventListener("click", function () { NET.kind = "merit"; tab("merit"); showViewbar(false); netLoad(); }, false);
+  if (tch) tch.addEventListener("click", function () { NET.kind = "cheer"; tab("cheer"); showViewbar(true); netGirls(); }, false);
+  /* 花榜版式：默认「花魁三席」（作者 2026-10-16 定案）；照片墙/名录 = 全 50 位，供打赏 */
+  setView(preferView());
+  var vc = el("v-chief"), vw = el("v-wall"), vl = el("v-list");
+  if (vc) vc.addEventListener("click", function () { setView("chief"); netRenderGirls(); }, false);
+  if (vw) vw.addEventListener("click", function () { setView("wall"); netRenderGirls(); }, false);
+  if (vl) vl.addEventListener("click", function () { setView("list"); netRenderGirls(); }, false);
+  if (vl) vl.addEventListener("click", function () { setView("list"); netRenderGirls(); }, false);
+  /* 进页先读名册；**已有名字就自动上传一次**（作者要的"有网就自动传，不用点"） */
+  if (NET.name) netPush(false); else netStat(T.needNameAuto);
+  netLoad();
+})();
+</script>
+</body>
+</html>

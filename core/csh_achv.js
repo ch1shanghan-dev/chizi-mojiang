@@ -72,6 +72,23 @@
 	function statProg(field, goal) {
 		return function (s) { return [Number(s[field]) || 0, goal]; };
 	}
+	/* v4 · 总量型进度（BOSS 挑战专用）：分母 = 快照里的动态总量（shell buildStats 由
+	   lib.cshBossRecord.summary() 注入，随档位名单变化），快照缺失时回落到静态值。
+	   —— 名单改动后成就阈值自动跟随，"数学上恒可达"不再依赖人工同步数字。 */
+	function bossProg(field, totalField, fallback) {
+		return function (s) {
+			return [Number(s[field]) || 0, Number(s[totalField]) || fallback];
+		};
+	}
+	/* v4 · 系列计数读取（键系容错）：快照 series/seriesTotal 的键**无 csh_ 前缀**
+	   （csh_bossrecord.summary 的 `sk.replace(/^csh_/,"")`，与讨伐录系列表同契约）。
+	   这里对「无前缀」与「带前缀」两种写法都查一次 —— 单点兼容，避免键系漂移再静默归零。 */
+	function pickSeries(bag, key) {
+		if (!bag) return 0;
+		var v = bag[key];
+		if (v == null) v = bag["csh_" + key];
+		return Number(v) || 0;
+	}
 	/* 「反向目标 + 证据前置」：必须先有真实经历（如打过手 / 曾有过钱），
 	   否则宿主字段全 0（世界模块未加载）时会瞬间伪达成。
 	   例：打穷它 → 至少同桌过 1 手；囊中羞涩 → 生涯峰值曾 ≥ 1000。 */
@@ -348,6 +365,85 @@
 		function (s) { return [(Number(s.billionaireBroke) || 0) >= 1 ? 1 : 0, 1]; }, 2000);
 	push("egg_full_house", "彩蛋", "🎯", "满堂彩", "单日把三项每日任务全部完成（任务完成数 ≥ 3）",
 		function (s) { return [Number(s.taskDone) || 0, 3]; }, 400);
+
+	/* ============================================================
+	   12. 挑战（BOSS 讨伐 · 2026-10-13 批次 4c · 16 条）
+	   ------------------------------------------------------------
+	数据源 = buildStats 的 bossKill* / bossSeries / bossTotal* / bossSeriesTotal
+	   （lib.cshBossRecord.summary 聚合，与讨伐录页面同一数据源，§6.4③）；
+	   领奖走既有 shell-ach-claim 链。
+	   阈值全部数学上可达：分母读快照动态总量（bossTotal*），名单改动自动跟随
+	   ——"打满"= 逐一击破，恒有终点。
+	   ============================================================ */
+	(function () {
+		var steps = [1, 5, 20, 50], rw = { 1: 200, 5: 400, 20: 900, 50: 2000 };
+		for (var i = 0; i < steps.length; i++) {
+			(function (v) {
+				push("bosskill_" + v, "挑战", "🗡", "初讨 · " + v, "累计讨伐 " + v + " 位魔王（讨伐录可查）",
+					function (s) { return [Number(s.bossKill) || 0, v]; }, rw[v]);
+			})(steps[i]);
+		}
+	})();
+	push("boss_all", "挑战", "🗡", "讨伐录 · 圆满", "册中魔王全部击破（整本讨伐录点亮）",
+		bossProg("bossKill", "bossTotal", 93), 8000);
+	push("boss_ult_all", "挑战", "🗡", "究极全破", "全部究极魔王击破（魔威 · 霸体 · 魔怒俱在）",
+		bossProg("bossKillUlt", "bossTotalUlt", 8), 3000);
+	push("boss_lord_all", "挑战", "🗡", "霸主全破", "全部霸主魔王击破",
+		bossProg("bossKillLord", "bossTotalLord", 30), 2600);
+	push("boss_egg_all", "挑战", "🗡", "彩蛋全破", "4 位彩蛋魔王全部击破",
+		bossProg("bossKillEgg", "bossTotalEgg", 4), 1200);
+	(function () {
+		/* d[2] 仅用于描述文案（v4 实际计数）；判定分母走快照 bossSeriesTotal 动态值。
+		   ★ 2026-10-14 审计修复（真 BUG）：快照 `series` / `seriesTotal` 的键是
+		     **不带 csh_ 前缀**的（csh_bossrecord.summary 里 `sk.replace(/^csh_/,"")`，
+		     与 bossbook 页的系列表契约一致）。此前本表用带前缀的 "csh_cuifeng" 去索引
+		     无前缀的快照 → 恒 undefined → 分子恒 0、分母回落静态值 → **8 条系列成就
+		     数学上永不可达成**（进度永远 0/N）。现在键统一为无前缀，并对旧写法双查兜底。 */
+		var seriesDef = [
+			["cuifeng", "摧锋", 24], ["zhoutian", "周天", 26], ["fulan", "覆澜", 10],
+			["huichuan", "汇川", 10], ["fuguang", "浮光", 10], ["jinhuo", "烬火", 7],
+			["jingting", "惊霆", 5], ["qunyou_lunwai", "外传", 1],
+		];
+		for (var i = 0; i < seriesDef.length; i++) {
+			(function (d) {
+				push("boss_series_" + d[0], "挑战", "🗡", d[1] + "全讨", d[1] + "系列 " + d[2] + " 位全部击破",
+					function (s) {
+						var tot = pickSeries(s.bossSeriesTotal, d[0]) || d[2];
+						return [pickSeries(s.bossSeries, d[0]) || 0, tot];
+					}, 800);
+			})(seriesDef[i]);
+		}
+	})();
+	/* v4.2 速通（作者定案：速通排行可以有）：某档"最快击破轮数 ≤ N"= 1/1 达成
+	   （分母恒 1，未达成时显示 0/1；数据源 buildStats.bossSpeed*） */
+	(function () {
+		var speedDef = [
+			["ultimate", "速通 · 究极", "12", 12, 2600],
+			["lord", "速通 · 霸主", "10", 10, 1800],
+			["elite", "速通 · 精英", "8", 8, 900],
+		];
+		for (var i = 0; i < speedDef.length; i++) {
+			(function (d) {
+				push("boss_speed_" + d[0], "挑战", "⏱", d[1], "在 " + d[2] + " 轮内击破一位" +
+					({ ultimate: "究极", lord: "霸主", elite: "精英" })[d[0]] + "魔王",
+					function (s) {
+						var sp = s.bossSpeed && Number(s.bossSpeed[d[0]]);
+						return [(sp && sp > 0 && sp <= d[3]) ? 1 : 0, 1];
+					}, d[4]);
+			})(speedDef[i]);
+		}
+	})();
+	/* v4.2 魔王方战绩（作者定案：操纵魔王的战绩挂上去）：应战模式取胜 1 / 5 / 20 次 */
+	(function () {
+		var steps = [1, 5, 20], rw = { 1: 300, 5: 900, 20: 2600 };
+		for (var i = 0; i < steps.length; i++) {
+			(function (v) {
+				push("boss_asboss_" + v, "挑战", "👑", "亲征 · " + v, "扮演魔王取得 " + v + " 场胜利（应战模式）",
+					function (s) { return [Number(s.bossAsBossWin) || 0, v]; }, rw[v]);
+			})(steps[i]);
+		}
+	})();
+
 
 	/* ============================================================
 	   引擎 API

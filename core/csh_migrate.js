@@ -1,36 +1,75 @@
-import { lib } from "../../../noname.js";
+import { lib, game } from "../../../noname.js";
 /*
  * 池子魔将 · 数据迁移与存档（§J）
  * ---------------------------------------------------------------
- * 一份文件装全部生涯：战绩(winrate) + 钱包(wallet) + 官阶(rank) + AI世界(world) + CDK序号(cdkUsed)
+ * 一份文件装全部生涯（v3 · 2026-10-15：由 19 键扩到「全部玩家数据」）
  *
  * 对外接口（lib.cshMigrate / window.CSH.migrate）：
  *   CM.export()                  → "CSHMIG1.<base64url>" 字符串
- *   CM.inspect(code)             → { ok, err?, meta?, summary? } 只读解析
+ *   CM.inspect(code)             → { ok, err?, meta?, data?, summary? } 只读解析
  *   CM.import(code, opts)        → { ok, err?, applied?, diff? } 执行覆盖（含自动备份）
  *   CM.backups()                 → 最近 3 份备份列表
  *   CM.rollback(stamp)           → 回滚到指定备份
+ *   CM.inventory()               → 家当清点（每域"有没有 / 多少"），给「行囊」页展示
  *   CM.selftest()                → 自检
  *
  * 规范要点：
  *   §J.3 前缀 CSHMIG1 + meta.sum = 全字段 SHA-256 前 8 字节 base64url
  *   §J.4 白名单 / 钳制 / 版本 / 二次确认(由调用方) / 自动备份 3 份 / CDK 只并集不覆盖
+ *
+ * ★ v3 三处结构性修正（2026-10-15 作者：「导入导出要涵盖全部的玩家数据」）：
+ *   ① **存储后端不再只有 localStorage**：讨伐录 / 扮演魔王 / 胜负统计 / 金鳞市
+ *      四份存档的真值在 `lib.config[...]`（game.saveConfig 范式），旧版 migrate 一律
+ *      按 localStorage 读 ⇒ **战绩从来就没有被导出过**（读到的恒是 null，功能是坏的
+ *      却没人发现）。现有 store 类型：0=localStorage JSON / 1=localStorage 字符串 /
+ *      2=通配族 / **3=lib.config（读时 localStorage 兜底）** / **4=多键合成一族**。
+ *   ② **键数与代码里的真实持久化键对齐**，并新增门禁（E41）扫源码比对
+ *      —— 以后再加键忘了登记，门禁直接红。
+ *   ③ **边界显式**：本机身份类键（设备 ID / 设备绑定表 / 天下榜 uid / 悬浮球坐标 /
+ *      按日免缠头日键 / 内部迁移标记）**故意不带**，理由逐条写在 EXCLUDED 里，
+ *      页面也会如实告诉玩家"哪些不随行囊走"。
  */
 (function () {
 	var CSH = typeof window !== "undefined" ? window.CSH : null;
 
-	var VERSION = 2;
+	var VERSION = 3;
 	var PREFIX = "CSHMIG1.";
 	var K_BACKUP_PREFIX = "csh_mig_backup_";
 	var MAX_BACKUPS = 3;
 
+	/* ---------- 本机身份类键（**故意不带** 的边界） ----------
+	   放在最前，因为"排除清单"与"重置清单"都要引用它们 —— 两边共用同一份键名，
+	   免得各写一份字面量然后漂移（本项目反复栽在"同一事实多份副本"上）。 */
+	var K_DEVICE_ID = "csh_cdk_dev";                          /* 本机设备 ID（CDK 设备绑定凭据） */
+	var K_DEV_BIND = "csh_cdk_devbind";                       /* CDK 序号 ↔ 设备 ID 绑定表 */
+	var K_NET_UID = "csh_net_uid";                            /* 天下榜本机身份 */
+	var K_FLOAT_POS = "extension_池子魔将_csh_debug_float_pos";/* 调试悬浮球坐标 */
+	var K_CHEER_DAY = "csh_rank_cheer_day";                   /* 每日首次免缠头日键 */
+	var K_MIG_FLAG = "csh_wallet_migrated";                   /* 内部迁移标记 */
+
 	/* 白名单键（§J.2 / §J.4#3 · 2026-10-01 由 6 项扩到 19 项）
 	   6 原有：winrate/wallet/rank/world/cdkUsed/meta
 	   + 6 必须补：dailyTask/achv/texasBest/bjBest/sniperBest/cdkLifetime
-	   + 7 建议补：panelSkin/bgmVolume/bgmOn/sfxVolume/texasSet/bjSet/dbgPresets */
+	   + 7 建议补：panelSkin/bgmVolume/bgmOn/sfxVolume/texasSet/bjSet/dbgPresets
+	   + 2026-10-15 v3 补 9 项：affection/bossKill/bossAsBoss/goldfish/ledger/
+	     walletHist/walletSnap/uiSeen/names（合计 28 项，覆盖全部玩家数据） */
 	var WHITELIST = ["winrate", "wallet", "rank", "world", "cdkUsed", "meta",
 		"dailyTask", "achv", "texasBest", "bjBest", "sniperBest", "cdkLifetime",
-		"panelSkin", "bgmVolume", "bgmOn", "sfxVolume", "texasSet", "bjSet", "dbgPresets"];
+		"panelSkin", "bgmVolume", "bgmOn", "sfxVolume", "texasSet", "bjSet", "dbgPresets",
+		"affection", "bossKill", "bossAsBoss", "goldfish", "ledger",
+		"walletHist", "walletSnap", "uiSeen", "names"];
+
+	/* 故意不带（边界清单 · 页面会如实展示给玩家）：
+	     · 键名             —— 为什么 */
+	var EXCLUDED = [
+		[K_DEVICE_ID, "本机设备 ID（CDK 设备绑定的凭据，跨设备带走等于两台机器共用一个身份）"],
+		[K_DEV_BIND, "CDK 序号 ↔ 设备 ID 绑定表（同上，属安全边界，不是玩家资产）"],
+		[K_NET_UID, "天下榜本机身份（换机后由服务端按机器指纹/网络重新认领，带过去会撞号）"],
+		[K_FLOAT_POS, "调试悬浮球坐标（跟着屏幕大小走，换设备会落在奇怪的位置）"],
+		[K_CHEER_DAY, "每日首次免缠头的日键（按机器按天，跨设备带过去会白送/吞掉一次）"],
+		[K_MIG_FLAG, "内部迁移标记（本机一次性开关，与新机器无关）"],
+	];
+
 
 	function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
 	function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
@@ -41,6 +80,28 @@ import { lib } from "../../../noname.js";
 		try { var o = JSON.parse(s); return (o == null) ? d : o; } catch (e) { return d; }
 	}
 	function lsPut(k, o) { try { lsSet(k, JSON.stringify(o)); } catch (e) {} }
+	/* ---------- lib.config 后端（v3 新增） ----------
+	   `lib.config[X]` 存的是**对象真值**（noname 的 game.saveConfig 范式），
+	   不是 JSON 文本 —— 所以这里不能借用 lsJSON/lsPut。
+	   读取：lib.config 优先（真值），localStorage 兜底（兼容 v1/v2 老串与将来的镜像）。
+	   写入：lib.config + game.saveConfig（持久化由引擎负责），**不写 localStorage 镜像**
+	   —— 两份副本必然漂移，本项目已经在"同一事实多份副本"上反复栽跟头。 */
+	function cfgGet(key) {
+		var v = null;
+		try { if (lib && lib.config && lib.config[key] !== undefined) v = lib.config[key]; } catch (e0) {}
+		if (v === undefined || v === null) {
+			var s = lsJSON(key, null);           /* 兜底：任何把同键写进 localStorage 的旧实现 */
+			if (s !== null) return s;
+		}
+		return (v === undefined) ? null : v;
+	}
+	function cfgSet(key, val) {
+		try { if (lib && lib.config) lib.config[key] = val; } catch (e1) {}
+		try {
+			if (game && typeof game.saveConfig === "function") game.saveConfig(key, val);
+		} catch (e2) {}
+	}
+
 
 	/* ---------- 存储键 ----------
 	   键名真值从 lib.cshWallet.KEYS 取（2026-10-01 收敛，避免两处手写漂移）。
@@ -73,6 +134,23 @@ import { lib } from "../../../noname.js";
 	var K_TEXAS_SET = "csh_texas_set";
 	var K_BJ_SET = "csh_bj_set";
 	var K_DBG_PRESETS = "csh_dbg_presets";
+
+	/* ---------- v3 新增键（2026-10-15） ----------
+	   ★ 命名规则：`K_CFG_*` 前缀 = 真值在 lib.config（game.saveConfig 范式），
+	     其余 = localStorage。这个区分是本轮最要紧的一处：
+	     旧版把 winrate 当 localStorage 读，于是**战绩一直没被导出过**。 */
+	var K_AFFECTION = "csh_affection";                 /* 好感度（羁绊/档位/收集册/回礼） */
+	var K_LEDGER = "csh_ledger";                       /* 账本（给人看的一本账） */
+	var K_WALLET_HIST = "csh_wallet_hist";             /* 兑换台账（最近 5 条） */
+	var K_WALLET_SNAP = "csh_wallet_snap";             /* 余额快照（防篡改对账用） */
+	var K_CFG_BOSSKILL = "extension_池子魔将_bossKill";       /* 讨伐录（lib.config） */
+	var K_CFG_BOSSASBOSS = "extension_池子魔将_bossAsBoss";   /* 扮演魔王战绩（lib.config） */
+	var K_CFG_GOLDFISH = "extension_池子魔将_goldfish";       /* 金鳞市（lib.config） */
+	/* 键族（多键合成一个逻辑域）：UI 已阅类 / 玩家在各处留的名字 */
+	var GROUP_UI_SEEN = [["bossbookSeen", "csh_bossbook_seen"], ["bossHideKilled", "csh_boss_hide_killed"]];
+	var GROUP_NAMES = [["ddz", "csh_ddz_name"], ["uno", "csh_uno_name"],
+		["netName", "csh_net_name"], ["netSig", "csh_net_sig"]];
+
 
 	/* ---------- 工具 ---------- */
 	function toB64Url(str) {
@@ -525,12 +603,207 @@ import { lib } from "../../../noname.js";
 		return out;
 	}
 
+	/* ============================================================
+	   v3 新增清洗器（2026-10-15）
+	   ------------------------------------------------------------
+	   设计口径（与 §J.4#4 一致）：**宁可少留，不可留毒**。
+	   · 每个域都有明确上限（键数 / 条数 / 数值区间），防"导入一份巨物把游戏拖死"；
+	   · 形状不认识就整键丢掉，绝不透传未知字段（未知字段 = 未来版本的注入面）；
+	   · 上限尽量取自模块自己的常量（AFF_MAX / AI_FUND_CAP / PC_CAP），
+	     取不到才用字面量兜底 —— 避免"同一事实两处手写"再度漂移。
+	   ============================================================ */
+	function affMax() {
+		try {
+			var A = (lib && lib.cshAffection && lib.cshAffection.AFF_MAX);
+			if (typeof A === "number" && A > 0) return A;
+		} catch (e) {}
+		return 100;
+	}
+	/* 通用：字符串键 → 数值（限量 + 钳制）。用于"id → 数字"类表。 */
+	function numMap(o, maxKeys, lo, hi, floorIt) {
+		if (!o || typeof o !== "object" || Array.isArray(o)) return null;
+		var out = {}, n = 0, keys = Object.keys(o);
+		for (var i = 0; i < keys.length && n < maxKeys; i++) {
+			var k = clampStr(keys[i], 48);
+			if (!k) continue;
+			var v = floorIt === false ? clampF(o[keys[i]], lo, hi, 0) : clampNum(o[keys[i]], lo, hi);
+			out[k] = v; n++;
+		}
+		return n ? out : null;
+	}
+	/* 通用：字符串键 → 短字符串（限量 + 截断）。用于"ID → 名字"类表。 */
+	function strMap(o, maxKeys, maxLen) {
+		if (!o || typeof o !== "object" || Array.isArray(o)) return null;
+		var out = {}, n = 0, keys = Object.keys(o);
+		for (var i = 0; i < keys.length && n < maxKeys; i++) {
+			var k = clampStr(keys[i], 48);
+			if (!k) continue;
+			if (typeof o[keys[i]] !== "string") continue;
+			out[k] = clampStr(o[keys[i]], maxLen || 64); n++;
+		}
+		return n ? out : null;
+	}
+	/* 通用：只保留"原始值"字段的小对象（形状不认识的存档用它兜底，
+	   例如 walletSnap / 兑换台账条目：只留 number / string / boolean，其余一律丢）。 */
+	function flat(o, maxKeys, maxLen) {
+		if (!o || typeof o !== "object" || Array.isArray(o)) return null;
+		var out = {}, n = 0, keys = Object.keys(o);
+		for (var i = 0; i < keys.length && n < maxKeys; i++) {
+			var k = clampStr(keys[i], 32);
+			if (!k) continue;
+			var v = o[keys[i]], t = typeof v;
+			if (t === "number") out[k] = (isFinite(v) ? v : 0);
+			else if (t === "string") out[k] = clampStr(v, maxLen || 40);
+			else if (t === "boolean") out[k] = v;
+			else continue;
+			n++;
+		}
+		return n ? out : null;
+	}
+
+	/* ① 好感度（csh_affection）：{ id: { v, last, saw, giveSum, giveN, day:{}, cnt:{} } }
+	   字段集与 csh_affection.readStore 的清洗口径**逐项对齐**（6 个日键 / 计数表限量）。 */
+	var AFF_DAILY_KEYS = ["hunt", "hold", "talk", "head", "close", "gift", "tea", "stars", "callname"];   /* v6.9 三新互动 */
+	function cleanAffection(o) {
+		if (!o || typeof o !== "object" || Array.isArray(o)) return null;
+		var MAXV = affMax(), out = {}, n = 0, keys = Object.keys(o);
+		for (var i = 0; i < keys.length && n < 128; i++) {
+			var id = clampStr(keys[i], 48);
+			var e = o[keys[i]];
+			if (!id || !e || typeof e !== "object" || Array.isArray(e)) continue;
+			var rec = {
+				v: clampNum(e.v, 0, MAXV),
+				last: isPastStamp(e.last),
+				saw: /^\d{4}-\d{2}-\d{2}$/.test(String(e.saw || "")) ? String(e.saw) : "",
+				giveSum: clampNum(e.giveSum, 0, PC_CAP()),
+				giveN: clampNum(e.giveN, 0, 999999),
+				oath: isPastStamp(e.oath),            /* ★ v6.9：契约时间戳（导入导出必须带） */
+			};
+			var day = {}, dn = 0;
+			if (e.day && typeof e.day === "object") {
+				for (var j = 0; j < AFF_DAILY_KEYS.length; j++) {
+					var dk = AFF_DAILY_KEYS[j];
+					if (typeof e.day[dk] === "string" && e.day[dk]) { day[dk] = clampStr(e.day[dk], 20); dn++; }
+				}
+			}
+			if (dn) rec.day = day;
+			var cnt = numMap(e.cnt, 24, 0, 999999);
+			if (cnt) rec.cnt = cnt;
+			out[id] = rec; n++;
+		}
+		return n ? out : null;
+	}
+
+	/* ② 讨伐录（lib.config · extension_池子魔将_bossKill）
+	   { map:{id:{n,first,last,best}} , ext:{同 map} , extPool:{id:{...}}, minions:{id:{n,first,last}}, lastDaily } */
+	function cleanFightMap(o, withBest) {
+		if (!o || typeof o !== "object" || Array.isArray(o)) return null;
+		var out = {}, n = 0, keys = Object.keys(o);
+		for (var i = 0; i < keys.length && n < 256; i++) {
+			var id = clampStr(keys[i], 64);
+			var e = o[keys[i]];
+			if (!id || !e || typeof e !== "object" || Array.isArray(e)) continue;
+			var cnt = clampNum(e.n, 0, 999999);
+			if (cnt <= 0) continue;
+			var rec = { n: cnt, first: isPastStamp(e.first), last: isPastStamp(e.last || e.first) };
+			if (!rec.first) rec.first = rec.last;
+			if (withBest && typeof e.best === "number" && isFinite(e.best) && e.best > 0) rec.best = clampNum(e.best, 1, 9999);
+			out[id] = rec; n++;
+		}
+		return n ? out : null;
+	}
+	function cleanBossKill(o) {
+		if (!o || typeof o !== "object" || Array.isArray(o)) return null;
+		var out = {};
+		var m = cleanFightMap(o.map, true); if (m) out.map = m;
+		var x = cleanFightMap(o.ext, true); if (x) out.ext = x;
+		var mn = cleanFightMap(o.minions, false); if (mn) out.minions = mn;
+		/* 外传名册快照：{id:{name,title,img,skillCount,hp,...}} —— 是"名册缓存"不是战绩，
+		   但它是外传卷能显示的前提，必须一起带走（否则换机后外传卷全是空态）。 */
+		if (o.extPool && typeof o.extPool === "object" && !Array.isArray(o.extPool)) {
+			var pool = {}, pn = 0, pkeys = Object.keys(o.extPool);
+			for (var i = 0; i < pkeys.length && pn < 256; i++) {
+				var pid = clampStr(pkeys[i], 64), pe = o.extPool[pkeys[i]];
+				if (!pid || !pe || typeof pe !== "object") continue;
+				pool[pid] = {
+					name: clampStr(pe.name, 32), title: clampStr(pe.title, 32), img: clampStr(pe.img, 160),
+					skillCount: clampNum(pe.skillCount, 0, 99), hp: clampNum(pe.hp, 0, 999),
+				};
+				pn++;
+			}
+			if (pn) out.extPool = pool;
+		}
+		if (typeof o.lastDaily === "string") out.lastDaily = clampStr(o.lastDaily, 20);
+		return Object.keys(out).length ? out : null;
+	}
+	/* ③ 扮演魔王战绩：{ win, lose, last } */
+	function cleanBossAsBoss(o) {
+		if (!o || typeof o !== "object" || Array.isArray(o)) return null;
+		return { win: clampNum(o.win, 0, 999999), lose: clampNum(o.lose, 0, 999999), last: isPastStamp(o.last) };
+	}
+	/* ④ 金鳞市（lib.config · extension_池子魔将_goldfish）
+	   ★ 价格不带走：价格是每日漂移的市场行情，跨设备/跨时间带过去等于开天眼
+	     （导入一份旧价 → 立刻按旧价买、按新价卖）。持仓与成本带（那是玩家真金白银）。 */
+	function cleanGoldfish(o) {
+		if (!o || typeof o !== "object" || Array.isArray(o)) return null;
+		var out = {
+			dayNo: clampNum(o.dayNo, 0, 999999),
+			day: typeof o.day === "string" ? clampStr(o.day, 20) : "",
+			hold: numMap(o.hold, 64, 0, 999999999),
+			cost: numMap(o.cost, 64, 0, PC_CAP()),
+			gift: !!o.gift,
+			earned: clampNum(o.earned, 0, 999999999999),
+			pendingDiv: clampNum(o.pendingDiv, 0, PC_CAP()),
+		};
+		var tips = cleanArr(o.tips);
+		if (tips) out.tips = tips.slice(0, 24);
+		return out;
+	}
+	/* ⑤ 账本 / 兑换台账 / 余额快照 */
+	function cleanLedger(o) {
+		if (!Array.isArray(o) || !o.length) return null;
+		var out = [];
+		for (var i = 0; i < o.length && out.length < 400; i++) {
+			var e = o[i];
+			if (!e || typeof e !== "object") continue;
+			var d = clampNum(e.d, -PC_CAP(), PC_CAP());
+			if (!d) continue;
+			out.push({
+				t: isPastStamp(e.t), d: d,
+				r: clampStr(e.r, 40), c: clampStr(e.c, 16),
+				b: clampNum(e.b, 0, PC_CAP()),
+			});
+		}
+		return out.length ? out : null;
+	}
+	function cleanHist(o) {
+		if (!Array.isArray(o) || !o.length) return null;
+		var out = [];
+		for (var i = 0; i < o.length && out.length < 5; i++) {
+			var f = flat(o[i], 16, 40);
+			if (f) out.push(f);
+		}
+		return out.length ? out : null;
+	}
+	function cleanSnap(o) { return flat(o, 24, 40); }
+
+	/* ⑥ 键族：UI 已阅 / 各游戏玩家名（统一走 strMap） */
+	function cleanUiSeen(o) { return strMap(o, 8, 32); }
+	function cleanNames(o) {
+		var m = strMap(o, 8, 24);      /* 名字最长 5 字、题壁 10 字，24 足够且留余量 */
+		return m;
+	}
+
 	/* ---------- 采集 / 应用 ---------- */
 	/* 键注册表（逻辑名 → localStorage 键 + 清洗器 + 存储类型）。
-	   存储类型：0 = JSON 对象/数字（lsPut）；1 = 字符串（lsSet）；2 = bgmOn 通配族。
-	   顺序即导出顺序（6 原 + 6 必须 + 7 建议 = 19 项，meta 为虚拟键不在此表）。 */
+	   存储类型：0 = localStorage JSON（lsPut）
+	             1 = localStorage 字符串（lsSet）
+	             2 = 通配族（bgmOn：一主键 + N 后缀键）
+	             3 = **lib.config**（game.saveConfig 范式 · v3 新增 · 读时 localStorage 兜底）
+	             4 = **多键合成一族**（v3 新增 · 表的取值见 GROUP_*）
+	   顺序即导出顺序（6 原 + 6 必须 + 7 建议 + 9 新增 = 28 项，meta 为虚拟键不在此表）。 */
 	var KEY_DEFS = [
-		["winrate", K_WINRATE, cleanWinrate, 0],
+		["winrate", K_WINRATE, cleanWinrate, 3],
 		["wallet", K_WALLET, cleanWallet, 0],
 		["rank", K_RANK, cleanRank, 0],
 		["world", K_WORLD, cleanWorld, 0],
@@ -548,7 +821,35 @@ import { lib } from "../../../noname.js";
 		["texasSet", K_TEXAS_SET, cleanObj, 0],
 		["bjSet", K_BJ_SET, cleanObj, 0],
 		["dbgPresets", K_DBG_PRESETS, cleanArr, 0],
+		/* ---- v3 新增 9 项（2026-10-15 · 覆盖全部玩家数据） ---- */
+		["affection", K_AFFECTION, cleanAffection, 0],
+		["bossKill", K_CFG_BOSSKILL, cleanBossKill, 3],
+		["bossAsBoss", K_CFG_BOSSASBOSS, cleanBossAsBoss, 3],
+		["goldfish", K_CFG_GOLDFISH, cleanGoldfish, 3],
+		["ledger", K_LEDGER, cleanLedger, 0],
+		["walletHist", K_WALLET_HIST, cleanHist, 0],
+		["walletSnap", K_WALLET_SNAP, cleanSnap, 0],
+		["uiSeen", "uiSeen", cleanUiSeen, 4],
+		["names", "names", cleanNames, 4],
 	];
+	/* 键族成员（类型 4）：[逻辑子键, localStorage 键] */
+	var GROUP_MEMBERS = { uiSeen: GROUP_UI_SEEN, names: GROUP_NAMES };
+	function groupCollect(name) {
+		var mem = GROUP_MEMBERS[name] || [], out = {}, n = 0;
+		for (var i = 0; i < mem.length; i++) {
+			var v = lsGet(mem[i][1]);
+			if (v === null || v === "") continue;
+			out[mem[i][0]] = v; n++;
+		}
+		return n ? out : null;
+	}
+	function groupApply(name, val) {
+		if (!val || typeof val !== "object") return;
+		var mem = GROUP_MEMBERS[name] || [];
+		for (var i = 0; i < mem.length; i++) {
+			if (Object.prototype.hasOwnProperty.call(val, mem[i][0])) lsSet(mem[i][1], clampStr(val[mem[i][0]], 40));
+		}
+	}
 
 	function collect() {
 		var body = {};
@@ -560,6 +861,10 @@ import { lib } from "../../../noname.js";
 				body[k] = (CSH && CSH.world && CSH.world.raw) ? CSH.world.raw() : lsJSON(lsKey, null);
 			} else if (store === 2) {
 				body[k] = collectBgmOn();
+			} else if (store === 3) {
+				body[k] = cfgGet(lsKey);
+			} else if (store === 4) {
+				body[k] = groupCollect(k);
 			} else {
 				body[k] = lsJSON(lsKey, null);
 			}
@@ -614,20 +919,35 @@ import { lib } from "../../../noname.js";
 	   （2000 CBY / 平民 0 功勋）。
 	   ⚠ 注意：这也会清掉 CDK 核销记录（已兑换的 CDK 码需自行保存，
 	   本地核销表清空后同一码可再次兑换，纯本地验证无服务端）。 */
+	/* ★ v3（2026-10-15）：「重置」必须与「导出」覆盖面**一致**，否则会出现
+	   "重置了但战绩还在""导出了但重置不掉"两头的口径分裂（本轮作者问的正是
+	   导入导出要不要涵盖全部数据 —— 涵盖之后，重置也必须跟上）。 */
 	var RESET_KEYS = [
-		K_WALLET, "csh_wallet_snap", "csh_wallet_hist", "csh_wallet_cdk_lifetime",
-		K_RANK, K_WORLD, K_CDK, "csh_cdk_used_n", "csh_cdk_dev", "csh_cdk_devbind",
-		"csh_daily_task", "csh_career_achv",
-		"csh_texas_best", "csh_sniper_best", "csh_bj_best",
-		"csh_texas_bank", "csh_texas_bank_legacy", "csh_wallet_migrated",
+		K_WALLET, K_WALLET_SNAP, K_WALLET_HIST, K_CDK_LIFETIME,
+		K_RANK, K_WORLD, K_CDK, "csh_cdk_used_n", K_DEVICE_ID, K_DEV_BIND,
+		K_DAILY_TASK, K_ACHV,
+		K_TEXAS_BEST, K_SNIPER_BEST, K_BJ_BEST,
+		"csh_texas_bank", "csh_texas_bank_legacy", K_MIG_FLAG,
 		K_WINRATE,
+		/* v3 新增：好感度 / 账本 / 讨伐录 / 扮演魔王 / 金鳞市 / UI 已阅 / 各处名字 */
+		K_AFFECTION, K_LEDGER,
+		K_CFG_BOSSKILL, K_CFG_BOSSASBOSS, K_CFG_GOLDFISH,
+		"csh_bossbook_seen", "csh_boss_hide_killed",
+		"csh_ddz_name", "csh_uno_name", "csh_net_name", "csh_net_sig",
 	];
 	function reset() {
 		var cleared = [];
 		var i, k;
 		for (i = 0; i < RESET_KEYS.length; i++) {
 			k = RESET_KEYS[i];
-			lsDel(k);
+			/* lib.config 域：清键 + 走一遍 saveConfig（否则内存里还留着旧对象，
+			   页面刷新前的任何读取都还是旧值） */
+			if (k === K_CFG_BOSSKILL || k === K_CFG_BOSSASBOSS || k === K_CFG_GOLDFISH || k === K_WINRATE) {
+				try { if (lib && lib.config) delete lib.config[k]; } catch (eD) {}
+				try { if (game && typeof game.saveConfig === "function") game.saveConfig(k, null); } catch (eS) {}
+			} else {
+				lsDel(k);
+			}
 			cleared.push(k);
 		}
 		var bks = backupKeys();
@@ -668,6 +988,11 @@ import { lib } from "../../../noname.js";
 						if (Object.prototype.hasOwnProperty.call(v, wk)) lsSet(wk, v[wk]);
 					}
 				}
+			} else if (store === 3) {
+				/* lib.config 域：写 lib.config + saveConfig（引擎负责持久化） */
+				if (v !== null && v !== undefined) cfgSet(lsKey, v);
+			} else if (store === 4) {
+				groupApply(k, v);
 			} else if (store === 1) {
 				if (v != null) lsSet(lsKey, v);
 			} else if (v !== null && v !== undefined) {
@@ -734,24 +1059,158 @@ import { lib } from "../../../noname.js";
 	}
 
 	function summaryOf(clean) {
-		var s = { pc: 0, rank: 0, ai: 0, cdk: 0, hasWinrate: false };
+		var s = { pc: 0, rank: 0, ai: 0, cdk: 0, hasWinrate: false, matches: 0, kills: 0, girls: 0 };
 		if (clean.wallet) s.pc = clean.wallet.pc || 0;
 		if (clean.rank) s.rank = clean.rank.rank || 0;
 		if (clean.world && clean.world.ai) s.ai = clean.world.ai.length;
 		if (clean.cdkUsed) s.cdk = clean.cdkUsed.length;
-		s.hasWinrate = !!clean.winrate;
+		s.hasWinrate = !!clean.winrate;          /* ★ v3：winrate 现在真的读得到了（原来恒 false） */
+		s.matches = wrTotals(clean.winrate).games;
+		s.kills = clean.bossKill && clean.bossKill.map ? Object.keys(clean.bossKill.map).length : 0;
+		s.girls = clean.affection ? Object.keys(clean.affection).length : 0;
 		return s;
 	}
+	/* 胜负统计总场次。
+	   ★ 真实形状（csh_winrate.readData）：顶层是**模式键**
+	     `{ identity:{角色:entry}, versus:{…}, doudizhu:{…}, guozhan:{…}, camps:{…}, me:{chars:{…},camps:{…}} }`
+	   ★ 口径必须与唯一的历史实现（csh_shell.buildStats）一致：它只读 `me.chars` ——
+	     因为 `me` 是"玩家亲自操控"的那一份，而模式桶是**全体（含 AI）**的汇总，
+	     两处都加会把玩家自己的对局数算两遍。故：
+	       有 me.chars → 只算它；没有（极老档）→ 退回累加四个模式桶。
+	     `camps` 是按阵营统计，与角色维度重叠，一律不计。 */
+	function wrTotals(w) {
+		var games = 0, win = 0, lose = 0;
+		if (!w || typeof w !== "object") return { games: games, win: win, lose: lose, push: 0 };
+		function absorb(bucket) {
+			if (!bucket || typeof bucket !== "object") return;
+			for (var ck in bucket) {
+				if (!Object.prototype.hasOwnProperty.call(bucket, ck)) continue;
+				var c = bucket[ck];
+				if (!c || typeof c !== "object" || typeof c.games !== "number") continue;
+				games += clampNum(c.games, 0, 9999999);
+				win += clampNum(c.win, 0, 9999999);
+				lose += clampNum(c.lose, 0, 9999999);
+			}
+		}
+		try {
+			if (w.me && typeof w.me === "object" && w.me.chars && typeof w.me.chars === "object") {
+				absorb(w.me.chars);
+			} else {
+				var MODES = ["identity", "versus", "doudizhu", "guozhan"];
+				for (var i = 0; i < MODES.length; i++) absorb(w[MODES[i]]);
+			}
+		} catch (e) {}
+		return { games: games, win: win, lose: lose, push: Math.max(0, games - win - lose) };
+	}
 
-	/* 差异摘要（§J.4#5） */
+	/* ---------- 家当清点（v3 · 「行囊」页的数据源） ----------
+	   返回**纯数据**（键名 + 有没有 + 数量 + 少量明细），一个中文字都没有 ——
+	   对外可见的文案一律由页面（games/save.html 的文案表 T）负责，
+	   与天下榜页同一条纪律：「页面上一切对外可见的字只从文案表里取」。
+	   顺序 = 玩家最关心的顺序（钱 → 位分 → 战绩 → 妖灵 → 市集 → 设置）。 */
+	function inventory(body) {
+		body = body || collect();
+		var rows = [];
+		function add(key, has, n, extra) {
+			rows.push({ key: key, has: !!has, n: n || 0, extra: extra || null });
+		}
+		var w = cleanWallet(body.wallet);
+		add("wallet", !!w, w ? w.pc : 0, w ? { peak: w.pcPeak, streak: w.streak } : null);
+		var r = cleanRank(body.rank);
+		add("rank", !!r, r ? r.merit : 0, r ? { rank: r.rank } : null);
+		var wr = cleanWinrate(body.winrate);
+		var wt = wrTotals(wr);
+		add("winrate", !!wr, wt.games, { win: wt.win, lose: wt.lose, push: wt.push });
+		var wld = cleanWorld(body.world);
+		add("world", !!(wld && wld.ai && wld.ai.length), wld && wld.ai ? wld.ai.length : 0, null);
+		var bk = cleanBossKill(body.bossKill);
+		add("bossKill", !!(bk && bk.map), bk && bk.map ? Object.keys(bk.map).length : 0,
+			{ minions: bk && bk.minions ? Object.keys(bk.minions).length : 0,
+			  ext: bk && bk.ext ? Object.keys(bk.ext).length : 0 });
+		var ab = cleanBossAsBoss(body.bossAsBoss);
+		add("bossAsBoss", !!(ab && (ab.win || ab.lose)), ab ? (ab.win + ab.lose) : 0,
+			ab ? { win: ab.win, lose: ab.lose } : null);
+		var af = cleanAffection(body.affection);
+		var afSum = 0, afTop = 0, afN = 0;
+		if (af) {
+			for (var id in af) {
+				if (!Object.prototype.hasOwnProperty.call(af, id)) continue;
+				var v = af[id].v || 0;
+				afSum += v; afN++;
+				if (v >= affMax()) afTop++;
+			}
+		}
+		add("affection", afN > 0, afN, afN ? { sum: afSum, full: afTop } : null);
+		var gf = cleanGoldfish(body.goldfish);
+		var gHold = gf && gf.hold ? Object.keys(gf.hold).length : 0;
+		var gCost = 0;
+		if (gf && gf.cost) for (var gk in gf.cost) if (Object.prototype.hasOwnProperty.call(gf.cost, gk)) gCost += gf.cost[gk] || 0;
+		add("goldfish", gHold > 0, gHold, gHold ? { cost: gCost } : null);
+		var tg = cleanDailyTask(body.dailyTask);
+		add("dailyTask", !!tg, tg ? countTrue(tg) : 0, null);
+		var ac = cleanAchv(body.achv);
+		add("achv", !!ac, ac ? countTrue(ac) : 0, null);
+		var cd = cleanCdk(body.cdkUsed);
+		add("cdkUsed", !!(cd && cd.length), cd ? cd.length : 0, null);
+		var lf = cleanLifetime(body.cdkLifetime);
+		add("cdkLifetime", !!(lf && (lf.count || lf.gained)), lf ? lf.count : 0, lf ? { gained: lf.gained } : null);
+		var lg = cleanLedger(body.ledger);
+		add("ledger", !!(lg && lg.length), lg ? lg.length : 0, null);
+		var hs = cleanHist(body.walletHist);
+		add("walletHist", !!(hs && hs.length), hs ? hs.length : 0, null);
+		add("walletSnap", !!body.walletSnap, 0, null);
+		/* 历史最佳：三款游戏各一条纪录 */
+		add("texasBest", !!body.texasBest, 0, null);
+		add("bjBest", !!body.bjBest, 0, null);
+		add("sniperBest", !!body.sniperBest, 0, null);
+		var nm = cleanNames(body.names);
+		add("names", !!nm, nm ? Object.keys(nm).length : 0, null);
+		/* 设置类（跟着走，但不必计数） */
+		add("panelSkin", body.panelSkin != null && body.panelSkin !== "", 0, null);
+		add("bgmVolume", body.bgmVolume != null, 0, null);
+		add("bgmOn", !!body.bgmOn, 0, null);
+		add("sfxVolume", body.sfxVolume != null, 0, null);
+		add("texasSet", !!body.texasSet, 0, null);
+		add("bjSet", !!body.bjSet, 0, null);
+		add("dbgPresets", !!(body.dbgPresets && body.dbgPresets.length), body.dbgPresets ? body.dbgPresets.length : 0, null);
+		add("uiSeen", !!body.uiSeen, 0, null);
+		return rows;
+	}
+	/* 计数：清洗后的对象里"真值"的个数（每日任务用 {done:true} 之类，
+	   成就用计数；两种口径都按"值不是 0/false/空"来数） */
+	function countTrue(o) {
+		var n = 0;
+		if (!o || typeof o !== "object") return 0;
+		for (var k in o) {
+			if (!Object.prototype.hasOwnProperty.call(o, k)) continue;
+			var v = o[k];
+			if (v === true || (typeof v === "number" && v > 0) || (typeof v === "string" && v)) n++;
+		}
+		return n;
+	}
+
+	/* 差异摘要（§J.4#5）—— v3 加了战绩/讨伐/羁绊三行，**只给"变了"的行**，
+	   免得确认框上列 28 行让人直接点确定。 */
 	function diffOf(clean) {
 		var cur = collect();
-		var cw = cleanWallet(cur.wallet) || { pc: 0, rank: 0 };
-		var cr = cleanRank(cur.rank) || { rank: 0 };
-		return {
+		var cw = cleanWallet(cur.wallet) || { pc: 0 };
+		var cr = cleanRank(cur.rank) || { rank: 0, merit: 0 };
+		var out = {
 			pc: { from: cw.pc, to: clean.wallet ? clean.wallet.pc : cw.pc },
 			rank: { from: cr.rank, to: clean.rank ? clean.rank.rank : cr.rank },
+			merit: { from: cr.merit, to: clean.rank ? clean.rank.merit : cr.merit },
 		};
+		var curWr = wrTotals(cleanWinrate(cur.winrate));
+		var newWr = wrTotals(clean.winrate);
+		if (newWr.games !== curWr.games) out.matches = { from: curWr.games, to: newWr.games };
+		var curK = cleanFightMap((cleanBossKill(cur.bossKill) || {}).map, true);
+		var newK = cleanFightMap((clean.bossKill || {}).map, true);
+		var ckn = curK ? Object.keys(curK).length : 0, nkn = newK ? Object.keys(newK).length : 0;
+		if (nkn !== ckn) out.kills = { from: ckn, to: nkn };
+		var curG = cleanAffection(cur.affection), newG = clean.affection;
+		var cgn = curG ? Object.keys(curG).length : 0, ngn = newG ? Object.keys(newG).length : 0;
+		if (ngn !== cgn) out.girls = { from: cgn, to: ngn };
+		return out;
 	}
 
 	/* 2026-09-29 修复（契约族实例 4）：
@@ -862,13 +1321,104 @@ import { lib } from "../../../noname.js";
 		var insH = await inspect(await mkCode(huge));
 		ok("导入 9990 亿钳制到上限", insH.ok && insH.data.wallet.pc === PC_CAP());
 
+		/* ============================================================
+		   v3（2026-10-15）新增用例：新键的清洗 / 后端 / 覆盖度
+		   ============================================================ */
+		/* ① 好感度：值钳到 AFF_MAX · 非法 saw 清空 · 非法记录丢弃 */
+		var af = cleanAffection({
+			a: { v: 9999, last: Date.now() + 86400000 * 30, saw: "乱码", giveSum: -5, giveN: 1e9, day: { talk: "2026-01-01" }, cnt: { x: 3 } },
+			b: "not-an-object",
+		});
+		ok("好感度：值钳到 AFF_MAX", af && af.a.v === affMax());
+		ok("好感度：非法 saw 清空", af && af.a.saw === "");
+		ok("好感度：未来的 last 压回当下", af && af.a.last <= Date.now() + 1);
+		ok("好感度：giveSum 钳到 ≥0", af && af.a.giveSum === 0);
+		ok("好感度：非对象记录被丢", af && af.b === undefined);
+		ok("好感度：只留 6 个日键", af && af.a.day && Object.keys(af.a.day).length === 1);
+
+		/* ② 讨伐录：n≤0 丢弃 · best 保留 · ext/minions/extPool 分节 */
+		var bk = cleanBossKill({
+			map: { m1: { n: 3, first: 1, last: 2, best: 5 }, bad: { n: 0 }, bad2: "x" },
+			ext: { e1: { n: 1 } },
+			minions: { mn1: { n: 7, first: 1 } },
+			extPool: { e1: { name: "甲", title: "", img: "a.webp", skillCount: 4, hp: 6, evil: "x" } },
+			lastDaily: "2026-10-15",
+		});
+		ok("讨伐录：n≤0 被丢", bk && bk.map && !bk.map.bad && !bk.map.bad2);
+		ok("讨伐录：best 保留", bk && bk.map.m1.best === 5);
+		ok("讨伐录：ext 段保留", bk && bk.ext && bk.ext.e1.n === 1);
+		ok("讨伐录：minions 段保留", bk && bk.minions && bk.minions.mn1.n === 7);
+		ok("讨伐录：extPool 未知字段被剥", bk && bk.extPool && bk.extPool.e1.evil === undefined);
+
+		/* ③ 扮演魔王：只 3 个字段 */
+		var ab = cleanBossAsBoss({ win: -1, lose: 4, last: 1, x: 1 });
+		ok("扮演魔王：win 钳到 0 · 只留 3 键", ab && ab.win === 0 && ab.lose === 4 && Object.keys(ab).length === 3);
+
+		/* ④ 金鳞市：**价格不带走**（否则等于开天眼），持仓与成本带走 */
+		var gf = cleanGoldfish({ dayNo: 3, prices: { a: 100 }, hold: { a: 2 }, cost: { a: 50 }, earned: -1, pendingDiv: -1 });
+		ok("金鳞市：价格不带（防开天眼）", gf && gf.prices === undefined);
+		ok("金鳞市：持仓与成本带", gf && gf.hold.a === 2 && gf.cost.a === 50);
+		ok("金鳞市：负数收益钳到 0", gf && gf.earned === 0 && gf.pendingDiv === 0);
+
+		/* ⑤ 账本：d=0 丢弃 · 条数上限 · 快照/台账走扁平清洗 */
+		var lg = cleanLedger([{ t: 1, d: 0, r: "x" }, { t: 2, d: -5, r: "y", c: "c", b: 9 }, "bad"]);
+		ok("账本：d=0 与非法条目被丢", lg && lg.length === 1 && lg[0].d === -5);
+		ok("余额快照：只留原始值字段", (function () {
+			var s = cleanSnap({ a: 1, b: "x", c: true, d: { deep: 1 } });
+			return s && s.a === 1 && s.b === "x" && s.c === true && s.d === undefined;
+		})());
+
+		/* ⑥ 键族：UI 已阅 / 各处名字 */
+		ok("UI 已阅：短字符串表", (function () { var m = cleanUiSeen({ bossbookSeen: "1" }); return m && m.bossbookSeen === "1"; })());
+		ok("名字表：超长截断", (function () { var m = cleanNames({ netSig: new Array(80).join("字") }); return m && m.netSig.length <= 24; })());
+
+		/* ⑦ 后端：lib.config 读优先、写回读得到（用临时键，测完清掉） */
+		var TMP = "csh_mig_selftest_tmp";
+		cfgSet(TMP, { hello: 1 });
+		ok("lib.config 后端：写入后读取一致", (function () { var v = cfgGet(TMP); return v && v.hello === 1; })());
+		try { if (lib && lib.config) delete lib.config[TMP]; } catch (eT) {}
+		lsDel(TMP);
+
+		/* ⑧ 覆盖度：白名单 = KEY_DEFS + meta（导出/解析同表，不可能一边多一边少）
+		   ★ 数数：6 原 + 6 必须 + 7 建议 = 19 项（含 meta）⇒ KEY_DEFS 18 条；
+		     v3 再补 9 条 ⇒ KEY_DEFS 27 条 / 白名单 28 项。 */
+		ok("键表 27 条（18 + v3 的 9）", KEY_DEFS.length === 27);
+		ok("白名单与键表一致（+meta）", WHITELIST.length === KEY_DEFS.length + 1 &&
+			KEY_DEFS.every(function (d) { return WHITELIST.indexOf(d[0]) >= 0; }));
+
+		/* ⑨ 家当清点：每域都有 key/has/n，顺序稳定 */
+		var inv = inventory({
+			wallet: { pc: 1234 }, rank: { rank: 3, merit: 99 },
+			/* 真实形状：顶层是模式键，玩家自己那份在 me.chars */
+			winrate: { identity: { 甲: { games: 20, win: 12, lose: 8 } }, me: { chars: { 甲: { games: 4, win: 3, lose: 1 } } } },
+			affection: { g1: { v: 100 }, g2: { v: 0 } },
+			bossKill: { map: { m1: { n: 1 } }, minions: { a: { n: 2 }, b: { n: 1 } } },
+			goldfish: { hold: { x: 1 }, cost: { x: 20 } },
+			names: { netName: "甲乙" },
+		});
+		var invMap = {};
+		for (var q = 0; q < inv.length; q++) invMap[inv[q].key] = inv[q];
+		ok("家当：钱包余额", invMap.wallet && invMap.wallet.has && invMap.wallet.n === 1234);
+		ok("家当：官阶功勋", invMap.rank && invMap.rank.n === 99 && invMap.rank.extra.rank === 3);
+		ok("家当：战绩场次（v3 修好后才非 0）", invMap.winrate && invMap.winrate.n === 4 && invMap.winrate.extra.win === 3);
+		ok("家当：羁绊只数 + 满档数", invMap.affection && invMap.affection.n === 2 && invMap.affection.extra.full === 1);
+		ok("家当：讨伐数 + 妖灵分节", invMap.bossKill && invMap.bossKill.n === 1 && invMap.bossKill.extra.minions === 2);
+		ok("家当：持仓只数 + 成本", invMap.goldfish && invMap.goldfish.n === 1 && invMap.goldfish.extra.cost === 20);
+		ok("家当：没数据的域 has=false", invMap.ledger && invMap.ledger.has === false);
+		ok("家当：清点行数 = 全部域", inv.length === WHITELIST.length - 1);
+		ok("家当：一个中文字都没有（文案归页面）", inv.every(function (r) { return /^[a-zA-Z]+$/.test(r.key); }));
+
+		/* ⑩ 差异：只列"变了"的行，没变的不出现 */
+		var dOnly = diffOf({ wallet: { pc: 5 } });
+		ok("差异：有变化的给出 from/to", dOnly.pc && dOnly.pc.to === 5);
+
 		var pass = out.filter(function (o) { return o.p; }).length;
 		return { pass: pass, fail: out.length - pass, cases: out };
 	}
 
 	/* ---------- 导出接口 ---------- */
 	var CM = {
-		VERSION: VERSION, PREFIX: PREFIX, WHITELIST: WHITELIST,
+		VERSION: VERSION, PREFIX: PREFIX, WHITELIST: WHITELIST, EXCLUDED: EXCLUDED,
 		export: exportCode,
 		inspect: inspect,
 		import: doImport,
@@ -877,12 +1427,18 @@ import { lib } from "../../../noname.js";
 		reset: reset,
 		summary: summaryOf,
 		diff: diffOf,
+		inventory: inventory,
 		_collect: collect,
 		_clean: {
 			wallet: cleanWallet, rank: cleanRank, world: cleanWorld, cdk: cleanCdk, winrate: cleanWinrate,
 			dailyTask: cleanDailyTask, achv: cleanAchv, obj: cleanObj, num: cleanNum, str: cleanStr,
 			bgmOn: cleanBgmOn, lifetime: cleanLifetime, arr: cleanArr,
+			affection: cleanAffection, bossKill: cleanBossKill, bossAsBoss: cleanBossAsBoss,
+			goldfish: cleanGoldfish, ledger: cleanLedger, hist: cleanHist, snap: cleanSnap,
+			uiSeen: cleanUiSeen, names: cleanNames,
 		},
+		_wrTotals: wrTotals,
+		_countTrue: countTrue,
 		selftest: selftest,
 	};
 

@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<!-- ============================================================
+     行囊（存档总口 · 与生涯大厅 / 讨伐录 / 天下榜平级 · 2026-10-15）
+     ------------------------------------------------------------
+     为什么单开一页：导入导出原先塞在生涯大厅右栏，覆盖面只有 19 键，
+     且**战绩那一域因为读错存储后端（lib.config vs localStorage）从来没生效**。
+     作者定案：「这次做的导入导出要涵盖全部的玩家数据，做成跟生涯大厅、讨伐录平级」。
+
+     分工（单一真源，页内不复制任何业务口径）：
+       · 数据的采集 / 清洗 / 校验 / 钳制 / 备份 / 回滚 / 重置 → core/csh_migrate.js（宿主的 lib.cshMigrate）
+       · 家当清点的行内容                              → 同上 inventory()
+       · 本页只做三件事：把清单画出来 · 把码收下发上 · 把失败说明白
+
+     传输：一律走宿主桥（shell-mig-*）。
+       ★ 为什么不用页内 localStorage：PC 是 file://、安卓是 https://localhost，
+         两侧"页面帧与游戏帧是否同源"不能赌（rank.html 就吃过这个亏）；
+         桥是唯一稳的路，且扣费/写盘都在单一账本里。
+
+     文案纪律（与天下榜同款）：页面上一切对外可见的字，都只从脚本顶部的文案表 T 取。
+     ============================================================ -->
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>行囊</title>
+<script src="../core/csh_selftest.js" data-csh-selftest="auto"></script>
+<script src="../core/csh_page.js"></script>
+<style>
+@font-face{font-family:'ZMX3';src:url("../font/csh_fx_font_3.woff2") format("woff2");font-display:swap}
+:root{
+  /* 字体三档 + 书法点缀（照 docs/art-direction.md §4.1，与讨伐录/金鳞市同栈） */
+  --ff-title:"Noto Serif SC","Source Han Serif SC","Songti SC","STSong","SimSun",serif;
+  --ff-body:"Noto Sans SC","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+  --ff-num:ui-monospace,"Cascadia Mono",Consolas,"SF Mono",Menlo,monospace;
+  --ff-callig:"ZMX3","Zhi Mang Xing","Kaiti SC","STKaiti",KaiTi,var(--ff-title);
+  --bg:#191512; --bg2:#221c17; --panel:#2a231c; --panel2:#332b21;
+  --ink:#efe6cf; --ink-dim:rgba(239,230,207,.62); --ink-faint:rgba(239,230,207,.36);
+  --gold:#d8bd7a; --gold-2:#b08d3e; --line:rgba(216,189,122,.28); --line-2:rgba(216,189,122,.14);
+  --warn:#e0863f; --danger:#c1554a; --ok:#8fbf7a;
+  --fs:14px; --fs-cap:12px;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;overflow:hidden}
+body{background:
+  radial-gradient(120% 80% at 50% 0%,rgba(216,189,122,.06),transparent 55%),
+  linear-gradient(170deg,var(--bg2),var(--bg));
+  color:var(--ink);font-family:var(--ff-body);font-size:var(--fs)}
+#app{display:flex;flex-direction:column;height:100%;padding:8px 12px 6px 30px}
+#app>*{flex:0 0 auto}
+
+/* ---------- 顶栏 ---------- */
+.topbar{display:flex;align-items:center;gap:10px;min-height:42px;padding-right:200px}
+.brand{font-family:var(--ff-callig);font-size:24px;letter-spacing:.2em;color:var(--gold)}
+.brand small{font-size:var(--fs-cap);letter-spacing:.1em;color:var(--ink-faint);margin-left:8px;font-family:var(--ff-body)}
+.assets{margin-left:auto;display:flex;gap:8px;font-family:var(--ff-num);font-size:13px;font-variant-numeric:tabular-nums}
+.asset{background:rgba(216,189,122,.10);border:1px solid var(--line-2);border-radius:999px;padding:4px 12px;white-space:nowrap}
+.asset b{color:var(--gold);font-weight:600}
+.asset i{font-style:normal;color:var(--ink-faint);margin-left:4px;font-size:11px}
+
+/* ---------- 唯一滚动区 ---------- */
+/* 铁律：可滚动容器必须显式限高 + overflow。此处 #board 从 flex 列吸收剩余高度。 */
+#board{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;
+  overscroll-behavior:contain;padding:2px 2px 4px}
+.card{background:var(--panel);border:1px solid var(--line-2);border-radius:12px;padding:11px 13px;margin:0 0 10px}
+.card h3{margin:0 0 9px;font-size:15px;font-weight:600;letter-spacing:.06em;color:var(--gold);font-family:var(--ff-title)}
+.card h3 span{font-family:var(--ff-body);font-size:11.5px;font-weight:400;color:var(--ink-faint);letter-spacing:.02em;margin-left:8px}
+.card.danger{border-color:rgba(193,85,74,.35)}
+.card.danger h3{color:#e08a80}
+
+/* ---------- 家当清点 ---------- */
+.inv{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:4px 14px}
+.iv{display:flex;align-items:baseline;gap:8px;padding:3px 0;border-bottom:1px dashed rgba(216,189,122,.10);min-width:0}
+.iv:last-child{border-bottom:0}
+.iv-k{flex:0 0 74px;font-size:12.5px;color:var(--ink-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.iv-v{flex:0 0 auto;font-family:var(--ff-num);font-variant-numeric:tabular-nums;font-size:13px;color:var(--ink)}
+.iv-x{flex:1 1 auto;min-width:0;font-size:11px;color:var(--ink-faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.iv[data-has="0"] .iv-k{color:var(--ink-faint)}
+.iv[data-has="0"] .iv-v{color:var(--ink-faint)}
+.note{font-size:11.5px;color:var(--ink-faint);margin-top:8px;line-height:1.6}
+
+/* ---------- 码区 ---------- */
+textarea{width:100%;min-height:76px;resize:vertical;background:rgba(0,0,0,.28);color:var(--ink);
+  border:1px solid var(--line-2);border-radius:9px;padding:9px 10px;font-family:var(--ff-num);font-size:11.5px;
+  line-height:1.5;word-break:break-all}
+textarea::placeholder{color:var(--ink-faint)}
+textarea:focus{outline:none;border-color:var(--line)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:34px;padding:0 14px;
+  border-radius:9px;border:1px solid var(--line);background:rgba(216,189,122,.10);color:var(--gold);
+  font-family:var(--ff-body);font-size:13px;cursor:pointer;white-space:nowrap}
+.btn:hover{background:rgba(216,189,122,.18)}
+.btn:active{transform:translateY(1px)}
+.btn.ghost{background:transparent;border-color:var(--line-2);color:var(--ink-dim)}
+.btn.ghost:hover{background:rgba(216,189,122,.08);color:var(--ink)}
+.btn.danger{border-color:rgba(193,85,74,.5);background:rgba(193,85,74,.14);color:#e59a90}
+.btn.danger:hover{background:rgba(193,85,74,.22)}
+.btn[disabled]{opacity:.45;cursor:default;transform:none}
+.rowbtn{display:flex;flex-wrap:wrap;gap:8px;margin-top:9px}
+.rowbtn:first-child{margin-top:0}
+
+/* ---------- 提示 / 差异 ---------- */
+.msg{font-size:12.5px;line-height:1.6;margin-top:9px;color:var(--ink-dim);min-height:1.2em}
+.msg.ok{color:var(--ok)} .msg.bad{color:#e59a90} .msg.warn{color:var(--warn)}
+.diff{margin-top:9px;border:1px solid var(--line-2);border-radius:9px;overflow:hidden;display:none}
+.diff.on{display:block}
+.diffrow{display:flex;align-items:baseline;gap:8px;padding:5px 10px;font-size:12.5px;
+  border-bottom:1px solid rgba(216,189,122,.08)}
+.diffrow:last-child{border-bottom:0}
+.diffrow .dk{flex:0 0 92px;color:var(--ink-dim)}
+.diffrow .dv{font-family:var(--ff-num);font-variant-numeric:tabular-nums}
+.diffrow .from{color:var(--ink-faint)}
+.diffrow .to{color:var(--gold);font-weight:600}
+.diffrow .arw{color:var(--ink-faint);margin:0 2px}
+.bkrow{display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px dashed rgba(216,189,122,.10)}
+.bkrow:last-child{border-bottom:0}
+.bkrow .bt{flex:0 0 auto;font-size:12.5px;color:var(--ink-dim);font-family:var(--ff-num)}
+.bkrow .bv{flex:1 1 auto;font-size:12.5px;font-family:var(--ff-num);color:var(--gold)}
+.excl{margin-top:9px;font-size:11.5px;color:var(--ink-faint);line-height:1.7}
+.excl b{color:var(--ink-dim);font-weight:600}
+.foot{font-size:11.5px;color:var(--ink-faint);line-height:1.7;padding:0 2px 2px}
+
+/* ---------- 紧凑档（实机 915×412）----------
+   纪律：只按 max-height 判定、只压字号与间距，不藏关键信息。 */
+@media (max-height:640px){
+  #app{padding:6px 10px 4px 24px}
+  .brand{font-size:20px}
+  #board{padding:0}
+  .card{padding:9px 11px;margin:0 0 8px}
+  .card h3{font-size:14px;margin:0 0 7px}
+}
+@media (max-height:520px){
+  .topbar{min-height:34px}
+  .brand{font-size:18px;letter-spacing:.16em}
+  .brand small{font-size:11px;margin-left:6px}
+  .asset{padding:3px 9px;font-size:12px}
+  #app{padding:4px 9px 3px 22px}
+  .card{padding:7px 10px;margin:0 0 6px}
+  .card h3{font-size:13px;margin:0 0 6px}
+  .iv{padding:2px 0} .iv-k{flex-basis:66px;font-size:11.5px} .iv-v{font-size:12px} .iv-x{font-size:10.5px}
+  textarea{min-height:56px;font-size:11px;padding:7px 8px}
+  .btn{min-height:30px;font-size:12.5px;padding:0 11px}
+  .msg{font-size:11.5px;margin-top:7px}
+  .diffrow{padding:4px 9px;font-size:11.5px} .diffrow .dk{flex-basis:80px}
+  .foot{margin-top:4px;font-size:11px}
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="topbar">
+    <div class="brand" id="brand">行囊<small id="brandsub"></small></div>
+    <div class="assets" id="assets"></div>
+  </div>
+
+  <div id="board">
+    <!-- ① 家当清点 -->
+    <div class="card">
+      <h3 id="h-inv"></h3>
+      <div class="inv" id="inv"></div>
+      <div class="note" id="invnote"></div>
+    </div>
+
+    <!-- ② 一份家当（导出 / 导入共用一格码） -->
+    <div class="card">
+      <h3 id="h-code"></h3>
+      <textarea id="code" spellcheck="false" autocomplete="off"></textarea>
+      <div class="rowbtn">
+        <button class="btn" id="b-pack" type="button"></button>
+        <button class="btn ghost" id="b-copy" type="button"></button>
+        <button class="btn ghost" id="b-check" type="button"></button>
+        <button class="btn" id="b-unpack" type="button"></button>
+      </div>
+      <div class="diff" id="diff"></div>
+      <div class="msg" id="msg"></div>
+    </div>
+
+    <!-- ③ 备份与回滚 -->
+    <div class="card">
+      <h3 id="h-bk"></h3>
+      <div id="bklist"></div>
+      <div class="rowbtn">
+        <button class="btn ghost" id="b-bk" type="button"></button>
+      </div>
+      <div class="note" id="bknote"></div>
+    </div>
+
+    <!-- ④ 推倒重来 -->
+    <div class="card danger">
+      <h3 id="h-reset"></h3>
+      <div class="note" id="resetnote"></div>
+      <div class="rowbtn">
+        <button class="btn danger" id="b-reset" type="button"></button>
+      </div>
+    </div>
+
+    <!-- ⑤ 边界说明 -->
+    <div class="card">
+      <h3 id="h-edge"></h3>
+      <div class="excl" id="edge"></div>
+    </div>
+
+    <div class="foot" id="foot"></div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   行囊 · 客户端
+   ------------------------------------------------------------
+   ★ 文案表 T：页面上一切对外可见的字都只从这里取（改话术只改这一处）。
+   ★ 一切数据读写走宿主桥 shell-mig-*：页面**不碰** localStorage、不碰钱包。
+   ★ 失败一律中性文案：不弹错、不指责、不阻塞。
+   ============================================================ */
+var T = {
+  brand: "行囊",
+  sub: "一身家当，随身可带",
+  /* 资产条单位 */
+  uPc: "池子币", uMerit: "功勋",
+  /* 家当清点 */
+  hInv: "家当清点", hInvSub: "这一趟要带走的全部",
+  invNote: "带勾的是本机有的；灰色的是你还没用过的部分，跟着行囊一起走，不会丢。",
+  /* 域标签（与宿主 inventory() 的逻辑键 1:1；新增域必须在这里补一行，否则门禁会红） */
+  d: {
+    wallet: "池子币", rank: "功勋", winrate: "战绩", world: "AI 世界",
+    bossKill: "讨伐录", bossAsBoss: "扮演魔王", affection: "羁绊", goldfish: "金鳞市",
+    dailyTask: "每日任务", achv: "成就", cdkUsed: "兑换码", cdkLifetime: "兑换累计",
+    ledger: "账本", walletHist: "兑换台账", walletSnap: "余额快照",
+    texasBest: "德州纪录", bjBest: "廿一点纪录", sniperBest: "神弩手纪录",
+    names: "各处留名", panelSkin: "面板皮肤", bgmVolume: "音乐音量", bgmOn: "音乐开关",
+    sfxVolume: "音效音量", texasSet: "德州设置", bjSet: "廿一点设置",
+    /* ★ 「调试」二字不能出现在成品页（门禁 E28 会拦）—— 这一项是面板里存下的预设，
+       对玩家只叫「面板预设」就够，不必交代它从哪来。 */
+    dbgPresets: "面板预设", uiSeen: "已阅标记"
+  },
+  /* 数量单位 */
+  unitG: "位", unitN: "人", unitItem: "项", unitCd: "枚", unitTimes: "次",
+  unitPen: "笔", unitEntry: "条", unitGame: "局", unitMatch: "场",
+  wordYes: "有", wordNone: "—",
+  fmtPeak: "峰值 {v}", fmtStreak: "连签 {v}",
+  fmtWinLose: "胜 {w} · 负 {l}", fmtMinion: "妖灵 {v}", fmtExt: "外传 {v}",
+  fmtSum: "合计 {v}", fmtFull: "满档 {v}", fmtCost: "成本 {v}",
+  fmtGained: "累计 {v}",
+  /* 码区 */
+  hCode: "一份家当", hCodeSub: "生成一串带走，或把别人的倒进来",
+  phCode: "点「收进行囊」生成一串；或把别人的那串粘到这里",
+  bPack: "收进行囊", bCopy: "复制", bCheck: "验一验", bUnpack: "倒进来",
+  msgIdle: "行囊是空的。点「收进行囊」，把这一身家当收进来。",
+  msgPacked: "已收好 · {n} 字 · 格式 v{v}。复制带走，或先存着。",
+  msgCopied: "已复制到剪贴板。",
+  msgCopyFail: "复制没成功，框里已全选，手动复制一次即可。",
+  msgCheckOk: "这份家当是好的 · 来自 {build} · 生成于 {time}",
+  msgCheckAgain: "这份家当是好的。再点一次「倒进来」就装进这一身。",
+  msgUnpacked: "已倒进来 · 备份戳 {stamp}。若数值没变，退出游戏重进一次即刷新。",
+  msgEmpty: "框里是空的。",
+  msgPackFail: "没收成，稍后再试一次。",
+  msgCheckFail: "这份家当读不出来：{err}",
+  msgUnpackFail: "倒不进来：{err}",
+  msgOffline: "没连上宿主（不影响游戏）。",
+  diffTitle: "倒进来会变成这样",
+  diffSame: "本机与这份家当没有差别。",
+  dkPc: "池子币", dkRank: "官阶序号", dkMerit: "功勋", dkMatch: "战绩场次",
+  dkKill: "已击破魔王", dkGirls: "羁绊人数",
+  /* 备份 */
+  hBk: "备份与回滚", hBkSub: "每次倒入前都会自动留一份",
+  bBk: "读取备份", bBkRoll: "回滚",
+  bkNone: "这台机器上还没有备份（倒过一次家当之后就有了）。",
+  bkNote: "只留最近三份，更早的会被挤掉。",
+  bkCell: "{pc} 池子币 · {ai} 位世界角色",
+  msgRolled: "已回滚到 {t}。",
+  msgRollFail: "回滚没成功。",
+  /* 重置 */
+  hReset: "推倒重来", hResetSub: "不可撤销",
+  resetNote: "清空全部家当，回到刚装好扩展的样子（2000 池子币 / 平民）。请先「收进行囊」留一份，再动手。",
+  bReset: "重置这一身",
+  resetConfirm1: "确定要清空这一身家当吗？\n\n清完就回到出厂初始态：\n· 池子币回到 2000，官阶回到「平民」\n· 战绩 / 讨伐录 / 羁绊 / 金鳞市持仓 / 成就 / 每日任务\n· 兑换码记录（已兑换的码会失效）\n\n建议先「收进行囊」留一份。",
+  resetConfirm2: "第二次确认：真的推倒重来吗？",
+  msgReset: "已清空，正在刷新…",
+  msgResetFail: "重置没成功：{err}",
+  /* 边界 */
+  hEdge: "不随行囊走的那些", hEdgeSub: "换台机器就该换的东西",
+  edgeLead: "下面这些是「这台机器」的标识，跟你的人身家当无关，所以不带：",
+  edgeTail: "另外，游戏设置里那些开关（音效播报、平行时空、面板样式之类）属于无名杀自己的设置，跟着本机走 —— 换机器时在设置界面里按自己习惯再调一次就行。",
+  /* 页脚 */
+  foot: ["行囊只装你自己攒下的东西。换机器时：在新机器上「倒进来」，家当就回来了。"]
+};
+function tt(k, v) {
+  var s = (T[k] == null) ? "" : String(T[k]);
+  if (v) for (var p in v) if (Object.prototype.hasOwnProperty.call(v, p)) s = s.split("{" + p + "}").join(v[p]);
+  return s;
+}
+function el(id) { return document.getElementById(id); }
+function fmt(n) { return (typeof CSHPage !== "undefined" && CSHPage.fmt) ? CSHPage.fmt(n) : String(n); }
+function esc(s) {
+  return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+    return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c];
+  });
+}
+/* 大数简写（与天下榜同口径，避免一屏塞 12 位数字） */
+function big(n) {
+  n = Math.floor(Number(n) || 0);
+  if (n >= 100000000) return (n / 100000000).toFixed(2) + " 亿";
+  if (n >= 10000) return (n / 10000).toFixed(2) + " 万";
+  return fmt(n);
+}
+var STATE = { inv: [], excluded: [], version: 0, pending: null, backups: [] };
+
+/* ---------- 桥（与 Game Shell 通信）----------
+   ★ 与 rank.html 同款：本页没有自关逻辑，关闭由壳的 ✕ 负责 ⇒ 不传 closeName。 */
+var Bridge = (typeof CSHPage !== "undefined" && CSHPage && CSHPage.transport)
+  ? CSHPage.transport({ timeout: 6000 })
+  : null;
+function bridged() { return !!(Bridge && Bridge.active); }
+function call(name, payload, cb) {
+  if (!bridged()) { setMsg(T.msgOffline, "warn"); cb(false, null); return; }
+  try {
+    Bridge.call(name, payload, function (ok, d) { cb(!!ok, d || null); });
+  } catch (e) { cb(false, null); }
+}
+function setMsg(s, cls) {
+  var e = el("msg");
+  if (!e) return;
+  e.textContent = s == null ? "" : String(s);
+  e.className = "msg" + (cls ? " " + cls : "");
+}
+
+/* ---------- 静态文案落位（独立于 boot：离线冒烟也会跑到） ---------- */
+function applyStaticCopy() {
+  try { if (typeof document !== "undefined" && document) document.title = T.brand; } catch (e) {}
+  var b = el("brandsub"); if (b) b.textContent = T.sub;
+  var ph = el("phCode"); if (!ph) { var ta = el("code"); if (ta) ta.setAttribute("placeholder", T.phCode); }
+  var H = [["h-inv", "hInv"], ["h-code", "hCode"], ["h-bk", "hBk"],
+    ["h-reset", "hReset"], ["h-edge", "hEdge"]];
+  for (var i = 0; i < H.length; i++) { var n = el(H[i][0]); if (n) n.textContent = T[H[i][1]]; }
+  /* 小标题的第二句（h3 里的 <span>）：结构上另建一个 span 更稳，这里用拼串 */
+  var subOf = { "h-inv": "hInvSub", "h-code": "hCodeSub", "h-bk": "hBkSub", "h-reset": "hResetSub", "h-edge": "hEdgeSub" };
+  for (var k in subOf) {
+    if (!Object.prototype.hasOwnProperty.call(subOf, k)) continue;
+    var h = el(k);
+    if (h && h.parentNode) {
+      var sp = h.querySelector("span");
+      if (!sp) { sp = document.createElement("span"); h.appendChild(sp); }
+      sp.textContent = T[subOf[k]];
+    }
+  }
+  var btns = [["b-pack", "bPack"], ["b-copy", "bCopy"], ["b-check", "bCheck"],
+    ["b-unpack", "bUnpack"], ["b-bk", "bBk"], ["b-reset", "bReset"]];
+  for (var j = 0; j < btns.length; j++) { var bb = el(btns[j][0]); if (bb) bb.textContent = T[btns[j][1]]; }
+  var nn = el("invnote"); if (nn) nn.textContent = T.invNote;
+  var bn = el("bknote"); if (bn) bn.textContent = T.bkNote;
+  var rn = el("resetnote"); if (rn) rn.textContent = T.resetNote;
+  var ed = el("edge"); if (ed) ed.innerHTML = esc(T.edgeLead);
+  var f = el("foot"); if (f) f.innerHTML = T.foot.join("<br>");
+  /* 码区初始态 */
+  setMsg(T.msgIdle);
+}
+applyStaticCopy();
+
+/* ---------- 家当清点渲染 ----------
+   ★ 宿主只回逻辑键 + 数量；**中文标签与单位一律在本页的 T 里**（同天下榜的纪律）。 */
+function valueOf(it) {
+  var n = it.n, x = it.extra || {};
+  switch (it.key) {
+    case "wallet": return { v: big(n) + " " + T.uPc, d: (x.peak ? tt("fmtPeak", { v: big(x.peak) }) : "") + (x.streak ? " · " + tt("fmtStreak", { v: x.streak }) : "") };
+    case "rank": return { v: big(n) + " " + T.uMerit, d: (x.rank != null ? "官阶 " + x.rank : "") };
+    case "winrate": return { v: n + " " + T.unitMatch, d: tt("fmtWinLose", { w: x.win || 0, l: x.lose || 0 }) };
+    case "world": return { v: n + " " + T.unitN, d: "" };
+    case "bossKill": return { v: n + " " + T.unitG, d: tt("fmtMinion", { v: x.minions || 0 }) + ((x.ext || 0) > 0 ? " · " + tt("fmtExt", { v: x.ext }) : "") };
+    case "bossAsBoss": return { v: n + " " + T.unitGame, d: tt("fmtWinLose", { w: x.win || 0, l: x.lose || 0 }) };
+    case "affection": return { v: n + " " + T.unitG, d: tt("fmtSum", { v: x.sum || 0 }) + ((x.full || 0) > 0 ? " · " + tt("fmtFull", { v: x.full }) : "") };
+    case "goldfish": return { v: n + " " + T.unitG, d: tt("fmtCost", { v: big(x.cost || 0) }) };
+    case "dailyTask": case "achv": return { v: n + " " + T.unitItem, d: "" };
+    case "cdkUsed": return { v: n + " " + T.unitCd, d: "" };
+    case "cdkLifetime": return { v: n + " " + T.unitTimes, d: tt("fmtGained", { v: big((x.gained || 0)) }) };
+    case "ledger": return { v: n + " " + T.unitPen, d: "" };
+    case "walletHist": return { v: n + " " + T.unitEntry, d: "" };
+    case "names": return { v: n + " " + T.unitItem, d: "" };
+    case "dbgPresets": return { v: n + " " + T.unitItem, d: "" };
+    default: return { v: T.wordYes, d: "" };
+  }
+}
+function renderInv() {
+  var box = el("inv");
+  if (!box) return;
+  if (!STATE.inv.length) { box.innerHTML = '<div class="iv"><span class="iv-k">' + esc(T.wordNone) + '</span></div>'; return; }
+  var h = "";
+  for (var i = 0; i < STATE.inv.length; i++) {
+    var it = STATE.inv[i];
+    var lab = (T.d && T.d[it.key]) ? T.d[it.key] : it.key;
+    var got = valueOf(it);
+    h += '<div class="iv" data-has="' + (it.has ? "1" : "0") + '">'
+      + '<span class="iv-k">' + esc(lab) + '</span>'
+      + '<span class="iv-v">' + (it.has ? esc(got.v) : T.wordNone) + '</span>'
+      + '<span class="iv-x">' + (it.has ? esc(got.d || "") : "") + '</span></div>';
+  }
+  box.innerHTML = h;
+}
+function renderAssets(s) {
+  var box = el("assets");
+  if (!box) return;
+  var v = s || {};
+  var pc = Math.max(0, Math.floor(Number(v.pc != null ? v.pc : v.cby) || 0));
+  var mt = Math.max(0, Math.floor(Number(v.merit != null ? v.merit : (v.rank && v.rank.merit)) || 0));
+  var seg = String(v.segName || (v.rank && v.rank.segName) || "");
+  box.innerHTML = '<span class="asset"><b>' + esc(big(pc)) + '</b><i>' + esc(T.uPc) + '</i></span>'
+    + '<span class="asset"><b>' + esc(big(mt)) + '</b><i>' + esc(T.uMerit) + '</i></span>'
+    + (seg ? '<span class="asset"><b>' + esc(seg) + '</b></span>' : '');
+}
+function renderEdge() {
+  var box = el("edge");
+  if (!box) return;
+  var h = "<b>" + esc(T.edgeLead) + "</b><br>";
+  for (var i = 0; i < (STATE.excluded || []).length; i++) {
+    h += "· " + esc(STATE.excluded[i][1]) + "<br>";
+  }
+  h += '<div style="margin-top:7px">' + esc(T.edgeTail) + "</div>";
+  box.innerHTML = h;
+}
+
+/* ---------- 差异渲染（只画"变了的"行；没变的不出现） ---------- */
+function renderDiff(d) {
+  var box = el("diff");
+  if (!box) return;
+  var map = [["pc", "dkPc"], ["rank", "dkRank"], ["merit", "dkMerit"],
+    ["matches", "dkMatch"], ["kills", "dkKill"], ["girls", "dkGirls"]];
+  var rows = "";
+  for (var i = 0; i < map.length; i++) {
+    var v = d && d[map[i][0]];
+    if (!v) continue;
+    rows += '<div class="diffrow"><span class="dk">' + esc(T[map[i][1]]) + '</span>'
+      + '<span class="dv"><span class="from">' + esc(big(v.from)) + '</span>'
+      + '<span class="arw">→</span><span class="to">' + esc(big(v.to)) + '</span></span></div>';
+  }
+  if (!rows) { box.className = "diff on"; box.innerHTML = '<div class="diffrow"><span class="dk">' + esc(T.diffTitle) + '</span><span class="dv">' + esc(T.diffSame) + '</span></div>'; return; }
+  box.className = "diff on";
+  box.innerHTML = rows;
+}
+function hideDiff() { var b = el("diff"); if (b) { b.className = "diff"; b.innerHTML = ""; } }
+
+/* ---------- 备份列表 ---------- */
+function stampText(t) {
+  try {
+    var d = new Date(Number(t));
+    function p(x) { return (x < 10 ? "0" : "") + x; }
+    return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()) + " " + p(d.getHours()) + ":" + p(d.getMinutes());
+  } catch (e) { return String(t); }
+}
+function renderBackups(list) {
+  STATE.backups = list || [];
+  var box = el("bklist");
+  if (!box) return;
+  if (!STATE.backups.length) { box.innerHTML = '<div class="note">' + esc(T.bkNone) + "</div>"; return; }
+  var h = "";
+  for (var i = 0; i < STATE.backups.length; i++) {
+    var b = STATE.backups[i];
+    h += '<div class="bkrow" data-stamp="' + esc(b.stamp) + '">'
+      + '<span class="bt">' + esc(stampText(b.time || b.stamp)) + '</span>'
+      + '<span class="bv">' + esc(tt("bkCell", { pc: big(b.pc || 0), ai: b.ai || 0 })) + '</span>'
+      + '<button class="btn ghost" type="button" data-roll="' + esc(b.stamp) + '">' + esc(T.bBkRoll) + '</button></div>';
+  }
+  box.innerHTML = h;
+  var bs = box.querySelectorAll("[data-roll]");
+  for (var k = 0; k < bs.length; k++) {
+    (function (x) {
+      x.addEventListener("click", function () {
+        var st = x.getAttribute("data-roll");
+        if (!window.confirm(T.msgRolled.split("{t}")[0] + stampText(st) + "？")) return;
+        call("shell-mig-rollback", { stamp: st }, function (ok) {
+          if (ok) { setMsg(tt("msgRolled", { t: stampText(st) }), "ok"); loadAll(); }
+          else setMsg(T.msgRollFail, "bad");
+        });
+      }, false);
+    })(bs[k]);
+  }
+}
+
+/* ---------- 动作 ---------- */
+function doPack() {
+  setMsg("", "");
+  call("shell-mig-export", null, function (ok, d) {
+    if (!ok || !d || !d.code) { setMsg(T.msgPackFail, "bad"); return; }
+    var ta = el("code");
+    if (ta) { ta.value = d.code; try { ta.select(); } catch (e) {} }
+    STATE.pending = null;
+    hideDiff();
+    /* 版本号从最近一次清点里取（拿不到就不写死一个假版本） */
+    setMsg(tt("msgPacked", { n: d.code.length, v: STATE.version || "?" }), "ok");
+  });
+}
+function doCopy() {
+  var ta = el("code");
+  if (!ta || !ta.value) { setMsg(T.msgEmpty, "warn"); return; }
+  var txt = ta.value;
+  var done = function () { setMsg(T.msgCopied, "ok"); };
+  var fail = function () { setMsg(T.msgCopyFail, "warn"); };
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(txt).then(done, function () { legacyCopy(txt, done, fail); });
+      return;
+    }
+  } catch (e) {}
+  legacyCopy(txt, done, fail);
+}
+function legacyCopy(txt, done, fail) {
+  try {
+    var ta = document.createElement("textarea");
+    ta.value = txt;
+    ta.style.position = "fixed"; ta.style.left = "-9999px"; ta.style.top = "0";
+    document.body.appendChild(ta);
+    ta.focus(); ta.select();
+    var ok = document.execCommand("copy");
+    document.body.removeChild(ta);
+    ok ? done() : fail();
+  } catch (e) { fail(); }
+}
+/* 验一验：只读解析 + 差异预览。hint 传值时用它替代成功文案
+   （给「倒进来」那条"没验过就先验"的路径用，见 doUnpack）。 */
+function doCheck(hint) {
+  var ta = el("code");
+  var code = ta ? String(ta.value || "").trim() : "";
+  if (!code) { setMsg(T.msgEmpty, "warn"); return; }
+  hideDiff();
+  call("shell-mig-import", { code: code, dryRun: true }, function (ok, r) {
+    if (!ok || !r || !r.ok) { STATE.pending = null; setMsg(tt("msgCheckFail", { err: (r && r.err) || "?" }), "bad"); return; }
+    STATE.pending = code;
+    var meta = r.meta || {};
+    setMsg(hint || tt("msgCheckOk", { build: meta.build || "?", time: stampText(meta.t || 0) }), hint ? "warn" : "ok");
+    renderDiff(r.diff || {});
+  });
+}
+/* 倒进来：**未验证不许下手**（防"看着是新的、装的是旧的"）。
+   框里内容一变，STATE.pending 就作废（input 监听）⇒ 这里比对的是**同一份串**。 */
+function doUnpack() {
+  var ta = el("code");
+  var code = ta ? String(ta.value || "").trim() : "";
+  if (!code) { setMsg(T.msgEmpty, "warn"); return; }
+  if (STATE.pending !== code) { doCheck(T.msgCheckAgain); return; }
+  if (!window.confirm(T.diffTitle + "。\n\n" + T.bUnpack + "？")) return;
+  call("shell-mig-import", { code: code }, function (ok, r) {
+    if (!ok || !r || !r.ok) { setMsg(tt("msgUnpackFail", { err: (r && r.err) || "?" }), "bad"); return; }
+    STATE.pending = null;
+    setMsg(tt("msgUnpacked", { stamp: (r && r.backup) || "—" }), "ok");
+    hideDiff();
+    loadAll();
+  });
+}
+function doReset() {
+  if (!window.confirm(T.resetConfirm1)) return;
+  if (!window.confirm(T.resetConfirm2)) return;
+  call("shell-mig-reset", null, function (ok, r) {
+    if (ok && r && r.ok) {
+      setMsg(T.msgReset, "ok");
+      setTimeout(function () {
+        try { window.parent.location.reload(); }
+        catch (e) { try { location.reload(); } catch (e2) {} }
+      }, 600);
+    } else setMsg(tt("msgResetFail", { err: (r && r.err) || "?" }), "bad");
+  });
+}
+function loadBackups() {
+  call("shell-mig-backups", null, function (ok, list) { renderBackups(ok ? list : []); });
+}
+function loadAll() {
+  call("shell-mig-inventory", null, function (ok, d) {
+    if (ok && d) {
+      STATE.inv = d.list || [];
+      STATE.excluded = d.excluded || [];
+      STATE.version = d.version || 0;
+    }
+    renderInv(); renderEdge();
+  });
+  call("shell-stats", null, function (ok, s) { renderAssets(ok ? s : null); });
+  loadBackups();
+}
+
+/* ---------- boot ---------- */
+(function boot() {
+  /* 只在**真实页面**里启动（离线冒烟 / 无 location 的沙箱里直接 return，不发请求） */
+  var real = false;
+  try {
+    real = (typeof window !== "undefined") && (typeof document !== "undefined")
+      && !!(window.location && window.location.protocol)
+      && /^(https?|file):$/.test(window.location.protocol);
+  } catch (e0) { real = false; }
+  if (!real) return;
+  var bind = [["b-pack", doPack], ["b-copy", doCopy], ["b-check", doCheck],
+    ["b-unpack", doUnpack], ["b-bk", loadBackups], ["b-reset", doReset]];
+  /* ★ 必须包一层再挂：直接把函数当监听器会把 **事件对象** 当第一个实参传进去，
+     而 doCheck(hint) 的第一个形参正是"提示语" ⇒ 页面上会出现 [object PointerEvent]。
+     （这条是实测截图抓出来的，不是想出来的。） */
+  for (var i = 0; i < bind.length; i++) {
+    var n = el(bind[i][0]);
+    if (!n) continue;
+    (function (fn) {
+      n.addEventListener("click", function () { fn(); }, false);
+    })(bind[i][1]);
+  }
+  /* 手动改框内内容 → 之前的"验过"作废（防止"看着是新的、装的是旧的"） */
+  var ta = el("code");
+  if (ta) ta.addEventListener("input", function () {
+    STATE.pending = null;
+    hideDiff();
+  }, false);
+  loadAll();
+})();
+</script>
+</body>
+</html>

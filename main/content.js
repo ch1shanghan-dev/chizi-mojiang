@@ -1,7 +1,103 @@
 import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 import cshVoices from "../core/voices.js";
+import { cshBossModeInstall } from "./bossmode.js";
+import { installBossRecord } from "../core/csh_bossrecord.js";
+import { installMarket } from "../core/csh_market.js";
+import { installAffection } from "../core/csh_affection.js";
+import { cshBossPackHide } from "../character/boss.js";
+
+/* ============================================================
+   ★ 本体兼容注入（engine-compat · 详见工作台《engine-compat清单.md》C4）
+   ------------------------------------------------------------
+   神/魔武将「选择势力」面板（引擎 `_doublegroup_choice` → chooseButton vcard）：
+   DOM = `.dialog > .content-container > .content > .buttons`
+   （dialog.js 为每组卡牌按钮各建一个 .buttons；.content-container 由引擎建）
+   势力多时按钮墙溢出视口。
+   ★ 2026-10-16 深夜七·实机重做（作者实机验收：旧实现「滚不动 / 范围固定」）：
+      实机（开发版 · 十周年UI 环境）测得机制真相：
+        ① 引擎原生滚动容器 = `.dialog > .content-container`（absolute / height:100% /
+           overflow:scroll）—— 滚动范围 = 内容高 − 对话框高，这才是「原生有滚动」的来源；
+        ② 对话框高度由 十周年UI 的 ui 覆盖内联写死 = min(45%屏高(桌面) / 75%屏高−80(手机),
+           内容高)（normal 布局另加 350px 上限）；
+        ③ 旧实现把 max-height:54vh 打在 .buttons 上 → 按钮盒子(54vh)反比对话框(45%)还高，
+           内容高被截成 ~54vh → 外层滚动范围塌缩成一个**固定的 120px 小段**
+           （作者所感「能滚动的范围是固定的」），且与外层双滚动条互相打架（「滚不动」）。
+      重做方案（单条原生滚动条 · 一处封顶）：
+        ④ 对话框本体封顶 max-height:70vh（仅含卡牌按钮、非 fullheight 的对话框）——
+           max-height 与内联 height 是两个属性，**无需 !important** 即可兜底；
+           正常面板（十周年UI 45% / 引擎布局约 40vh）不触发，只在「内容撑满、比屏幕还高、
+           尾部够不到」时兜底（手机端 75%屏高−80 超屏的场景即此类）；
+        ⑤ 不再截断 .buttons，滚动整条交还原生 .content-container（滚动阴影 / 细滚动条
+           样式随它走）—— 滚轮在卡片上与面板空白处行为一致，从头到尾一条滚动条。
+   ★ 两个必须：① **在 content 加载时立即注入**（面板在开局选将时就出现，不能等任何懒加载）；
+   ② 挂 class 门控（`html.csh-egsc`）→ 设置项 `csh_eg_group_scroll` 可即时开关。
+   初版教训（2026-10-16 晚）：误注入到 cshShoushaFx 的懒注入块里 —— 要等第一次击杀
+   特效播放才生效，等于没装。E45 门禁已锚定"两处不得混居"。 */
+function cshEgScrollApply(force) {
+    try {
+        var on = (force === undefined)
+            ? (lib.config["extension_池子魔将_csh_eg_group_scroll"] !== false)
+            : !!force;
+        if (!document.getElementById("csh_eg_scroll_css")) {
+            var st = document.createElement("style");
+            st.id = "csh_eg_scroll_css";
+            var dlgSel = ".csh-egsc .dialog:not(.fullheight):has(.card.button)";
+            st.textContent = [
+                /* ④ 对话框本体封顶（内联 height 由引擎/十周年UI 写死，max-height 独立生效兜底）+
+                   overflow:hidden 使其成为滚动链终点：滚轮在标题/空白处也不会把滚动冒泡给
+                   页面（防止「滑主界面」——主界面随滚轮整体上下动）。 */
+                dlgSel + "{max-height:70vh;overflow:hidden;overscroll-behavior:contain}",
+                /* ⑤ 原生滚动容器接管：单条纵向滚动 + 滚动阴影（上下渐隐）+ 滚动条
+                   （阴影同 2026-10-16 深夜五方案：local 随内容滚 + scroll 固定两层；
+                    深夜八强化：条宽 10px + 轨道 + 提亮 + 悬停，做到「一眼见一条」） */
+                /* ★ 注意：Chromium 里「标准滚动条属性」（scrollbar-width/color）一旦设置会屏蔽
+                   ::-webkit-scrollbar 样式，二者互斥 —— 故只设 scrollbar-color（新内核走配色、
+                   旧内核不识别则走下方 webkit 样式），滚动条宽度保持默认（最醒目）。 */
+                dlgSel + ">.content-container{overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;scrollbar-color:rgba(255,255,255,.45) rgba(0,0,0,.22);"
+                + "background:linear-gradient(rgba(0,0,0,.22),rgba(0,0,0,0)) 0 0/100% 14px no-repeat local,"
+                + "linear-gradient(rgba(0,0,0,0),rgba(0,0,0,.22)) 0 100%/100% 14px no-repeat local,"
+                + "radial-gradient(farthest-side at 50% 0,rgba(0,0,0,.30),rgba(0,0,0,0)) 0 0/100% 7px no-repeat scroll,"
+                + "radial-gradient(farthest-side at 50% 100%,rgba(0,0,0,.30),rgba(0,0,0,0)) 0 100%/100% 7px no-repeat scroll}",
+                /* 右缘防裁：卡牌按钮宽度不得超出容器（窄屏把右侧势力裁掉的根因之一） */
+                dlgSel + ">.content-container>.content>.buttons>.card{max-width:100%;box-sizing:border-box}",
+                dlgSel + ">.content-container::-webkit-scrollbar{width:10px}",
+                dlgSel + ">.content-container::-webkit-scrollbar-track{background:rgba(0,0,0,.22);border-radius:5px}",
+                dlgSel + ">.content-container::-webkit-scrollbar-thumb{background:rgba(255,255,255,.45);border-radius:5px}",
+                dlgSel + ">.content-container::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.68)}",
+                /* 旧内核兜底（无 :has 时放弃卡牌门控，非 fullheight 对话框同能力） */
+                "@supports not selector(:has(*)){.csh-egsc .dialog:not(.fullheight){max-height:70vh;overflow:hidden}"
+                + ".csh-egsc .dialog:not(.fullheight)>.content-container{overflow-y:auto;overflow-x:hidden}}",
+            ].join("");
+            document.head.appendChild(st);
+        }
+        document.documentElement.classList.toggle("csh-egsc", on);
+        try { lib.__cshEgScrollApply = cshEgScrollApply; } catch (eL) {}
+    } catch (e) { /* 兼容注入失败绝不阻断 content */ }
+}
 
 export function cshContent(config, pack) { try {
+    /* 讨伐记录层（2026-10-13 · 批次 4a）：常驻挂 lib.cshBossRecord（对局写入/快照聚合/
+       bossbook 展示三处共用；install 幂等） */
+    installBossRecord();
+    /* 金鳞市市场层（2026-10-14 · 批次 B）：常驻挂 lib.cshMarket（快照/交易/每日结算三处共用；
+       与讨伐记录层配合：csh_bossrecord.minionHeat → 标的永久基本面加成；install 幂等）。 */
+    installMarket();
+    /* 妖灵好感度层（v6.2）：常驻挂 lib.cshAffection（讨伐/持股/聊天/送礼 四来源 + 五档台词；
+       与金鳞市同源同一份 50 位；install 幂等）。 */
+    installAffection();
+    /* 魔王包级隐藏（v4）：引擎 loadCharacter（init/index.js:465）已在 content（521）之前
+       跑完——此刻把"池子魔将_boss"包从 lib.characterPack 移除，武将设置页不再出现该包节点；
+       魔王本体已在 lib.character（get.character 首选），一切读取不受影响。 */
+    cshBossPackHide();
+    /* BOSS 模式注入（v4 · 精简版）：判 mode==="boss" 后仅注入 lib.boss 模式配置
+       （chongzheng / minion / gameDraw / _csh_x）+ 首进焦点——角色本体与译名一律由
+       character/boss.js 的 game.import("character") 原生注册（引擎 loadCharacter 处理）。
+       其它模式此调用零执行（§4 零污染）；内部自带幂等守卫与异常兜底。
+       ★pack（扩展包原始对象）随参数保留（bossdata 的纯构造入口同签名，便于未来扩展）。 */
+    cshBossModeInstall(config, pack);
+    /* ★ 本体兼容：选将势力面板滚动条（engine-compat C4）——必须在此即执行（不能等任何懒加载）。
+       开关 = 设置项 csh_eg_group_scroll（默认开 · 改动即时生效，见 config.js 的 onclick）。 */
+    cshEgScrollApply();
     if (typeof cshVoices === "object" && cshVoices) Object.assign(lib.translate, cshVoices);
     try {
         if (lib.cshInteract && typeof lib.cshInteract.install === "function") {
@@ -1174,6 +1270,13 @@ export function cshContent(config, pack) { try {
             style.textContent = [
                 "@font-face{font-family:'ZMX';src:url(" + _fontBase + "csh_fx_font_1.woff2) format('woff2');font-display:swap;}",
                 "@font-face{font-family:'LC';src:url(" + _fontBase + "csh_fx_font_2.woff2) format('woff2');font-display:swap;}",
+                /* 2026-10-15：ZMX3 = 全覆盖子集（4058 字，开源 Zhi Mang Xing）。
+                   原 LC/ZMX 子集仅 78/84 字（专供早期技能名），新批次技能名几乎全不在表内 →
+                   横幅会逐字回退宋体。故在 LC 之后补 ZMX3 作为书法体兜底（老横幅仍走 LC，观感不变）。 */
+                "@font-face{font-family:'ZMX3';src:url(" + _fontBase + "csh_fx_font_3.woff2) format('woff2');font-display:swap;}",
+                /* 注：神/魔选势力面板滚动条（engine-compat C4）**不在这里**——
+                   本块是击杀特效的懒注入（要等第一次特效才跑），而选将面板开局就出现。
+                   正确落点 = cshEgScrollApply()（content 加载即执行）。此处曾误挂，已迁出。 */
                 ".csh_ssfx_layer{position:fixed;inset:0;z-index:10000;pointer-events:none;overflow:hidden;}",
                 ".csh_ssfx_bgfade{animation:csh_ssfx_bgfade 2.4s ease-in-out forwards;}",
                 "@keyframes csh_ssfx_bgfade{0%{opacity:0;}12%{opacity:1;}78%{opacity:1;}100%{opacity:0;}}",
@@ -1770,7 +1873,7 @@ export function cshContent(config, pack) { try {
             // 「逆流河」——墨字如印，随墨浪托出
             var box = document.createElement("div");
             box.className = "csh_ssfx_dtext";
-            box.style.cssText = "font-size:15.5vmin;font-family:'LC','LongCang','STXingkai','KaiTi',serif;font-weight:800;top:50%;letter-spacing:.04em;";
+            box.style.cssText = "font-size:15.5vmin;font-family:'ZMX3','LC','LongCang','STXingkai','KaiTi',serif;font-weight:800;top:50%;letter-spacing:.04em;";
             box.innerHTML = '<div class="csh_ssfx_dstack"><div class="csh_ssfx_dglow" style="color:#bfe6f8;-webkit-text-stroke:4px #08131f;text-shadow:0 0 22px rgba(120,200,240,.85),0 0 54px rgba(70,150,210,.7),0 7px 16px rgba(0,0,0,.95);">逆流河</div><div class="csh_ssfx_dfill" style="background-image:linear-gradient(180deg,#f6fcff 0%,#cfeaf8 34%,#6fb4d8 66%,#1d4a6b 100%);">逆流河</div></div>';
             layer.appendChild(box);
             setTimeout(function () {
@@ -1971,7 +2074,7 @@ export function cshContent(config, pack) { try {
                     w.style.cssText = "position:absolute;left:50%;top:50%;width:0;height:0;opacity:0;";
                     var st = document.createElement("div");
                     st.className = "csh_ssfx_dstack";
-                    st.style.cssText = "position:absolute;left:" + ((idx - 1.5) * cgap - csize / 2) + "vmin;top:" + (-csize / 2) + "vmin;font-size:" + csize + "vmin;font-family:'LC','LongCang','STXingkai','KaiTi',serif;font-weight:400;white-space:nowrap;";
+                    st.style.cssText = "position:absolute;left:" + ((idx - 1.5) * cgap - csize / 2) + "vmin;top:" + (-csize / 2) + "vmin;font-size:" + csize + "vmin;font-family:'ZMX3','LC','LongCang','STXingkai','KaiTi',serif;font-weight:400;white-space:nowrap;";
                     st.innerHTML = '<div class="csh_ssfx_dglow" style="color:#ffe9a8;-webkit-text-stroke:3px #3a2a00;text-shadow:0 0 24px rgba(255,215,110,.95),0 0 60px rgba(255,200,80,.85),0 7px 16px rgba(0,0,0,.95);">' + ch + '</div><div class="csh_ssfx_dfill" style="background-image:linear-gradient(180deg,#fffdf2 0%,#ffefb8 30%,#ffc233 62%,#b57a00 100%);">' + ch + '</div>';
                     w.appendChild(st);
                     layer.appendChild(w);
@@ -2355,6 +2458,23 @@ if(lib.rank.rarity.legend) lib.rank.rarity.legend.addArray(["csh_mingrixiang","c
 
 
 		// [界陆绩] 浑天仪已改为扩展内置衍生卡 csh_huntianyi（见 package.card），不依赖族包
+
+		// 索引兼容（v4 · 最小改动）：引擎多处按**数组索引**读取角色条目
+		// （optionsMenu.js:203 取 [3] 技能表、boss.js:109 列表血条取 [2]、player.init:2628…）。
+		// 本体角色是数组字面量（天然具备 [N]），扩展角色是对象形式——
+		// 给**本扩展自己的条目**（csh_* 键）补数字索引，让 [N] 与 .属性 双通道可读。
+		try {
+			for (const ck in lib.character) {
+				if (ck.indexOf("csh_") !== 0) continue;
+				const ci = lib.character[ck];
+				if (!ci || typeof ci !== "object" || Array.isArray(ci)) continue;
+				if (ci.skills !== undefined && ci[3] === undefined) ci[3] = ci.skills;
+				if (ci.sex !== undefined) ci[0] = ci.sex;
+				if (ci.group !== undefined) ci[1] = ci.group;
+				if (ci.hp !== undefined) ci[2] = ci.hp;
+				if (ci.extraModeData !== undefined) ci[5] = ci.extraModeData;
+			}
+		} catch (eIdx) {}
 	} catch (eCshContent) {
 		// 引擎把 content 的异常吞进 console（loading.js 的 try/catch），调试导出里一点痕迹都没有。
 		// 这里自己兜住并写进错误收集器：以后再出现「某段功能莫名不生效」，导出里能直接看到断在哪一行。

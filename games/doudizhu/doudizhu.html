@@ -435,7 +435,7 @@
 <div id="view-start" class="view">
   <div class="start-card">
     <div class="title">斗地主</div>
-    <div class="subtitle">池子魔将 · 调试面板彩蛋</div>
+    <div class="subtitle">计分赛 · 与 AI 同桌</div>
     <div class="field">
       <label for="inp-name">你的昵称</label>
       <input id="inp-name" maxlength="12" placeholder="池子">
@@ -1246,8 +1246,11 @@ var lastLog = '';
    【2026-09-30 用户要求】改为「默认关闭、且不跨会话记忆」。
    原实现 `lsGet(GOOD_KEY) === '1'` 会把上次的手动开启记忆到下次进入，
    表现为「怎么每次进来都是开的」；而好牌模式是练习局（不计输赢），
-   默认关闭更符合经济安全预期。局内仍可随时手动开启，只是不再跨会话保留。 */
-var GOOD_KEY = 'csh_ddz_good';
+   默认关闭更符合经济安全预期。局内仍可随时手动开启，只是不再跨会话保留。
+   ★ 2026-10-15 清尾（做「行囊」覆盖度扫描时抓出来的）：读侧当时删了，
+     写侧 `lsSet(GOOD_KEY, …)` 留了下来 ⇒ 全项目**只写不读**的死写入点，
+     还凭空造出一个谁都不认识的存储键。现已一并删除 —— 代码这才真正对上
+     "不跨会话保留" 这句说明。 */
 var goodMode = false;
 
 /* ============================================================
@@ -2178,7 +2181,7 @@ $('#inp-name').value = lsGet('csh_ddz_name') || '池子';
 /* 好牌模式开关：状态记忆 + 回写 UI（用 class 驱动样式，不依赖 :has()） */
 function setGood(on) {
   goodMode = !!on;
-  lsSet(GOOD_KEY, goodMode ? '1' : '0');
+  /* 不再落盘（好牌模式不跨会话保留 · 见 GOOD_KEY 那一段的说明） */
   var row = $('#good-row'), chk = $('#chk-good');
   if (chk) chk.checked = goodMode;
   if (row) row.classList.toggle('on', goodMode);

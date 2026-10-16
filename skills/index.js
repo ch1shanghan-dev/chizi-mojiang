@@ -1,4 +1,29 @@
 import { lib, game, ui, get, ai, _status } from "../../../noname.js";
+import cshBossPack from "./boss.js";
+
+/* ============================================================
+   【v6.6 新增】BOSS 模式·濒死观察隔离守卫
+   ------------------------------------------------------------
+   背景（作者 2026-10-15）：「有一些进入濒死触发技能的武将，会不会出现一些跟魔王技的冲突。
+   这部分也需要很好的优化。」
+   实证：本文件里有若干"观察**别人**濒死"的技，在身份局里是合理的团队/危机收益，但在
+   池子魔将挑战局里语义完全反了 —— 魔王或妖灵濒死，对挑战者来说是"我方即将取胜"的信号，
+   这些技却会白送挑战者成长：
+     · csh_gongao（功傲）：任何人（非自己）濒死 → 自己 +1 体力上限、回复 1 点、摸 1 张
+     · csh_daorui（刀锐）：任何人进入濒死 → 自己 +1 体力上限
+   隔离口径：**只在 boss 模式下**追加"濒死者必须属于挑战者方"这一条。
+   池子魔将挑战局里双方 side 固定：魔王方（魔王 + 妖灵）side === true，挑战者 side === false；
+   其它模式（身份局等）side 的含义不同，因此本函数在非 boss 模式恒返回 false，行为零变化。
+   ★ 注意：本函数只用于"隔离收益"，不要拿它去改伤害/胜负判定。 */
+function cshIsBossSidePlayer(p) {
+	try {
+		if (!lib || !game) return false;
+		if (lib.config.mode !== "boss" || !game.bossinfo) return false;
+		return !!(p && p.side === true);
+	} catch (e) {
+		return false;
+	}
+}
 /* package.skill 区块：2026-10-04 由 extension.js 原样拆出（零内容改动）。
    ★ 本文件必须自带 noname 绑定 import —— 当年的拆分事故就是丢了这一行，
      ~3700 处 lib./game./get. 裸引用在运行时抛 ReferenceError（详见 extension.js 顶部注）。
@@ -529,6 +554,7 @@ const cshSkillPack = {
                 charlotte: true,
                 forced: true,
                 popup: false,
+                forceDie: true, forceOut: true, // ★ 死时触发必需（filterTrigger 的 isDead/出局闸；2026-10-16 修）
                 trigger: { player: "dieBegin" },
                 async content(event, trigger, player) {
                     delete player.storage[RING];
@@ -5506,7 +5532,8 @@ const cshSkillPack = {
                 },
                 direct: true,
                 filter: function(event,player,name){
-                    if(name=='dying') return true;
+                    /* v6.6：boss 模式下魔王/妖灵的濒死不触发（同上） */
+                    if(name=='dying') return !cshIsBossSidePlayer(event.player);
                     return event.player==player;
                 },
                 content: function(){
@@ -5646,16 +5673,19 @@ const cshSkillPack = {
                             order: 8,
                             result: {
                                 player: function (player) {
-                                    var enemies = game.filterPlayer(c => c != player && get.attitude(player, c) < 0);
-                                    if (enemies.length < 2) return 0;
+                                    // 按真实效果逐人定价：1点流失体力（伤害效应自带态度，敌正友负）
+                                    // ＋被清空的全部装备与至多两张手牌；再减去自减1点体力上限的代价。
+                                    // 修正前系数过低(0.6/0.4/0.3)且门槛 score>3：2敌典型分 3.98-2.5=1.48 恒被截为0，实战几乎不发动。
                                     var score = 0;
-                                    for (var e of enemies) {
-                                        score += get.damageEffect(e, player, player) * 0.6;
-                                        score += e.countCards("e") * 0.4;
-                                        score += Math.min(2, e.countCards("h")) * 0.3;
-                                    }
-                                    score -= (player.maxHp > 4 ? 1.5 : 2.5);
-                                    return score > 3 ? score : 0;
+                                    game.filterPlayer(function (c) {
+                                        if (c == player) return;
+                                        var att = get.sgnAttitude(player, c);
+                                        score += get.damageEffect(c, player, player);
+                                        score -= (c.countCards("e") * 0.7 + Math.min(2, c.countCards("h")) * 0.6) * att;
+                                    });
+                                    score -= player.maxHp > 4 ? 1.5 : 2.5;
+                                    // 限定技：净收益需过小门槛（1）才发动，避免浪费
+                                    return score > 1 ? score : 0;
                                 },
                             },
                             threaten: 2.2,
@@ -7797,8 +7827,6 @@ const cshSkillPack = {
                 audioname: ["re_jiaxu"],
                 enable: "phaseUse",
                 usable: 1,
-                skillAnimation: "epic",
-                animationColor: "thunder",
                 filterTarget: function(card,player,target){
                     return target!=player;
                 },
@@ -7838,11 +7866,17 @@ const cshSkillPack = {
                             waitMs = lib.cshShoushaFx._dur.luanwu;
                         }
                     } catch (eFx2) {}
+                    // 暂停至横幅播完。resume 必须由 setTimeout 独立调度兜底——
+                    // 本引擎无 event.wait（调用即抛错，被空 catch 吞掉后 pause 永不恢复＝卡死），
+                    // 与文鸯却敌同管线写法保持一致。
                     try {
                         game.pause();
-                        event.wait(waitMs);
-                        game.resume();
                     } catch (eFx3) {}
+                    setTimeout(function () {
+                        try {
+                            game.resume();
+                        } catch (eRs) {}
+                    }, waitMs);
                 },
                 content: function(){
                     "step 0"
@@ -8473,7 +8507,11 @@ const cshSkillPack = {
                                     if (player.inRange(game.players[i])) enemies++;
                                 }
                             }
-                            if (_status.event.type != 'phase') return 0;
+                            if (_status.event.type != 'phase') return;
+                            // ↑ 非阶段（响应杀/救人/无懈等）不追加修正。
+                            // 必须 return undefined：引擎对 number 返回值按乘数处理（result1 *= temp1），
+                            // 返回 0 会把整个响应价值清零 → AI 选完牌后收益检查 check()>0 恒假 →
+                            // 取消响应并排除技能 —— 这就是"AI 不会转【闪】"的根因。
             
                             var type = get.type(card);
                             var suit = get.suit(card, player);
@@ -8514,7 +8552,7 @@ const cshSkillPack = {
                                 return [1, 1];
                             }
             
-                            return 0;
+                            return;
                         },
                     },
                     order: function(item, player) {
@@ -9842,7 +9880,8 @@ const cshSkillPack = {
                     global: "dying",
                 },
                 filter: function(event,player){
-                    return player!=event.player;
+                    /* v6.6：boss 模式下魔王/妖灵的濒死不触发（挑战者不该因"我方大捷"而白拿成长） */
+                    return player!=event.player && !cshIsBossSidePlayer(event.player);
                 },
                 forced: true,
                 logTarget: "player",
@@ -14618,10 +14657,14 @@ const cshSkillPack = {
                             if (target.hasSkillTag("nogain")) {
                                 return 0;
                             }
+                            // 交出全部手牌＝对方获得资源：目标视角应取【正值】，
+                            // 敌我差异由引擎 final = result.target × 态度(你, 目标) 自动完成
+                            // （旧写法给敌方返回-2，被态度再乘一次变成对己方正收益＝优先资敌）。
                             if (player.countCards("h") > 1) {
-                                // 敌我判定（§5.1）：交出全部手牌必须看态度，否则 AI 会资敌
-                                return get.attitude(player, target) > 0 ? 1 : -2;
+                                return 1;
                             }
+                            // 仅剩最后一张时资源收益很小：存在可拼点的敌人时再打薄一档；
+                            // 仍保持目标视角为正，避免态度乘算后翻转成"优先交给敌人"。
                             var players = game.filterPlayer();
                             for (var i = 0; i < players.length; i++) {
                                 if (players[i].countCards("h") && players[i] != target && players[i] != player && get.attitude(player, players[i]) < 0) {
@@ -14631,7 +14674,7 @@ const cshSkillPack = {
                             if (i == players.length) {
                                 return 1;
                             }
-                            return -2 / (target.countCards("h") + 1);
+                            return 1 / (target.countCards("h") + 1);
                         },
                     },
                 },
@@ -19209,37 +19252,39 @@ const cshSkillPack = {
                     order: 3.2,
                     result: {
                         player(player) {
-                            // 巽离：弃牌链 or 交一张；联机/单机共用
+                            // 巽离：每位其他角色「弃置至少X张 或 交给你一张牌」。
+                            // 逐人按真实结果定价：敌方掉牌/交牌为正收益；友军弃牌是真实损失，
+                            // 但交给你一张≈团队内平移（牌进你手），只记轻微代价；中立轻微。
+                            // 修正前：友军交牌记-1.6、弃牌-0.9/张，且门槛score>=2.5+enemies>=3特例，
+                            // 友方较多时净收益被抹平，典型2敌局几乎永不发动。
                             const others = game.filterPlayer(c => c !== player && c.isIn()).sortBySeat(player);
                             if (!others.length) return 0;
                             let x = 1;
                             let score = 0;
-                            let enemies = 0;
                             for (const t of others) {
                                 const att = get.attitude(player, t);
                                 const he = t.countCards("he");
-                                if (att < 0) enemies++;
-                                // 估对方会弃还是交：牌够且低价值牌多 → 更可能弃（X升高）；否则交一张（你得牌）
                                 let low = 0;
                                 t.getCards("he").forEach(c => {
                                     if (get.value(c, t) < 5) low++;
                                 });
                                 if (he >= x && low >= Math.min(x, 2)) {
-                                    // 倾向弃：对敌人好（掉牌），对友军坏
+                                    // 倾向弃：掉牌数≈min(he, x)；敌人为正、友军为负、中立轻微
                                     const loss = Math.min(he, x + 1);
-                                    score += (att < 0 ? 1.2 : -0.9) * loss;
+                                    if (att < 0) score += 1.2 * loss;
+                                    else if (att > 0) score -= 0.6 * loss;
+                                    else score -= 0.3 * loss;
                                     x = Math.min(he, x) + 1;
                                 } else {
-                                    // 倾向交一张给你
-                                    if (att < 0) score += 1.4; // 抢敌牌
-                                    else if (att > 0) score -= 1.6; // 刮友牌
+                                    // 倾向交一张给你：抢敌牌为正；友军≈平移，轻微负；中立轻微正
+                                    if (att < 0) score += 1.4;
+                                    else if (att > 0) score -= 0.4;
                                     else score += 0.3;
                                     x = 1;
                                 }
                             }
-                            if (enemies <= 0) return score > 1 ? 0.2 : 0;
-                            // 至少压到两个敌人或总分够才开
-                            return score >= 2.5 ? score : (enemies >= 3 && score > 0 ? score * 0.6 : 0);
+                            // 两轮限一次的群体技：净收益为正且过小门槛才发动，避免误伤友方/无收益发动
+                            return score > 1 ? score : 0;
                         },
                     },
                 },
@@ -24460,6 +24505,7 @@ const cshSkillPack = {
                 silent: true,
                 forced: true,
                 popup: false,
+                forceDie: true, forceOut: true, // ★ 死时触发必需（filterTrigger 的 isDead/出局闸；2026-10-16 修）
                 filter(event, player) {
                     return game.hasPlayer((cur) => cur.storage.csh_zhali_box === player.playerid);
                 },
@@ -25421,6 +25467,10 @@ const cshSkillPack = {
                         if (!info) return false;
                         if (info.equipSkill || info.cardSkill) return false;
                         if (info.hiddenSkill) return false;
+                        if (info.unique || info.charlotte || info.silent) return false; // v4：功能技/静默技不可被复制（魔王 watch/归魔 等枚举卫生）
+                        // v4：BOSS 模式专用技整体不可复制——它们依赖 game.bossinfo 档位参数
+                        // （_csh_moxi/_csh_x）与魔王阵营，被挑战者复制会产生越权成长（如【醒魔】无限涨上限）
+                        if (skill.indexOf("csh_boss_") === 0) return false;
                         // 武将牌技能即使带 charlotte 也允许（极少见）；仅排除纯临时标记技名
                         return true;
                     });
@@ -32475,5 +32525,11 @@ const cshSkillPack = {
 
 /* 暴露给调试 / 外部扩展（独立扩展在 content() 里挂的 lib.tongyuanBird，这里在模块作用域挂上） */
 try { if (typeof lib !== "undefined") lib.tongyuanBird = tongyuanBird; } catch (e) {}
+
+/* BOSS 模式魔王技（2026-10-13 · 批次 1）：skills/boss.js 为零 import 纯数据
+   （node 门禁可直校）；skill/translate 两键浅合并进主包——
+   boss 技 ID 均带 csh_boss_ 前缀，与既有 442 键零冲突（runBossChecks 断言兜底）。 */
+cshSkillPack.skill = Object.assign(cshSkillPack.skill || {}, cshBossPack.skill);
+cshSkillPack.translate = Object.assign(cshSkillPack.translate || {}, cshBossPack.translate);
 
 export default cshSkillPack;

@@ -1,7 +1,9 @@
 /* 【2026-09-30 修复】配置项里的 onclick 回调引用 lib
    （打开「胜负统计」/「局内互动」面板）。原在 extension.js 作用域内可见，
-   拆出后必须自带 import，否则点这两个按钮会抛 ReferenceError: lib is not defined。 */
-import { lib } from "../../../noname.js";
+   拆出后必须自带 import，否则点这两个按钮会抛 ReferenceError: lib is not defined。
+   【2026-10-16 深夜八】游戏类补 game（滚动条开关 onclick 落盘用 game.saveExtensionConfig）——
+   同一条红线：本文件用到的 noname 绑定必须在本文件 import。 */
+import { lib, game } from "../../../noname.js";
 
 export const cshConfig = {
             /* ===== 顶部：仅次于版本号的两个面板入口 ===== 
@@ -37,7 +39,17 @@ export const cshConfig = {
             /* ===== 功能开关 ===== */
             "csh_effect_announce":{"name":"伤害/击杀/回复播报","intro":"默认关闭。开启后播放伤害/连杀/回复播报（手游位图特效 + 手游原声）。逆流/却敌/归来仍为毛笔字特效。与其他扩展effect冲突时请关闭。","init":false},
             /* 【2026-10-05】默认关闭化：调试悬浮球默认不再开启（老玩家已保存的选择不受影响）。 */
-            "csh_debug_menu":{"name":"启用池子调试（悬浮球）","intro":"默认关闭。联机一律禁用。单机对局显示悬浮球，短按打开调试面板，F1 同效。","init":false},
+            /* 【2026-10-15 作者指令】改回**默认开启**（调试期需要随时看状态；联机仍一律禁用，
+               见 csh_debug.js 的 canShow）。老存档若手动关过，仍以玩家保存值为准。 */
+            "csh_debug_menu":{"name":"启用池子调试（悬浮球）","intro":"默认开启。联机一律禁用。单机对局显示悬浮球，短按打开调试面板，F1 同效。","init":true},
+            /* ★ 2026-10-16 深夜四（作者：给滚动条「在扩展设置里加一个开关」）：
+               本体兼容注入 C4 的开关。改动即时生效（onclick 传新状态给注入器），无需重启。
+               ★ 2026-10-16 深夜八·修「关了他又自动打开」：引擎（optionsMenu.js:305 /
+               exetensionMenu.js:135）对**有自定义 onclick 的选项不代存**（默认保存回调只在
+               `if (!cfg.onclick)` 时装），而本项 onclick 当时只调了注入器 —— 存值永远缺失 →
+               每次重开设置页/重启都回落到默认 init:true。修法 = onclick 里自行落盘（与引擎
+               默认回调同键同法：extension_池子魔将_csh_eg_group_scroll）。E45 已加断言防回退。 */
+            "csh_eg_group_scroll":{"name":"选将势力面板滚动条","intro":"默认开启。神/魔武将选择势力时，势力按钮墙限高并加纵向滚动条（势力多时不再溢出被裁；本体升级后仍可用）。关闭则恢复本体原样。改动即时生效。","init":true,"onclick":function(bool){ try{ game.saveExtensionConfig("池子魔将","csh_eg_group_scroll",bool); }catch(e){} try{ if(typeof lib.__cshEgScrollApply==="function") lib.__cshEgScrollApply(bool); }catch(e){} }},
             /* 【2026-10-05】「开发者日志」设置项按需求移除；precontent 会把历史开启的存档一并复位。 */
             /* 【2026-10-05】联机手气卡：仅联机（connectMode）生效；实现见 main/precontent.js 的
                _csh_swReplaceHandCards 全局规则技。本功能为最高优先级：与懒人包/云中守望同类开局

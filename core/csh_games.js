@@ -31,6 +31,32 @@ import { lib, game, ui } from "../../../noname.js";
 	     statFn 返回一行统计文字（如「最高 12,340」），用于卡片副标题；
 	            无统计的游戏不写此字段，卡片只显示 desc。 */
 	var CARDS = {
+		/* 行囊（v6.10 · 2026-10-15）：与生涯大厅/讨伐录/天下榜同级的非游戏页。
+		   卡片上显示"已经积了多少项家当" —— 比"有没有备份"更像玩家自己的账。 */
+		save: {
+			tag: "存档",
+			desc: "一身家当，随身可带",
+			statFn: function () {
+				try {
+					var M = (typeof lib !== "undefined" && lib.cshMigrate) ||
+						((typeof window !== "undefined" && window.CSH && window.CSH.migrate) || null);
+					if (!M || typeof M.inventory !== "function") return "";
+					var rows = M.inventory() || [], n = 0;
+					for (var i = 0; i < rows.length; i++) if (rows[i].has) n++;
+					return n ? ("已积 " + n + " 项家当") : "家当还没攒下";
+				} catch (e) { return ""; }
+			},
+		},
+		/* 天下榜（v6.9）：与生涯大厅/讨伐录同级的非游戏页 */
+		rank: {
+			tag: "联机",
+			desc: "天下英雄的池子币与功勋",
+			statFn: function () {
+				var n = "";
+				try { n = localStorage.getItem("csh_net_name") || ""; } catch (e) {}
+				return n ? ("留名 · " + n) : "尚未留名";
+			},
+		},
 		texas: {
 			tag: "牌桌", desc: "真实 AI 同桌 · 带入制",
 			statFn: function () {
@@ -54,6 +80,38 @@ import { lib, game, ui } from "../../../noname.js";
 		},
 		uno: {
 			tag: "纸牌", desc: "你 vs 1~3 个人机",
+		},
+		/* 金鳞市（2026-10-14 批次 B）：股市小游戏——卡片统计显示当前持仓市值与持有只数
+		   （只读快照 · 不触发每日结算——结算是进页/开壳时的事） */
+		goldfish: {
+			tag: "市集", desc: "五十位妖灵挂牌 · 持仓吃分红",
+			statFn: function () {
+				try {
+					var M = lib.cshMarket;
+					if (!M || !M.snapshot) return "";
+					var s = M.snapshot();
+					if (!s || !s.list || !s.list.length) return "";
+					var held = 0;
+					for (var i = 0; i < s.list.length; i++) if (s.list[i].hold > 0) held++;
+					if (!held) return "挂牌 " + s.list.length + " 位 · 尚未建仓";
+					return "持仓 " + fmtNum(s.marketValue) + " CBY · 持 " + held + " 只";
+				} catch (e) { return ""; }
+			},
+		},
+		/* 妖灵图鉴（2026-10-14 批次 C）：卡片统计显示已收录（已讨伐过）的妖灵数 */
+		codex: {
+			tag: "档案", desc: "五十位妖灵的大图档案",
+			statFn: function () {
+				try {
+					var R = lib.cshBossRecord;
+					if (!R || !R.summary) return "";
+					var s = R.summary();
+					var m = (s && s.minions) ? Object.keys(s.minions).length : 0;
+					var total = 50;
+					try { total = (lib.cshMarket && lib.cshMarket.LISTED && lib.cshMarket.LISTED.length) || 50; } catch (e2) {}
+					return m ? ("已收录 " + m + " / " + total + " 位") : ("五十位妖灵 · 尚未讨伐");
+				} catch (e) { return ""; }
+			},
 		},
 	};
 

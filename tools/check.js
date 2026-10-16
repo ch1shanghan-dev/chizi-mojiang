@@ -704,6 +704,1814 @@ function runConsistency() {
 }
 
 /* ------------------------------------------------------------------ *
+ * BOSS 模式断言（2026-10-13 · 设计定稿 §5.4 · runBossChecks）
+ * 数据源：core/csh_bossdata.js（零 import 纯数据，Node 可直校）+ skills/boss.js
+ * ------------------------------------------------------------------ */
+function bossBlockOf(text, marker) {
+	const start = text.indexOf(marker);
+	if (start < 0) return "";
+	let i = text.indexOf("{", start), depth = 0;
+	for (let p = i; p < text.length; p++) {
+		const c = text[p];
+		if (c === "{") depth++;
+		else if (c === "}") { depth--; if (depth === 0) return text.slice(i + 1, p); }
+	}
+	return "";
+}
+
+async function runBossChecks() {
+	log("");
+	log("【BOSS 模式断言（runBossChecks）】");
+	let BD, BJ;
+	try {
+		BD = await import("../core/csh_bossdata.js");
+		/* ★ 2026-10-15：skills/boss.js 现在**必须**显式 import 引擎全局
+		   （它此前零 import 却用了 160 次 game./lib./get. …，作者实机吃到
+		   `game is not defined` —— 见门禁 E36）。但真去 import 引擎会连带加载
+		   noname 的 onload 模块，而那条链上依赖 vue 包，工具侧（Node）解析不到。
+		   这里的静态断言只关心"技能表的结构"（数量/描述/文案/registry），
+		   并不需要真引擎对象 ⇒ 因此**用桩加载**：把 import 行换成一组空对象，
+		   写进临时文件再 import，其余检查一字不变。 */
+		const bjPath = path.join(ROOT, "skills", "boss.js");
+		const bjSrc = fs.readFileSync(bjPath, "utf8");
+		const STUB = "const lib = {}, game = {}, ui = {}, get = {}, ai = {}, _status = {};";
+		let okStub = false;
+		const bjStub = bjSrc.replace(
+			/^import\s*\{[^}]*\}\s*from\s*["'][^"']*noname\.js["'];?[^\n]*\n/m,
+			function (m0) { okStub = true; return STUB + "\n"; }
+		);
+		if (okStub) {
+			const os = await import("node:os");
+			const { pathToFileURL } = await import("node:url");
+			const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "csh-bj-"));
+			const tmpFile = path.join(tmpDir, "boss_stub.mjs");
+			fs.writeFileSync(tmpFile, bjStub, "utf8");
+			BJ = await import(pathToFileURL(tmpFile).href);
+			try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch (eRm) {}
+		} else {
+			/* 没有可替换的 import 行 ⇒ 说明又回到"零 import 用全局"的老写法，正是 E36 要挡的 */
+			fail("skills/boss.js 缺引擎 import 行（工具侧无法桩加载；见 E36）");
+			return;
+		}
+	} catch (e) {
+		fail("BOSS 模块无法 import（ESM 语法错误？" + e.message + "）");
+		return;
+	}
+
+	/* 名册真值（character/index.js 单源） */
+	const charText = fs.readFileSync(path.join(ROOT, "character", "index.js"), "utf8");
+	const charBlock = bossBlockOf(charText, "character: {");
+	const roster = [];
+	{ const re = /"(csh_[a-z_0-9]+)"\s*:\s*\{/g; let m; while ((m = re.exec(charBlock))) roster.push(m[1]); }
+	const rosterSkills = new Set();
+	{ const re = /"(csh_[a-z_0-9]+)"\s*:\s*\{/g; let m;
+		while ((m = re.exec(charBlock))) {
+			const seg = charBlock.slice(m.index, m.index + 900);
+			const sk = /(?:^|[\s,{])skills\s*:\s*\[([^\]]*)\]/.exec(seg);
+			if (sk) (sk[1].match(/"(csh_[^"]+)"/g) || []).forEach(x => rosterSkills.add(x.slice(1, -1)));
+		}
+	}
+
+	/* ① 覆盖与档位：分配表 ↔ 名册（selfCheck 内含 93/总数/重复/档位计数） */
+	const errs = BD.selfCheck(roster);
+	if (errs.length) fail("BOSS 分配表自检未过：" + errs.join("；"));
+	else ok("BOSS 分配表 93/93 覆盖名册（究极 8 / 霸主 30 / 彩蛋 4 / 精英 51，无重复无缺漏；移出 6 人见 BOSS_EXCLUDED）");
+
+	/* ② 构造冒烟（mock 原始包数据 → 纯构造函数；trans/titles 与 bossmode 实调同参） */
+	const mock = {}; const mockTrans = {}; const mockTitles = {};
+	roster.forEach(id => {
+		mock[id] = { sex: "male", group: "qun", hp: 4, skills: ["csh_mock_skill"], img: "extension/池子魔将/image/" + id + ".webp", dieAudios: ["d"] };
+		mockTrans[id] = "测名_" + id;
+		mockTitles[id] = "称号_" + id;
+	});
+	const built = BD.buildBossEntries(mock, mockTrans, mockTitles);
+
+	/* ③ 条目完整性：watch 全装配 / group=devil / extraModeData 保留出身 / hp=maxHp */
+	const bossIds = Object.keys(built.entries);          /* boss ID 键序 = 出场顺序（对象键序） */
+	const badE = [];
+	for (const bid of bossIds) {
+		const e = built.entries[bid];
+		if (!e) { badE.push(bid + "（缺条目）"); continue; }
+		const id = BD.origIdOf(bid);                     /* ★ v4 修正：循环变量是 bid，原 ID 需转换 */
+		const tier = BD.tierOf(id);
+		/* v4：条目为对象形态（与 character/index.js 原生条目同格式），
+		   但必须补齐数组索引（[0]sex/[1]group/[2]hp/[3]skills/[5]extraModeData）——
+		   引擎多处 [N] 直读（optionsMenu.js:203 / boss.js:109 / player.init:2628） */
+		if (Array.isArray(e)) { badE.push(bid + "（不应为数组，应与原生条目同对象格式）"); continue; }
+		if (!Array.isArray(e[3]) || !e[3].length) { badE.push(bid + "（[3] 索引缺失）"); continue; }
+		if (e[1] !== BD.BOSS_GROUP) badE.push(bid + "（[1]/group≠" + BD.BOSS_GROUP + "）");
+		if (e[5] !== "qun") badE.push(bid + "（[5]/extraModeData 丢失）");
+		if (!e.skills.includes("csh_boss_watch")) badE.push(bid + "（缺 watch）");
+		if (BD.BOSS_SYSTEM_SKILLS.some(sk => !e.skills.includes(sk))) badE.push(bid + "（缺系统层技能）");
+		if (!e.isUnseen) badE.push(bid + "（缺 isUnseen · 武将设置页隐藏）");
+		/* 醒魔（解封）：张飞/关索（NO_AWAKEN）/ 彩蛋档 / 50 血特例不装配；其余必须装配 */
+		const wantXm = BD.growsOf(id);
+		if (wantXm && !e.skills.includes("csh_boss_xingmo")) badE.push(bid + "（缺 xingmo）");
+		if (!wantXm && e.skills.includes("csh_boss_xingmo")) badE.push(bid + "（不应有 xingmo）");
+		if (e.skills.includes("csh_boss_groupfix")) badE.push(bid + "（groupfix 应已删除）");
+		/* v4 开局血量：装解封者 = 40% 起点；不装者 = 完全体 X（董卓/兀突骨 50 特例同口径） */
+		const wantHp = BD.startHpOf(id);
+		if (e.hp !== wantHp || e.maxHp !== wantHp) badE.push(bid + "（开局 hp≠" + wantHp + "）");
+		if (!e.groupInGuozhan) badE.push(bid + "（缺 groupInGuozhan）");
+		if (!built.names[bid] || built.names[bid] === bid) badE.push(bid + "（译名缺失/未取到）");
+		if (!e.img || e.img === bid) badE.push(bid + "（立绘未复制）");
+	}
+	if (bossIds.length !== 93) badE.unshift("构造条目 " + bossIds.length + " ≠ 93");
+	if (badE.length) fail("魔王条目异常：" + badE.slice(0, 6).join("；"));
+	else ok("魔王条目 93 条完整（对象形态+数组索引双通道 / watch+系统层二技+isUnseen+醒魔 按档位装配 / 立绘·出身色 / hp=maxHp）");
+
+	/* ④ 档位参数：chongzheng 5/4/2/0（2026-10-15 作者定案）· 魔息 3/2/1/0 · minion（究极 2@2/8 · 霸主 1@2 · 精英游魂） */
+	const badC = [];
+	for (const bid of bossIds) {
+		const id = BD.origIdOf(bid);
+		const tier = BD.tierOf(id);
+		const c = built.cfg[bid];
+		if (!c) { badC.push(bid + "（缺 cfg）"); continue; }
+		if (c.chongzheng !== BD.TIER_CHONGZHENG[tier]) badC.push(bid + "（chongzheng≠" + BD.TIER_CHONGZHENG[tier] + "）");
+		if (c._csh_moxi !== BD.TIER_MOXI[tier]) badC.push(bid + "（魔息≠" + BD.TIER_MOXI[tier] + "）");
+		if (c._csh_x !== BD.fullHpOf(id)) badC.push(bid + "（_csh_x≠" + BD.fullHpOf(id) + "）");
+		/* v6.1 随机搭配（全随机）：断言【结构】——究极 2 只 @2/8 互异且在池、
+		   霸主 1 只 @2 在池、**精英 1 只 @2 在池**、彩蛋不配。 */
+		const mn = c.minion || null;
+		if (tier === "egg") {
+			if (mn) badC.push(bid + "（彩蛋不应配 minion）");
+		} else if (tier === "elite") {
+			if (!mn || Object.keys(mn).length !== 1 || !mn["2"]) badC.push(bid + "（精英应配 1 只 @2）");
+			else if (!BD.MINION_POOL.includes(mn["2"])) badC.push(bid + "（精英妖灵不在池内）");
+		} else if (tier === "ultimate") {
+			const ks = mn ? Object.keys(mn).sort() : [];
+			if (ks.length !== 2 || ks[0] !== "2" || ks[1] !== "8") badC.push(bid + "（究极应 2 只 @2/8）");
+			else if (mn["2"] === mn["8"]) badC.push(bid + "（究极两妖灵重复）");
+			else if (!BD.MINION_POOL.includes(mn["2"]) || !BD.MINION_POOL.includes(mn["8"])) badC.push(bid + "（究极妖灵不在池内）");
+		} else if (tier === "lord") {
+			if (!mn || Object.keys(mn).length !== 1 || !mn["2"]) badC.push(bid + "（霸主应配 1 只 @2）");
+			else if (!BD.MINION_POOL.includes(mn["2"])) badC.push(bid + "（霸主妖灵不在池内）");
+		}
+	}
+	if (badC.length) fail("lib.boss 配置异常：" + badC.slice(0, 6).join("；"));
+	else ok("档位参数正确（重整 5/4/2/0 · 魔息 3/2/1 · 解封上限 _csh_x=档位完全体 · 妖灵 v6.1 全随机：究极 2@2/8 池内互异/霸主 1@2 池内/精英 1@2 池内/彩蛋无）");
+	/* v6.1 随机覆盖（抽取 1000 次，三档合计必须覆盖全池 50 只） */
+	{
+		const hit = new Set();
+		for (let i = 0; i < 1000; i++) {
+			const p2 = BD.pickMinions("ultimate");
+			hit.add(p2["2"]); hit.add(p2["8"]);
+			hit.add(BD.pickMinions("lord")["2"]);
+			hit.add(BD.pickMinions("elite")["2"]);
+		}
+		const missed = BD.MINION_POOL.filter(x => !hit.has(x));
+		if (missed.length) fail("随机池覆盖不足（三档合计抽取未出现）：" + missed.join("、"));
+		else ok("随机搭配覆盖：三档合计抽取命中全池 50 只（六式 6 + 十二美 12 + 希里 + 春野樱 + 十卫 10 + 二十刑 20）");
+	}
+
+	/* ④+ ★执行级门禁 E1/E2（v4.0.6 键系错配 BUG 的形式化——order 键系必须与产物同键，
+	   且引擎开局合并逻辑（boss.js:215-218 同款）必须能读到 minion/gameDraw） */
+	const e1bad = BD.allBossIds().filter(bid => !built.entries[bid] || !built.cfg[bid] || !built.names[bid]);
+	if (e1bad.length) fail("键系错配（order 出现与 entries/cfg/names 不同键的 ID）：" + e1bad.slice(0, 5).join("、"));
+	else ok("执行级 E1：allBossIds() 与产物同键系（csh_boss_*）——4.0.6 妖灵 BUG 的键系错配已结构性排除");
+	const simCfg = built.cfg["csh_boss_mlb"];
+	const simBossinfo = { loopType: 1, chongzheng: 5 };
+	for (const k in simCfg) simBossinfo[k] = simCfg[k];
+	if (!simBossinfo.minion || !simBossinfo.minion["2"] || simBossinfo._csh_moxi !== 4 || simBossinfo._csh_x !== 30
+		|| simBossinfo._csh_bati_lim !== 2 || simBossinfo._csh_monu_lim !== 3) {
+		fail("执行级 E2：模拟引擎开局合并后 minion/_csh_moxi/_csh_x 不可达（" + JSON.stringify(simBossinfo) + "）");
+	} else {
+		ok("执行级 E2：模拟引擎合并（boss.js:215-218）后究极配置可达——minion 双怪 / 魔息 4 / 重整 5 / 解封上限 30 / 霸体 2 次 / 魔怒 3 次");
+	}
+	const bmText = fs.readFileSync(path.join(ROOT, "main", "bossmode.js"), "utf8");
+	if (/\bbid\.slice\(\d+\)|bid\.replace\(/.test(bmText)) {
+		fail("执行级 E4：bossmode.js 存在散落的手工键转换（应使用 bossdata 的键系导出）");
+	} else {
+		ok("执行级 E4：bossmode 无散落键转换（键系唯一真源）");
+	}
+	/* E5（v4 · 原生注册守护）：角色必须走 game.import("character", …) 由引擎 loadCharacter
+	   处理（init/index.js:465），bossmode **禁止**手工写 lib.character / mode_boss 包
+	   （手工塞 = 绕过引擎 → 条目形态不一致 → optionsMenu.js:203 等 [N] 读取报错）。 */
+	if (/lib\.character\s*=|lib\.characterPack\.mode_boss\s*=/.test(bmText)) {
+		fail("执行级 E5：bossmode 违反原生注册原则（不得手工写 lib.character / mode_boss 包）");
+	} else {
+		ok("执行级 E5：bossmode 零手工写 lib.character / mode_boss 包（角色走原生注册）");
+	}
+	/* E7：character/boss.js 在位且用 game.import 原生注册 */
+	const cbPath = path.join(ROOT, "character", "boss.js");
+	const cbText = fs.existsSync(cbPath) ? fs.readFileSync(cbPath, "utf8") : "";
+	if (!/game\.import\(\s*"character"/.test(cbText)) {
+		fail("执行级 E7：character/boss.js 缺失或未用 game.import(\"character\") 原生注册");
+	} else if (!/lib\.config\.characters\.add/.test(cbText)) {
+		fail("执行级 E8：动态角色包必须先登记启用（lib.config.characters.add）——否则 loadCharacter 会跳过处理（loading.js:110）");
+	} else {
+		ok("执行级 E7/E8：魔王角色走 game.import(\"character\") 原生注册且已登记启用（引擎 loadCharacter 处理）");
+	}
+	/* E10（v4 · 包级隐藏守护）：武将设置页的包节点枚举 = 静态包列表 + lib.characterPack
+	   全键兜底补建（characterPackMenu.js:424-430）——仅条目级 isUnseen 只隐藏条目、节点仍在。
+	   必须先导出 cshBossPackHide（character/boss.js）并在 content 时点调用（loadCharacter 之后）。 */
+	{
+		const contentText = fs.readFileSync(path.join(ROOT, "main", "content.js"), "utf8");
+		if (!/export function cshBossPackHide\s*\(/.test(cbText)) {
+			fail("执行级 E10：character/boss.js 未导出 cshBossPackHide（包级隐藏缺失——武将设置页会出现魔王包节点）");
+		} else if (!/import\s*\{[^}]*cshBossPackHide[^}]*\}/.test(contentText) || !/cshBossPackHide\s*\(\s*\)/.test(contentText)) {
+			fail("执行级 E10：main/content.js 未引入/调用 cshBossPackHide（包级隐藏未接电）");
+		} else if (!/lib\.characterPack\[NAME\]/.test(cbText) || !/delete\s+lib\.characterPack\[NAME\]/.test(cbText)) {
+			fail("执行级 E10：cshBossPackHide 未按「移除包键 + 加载守卫」实现（delete lib.characterPack[NAME]）");
+		} else {
+			ok("执行级 E10：包级隐藏接线在位（导出 → content 调用 → loadCharacter 后移除包键，守卫防误删）");
+		}
+	}
+
+	/* E12（v5 · 冷眼 global 装配守护）：【冷眼】的 maxHandcard mod 要让「挑战者」
+	   的手牌上限-1，必须登记 lib.skill.global——引擎 checkMod 的遍历范围 =
+	   自身技能 + lib.skill.global（getModableSkills 内 concat），妖灵技能
+	   挂在挑战者身上是不可能的，唯一通路是 global。漏装配 = 技能静默失效。 */
+	{
+		const bmText12 = fs.readFileSync(path.join(ROOT, "main", "bossmode.js"), "utf8");
+		const hasGlobal = /lib\.skill\.global/.test(bmText12) && /csh_boss_lengyan/.test(bmText12);
+		const sk12 = fs.readFileSync(path.join(ROOT, "skills", "boss.js"), "utf8");
+		const isMod = /csh_boss_lengyan:[\s\S]{0,200}?maxHandcard/.test(sk12);
+		if (!isMod) fail("执行级 E12：csh_boss_lengyan 未按 maxHandcard mod 实现（手牌上限-1 的唯一通路）");
+		else if (!hasGlobal) fail("执行级 E12：bossmode.js 未装配 lib.skill.global（冷眼将静默失效——挑战者 checkMod 遍历不到妖灵 mod）");
+		else {
+			/* v6.2：跨角色 mod 技全部必须登记（漏一个 = 该技静默失效） */
+			const bmTxt = fs.readFileSync(path.join(ROOT, "main", "bossmode.js"), "utf8");
+			const needG = ["csh_boss_lengyan", "csh_boss_yongdong", "csh_boss_ranxin_mod", "csh_boss_kongshou_lock"];
+			const missG = needG.filter(g => !bmTxt.includes('"' + g + '"'));
+			if (missG.length) fail("执行级 E12：bossmode.js 未登记跨角色 mod 技：" + missG.join("、"));
+			else {
+				/* 带触发器的技绝不能进 global（会每个角色各触发一次） */
+				const skillTxt12 = fs.readFileSync(path.join(ROOT, "skills", "boss.js"), "utf8");
+				const bad = [];
+				for (const g of needG) {
+					const i = skillTxt12.indexOf("\n\t" + g + ": {");
+					if (i < 0) continue;
+					/* 只取该技能**自己的块**（到下一个顶层 key / 收尾 `};` 为止）——
+					   取固定长度窗口会把后面带触发器的技能一起圈进来（误报）。 */
+					const rest = skillTxt12.slice(i + 1);
+					const mm = /\n(?=\t[a-zA-Z_$][A-Za-z0-9_$]*: \{|\};)/.exec(rest);
+					const seg = mm ? rest.slice(0, mm.index) : rest.slice(0, 700);
+					if (/trigger\s*:/.test(seg)) bad.push(g);
+				}
+				if (bad.length) fail("执行级 E12：被登记进 global 的 mod 技带触发器（会重复触发）：" + bad.join("、"));
+				else ok("执行级 E12：跨角色 mod 技接线在位（冷眼/永动/燃心 maxHandcard + 空手 cardEnabled · bossmode 全 4 技登记 · global 内无触发器）");
+			}
+		}
+	}
+
+	/* E13（v5.3 立 · v6.2 修正 · 2026-10-16 三轮修正价值 · 四轮修正数值 · 妖灵讨伐收益守护）：
+	   作者定案"CBY + 功勋 + 永久加成"；2026-10-16 拍板两场景两值、当晚又**统一为 800**
+	   （"3000 和 1000 有点多，统一改成 800"）——两值同为 800，分流结构保留。
+	   常量单点 + recordMinion（含 asBoss 场景参数）/minionHeat 实现 + watch 击破分支接线（含 asBoss 传参）。 */
+	{
+		const rt13 = fs.readFileSync(path.join(ROOT, "core", "csh_bossrecord.js"), "utf8");
+		const bt13 = fs.readFileSync(path.join(ROOT, "skills", "boss.js"), "utf8");
+		if (!/MINION_CBY\s*=\s*800\b/.test(rt13)) fail("执行级 E13：MINION_CBY 缺失或 ≠ 800（2026-10-16 四轮拍板）");
+		else if (!/MINION_CBY_ASBOSS\s*=\s*800\b/.test(rt13)) fail("执行级 E13：MINION_CBY_ASBOSS 缺失或 ≠ 800（四轮统一值）");
+		else if (!/export function recordMinion\s*\(\s*minionId,\s*opts\s*\)/.test(rt13)) fail("执行级 E13：recordMinion 未接 asBoss 场景参数");
+		else if (!/export function minionHeat\s*\(/.test(rt13)) fail("执行级 E13：minionHeat（金鳞市基本面读取）未实现");
+		else if (/guardPass/.test(rt13)) fail("执行级 E13：v6.2 已取消同局去重，但去重守卫仍在（作者：妖灵收益不再去重）");
+		else if (!/recordMinion/.test(bt13) || !/csh_boss_minion_/.test(bt13)) fail("执行级 E13：csh_boss_watch 未接妖灵讨伐分支");
+		else if (!/recordMinion\([^)]*asBoss/.test(bt13)) fail("执行级 E13：csh_boss_watch 未把应战场景传给 recordMinion（应传 asBoss）");
+		else ok("执行级 E13：妖灵讨伐收益接线在位（统一 800 + 功勋 + 金鳞市热度 · watch 击破分支 · 无同局去重）");
+	}
+
+	/* E14（v5.4 · 金鳞市守护）：registry 卡片 + 页面文件 + 市场引擎四件套 + 50 位人设 */
+	{
+		const rg14 = fs.readFileSync(path.join(ROOT, "core", "csh_registry.js"), "utf8");
+		const mk14 = fs.readFileSync(path.join(ROOT, "core", "csh_market.js"), "utf8");
+		const hasCard = /goldfish:\s*\{/.test(rg14) && /"goldfish"/.test(rg14);
+		const hasPage = fs.existsSync(path.join(ROOT, "games", "goldfish.html"));
+		const hasEngine = /export const BASE_PRICE/.test(mk14) && /export function ensureDay/.test(mk14)
+			&& /export function trade/.test(mk14) && /export function snapshot/.test(mk14);
+		const girlCount = (mk14.match(/tag:\s*"/g) || []).length;
+		if (!hasCard) fail("执行级 E14：金鳞市未接入 registry（池子休闲卡片）");
+		else if (!hasPage) fail("执行级 E14：games/goldfish.html 缺失");
+		else if (!hasEngine) fail("执行级 E14：市场引擎四件套（BASE_PRICE/ensureDay/trade/snapshot）不完整");
+		else if (girlCount < 50) fail("执行级 E14：妖灵人设不足 50 位（实际 " + girlCount + "）");
+		else ok("执行级 E14：金鳞市接线在位（registry 卡片 + 页面 + 市场引擎 + 50 位人设台词）");
+	}
+
+	/* E15（批次 A · 讨伐录「外传卷」守护）：收录 **非池子魔将** 的 isBoss 角色。
+	   四个必须同时在位的接线点（缺一即静默失效）：
+	     ① 数据层 extRoster（动态枚举）/ recordExt（独立段 s.ext，不并入 93 主进度）
+	     ② 全局捕获 csh_boss_watch_ext（本体 BOSS 身上没有我们的技能，只能靠 lib.skill.global）
+	     ③ bossmode 登记 lib.skill.global
+	     ④ 页面 renderExtSection + **根相对立绘前缀三位**（../../ 是错的——页面在 games/ 下） */
+	{
+		const rt15 = fs.readFileSync(path.join(ROOT, "core", "csh_bossrecord.js"), "utf8");
+		const bt15 = fs.readFileSync(path.join(ROOT, "skills", "boss.js"), "utf8");
+		const bm15 = fs.readFileSync(path.join(ROOT, "main", "bossmode.js"), "utf8");
+		const bb15 = fs.readFileSync(path.join(ROOT, "games", "bossbook.html"), "utf8");
+		const sh15 = fs.readFileSync(path.join(ROOT, "core", "csh_shell.js"), "utf8");
+		const hasData = /export function extRoster\s*\(/.test(rt15) && /export function recordExt\s*\(/.test(rt15);
+		const sepSeg = /s\.ext\s*=\s*\{\}/.test(rt15) && /isBossChar/.test(rt15) && /deriveImg/.test(rt15);
+		const hasWatch = /csh_boss_watch_ext\s*:/.test(bt15) && /recordExt/.test(bt15);
+		const hasGlobal = /csh_boss_watch_ext/.test(bm15) && /lib\.skill\.global/.test(bm15);
+		const hasPage = /function renderExtSection\s*\(/.test(bb15) && /异界来客/.test(bb15);
+		/* ★ 跨模式名册（池子休闲里 lib.character 不含本体 BOSS → 纯当场枚举恒空）：
+		   snapshotExt（boss 局内快照 s.extPool）+ extRosterAll（三源合并）必须成对在位，
+		   且 shell 透传与 bossmode 快照调用都要接上，否则外传卷永远空态。 */
+		const hasPool = /s\.extPool/.test(rt15) && /export function extRosterAll\s*\(/.test(rt15) && /export function snapshotExt\s*\(/.test(rt15);
+		const wiredSnap = /snapshotExt\s*\(/.test(bm15) && /extRosterAll/.test(sh15) && /extRosterAll/.test(bb15);
+		/* 立绘前缀回归守卫：必须是 ../../../（三层），且不得残留 "../../" + rec.img 的错位写法 */
+		const badPrefix = /"\.\.\/\.\.\/"\s*\+\s*rec\.img/.test(bb15);
+		const goodPrefix = /"\.\.\/\.\.\/\.\.\/"\s*\+\s*raw/.test(bb15);
+		if (!hasData) fail("执行级 E15：外传数据层缺失（extRoster / recordExt 未导出）");
+		else if (!sepSeg) fail("执行级 E15：外传独立存储段 s.ext / isBossChar / deriveImg 不完整（会污染 93 主进度）");
+		else if (!hasWatch) fail("执行级 E15：skills/boss.js 缺 csh_boss_watch_ext（外传阵亡无法捕获）");
+		else if (!hasGlobal) fail("执行级 E15：bossmode.js 未登记 csh_boss_watch_ext 到 lib.skill.global（全局触发失效）");
+		else if (!hasPage) fail("执行级 E15：games/bossbook.html 缺 renderExtSection / 异界来客 区块");
+		else if (!hasPool) fail("执行级 E15：缺 s.extPool / extRosterAll / snapshotExt（池子休闲里外传卷将恒空态）");
+		else if (!wiredSnap) fail("执行级 E15：跨模式名册未接电（bossmode 调 snapshotExt / shell 与页面用 extRosterAll）");
+		else if (badPrefix || !goodPrefix) fail("执行级 E15：外传立绘前缀错位（页面在 games/ 下，根相对须 ../../../，不得 ../../）");
+		else ok("执行级 E15：外传卷接线在位（extRoster/recordExt 独立段 + global 捕获 + bossmode 登记 + 跨模式快照 + 页面区块 + 立绘前缀三层）");
+	}
+
+	/* E16（批次 C · 妖灵图鉴守护）：galgame 档案页 —— 只消费数据层，不硬编码名单。
+	     registry 卡片 + games/codex.html + csh_games 卡片三者齐备，且人设/挂牌来自市场引擎。 */
+	{
+		const rg16 = fs.readFileSync(path.join(ROOT, "core", "csh_registry.js"), "utf8");
+		const gm16 = fs.readFileSync(path.join(ROOT, "core", "csh_games.js"), "utf8");
+		const hasCard = /codex:\s*\{/.test(rg16) && /"codex"/.test(rg16);
+		const hasPage = fs.existsSync(path.join(ROOT, "games", "codex.html"));
+		const hasGamesCard = /codex:\s*\{/.test(gm16);
+		let codexOk = hasCard && hasPage && hasGamesCard;
+		let codexDetail = "（registry 卡片 + csh_games 卡片 + games/codex.html）";
+		if (codexOk) {
+			const cx = fs.readFileSync(path.join(ROOT, "games", "codex.html"), "utf8");
+			const noHard = /GIRLS/.test(cx) && /LISTED/.test(cx) && !/csh_boss_minion_[a-z]/.test(cx);
+			const hasFace = /csh_face_/.test(cx);
+			if (!noHard) { codexOk = false; codexDetail = "图鉴页硬编码了妖灵名单（必须走 GIRLS/LISTED 数据层）"; }
+			else if (!hasFace) { codexOk = false; codexDetail = "图鉴页未接人像图（csh_face_）"; }
+		}
+		if (!codexOk) fail("执行级 E16：妖灵图鉴接线不完整 " + codexDetail);
+		else ok("执行级 E16：妖灵图鉴接线在位（registry 卡片 + csh_games 卡片 + 页面 · 人设走市场引擎，零硬编码名单）");
+	}
+
+	/* E17（2026-10-14 审计 · BOSS 成就键系守护）：★ 真 BUG 回归守卫 ——
+	   csh_bossrecord.summary() 输出的 series/seriesTotal **键无 csh_ 前缀**
+	   （`sk.replace(/^csh_/,"")`，与 bossbook 系列表同契约）。而 csh_achv 的
+	   系列成就此前用带前缀的键索引 → 恒 undefined → 分子恒 0 → **8 条成就永不可达成**。
+	   这里**真跑一遍成就引擎**（vm + window 桩，与浏览器同路径）：
+	     · 「挑战」分类 22 条；
+	     · 系列成就 prog() 在无前缀 / 带前缀两种快照下都要算出非零进度（键系契约）。 */
+	try {
+		const vm = await import("node:vm");
+		const aSrc = fs.readFileSync(path.join(ROOT, "core", "csh_achv.js"), "utf8");
+		const relText = fs.readFileSync(path.join(ROOT, "core", "csh_bossrecord.js"), "utf8");
+		const sandbox = { window: {}, localStorage: { getItem() { return null; }, setItem() { } }, console: console };
+		sandbox.window.localStorage = sandbox.localStorage;
+		vm.createContext(sandbox);
+		vm.runInContext(aSrc, sandbox, { filename: "csh_achv.js" });
+		const AC = sandbox.window.CSH_ACHV;
+		const contractOk = /sk\.replace\(\/\^csh_\//.test(relText);      /* 快照侧：去前缀 */
+		if (!AC || !AC.defs) fail("执行级 E17：成就引擎无法在 vm 中加载（window.CSH_ACHV 缺失）");
+		else if (!contractOk) fail("执行级 E17：csh_bossrecord 的 series 键不再去 csh_ 前缀（成就/讨伐录键系契约被破坏）");
+		else {
+			const boss = AC.defs.filter(d => d.cat === "挑战");
+			const sfx = AC.byId("boss_series_cuifeng");
+			if (!sfx) fail("执行级 E17：缺系列成就 boss_series_cuifeng");
+			else {
+				const bagA = { bossSeries: { cuifeng: 24 }, bossSeriesTotal: { cuifeng: 24 } };
+				const bagB = { bossSeries: { csh_cuifeng: 24 }, bossSeriesTotal: { csh_cuifeng: 24 } };
+				const pA = sfx.prog(bagA), pB = sfx.prog(bagB);
+				if (pA[0] !== 24 || pA[1] !== 24) fail("执行级 E17：系列成就读无前缀快照失败（得到 " + JSON.stringify(pA) + "）—— 与 csh_bossrecord 键系不一致，成就会恒不可达成");
+				else if (pB[0] !== 24) fail("执行级 E17：系列成就未兼容带 csh_ 前缀的旧键（容错读取失效）");
+				else if (boss.length !== 22) fail("执行级 E17：「挑战」成就条数 " + boss.length + " ≠ 22");
+				else ok("执行级 E17：BOSS 成就键系一致（真跑引擎：系列进度 24/24，兼容两种键写法 · 22 条挑战成就）");
+			}
+		}
+	} catch (e17) {
+		fail("执行级 E17 执行异常：" + e17.message);
+	}
+
+	/* E18（2026-10-14 审计 · 经济安全守护）：钱相关通道不许静默吞账/重放 ——
+	   ① 买：`done !== true` 即拒（不得把"未知返回值"当成功）；
+	   ② 卖：**先确认入账再扣持仓**（否则钱包异常=白卖）；
+	   ③ 体验金/分红：入账成功才落标记；失败挂 pendingDiv 下次补发；
+	   ④ 金鳞市页面的交易桥**不得做本地重放兜底**（Bridge 超时也会回 ok=false，
+	      再走父窗 M.trade 就会真买两次）。 */
+	{
+		const mText = fs.readFileSync(path.join(ROOT, "core", "csh_market.js"), "utf8");
+		const gText = fs.readFileSync(path.join(ROOT, "games", "goldfish.html"), "utf8");
+		const buyStrict = /done !== true/.test(mText);
+		const sellSafe = /const gain = price \* n \* \(1 - TRADE_FEE\);\s*\n\s*\/\*[^*]*\*\/\s*\n\s*if \(!pay\(/.test(mText)
+			|| /if \(!pay\(Math\.round\(gain\)/.test(mText);
+		const giftSafe = /if \(pay\(WELCOME_GIFT[^)]*\)\) s\.gift = true/.test(mText);
+		const pendSafe = /s\.pendingDiv \+= gain/.test(mText) && /function pay\s*\(/.test(mText);
+		const dblRaw = bossBlockOf(gText, "function doTrade(");
+		/* 去注释后再判（注释里也会出现 M.trade() 字样） */
+		const dbl = dblRaw ? dblRaw.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "") : "";
+		/* 桥分支必须"报错退出"而不是回落执行：块内 M.trade( 只应出现在非桥分支（1 次），
+		   且桥分支内出现失败回调（cb({ ok:false ...)）而非交易调用。 */
+		const bridgeSafe = !!dbl
+			&& (dbl.match(/M\.trade\(/g) || []).length === 1
+			&& /Bridge\.active\) \{[\s\S]*?cb\(\{\s*ok:\s*false[\s\S]*?\n\s*\}\s*\);\s*\n\s*return;/.test(dbl);
+		if (!buyStrict) fail("执行级 E18：金鳞市买入未做严格扣款确认（done !== true）");
+		else if (!sellSafe) fail("执行级 E18：金鳞市卖出未「先入账再扣持仓」（钱包异常时会白卖）");
+		else if (!giftSafe) fail("执行级 E18：体验金标记未与入账绑定（失败会永久吞掉开户礼）");
+		else if (!pendSafe) fail("执行级 E18：分红失败未挂 pendingDiv 补发（会静默吞掉分红）");
+		else if (!bridgeSafe) fail("执行级 E18：金鳞市 doTrade 桥分支仍在失败时本地重放（Bridge 超时 ⇒ 双买双卖）");
+		else ok("执行级 E18：金鳞市经济安全（严格扣款 · 先入账后扣仓 · 记账失败挂账补发 · 交易桥不重放）");
+	}
+
+	/* E19（2026-10-14 审计 · 「静默永不发动」三例回归守卫）：这三条都是**改前完全
+	   不生效**的真 BUG（静态可判，运行时无痕），固化为断言 ——
+	   ① 【乱入】原 `player: "gameStart"`：gameStart 是全局事件（宿主事件不带 player），
+	      `player:` 角色要求 event.player === 持有者 → 恒 false。必须 global。
+	   ② 【天命】原写 `trigger.directresult`：judge content 在**触发 judge 之前**就读取
+	      directresult 选牌并亮出（content.js judge step1）→ 赋值太晚 = 全无效果。
+	      改判必须替换 `judging[0]`（本体 guidao/key/diy 范式）。
+	   ③ 【水月】原用 `trigger.source`：useCardToTarget 系事件由 _triggerTo 构造，
+	      只有 player/target/card/cards（无 source）→ undefined 传入 targetEnabled
+	      → checkMod 取 getModableSkills 抛 TypeError。必须用 trigger.player。 */
+	{
+		const b19 = fs.readFileSync(path.join(ROOT, "skills", "boss.js"), "utf8");
+		const strip19 = (s) => String(s || "").replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
+		const badGS = /trigger\s*:\s*\{\s*player\s*:\s*"gameStart"/.test(strip19(b19));
+		const tm = strip19(bossBlockOf(b19, "csh_boss_tianming: {"));
+		const badTM = /trigger\.directresult\s*=/.test(tm) || !/judging\[0\]\s*=\s*best/.test(tm);
+		const sy = strip19(bossBlockOf(b19, "csh_boss_shuiyue: {"));
+		const badSY = /trigger\.source/.test(sy);
+		if (badGS) fail("执行级 E19：【乱入】用 player:\"gameStart\"（永不发动——gameStart 必须 global）");
+		else if (badTM) fail("执行级 E19：【天命】改判写 directresult 而非 judging[0]（判定牌早已选定 → 全无效果）");
+		else if (badSY) fail("执行级 E19：【水月】用 trigger.source（useCardToTarget 无该字段 → targetEnabled 抛 TypeError）");
+		else ok("执行级 E19：三例「静默永不发动」已修且无回归（乱入 global / 天命 judging[0] / 水月 trigger.player）");
+	}
+
+	/* E20（2026-10-15 · 书法体字表覆盖守护）：全部会以书法体呈现的文字（技能名 /
+	   妖灵名 / 魔王名）必须落在 csh_fx_font_3.woff2 的字形表内，否则逐字回退系统字体 =
+	   同一串文字混排（作者 2026-10-15 实机反馈的"字体不统一"根因）。
+	   字表由 tools/make_font_subset.py 从字体导出到 tools/font_charset.json。
+	   KNOWN_MISSING = 源字体本身缺的 5 个生僻字（回退到楷体，肉眼可接受）—— 除这 5 个以外
+	   出现任何缺字都视为缺陷（新增人名/技能名写了表外字会被立刻拦下）。 */
+	{
+		const KNOWN_MISSING = "濑鬘郿毦囷";
+		let fc = null;
+		try { fc = JSON.parse(fs.readFileSync(path.join(ROOT, "tools", "font_charset.json"), "utf8")); } catch (e) {}
+		if (!fc || !fc.chars) fail("执行级 E20：tools/font_charset.json 缺失（跑 tools/make_font_subset.py 生成）");
+		else {
+			const have = new Set(fc.chars);
+			const bTrans2 = (BJ.default && BJ.default.translate) || BJ.translate || {};
+			const texts = [];
+			for (const k in bTrans2) if (/^csh_boss_/.test(k) && !/_info$/.test(k)) texts.push([k, bTrans2[k]]);
+			for (const mid in BD.MINIONS) texts.push([mid, BD.MINIONS[mid].name]);
+			for (const bid of bossIds) if (built.names[bid]) texts.push([bid, built.names[bid]]);
+			const bad = [], known = [];
+			for (const [k, v] of texts) {
+				for (const ch of String(v || "")) {
+					if (!/[\u4e00-\u9fff]/.test(ch) || have.has(ch)) continue;
+					(KNOWN_MISSING.includes(ch) ? known : bad).push(v + ". " + ch);
+				}
+			}
+			if (bad.length) fail("执行级 E20：书法体字形表缺字（会逐字回退 → 混排）：" + bad.slice(0, 8).join("；"));
+			else ok("执行级 E20：书法体字形表覆盖全部技能名/妖灵名/魔王名（" + fc.subsetCount +
+				" 字；源字体自带缺失 " + known.length + " 处已白名单：" + KNOWN_MISSING + "）");
+		}
+	}
+
+	/* E21（2026-10-15 · 金鳞市人设与挂牌一致性）：GIRLS 键集合必须与 LISTED 完全一致 ——
+	   多了会"人设永不出现"，少了会"挂牌却没有台词"（galgame 面板空口无言）。 */
+	{
+		const mkText = fs.readFileSync(path.join(ROOT, "core", "csh_market.js"), "utf8");
+		const gSeg = (mkText.match(/export const GIRLS = \{[\s\S]*?\n\};/) || [""])[0];
+		const gKeys = [...gSeg.matchAll(/^\tcsh_boss_minion_([a-z0-9_]+):\s*\{/gm)].map(m => "csh_boss_minion_" + m[1]);
+		const listed = BD.MINION_POOL.slice();
+		const noLine = listed.filter(k => !gKeys.includes(k));
+		const noStock = gKeys.filter(k => !listed.includes(k));
+		if (gKeys.length !== listed.length || noLine.length || noStock.length) {
+			fail("执行级 E21：人设/挂牌不一致（挂牌无台词 " + noLine.length + " / 台词未挂牌 " + noStock.length + "）");
+		} else ok("执行级 E21：金鳞市人设与挂牌一一对应（" + listed.length + " 位，零缺零余）");
+	}
+
+	/* ⑤ 妖灵完整（v6.1 · 50 只全女性立绘 · **全员 3 血**：六式 6 + 十二美 12 + 希里 + 春野樱 + 十卫 10 + 二十刑 20） */
+	const mBad = [];
+	const MINION_HP = {};                                          /* v6.1：无特例，全部取 MINIONS 的 hp（=3） */
+	/* 50 只逐只：专属技映射 + 女性 + webp 立绘 + 人像文件存在性 */
+	const BEAUTY_SKILL = {
+		csh_boss_minion_eve: "csh_boss_ying_hunshi",
+		csh_boss_minion_ada: "csh_boss_kan_guzao",
+		csh_boss_minion_tenten: "csh_boss_feng_fengshi",
+		csh_boss_minion_empress: "csh_boss_lang_nongchao",
+		csh_boss_minion_triss: "csh_boss_fen_yujin",
+		csh_boss_minion_fubuki: "csh_boss_kui_qiansi",
+		csh_boss_minion_ciri: "csh_boss_you_cannian",
+		csh_boss_minion_catherine: "csh_boss_jinchi",
+		csh_boss_minion_kaguya: "csh_boss_lengyan",
+		csh_boss_minion_zelda: "csh_boss_xiushi",
+		csh_boss_minion_angel: "csh_boss_enze",
+		csh_boss_minion_chunli: "csh_boss_bailie",
+		csh_boss_minion_makima: "csh_boss_zhipei",
+		csh_boss_minion_ayasato: "csh_boss_jiangling",
+		csh_boss_minion_robin: "csh_boss_huafu",
+		csh_boss_minion_emilia: "csh_boss_bingjie",
+		csh_boss_minion_ashe: "csh_boss_qianru",
+		csh_boss_minion_frieren: "csh_boss_qiannian",
+		csh_boss_minion_tifa: "csh_boss_yaoqi",
+		csh_boss_minion_sakura: "csh_boss_baihao",
+		/* v6 新批次（2026-10-15 · 十卫 10 + 二十刑 20） */
+		csh_boss_minion_mai: "csh_boss_renwu",
+		csh_boss_minion_android: "csh_boss_yongdong",
+		csh_boss_minion_ishtar: "csh_boss_tianzhou",
+		csh_boss_minion_sarada: "csh_boss_xuetong",
+		csh_boss_minion_perona: "csh_boss_youling",
+		csh_boss_minion_guangxi: "csh_boss_guangyan",
+		csh_boss_minion_hachikuji: "csh_boss_milu",
+		csh_boss_minion_megumi: "csh_boss_linzuo",
+		csh_boss_minion_yoruichi: "csh_boss_shunbu",
+		csh_boss_minion_fortune: "csh_boss_shuangqiang",
+		csh_boss_minion_nilou: "csh_boss_wuqi",
+		csh_boss_minion_nami: "csh_boss_tianhou",
+		csh_boss_minion_konan: "csh_boss_zhiwu",
+		csh_boss_minion_temari: "csh_boss_lianyou",
+		csh_boss_minion_tsukihi: "csh_boss_fenshen",
+		csh_boss_minion_liulibei: "csh_boss_libei",
+		csh_boss_minion_maisakura: "csh_boss_yinshen",
+		csh_boss_minion_ran: "csh_boss_kongshou",
+		csh_boss_minion_mui: "csh_boss_wangzhi",
+		csh_boss_minion_tayama: "csh_boss_shanwu",
+		csh_boss_minion_wonder: "csh_boss_shendun",
+		csh_boss_minion_yui: "csh_boss_shuju",
+		csh_boss_minion_momo: "csh_boss_taoyao",
+		csh_boss_minion_fern: "csh_boss_bingshuang",
+		csh_boss_minion_valentine: "csh_boss_lianfu",
+		csh_boss_minion_shinobu: "csh_boss_dudie",
+		csh_boss_minion_yukino: "csh_boss_fengyan",
+		csh_boss_minion_luna: "csh_boss_yueying",
+		csh_boss_minion_anne: "csh_boss_ranxin",
+		csh_boss_minion_oniko: "csh_boss_guiku",
+	};
+	for (const mid in BD.MINIONS) {
+		const e = built.minionEntries[mid];
+		if (!e) { mBad.push(mid + "（缺）"); continue; }
+		const wantHp = MINION_HP[mid] || 3;                       /* v6.1：全员 3 血 */
+		if (!e.isUnseen) mBad.push(mid + "（缺 isUnseen）");
+		if (e.hp !== wantHp) mBad.push(mid + "（hp≠" + wantHp + "）");
+		if (!e.skills.length) mBad.push(mid + "（无技能）");
+		/* v4：每只妖灵 2 技 = 专属（存活+死亡段）+ 统一【池悯】 */
+		if (!e.skills.includes("csh_boss_chi")) mBad.push(mid + "（缺池悯）");
+		if (e.skills.length < 2) mBad.push(mid + "（技能不足 2）");
+		if (e.group !== BD.BOSS_GROUP) mBad.push(mid + "（group）");
+		if (!e.img || !/csh_minion_/.test(e.img)) mBad.push(mid + "（缺妖灵立绘）");
+		/* v5：立绘与 人像 文件必须真实存在（中文名 webp） */
+		const imgRel = String(e.img || "").replace(/^extension\/池子魔将\//, "");
+		if (!imgRel || !fs.existsSync(path.join(ROOT, imgRel))) mBad.push(mid + "（立绘文件缺失）");
+		const faceRel = String(e.face || "").replace(/^extension\/池子魔将\//, "");
+		if (!faceRel || !fs.existsSync(path.join(ROOT, faceRel))) mBad.push(mid + "（人像文件缺失）");
+	}
+	if (!built.minionEntries["csh_boss_minion_ciri"] || !built.minionEntries["csh_boss_minion_ciri"].skills.includes("csh_boss_you_cannian")) {
+		mBad.push("希里（游魂位 · 缺【时痕】死亡段）");
+	}
+	for (const mid in BEAUTY_SKILL) {
+		const e = built.minionEntries[mid];
+		if (!e) { mBad.push(mid + "（缺条目）"); continue; }
+		if (!e.skills.includes(BEAUTY_SKILL[mid])) mBad.push(mid + "（缺专属技）");
+		if (e.sex !== "female") mBad.push(mid + "（sex≠female）");
+		if (!/\.webp$/.test(e.img || "")) mBad.push(mid + "（立绘应为 webp）");
+		if (!/csh_minion_/.test(String(e.img || ""))) mBad.push(mid + "（立绘命名异常）");
+		if (!/csh_face_/.test(String(e.face || ""))) mBad.push(mid + "（人像命名异常）");
+	}
+	if (Object.keys(BD.MINIONS).length !== 50) mBad.unshift("妖灵 " + Object.keys(BD.MINIONS).length + " 只 ≠ 50");
+	if (BD.MINION_POOL.length !== 50) mBad.unshift("随机池 " + BD.MINION_POOL.length + " ≠ 50（v6.1 全池随机）");
+	if (mBad.length) fail("妖灵条目异常：" + mBad.join("；"));
+	else ok("妖灵 50 只完整（全女性 / 统一 3 血 / 全池随机出场 / 每只 2 技含池悯 / 专属技·webp·人像文件全在位）");
+
+	/* v6.2 立绘比例统一（作者："需要重构，但是不能丢失主体人物完整画面"）——
+	   引擎立绘框 130×160 ≈ 0.8125 且 background-size: cover：方图横裁、
+	   窄图纵裁（0.524 的窄图会被裁掉 36% 高度）。故主图统一重构为
+	   0.8125 画布（原图等比完整放入 + 自身模糊扩边，**零裁切**）。
+	   此处直接解析 WebP 头断言比例，防止日后又混进异形图。 */
+	{
+		const vp = [];
+		function webpSize(buf) {
+			try {
+				if (buf.slice(0, 4).toString("latin1") !== "RIFF" || buf.slice(8, 12).toString("latin1") !== "WEBP") return null;
+				const fourcc = buf.slice(12, 16).toString("latin1");
+				if (fourcc === "VP8 ") return [buf.readUInt16LE(26) & 0x3fff, buf.readUInt16LE(28) & 0x3fff];
+				if (fourcc === "VP8L") {
+					const b0 = buf[21], b1 = buf[22], b2 = buf[23], b3 = buf[24];
+					return [1 + (((b1 & 0x3f) << 8) | b0), 1 + (((b3 & 0x0f) << 10) | (b2 << 2) | (b1 >> 6))];
+				}
+				if (fourcc === "VP8X") {
+					const w = 1 + (buf[24] | (buf[25] << 8) | (buf[26] << 16));
+					const h = 1 + (buf[27] | (buf[28] << 8) | (buf[29] << 16));
+					return [w, h];
+				}
+			} catch (e) {}
+			return null;
+		}
+		for (const mid in BD.MINIONS) {
+			const m = BD.MINIONS[mid];
+			const rel = String((m && m.img) || "").replace(/^extension\/池子魔将\//, "");
+			if (!rel) continue;
+			let buf = null;
+			try { buf = fs.readFileSync(path.join(ROOT, rel)); } catch (e) { continue; }
+			const sz = webpSize(buf);
+			if (!sz) { vp.push(mid.replace("csh_boss_minion_", "") + "（WebP 头不可解析）"); continue; }
+			const ar = sz[0] / sz[1];
+			if (Math.abs(ar - 0.8125) > 0.02) {
+				vp.push(mid.replace("csh_boss_minion_", "") + " ar=" + ar.toFixed(3));
+			}
+		}
+		if (vp.length) fail("妖灵主图比例不统一（目标 0.8125，容差 0.02）：" + vp.slice(0, 6).join("、"));
+		else ok("妖灵主图 50 张比例统一（0.8125 = 引擎立绘框 · 原图完整放入 + 部分构图微调）；人像仍为 4:5");
+	}
+
+	/* E22（v6.2 · 妖灵技能「不重复」守护）：作者实机反馈"50 个技能里很多都重复了"。
+	   三重断言：
+     ① 50 条 `_info` 两两不同（玩家看到的描述不许撞车）
+     ② 50 只的 (触发事件 + 效果动词) 签名两两不同（**机制**不许撞车）
+     ③ 「纯随机弃牌 / 流失体力」家族封顶（通用副作用不许占半壁）
+   —— 签名由源码文本推出（触发器名 / 主动技 / num 增减方向 / 动作动词 / 条件里的牌名），
+      不看注释、不看 `_info`：**改描述不改机制骗不过这道门**。
+      `_clear` / `_round` 这类"状态复位"子技不计入签名（它们是记账，不是机制）。 */
+	{
+		const bj22 = fs.readFileSync(path.join(ROOT, "skills", "boss.js"), "utf8");
+		function minionBlock(key) {
+			const i = bj22.indexOf("\n\t" + key + ": {");
+			if (i < 0) return "";
+			const out = bj22.slice(i + 1);
+			let end = out.length;
+			const re = /\n(?=\t([a-zA-Z_$][A-Za-z0-9_$]*): \{|\};)/g;
+			let m;
+			while ((m = re.exec(out))) {
+				const nm = m[1];
+				if (nm && (nm === key || nm.indexOf(key + "_") === 0)) continue;
+				end = m.index;
+				break;
+			}
+			let txt = out.slice(0, end);
+			/* 剔掉"状态复位"子技整块（纯记账，不构成机制差异） */
+			txt = txt.replace(new RegExp("\\n\\t" + key + "_(clear|round): \\{[\\s\\S]*?\\n\\t\\},", "g"), "");
+			return txt;
+		}
+		const VERB_PAT = [
+			[/num\s*\+=\s*1|num\s*\+\+/, "numUp"],
+			[/num\s*=\s*Math\.max\(0,\s*trigger\.num\s*-\s*1\)|num\s*--|num\s*-\s*1/, "numDown"],
+			[/trigger\.num\s*=\s*0\b/, "numZero"],
+			[/Math\.ceil\(trigger\.num\s*\/\s*2\)/, "numHalf"],
+			[/randomDiscard/, "randomDiscard"],
+			[/\.discard\(/, "discard"],
+			[/loseHp/, "loseHp"],
+			[/\.damage\(/, "damage"],
+			[/\.draw\(/, "draw"],
+			[/recover\(/, "recover"],
+			[/\.gain\(/, "gain"],
+			[/\.equip\(/, "equip"],
+			[/game\.boss\.useCard\(|boss\.useCard\(/, "bossUse"],
+			[/pr\[0\]\.useCard\(/, "otherUse"],
+			[/player\.useCard\(/, "selfUse"],
+			[/cancel\(\)/, "cancel"],
+			[/maxHp\s*-\s*1/, "maxHpDown"],
+			[/addJudge/, "addJudge"],
+			[/\.link\(\)/, "link"],
+			[/changeHujia\(/, "hujia"],
+			[/globalTo/, "globalTo"],
+			[/maxHandcard/, "maxHandcard"],
+			[/judging\[0\]/, "judgeFlip"],
+			[/card\.name\s*===\s*"sha"|card\.name\s*==\s*"sha"/, "cardSha"],
+			[/card\.name\s*===\s*"shan"|card\.name\s*==\s*"shan"/, "cardShan"],
+			[/"tao"/, "cardTao"],
+			[/get\.type\(event\.card\)\s*===\s*"trick"/, "cardTrick"],
+		];
+		const iBad = [];
+		const sigMap = {};
+		let pureDiscard = 0, loseFam = 0;
+		const infos = [];
+		for (const mid in BEAUTY_SKILL) {
+			const key = BEAUTY_SKILL[mid];
+			const blk = minionBlock(key);
+			if (!blk) { iBad.push(key + "（块未找到）"); continue; }
+			const trigs = [...new Set([...blk.matchAll(/(?:player|source|target|global)\s*:\s*"([a-zA-Z0-9]+)"/g)].map(x => x[1]))].sort();
+			const isActive = /\benable\s*:/.test(blk);
+			const verbs = VERB_PAT.filter(([re]) => re.test(blk)).map(x => x[1]).sort();
+			const sig = (isActive ? "主动" : (trigs.join("+") || "(mod)")) + "|" + verbs.join(",");
+			const nm = (bj22.match(new RegExp(key + '_info:\\s*"([^"]*)"')) || [])[1] || "";
+			infos.push({ key: mid, info: nm });
+			(sigMap[sig] = sigMap[sig] || []).push(mid.replace("csh_boss_minion_", ""));
+			const other = ["gain", "equip", "damage", "loseHp", "maxHpDown", "draw", "addJudge", "recover", "maxHandcard"].some(v => verbs.includes(v));
+			if (verbs.includes("randomDiscard") && !other) pureDiscard++;
+			if (verbs.includes("loseHp")) loseFam++;
+		}
+		const infoSeen = {};
+		for (const r of infos) {
+			if (!r.info) iBad.push(r.key + "（缺 _info）");
+			else if (infoSeen[r.info]) iBad.push(r.key + " 与 " + infoSeen[r.info] + " 描述完全相同");
+			else infoSeen[r.info] = r.key;
+		}
+		for (const sg in sigMap) if (sigMap[sg].length > 1) iBad.push("机制签名重复：" + sigMap[sg].join("/") + "（" + sg + "）");
+		if (pureDiscard > 4) iBad.push("「纯随机弃牌」家族过大：" + pureDiscard + " 只（上限 4）");
+		if (loseFam > 5) iBad.push("「流失体力」家族过大：" + loseFam + " 只（上限 5）");
+		/* v6.3 追加三个家族封顶：「无差别减伤」「增伤」「限制手牌/摸牌」也最容易变成模板 */
+		const famTxt = {};
+		for (const r2 of infos) famTxt[r2.key] = r2.info || "";
+		const cntFam = (re) => Object.keys(famTxt).filter(k => re.test(famTxt[k])).length;
+		const cutFam = Object.keys(famTxt).filter(k => /伤害减半|伤害改为0|伤害-1|伤害 −1/.test(famTxt[k])).length;
+		const upFam = cntFam(/伤害\+1|伤害 \+1/);
+		const handFam = Object.keys(famTxt).filter(k => /挑战者.{0,12}(摸牌阶段少摸|手牌上限)/.test(famTxt[k])).length;
+		if (cutFam > 3) iBad.push("「无差别减伤」家族过大：" + cutFam + " 只（上限 3）");
+		if (upFam > 4) iBad.push("「增伤」家族过大：" + upFam + " 只（上限 4）");
+		if (handFam > 4) iBad.push("「限制手牌/摸牌」家族过大：" + handFam + " 只（上限 4）");
+		if (iBad.length) fail("执行级 E22：妖灵技能重复（" + iBad.slice(0, 6).join("；") + "）");
+		else ok("执行级 E22：妖灵 50 技零重复（描述 50 条互异 · 机制签名 50 个互异 · 家族分布 纯随机弃牌 " +
+			pureDiscard + " / 流失体力 " + loseFam + " / 无差别减伤 " + cutFam + " / 增伤 " + upFam + " / 限手牌 " + handFam + " 只，全在上限内）");
+	}
+
+	/* E23（v6.2 · 账本守护）：作者「CBY 需要有一个地方写清楚来源和去处，就是做账」。
+	   四件套缺一即静默降级：① 钱包有账本容器与读写
+	                              ② **单一写入点**（addPC/spendPC 两处都挂）
+	                              ③ shell-ledger 命令
+	                              ④ 生涯大厅「账本」页（页签 + 容器 + 加载函数 + 总览大数字入口） */
+	{
+		const w23 = fs.readFileSync(path.join(ROOT, "core", "csh_wallet.js"), "utf8");
+		const sh23 = fs.readFileSync(path.join(ROOT, "core", "csh_shell.js"), "utf8");
+		const cr23 = fs.readFileSync(path.join(ROOT, "games", "career.html"), "utf8");
+		const addHooked = /pushLedger\(got, reason/.test(w23);
+		const spendHooked = /pushLedger\(-n, reason/.test(w23);
+		const e23 = [];
+		if (!/K_LEDGER\s*=/.test(w23) || !/function pushLedger/.test(w23) || !/function ledgerSummary/.test(w23)) e23.push("钱包缺账本容器/读写");
+		if (!addHooked) e23.push("入账未挂账本");
+		if (!spendHooked) e23.push("出账未挂账本");
+		if (!/ledger: ledger/.test(w23)) e23.push("账本未对外导出");
+		if (!/cmd === "shell-ledger"/.test(sh23)) e23.push("shell-ledger 命令缺失");
+		if (!/data-p="ledger"/.test(cr23)) e23.push("生涯大厅缺账本页签");
+		if (!/id="p-ledger"/.test(cr23) || !/function loadLedger/.test(cr23) || !/function renderHeat/.test(cr23)) e23.push("账本页渲染不完整");
+		/* v6.3（作者修正）：总览的池子币大数字**不再是入口**（左侧页签即入口）——
+		   反过来守：大数字上不许再挂「查账 ›」这类链接文案与事件（会与小字重叠）。 */
+		const cr23n = cr23.replace(/<!--[\s\S]*?-->/g, "");   /* 注释里的「查账」是历史说明，不算残留 */
+		if (/ov-pc-link/.test(cr23n)) e23.push("总览大数字仍在当账本入口（作者已要求移除）");
+		if (/查账/.test(cr23n)) e23.push("总览/账本仍残留「查账 ›」链接文案");
+		if (!/data-p="ledger"/.test(cr23)) e23.push("左侧导航缺账本页签");
+		if (e23.length) fail("执行级 E23：账本接线不完整（" + e23.join("；") + "）");
+		else ok("执行级 E23：账本接线在位（钱包容器 + 入/出账双挂 + shell-ledger + 生涯大厅账本页 · 入口只走左侧页签）");
+	}
+
+	/* E24（v6.2 · 好感度守护）：作者全权委托的「好感度系统」。
+	   六件套：① core/csh_affection.js 五档 + 四来源 + 送礼扣款 + interact/heard
+	           ② content 安装（lib.cshAffection）
+	           ③ 讨伐/持股两处自动增长接线
+	           ④ shell 读写命令
+	           ⑤ 图鉴与金鳞市都有爱心 UI（且 GIRLS 50 位齐备好感台词） */
+	{
+		const affPath = path.join(ROOT, "core", "csh_affection.js");
+		const e24 = [];
+		if (!fs.existsSync(affPath)) e24.push("缺 core/csh_affection.js");
+		else {
+			const af = fs.readFileSync(affPath, "utf8");
+			if (!/AFF_LEVELS\s*=/.test(af) || (af.match(/key: "[SABCD]"/g) || []).length < 5) e24.push("五档定义不完整");
+			if (!/export function noteHunt/.test(af) || !/export function noteHold/.test(af) || !/export function noteTalk/.test(af) || !/export function gift/.test(af)) e24.push("四来源不齐");
+			/* v6.4：统一互动入口 interact（含 close 贴近）与台词收集册 heard —— 缺一即静默降级 */
+			if (!/export function interact\s*\(/.test(af)) e24.push("缺统一互动入口 interact");
+			if (!/key: "close"/.test(af)) e24.push("缺 close（贴近）互动");
+			if (!/export function heardOf\s*\(/.test(af) || !/export function heardLines\s*\(/.test(af)) e24.push("缺台词收集册 heard");
+			if (!/function pickFresh\s*\(/.test(af)) e24.push("缺 pickFresh（优先说没听过的台词）");
+			/* v6.5：她的回礼（陪伴类互动给 CBY）+ 疏远按日键判定 */
+			if (!/AFF_GIVE\s*=/.test(af) || !/export function giveRoll\s*\(/.test(af)) e24.push("缺她的回礼（AFF_GIVE/giveRoll）");
+			/* v6.5：回礼收在一个单点实现 rollGive() 里（满档 / 常规两条路都走它） */
+			if (!/function rollGive\s*\(/.test(af)) e24.push("缺回礼单点实现 rollGive");
+			if (!/rollGive\(id, cur\.level, cur\.v, act\)/.test(af)) e24.push("满档（羁绊 100）后回礼断线");
+			if (!/rollGive\(id, r\.level\.key, r\.value, act\)/.test(af)) e24.push("回礼未接进常规 interact");
+			if (!/AFF_GIVE\.acts\.indexOf\(act\)/.test(af)) e24.push("回礼未按「陪伴类动作」白名单收口（送礼不该回礼）");
+			if (!/var LINE_KINDS = \[[^\]]*"give"/.test(af)) e24.push("give 段未接入选句（LINE_KINDS 缺 give）");
+			if (!/function stDay\s*\(/.test(af) || !/cur\.v >= AFF_MAX/.test(af)) e24.push("满档后互动变死按钮（缺 stDay / 满档分支）");
+			if (!/backfillSaw\s*\(/.test(af) || !/function dayGap\s*\(/.test(af)) e24.push("缺疏远的日键守卫（backfillSaw/dayGap）");
+			const sh24b = fs.readFileSync(path.join(ROOT, "core", "csh_shell.js"), "utf8");
+			if (!/cmd === "shell-pc"/.test(sh24b)) e24.push("缺 shell-pc（回礼后刷新余额胶囊）");
+			const wt24 = fs.readFileSync(path.join(ROOT, "core", "csh_wallet.js"), "utf8");
+			if (!/她的回礼/.test(wt24)) e24.push("账本缺「她的回礼」分类");
+			if (!/W\.spend\(g\.cost/.test(af)) e24.push("送礼未走钱包扣款（顺序应「先扣款后加好感」）");
+			if (!/export function installAffection/.test(af)) e24.push("缺 installAffection");
+		}
+		const ct24 = fs.readFileSync(path.join(ROOT, "main", "content.js"), "utf8");
+		if (!/installAffection\(\)/.test(ct24)) e24.push("content 未安装好感度层");
+		const br24 = fs.readFileSync(path.join(ROOT, "core", "csh_bossrecord.js"), "utf8");
+		if (!/noteHunt\(minionId\)/.test(br24)) e24.push("讨伐未接好感度");
+		const mk24 = fs.readFileSync(path.join(ROOT, "core", "csh_market.js"), "utf8");
+		if (!/noteHold\(id\)/.test(mk24)) e24.push("持股未接好感度");
+		/* v6.3：好感台词搬到了独立台词库 core/csh_aff_lines.js（v6.4 已扩到每人 29 句）——
+		   这里只断言"模块在、装载正确"，句数与去重交给 E26。 */
+		const af24 = fs.existsSync(path.join(ROOT, "core", "csh_aff_lines.js"))
+			? fs.readFileSync(path.join(ROOT, "core", "csh_aff_lines.js"), "utf8") : "";
+		if ((af24.match(/^\tcsh_boss_minion_\w+: \{/gm) || []).length < 50) e24.push("好感台词库不足 50 位");
+		if (!/export function linesOf/.test(af24) && !/export const AFF_LINES/.test(af24)) e24.push("台词库未导出访问器");
+		const sh24 = fs.readFileSync(path.join(ROOT, "core", "csh_shell.js"), "utf8");
+		if (!/cmd === "shell-aff"/.test(sh24) || !/cmd === "shell-aff-do"/.test(sh24)) e24.push("shell 好感度命令缺失");
+		const cx24 = fs.readFileSync(path.join(ROOT, "games", "codex.html"), "utf8");
+		const gf24 = fs.readFileSync(path.join(ROOT, "games", "goldfish.html"), "utf8");
+		if (!/id="affbox"/.test(cx24) || !/function heartSvg/.test(cx24)) e24.push("图鉴缺爱心 UI");
+		if (!/id="affbox"/.test(gf24) || !/function renderCardAff/.test(gf24)) e24.push("金鳞市缺爱心 UI");
+		if (!/ff-callig/.test(cx24)) e24.push("好感标题未用书法体");
+		if (e24.length) fail("执行级 E24：好感度系统不完整（" + e24.join("；") + "）");
+		else ok("执行级 E24：好感度系统就位（五档 · 十种互动含贴近/递茶/看星/称呼 · 送礼扣款 · **她的回礼（满档仍可互动）** · 日键疏远守卫 · content/shell 接线 · 独立台词库 · 收集册 · 两页爱心 UI）");
+	}
+
+	/* E26（v6.3 · 好感台词库守护）：作者「台词越丰富越好，每个角色都要差异化，
+	   目前的重复度还是太高了，争取每个角色各不同」——
+	   ① 覆盖 50 位妖灵，一位不缺
+	   ② 每人结构齐全（2 招呼 / 8 闲聊 / 5 摸头 / 4 贴近 / 3 回礼 / 4 礼物 / 4 升档 / 1 羁绊 / 1 疏远 = 32 句）
+	   ③ 全库 **两两不同**（去重断言：把描述改一改糊弄不过去）
+	   ④ 儿童向角色（结衣/佐良娜/八九寺/月火）不含恋爱语气词 */
+	{
+		const afP = path.join(ROOT, "core", "csh_aff_lines.js");
+		const e26 = [];
+		if (!fs.existsSync(afP)) e26.push("缺 core/csh_aff_lines.js");
+		else {
+			const af = fs.readFileSync(afP, "utf8");
+			/* 不落临时文件：直接用文本手段抽出所有台词字面量做去重
+			   （RAW 表里的每一行 `"..."` 都是台词；注释与键名不带中文引号包裹的句号结尾格式） */
+			const body = af.slice(af.indexOf("const RAW = {"), af.indexOf("/* 只读访问器"));
+			const lines = [];
+			for (const m of body.matchAll(/"(\u[0-9a-fA-F]{4}|[^"\\])*"/g)) {
+				const t = m[0].slice(1, -1);
+				if (t.indexOf("csh_boss_minion_") === 0) continue;      /* 键名 */
+				if (!t) continue;
+				lines.push(t);
+			}
+			const seen = {};
+			for (const t of lines) {
+				if (seen[t]) e26.push("台词重复：" + t.slice(0, 14));
+				else seen[t] = 1;
+			}
+			if (lines.length < 1500) e26.push("台词总量偏少：" + lines.length);
+			if (lines.length !== new Set(lines).size) e26.push("存在重复台词");
+			/* 每角色的结构（逐个键数下来太脆，改断言总键数与 19 的倍数关系 + 关键字段全在） */
+			if ((af.match(/\bgreet: \[/g) || []).length !== 50) e26.push("greet 段不等于 50");
+			if ((af.match(/\btalk: \[/g) || []).length !== 50) e26.push("talk 段不等于 50");
+			if ((af.match(/\bhead: \[/g) || []).length !== 50) e26.push("head 段不等于 50");
+			if ((af.match(/\bclose: \[/g) || []).length !== 50) e26.push("close 段不等于 50");
+			if ((af.match(/\bgive: \[/g) || []).length !== 50) e26.push("give 段（她的回礼）不等于 50");
+			if ((af.match(/\bwine: "/g) || []).length !== 50) e26.push("礼物 wine 段不等于 50");
+			if ((af.match(/\bstardust: "/g) || []).length !== 50) e26.push("礼物 stardust 段不等于 50");
+			if ((af.match(/\btop: "/g) || []).length !== 50) e26.push("top 段不等于 50");
+			if ((af.match(/\bcool: "/g) || []).length !== 50) e26.push("cool 段不等于 50");
+			/* v6.3.1 作者校正：结衣 / 佐良娜 / 八九寺真宵 / 月火 是**平行时空的成年角色**，
+			   "跟其他的一样待遇即可" ⇒ 取消语气特例，改为**正向断言**：
+			   这四位与其余 46 位结构完全同级（32 句，且各有独立的 top / cool）。 */
+			const SAME = ["csh_boss_minion_yui", "csh_boss_minion_sarada", "csh_boss_minion_hachikuji", "csh_boss_minion_tsukihi"];
+			const tops = new Set();
+			for (const cid of SAME) {
+				const i = af.indexOf("\t" + cid + ": {");
+				if (i < 0) { e26.push("缺角色 " + cid); continue; }
+				const seg = af.slice(i, af.indexOf("\n\t},", i));
+				if (!/\btop: "/.test(seg) || !/\bcool: "/.test(seg)) e26.push(cid + " 结构与其他角色不同级");
+				const tm = seg.match(/\btop: "([^"]*)"/);
+				if (tm) { if (tops.has(tm[1])) e26.push(cid + " 的羁绊台词与他人重复"); tops.add(tm[1]); }
+			}
+		}
+		if (e26.length) fail("执行级 E26：好感台词库异常（" + e26.slice(0, 5).join("；") + "）");
+		else ok("执行级 E26：好感台词库完备（50 位 · 每人 32 句 = 1600 句 · 全库两两不同 · 全员同一待遇）");
+	}
+
+	/* E27（v6.3 · 好感经济回报守护）：作者「好感度经济回报需要，而且这个功能需要再丰富」。
+	   四件套：① 特权与经济常量单点定义（AFF_PERKS / AFF_ECON）
+	           ② 三个读取函数（feeDiscount / divBonus / heatBonus）
+	           ③ 金鳞市真的用上了（heatOf 加好感 · 买卖用 feeOf · 分红用 divRateOf）
+	           ④ 0 好感时**完全无副作用**（否则原有 35 条金鳞市断言会被打破） */
+	{
+		const af = fs.readFileSync(path.join(ROOT, "core", "csh_affection.js"), "utf8");
+		const mk = fs.readFileSync(path.join(ROOT, "core", "csh_market.js"), "utf8");
+		const e27 = [];
+		if (!/AFF_PERKS\s*=/.test(af) || (af.match(/key: "fee1"|key: "tip"|key: "fee2"|key: "div"/g) || []).length < 4) e27.push("四档特权定义不齐");
+		if (!/AFF_ECON\s*=/.test(af)) e27.push("经济常量未单点定义");
+		if (!/export function feeDiscount/.test(af) || !/export function divBonus/.test(af) || !/export function heatBonus/.test(af)) e27.push("经济读取函数不齐");
+		if (!/export function perkKeys/.test(af)) e27.push("perkKeys 未实现");
+		if (!/affHeatOf\(id\)/.test(mk)) e27.push("金鳞市未接好感热度");
+		if (!/function feeOf\(id\)/.test(mk) || !/feeOf\(id\)/.test(mk.slice(mk.indexOf("function feeOf")))) e27.push("金鳞市未实现 feeOf");
+		if (!/divRateOf\(id\)/.test(mk)) e27.push("金鳞市分红未接好感加成");
+		if (e27.length) fail("执行级 E27：好感经济回报接线不完整（" + e27.join("；") + "）");
+		else ok("执行级 E27：好感经济回报在位（四档特权 + 基本面热度 + 手续费/分红接线 · 0 好感时零副作用）");
+	}
+
+	if (!built.minionEntries["csh_boss_minion_ciri"] || !built.minionEntries["csh_boss_minion_ciri"].skills.includes("csh_boss_you_cannian")) {
+		mBad.push("希里（游魂位 · 缺【时痕】死亡段）");
+	}
+	for (const mid in BEAUTY_SKILL) {
+		const e = built.minionEntries[mid];
+		if (!e) { mBad.push(mid + "（缺条目）"); continue; }
+		if (!e.skills.includes(BEAUTY_SKILL[mid])) mBad.push(mid + "（缺专属技）");
+		if (e.sex !== "female") mBad.push(mid + "（sex≠female）");
+		if (!/\.webp$/.test(e.img || "")) mBad.push(mid + "（立绘应为 webp）");
+		if (!/csh_minion_/.test(String(e.img || ""))) mBad.push(mid + "（立绘命名异常）");
+		if (!/csh_face_/.test(String(e.face || ""))) mBad.push(mid + "（人像命名异常）");
+	}
+	if (Object.keys(BD.MINIONS).length !== 50) mBad.unshift("妖灵 " + Object.keys(BD.MINIONS).length + " 只 ≠ 50");
+	if (BD.MINION_POOL.length !== 50) mBad.unshift("随机池 " + BD.MINION_POOL.length + " ≠ 50（v6.1 全池随机）");
+	if (mBad.length) fail("妖灵条目异常：" + mBad.join("；"));
+	else ok("妖灵 50 只完整（全女性 / 统一 3 血 / 全池随机出场 / 每只 2 技含池悯 / 专属技·webp·人像文件全在位）");
+
+
+
+	/* ⑥ 技能完整性：装配引用 ⊆ boss.js 定义；非 silent 技译名齐备且 2 字 */
+	const bSkill = (BJ.default && BJ.default.skill) || BJ.skill || {};
+	const bTrans = (BJ.default && BJ.default.translate) || BJ.translate || {};
+	const need = new Set(BD.MAIN_SKILLS);
+	for (const bid of bossIds) (built.entries[bid].skills || []).forEach(s => { if (s.startsWith("csh_boss_")) need.add(s); });
+	for (const mid in built.minionEntries) (built.minionEntries[mid].skills || []).forEach(s => need.add(s));
+	const missS = [...need].filter(s => !bSkill[s]);
+	if (missS.length) fail("装配引用缺技能定义：" + missS.join("、"));
+	else ok("装配引用的 " + need.size + " 个技能全部在 skills/boss.js 定义");
+
+	const missT = [];
+	for (const s of need) {
+		const def = bSkill[s] || {};
+		if (def.silent) continue;
+		if (!bTrans[s]) missT.push(s + "（缺名）");
+		else if ([...bTrans[s]].length > 2) missT.push(s + "（名超 2 字）");
+		else if (!bTrans[s + "_info"]) missT.push(s + "（缺 _info）");
+	}
+	if (missT.length) fail("魔王技译名/命名规约异常：" + missT.slice(0, 8).join("；"));
+	else ok("非 silent 技译名齐备且全部 2 字（§2.0 铁律）");
+
+	/* ⑦ 隔离：BOSS 角色 ID 与名册零冲突；名册零引用 BOSS 技 */
+	const conflict = bossIds.filter(bid => roster.includes(bid))
+		.concat(Object.keys(built.minionEntries).filter(mid => roster.includes(mid)));
+	if (conflict.length) fail("BOSS 角色 ID 与名册冲突：" + conflict.join("、"));
+	else ok("BOSS/妖灵 ID 与名册零冲突");
+	const leak = [...need].filter(s => rosterSkills.has(s));
+	if (leak.length) fail("名册角色引用了 BOSS 技：" + leak.join("、"));
+	else ok("名册 99 人零引用 BOSS 技（隔离成立）");
+
+	/* E9（filter 禁 trigger · v4 实机报错根因）：filter(event, player) 的参数是 event/player，
+	   trigger 仅 content 内由引擎注入——filter 内引用 trigger = ReferenceError（实机 556 行）。
+	   按技能块提取 filter 函数体（括号平衡）逐一检查。 */
+	{
+		const bLines0 = fs.readFileSync(path.join(ROOT, "skills", "boss.js"), "utf8");
+		const skillRe2 = /\t(csh_boss_[a-z_0-9]+): \{/g;
+		let mm; const badF = [];
+		while ((mm = skillRe2.exec(bLines0))) {
+			const skill = mm[1];
+			const start = mm.index;
+			let d = 0, end = -1;
+			const q = bLines0.indexOf("{", start);
+			for (let p = q; p < bLines0.length; p++) {
+				const c = bLines0[p];
+				if (c === '"') { let z = p + 1; while (z < bLines0.length) { if (bLines0[z] === "\\") z++; else if (bLines0[z] === '"') break; z++; } p = z; continue; }
+				if (c === "{") d++;
+				else if (c === "}") { d--; if (d === 0) { end = p; break; } }
+			}
+			const body = bLines0.slice(start, end);
+			const fAt = body.search(/\bfilter\s*\(/);
+			if (fAt < 0) continue;
+			let fd = 0, fend = -1;
+			const fp = body.indexOf("(", fAt);
+			for (let p = fp; p < body.length; p++) {
+				const c = body[p];
+				if (c === '"') { let z = p + 1; while (z < body.length) { if (body[z] === "\\") z++; else if (body[z] === '"') break; z++; } p = z; continue; }
+				if (c === "(" || c === "{") fd++;
+				else if (c === ")" || c === "}") { fd--; if (fd === 0) { fend = p; break; } }
+			}
+			if (/\btrigger\b/.test(body.slice(fAt, fend))) badF.push(skill);
+		}
+		if (badF.length) fail("执行级 E9：filter 内引用 trigger（应使用参数 event）：" + badF.join("、"));
+		else ok("执行级 E9：全部 filter 无 trigger 误用（filter(event, player) 参数纪律）");
+	}
+
+	/* E11（v4.1 · 实机「选择下一个触发的技能」弹窗根因）：同一玩家、同一事件、
+	   同优先级出现多个可触发技能时，引擎 arrangeTrigger（content.js:3502-3535）会弹窗
+	   让玩家排序；本模式技能多为数值叠加，选择毫无意义。纪律 = 非 silent 触发技
+	   全部显式声明 priority 且【两两不同】（含 惊变·天鼓/魔威、汇流/魔息 两组同场组合）。 */
+	{
+		const bLines1 = fs.readFileSync(path.join(ROOT, "skills", "boss.js"), "utf8");
+		const skillRe3 = /\t(csh_boss_[a-z_0-9]+): \{/g;
+		let mm3; const noPri = [], priMap = new Map(), dupPri = [];
+		while ((mm3 = skillRe3.exec(bLines1))) {
+			const skill = mm3[1];
+			const start = mm3.index;
+			let d = 0, end = -1;
+			const q = bLines1.indexOf("{", start);
+			for (let p = q; p < bLines1.length; p++) {
+				const c = bLines1[p];
+				if (c === '"') { let z = p + 1; while (z < bLines1.length) { if (bLines1[z] === "\\") z++; else if (bLines1[z] === '"') break; z++; } p = z; continue; }
+				if (c === "{") d++;
+				else if (c === "}") { d--; if (d === 0) { end = p; break; } }
+			}
+			const body = bLines1.slice(start, end);
+			if (!/trigger:/.test(body)) continue;
+			if (/silent:\s*true/.test(body)) continue;
+			const pm = body.match(/priority:\s*(-?[\d.]+)/);
+			if (!pm) { noPri.push(skill); continue; }
+			const v = Number(pm[1]);
+			if (priMap.has(v)) dupPri.push(skill + " 与 " + priMap.get(v) + " 同为 " + v);
+			else priMap.set(v, skill);
+		}
+		if (noPri.length) fail("执行级 E11：非 silent 触发技缺 priority（实机会弹「选择下一个触发的技能」）：" + noPri.join("、"));
+		else if (dupPri.length) fail("执行级 E11：priority 撞值（同值时引擎弹窗让玩家排序）：" + dupPri.join("；"));
+		else ok("执行级 E11：技能结算顺序纪律——非 silent 触发技全部显式 priority 且两两不同（" + priMap.size + " 个）");
+	}
+
+	/* ⑧ 触发事件白名单（运行时静默失败的高危点 → fail 级） */
+	const WL = new Set(["damageBegin1", "damageBegin3", "damageBegin4", "damageEnd", "damageBegin", "phaseBegin",
+		"roundStart", "phaseDrawBegin2", "useCardToBefore", "useCardToPlayered", "useCardToTarget", "useCardAfter",
+		"judge", "dying", "gameStart", "enterGame", "phaseZhunbeiBegin", "die", "dieAfter",
+		/* v5 新增（十二美）：useCard/respond（锈蚀 · 与 rehujia 同款双时点）；
+		   recoverEnd（恩泽 · zhanfa.js:1912 同款）；phaseEnd（百裂/支配/七曜/花缚 · content.js:4310） */
+		"useCard", "respond", "recoverEnd", "phaseEnd",
+		/* v6 新增（2026-10-15 新批次妖灵 · 均已源码核实）：
+		   gainAfter   —— 获得牌后（content.js gain 内容尾部 trigger("gainAfter")；本体 bingshi:415 同款）
+		   recoverBegin—— 回复体力前（content.js recover 内容 begin 阶段；本体 key:520 同款） */
+		"gainAfter", "recoverBegin",
+		/* v6.6 dynamic-integrity: dyingAfter (fanpu-back). Engine proof:
+		   library/element/gameEvent.js:213-218 trigger(name,to) does
+		   `await this.trigger(this.name + trigger2)` with trigger2 in Before/Begin/End/After
+		   => every event X also exposes XBefore / XBegin / XEnd / XAfter.
+		   dying order = dyingBefore -> dyingBegin -> content -> dyingEnd -> dyingAfter. */
+		"dyingAfter",
+		/* v6.3 新增：damageBegin2 —— 伤害流程第二时点（huicui.js:14318 / clan.js:2380 同款），
+		   用于把【烈焰】的增伤与【魂矢】的通用增伤在签名上错开。 */
+		"damageBegin2"]);
+	const bText = fs.readFileSync(path.join(ROOT, "skills", "boss.js"), "utf8");
+	const badEv = new Set();
+	/* 支持两种书写：`global: "event"` 与 `global: ["a", "b"]` */
+	for (const m of bText.matchAll(/(?:player|source|target|global)\s*:\s*(\[[^\]]*\]|"([a-zA-Z0-9]+)")/g)) {
+		const seg = m[1];
+		const names = seg.startsWith("[")
+			? (seg.match(/"([a-zA-Z0-9]+)"/g) || []).map(x => x.slice(1, -1))
+			: [seg.slice(1, -1)];
+		for (const n of names) if (!WL.has(n)) badEv.add(n);
+	}
+	if (badEv.size) fail("BOSS 技出现白名单外事件名（核对引擎后更新白名单或改正）：" + [...badEv].join("、"));
+	else ok("全部触发事件在白名单内（16 种，均已源码核实；含数组写法）");
+
+	/* ⑨ 讨伐录接入：registry 条目 + 页面文件 */
+	const regText = fs.readFileSync(path.join(ROOT, "core", "csh_registry.js"), "utf8");
+	const hasReg = /bossbook/.test(regText);
+	const hasPage = fs.existsSync(path.join(ROOT, "games", "bossbook.html"));
+	if (!hasReg || !hasPage) fail("讨伐录接入缺失：" + (!hasReg ? "registry 无 bossbook 条目；" : "") + (!hasPage ? "games/bossbook.html 不存在" : ""));
+	else ok("讨伐录接入在位（registry 条目 + games/bossbook.html）");
+
+	/* E25（v6.5 新增 · 难度评分守护）：`difficultyOf` / `difficultyOfForeign` 是讨伐录
+	   「难度 N · 档名」的数据真源，此前零门禁。★ 这类纯函数最危险的失败模式是
+	   "**静默返回一个看着合理的常数**"——传错键系（`csh_boss_x` 而非 `csh_x`）时
+	   `tierOf` 落回 elite、其余维度全取缺省，93 位会长出同一个分数：不报错、不像 BUG。
+	   这里**真跑函数**把它钉住（档位台阶 · 值域 · 键系敏感性 · 本体公式单调封顶）。 */
+	{
+		const d25 = [];
+		const rawIds25 = BD.allBossIds().map(b => b.replace(/^csh_boss_/, "csh_"));
+		const byTier25 = { ultimate: [], lord: [], egg: [], elite: [] };
+		const cnt25 = {};
+		for (const r of rawIds25) {
+			const s = BD.difficultyOf(r, 4);
+			if (!(typeof s === "number" && s >= 5 && s <= 99)) d25.push(r + " 难度分越界（" + s + "）");
+			cnt25[s] = 1;
+			(byTier25[BD.tierOf(r)] || byTier25.elite).push(s);
+		}
+		const avg25 = (a) => a.reduce((p, c) => p + c, 0) / (a.length || 1);
+		const nUniq25 = Object.keys(cnt25).length;
+		if (rawIds25.length !== 93) d25.push("难度评分覆盖 " + rawIds25.length + " 位 ≠ 93");
+		if (nUniq25 < 3) d25.push("93 位魔王只有 " + nUniq25 + " 种难度取值（档位/键系可能整体塌回缺省）");
+		if (!(avg25(byTier25.ultimate) > avg25(byTier25.lord) && avg25(byTier25.lord) > avg25(byTier25.elite) && avg25(byTier25.elite) > avg25(byTier25.egg)))
+			d25.push("档位台阶不单调（究极/霸主/精英/彩蛋 均值 " + ["ultimate", "lord", "elite", "egg"].map(t => avg25(byTier25[t]).toFixed(1)).join(" / ") + "）");
+		if (Math.min(...byTier25.ultimate) < 90) d25.push("究极档出现非 S 级难度（最低 " + Math.min(...byTier25.ultimate) + "）");
+		if (Math.max(...byTier25.egg) >= 58) d25.push("彩蛋档难度过高（最高 " + Math.max(...byTier25.egg) + "）");
+		/* 错键系自证：传 boss 键（csh_boss_x）必须与传原始键（csh_x）不同 —— 记录层只许传原始键 */
+		if (BD.difficultyOf("csh_boss_mlb", 4) === BD.difficultyOf("csh_mlb", 4))
+			d25.push("难度分对键系不敏感（传错键也命中）——记录层传参口径可能已改错");
+		/* 本体/他扩展公式：单调 + 封顶 + 锚点 */
+		if (!(BD.difficultyOfForeign(5, 3) < BD.difficultyOfForeign(6, 5) && BD.difficultyOfForeign(6, 5) < BD.difficultyOfForeign(10, 7)))
+			d25.push("本体难度公式非单调（体力/技数上升分数不升）");
+		if (BD.difficultyOfForeign(30, 12) > 99 || BD.difficultyOfForeign(5, 3) < 5) d25.push("本体难度公式值域越界");
+		if (BD.difficultyOfForeign(10, 7) < 50) d25.push("本体锚点偏低（10 血 7 技 = " + BD.difficultyOfForeign(10, 7) + "，文档口径 ≈ 58）");
+		/* 档名映射：从高到低、端点正确 */
+		for (let i = 1; i < BD.DIFF_BANDS.length; i++) if (BD.DIFF_BANDS[i - 1].min <= BD.DIFF_BANDS[i].min) d25.push("DIFF_BANDS 未按 min 降序");
+		if (BD.diffBandOf(0).key !== "D" || BD.diffBandOf(94).key !== "S") d25.push("档名映射端点错误");
+		/* 记录层必须传原始键（页面只读不重算） */
+		const br25 = fs.readFileSync(path.join(ROOT, "core", "csh_bossrecord.js"), "utf8");
+		if (!/difficultyOf\(orig, baseSk\)/.test(br25)) d25.push("讨伐录未按原始键调用 difficultyOf（页面会显示常数分）");
+		if (d25.length) fail("执行级 E25：难度评分异常（" + d25.slice(0, 5).join("；") + "）");
+		else ok("执行级 E25：难度评分正确（93 位全算 · 台阶单调 究极 " + avg25(byTier25.ultimate).toFixed(0) +
+			" > 霸主 " + avg25(byTier25.lord).toFixed(0) + " > 精英 " + avg25(byTier25.elite).toFixed(0) +
+			" > 彩蛋 " + avg25(byTier25.egg).toFixed(0) + " · 共 " + nUniq25 + " 种取值 · 键系敏感 · 本体公式单调封顶）");
+	}
+
+	/* E28（v6.5.1 新增 · 成品卫生）：玩家可见页面**不许**出现调试入口与「调试」字样。
+	   作者原话：「现在应该是完全版成品才对，不应该让玩家知道的就隐去相关内容」——
+	   典型踩坑：图鉴右栏曾挂过「重置她的记录（调试）」按钮（只有 lib.cshDebug 存在才渲染，
+	   作者机器上恰好有 → 作者自己截图看到），斗地主开局页副标题曾写「调试面板彩蛋」。
+	   扫描前先剥掉注释（`<!-- -->` / 块注释 / 整行 `//`），只查**真正会被渲染**的文本。 */
+	{
+		const e28 = [];
+		const gdir = path.join(ROOT, "games");
+		const pages = [];
+		for (const f of fs.readdirSync(gdir)) {
+			const p = path.join(gdir, f);
+			if (fs.statSync(p).isDirectory()) {
+				for (const g of fs.readdirSync(p)) if (/\.html$/.test(g)) pages.push(path.join(p, g));
+			} else if (/\.html$/.test(f)) pages.push(p);
+		}
+		for (const p of pages) {
+			const rel = path.relative(ROOT, p).replace(/\\/g, "/");
+			const src = fs.readFileSync(p, "utf8")
+				.replace(/<!--[\s\S]*?-->/g, "")
+				.replace(/\/\*[\s\S]*?\*\//g, "")
+				.replace(/^[ \t]*\/\/.*$/gm, "");
+			if (/cshDebug/.test(src)) e28.push(rel + "：出现 lib.cshDebug 分支（调试入口不该进成品页）");
+			if (/调试/.test(src)) e28.push(rel + "：可见文本出现「调试」字样");
+		}
+		if (pages.length < 8) e28.push("页面枚举异常（只找到 " + pages.length + " 个，应 ≥ 8）");
+		if (e28.length) fail("执行级 E28：成品页面卫生（" + e28.slice(0, 4).join("；") + "）");
+		else ok("执行级 E28：成品页面卫生（" + pages.length + " 页 · 零调试入口 · 零「调试」字样）");
+	}
+
+	/* E29（v6.6 新增 · 濒死链路隔离）：作者指出「有一些进入濒死触发技能的武将，会不会出现
+	   一些跟魔王技的冲突」。实证后确认两处真冲突并已修，这里钉住：
+	   ① 名册里"观察**别人**濒死"的技（功傲 csh_gongao / 刀锐 csh_daorui）在挑战局里会被
+	      魔王方的濒死白嫖（魔王濒死 = 挑战者即将获胜，却白送 +1 上限 / 回血 / 摸牌）
+	      ⇒ 必须走 cshIsBossSidePlayer 隔离；
+	   ② 【反扑】原本在 dying 的 content 里让全体挑战者一起进 _status.dying 队列，
+	      会在"魔王半死"的上下文里连环触发挑战者的 22 个濒死技 ⇒ 已把反噬挪到 dyingAfter。
+	   注：csh_rewansha（完杀）的封印只封**非锁定技**（library/skill.js:1634
+	   `!persevereSkill && !charlotte && !get.is.locked()`），魔王技全员锁定 ⇒ 不受影响，
+	   只封妖灵的主动技（百裂/支配/七曜），属可接受语义，故不隔离。 */
+	{
+		const e29 = [];
+		const sk29 = fs.readFileSync(path.join(ROOT, "skills", "index.js"), "utf8");
+		const bo29 = fs.readFileSync(path.join(ROOT, "skills", "boss.js"), "utf8");
+		if (!/function cshIsBossSidePlayer\s*\(/.test(sk29)) e29.push("缺濒死隔离守卫 cshIsBossSidePlayer");
+		if (!/lib\.config\.mode !== "boss"/.test(sk29) || !/p\.side === true/.test(sk29))
+			e29.push("隔离守卫口径不对（应「非 boss 模式恒 false + 魔王方 side===true」）");
+		const gongao = sk29.slice(sk29.indexOf('"csh_gongao"'), sk29.indexOf('"csh_gongao"') + 900);
+		if (!/cshIsBossSidePlayer\(event\.player\)/.test(gongao)) e29.push("功傲未隔离（任何人濒死都给挑战者成长）");
+		const daorui = sk29.slice(sk29.indexOf('"csh_daorui"'), sk29.indexOf('"csh_daorui"') + 1200);
+		if (!/cshIsBossSidePlayer\(event\.player\)/.test(daorui)) e29.push("刀锐未隔离");
+		/* 反扑：dying 段只许回血，反噬必须在 dyingAfter 段 */
+		const fpStart = bo29.indexOf("\tcsh_boss_fanpu: {");
+		const fpMain = bo29.slice(fpStart, bo29.indexOf("\tcsh_boss_fanpu_back: {"));
+		if (/loseHp/.test(fpMain)) e29.push("反扑的 dying 段仍在对挑战者流失体力（应挪到 dyingAfter）");
+		if (!/trigger: \{ player: "dyingAfter" \}/.test(bo29.slice(fpStart, fpStart + 2600)))
+			e29.push("反扑缺少 dyingAfter 反噬段");
+		if (!/cur\.hp > 1/.test(bo29.slice(fpStart, fpStart + 2600)))
+			e29.push("反扑反噬段缺「跳过已濒死者」守卫");
+		/* 换血：对方"归零"必须走 loseHp（changeHp 不触发濒死 · content.ts:12275-12281） */
+		const hxStart = bo29.indexOf("\tcsh_boss_huanxue: {");
+		const hxMain = bo29.slice(hxStart, bo29.indexOf("\tcsh_boss_huanxue_round: {"));
+		if (!/best\.loseHp\(/.test(hxMain)) e29.push("换血掉血未走 loseHp（changeHp 不会触发濒死 ⇒ 0 血活人复发）");
+		if (/best\.changeHp\(/.test(hxMain)) e29.push("换血仍在对对方用 changeHp（应改用 loseHp）");
+		if (e29.length) fail("执行级 E29：濒死链路隔离（" + e29.slice(0, 4).join("；") + "）");
+		else ok("执行级 E29：濒死链路隔离（功傲/刀锐不再被魔王方濒死白嫖 · 反扑已拆到 dyingAfter · 换血掉血改用 loseHp）");
+	}
+
+	/* E30（v6.7 新增 · CBY 防护 + 同桌好感）：
+	   ① CBY 防护只拦两条"正常玩法绝不可能命中"的路径（无来源 / 单笔超硬上限），
+	      并**扫描所有入账调用点**确保今后新增来源都带字符串前缀（否则会被这层静默丢掉）；
+	   ② 同桌好感度：notePlay 无冷却 + 壳层接线齐全（shell-seat 记账 · shell-close/settle 发放）。 */
+	{
+		const e30 = [];
+		const wt30 = fs.readFileSync(path.join(ROOT, "core", "csh_wallet.js"), "utf8");
+		if (!/SINGLE_ADD_CAP\s*=\s*\d+/.test(wt30)) e30.push("缺单笔硬上限常量 SINGLE_ADD_CAP");
+		if (!/typeof reason !== "string"/.test(wt30)) e30.push("addPC 未拦「无来源入账」（控制台最容易走的那条）");
+		if (!/n > SINGLE_ADD_CAP/.test(wt30)) e30.push("addPC 未拦「单笔超硬上限」");
+		if (!/SINGLE_ADD_CAP: SINGLE_ADD_CAP/.test(wt30)) e30.push("SINGLE_ADD_CAP 未对外暴露（页面/门禁读不到）");
+		/* 扫描全部入账调用点：第 2 参必须是非空字符串字面量或以 " 开头的拼接。
+		   先剥注释（否则注释里的示例代码会误报），再逐行匹配（跨行匹配会吃掉后面的对象字面量）。
+		   另外 `core/csh_market.js` 的 pay(amount, reason) 是入账封装，内部已加同样的守卫，
+		   故这里连它的调用点一起查。 */
+		const bad30 = [];
+		const scan30 = (dir) => {
+			for (const f of fs.readdirSync(dir)) {
+				const fp = path.join(dir, f);
+				if (fs.statSync(fp).isDirectory()) { scan30(fp); continue; }
+				if (!/\.(js|html)$/.test(f)) continue;
+				const t = fs.readFileSync(fp, "utf8")
+					.replace(/\/\*[\s\S]*?\*\//g, "")
+					.replace(/^[ \t]*\/\/.*$/gm, "")
+					.replace(/<!--[\s\S]*?-->/g, "");
+				const rel = path.relative(ROOT, fp).replace(/\\/g, "/");
+				const re = /(?:wallet\.add|pay)\(\s*[^,()]+,\s*([^)]*)\)/g;
+				let m;
+				while ((m = re.exec(t))) {
+					if (/\n/.test(m[0])) continue;                 /* 跨行 = 不是入账调用 */
+					if (/\bfunction\s+$/.test(t.slice(Math.max(0, m.index - 12), m.index))) continue;  /* 函数定义行 */
+					const arg = m[1].trim();
+					/* 封装函数自身的函数体（core/csh_market.js 的 pay → wallet.add(amount, reason)）
+					   已在封装内做过同样的守卫，这里放行；守卫缺失由下面那条断言单独抓。 */
+					if (rel === "core/csh_market.js" && arg === "reason") continue;
+					if (!/^"/.test(arg)) bad30.push(rel + " → " + arg.slice(0, 40));
+				}
+			}
+		};
+		scan30(path.join(ROOT, "core"));
+		scan30(path.join(ROOT, "games"));
+		if (bad30.length) e30.push("入账调用点缺字符串来源（会被 CBY 防护丢掉）：" + bad30.slice(0, 4).join("；"));
+		const mk30 = fs.readFileSync(path.join(ROOT, "core", "csh_market.js"), "utf8");
+		if (!/typeof reason !== "string"/.test(mk30)) e30.push("金鳞市 pay() 未做同样的来源守卫");
+		/* 同桌好感 */
+		const af30 = fs.readFileSync(path.join(ROOT, "core", "csh_affection.js"), "utf8");
+		if (!/export function notePlay\s*\(/.test(af30)) e30.push("缺 notePlay（同桌游玩好感）");
+		if (!/stAdd\(id, AFF_GAIN\.play, null\)/.test(af30)) e30.push("notePlay 不是无冷却写法（应为 stAdd(id, AFF_GAIN.play, null)）");
+		if (!/play:\s*\d+/.test(af30)) e30.push("AFF_GAIN 缺 play 档");
+		const sh30 = fs.readFileSync(path.join(ROOT, "core", "csh_shell.js"), "utf8");
+		if (!/function cshTableRecord\s*\(/.test(sh30) || !/function cshTableAward\s*\(/.test(sh30))
+			e30.push("壳层缺同桌记账/发放函数");
+		if (!/cshTableRecord\(seats\)/.test(sh30)) e30.push("shell-seat 未记同桌座位");
+		if ((sh30.match(/cshTableAward\(\)/g) || []).length < 3) e30.push("同桌好感发放点不足（应在 close / settle / settle-session 三处各一次）");
+		if (e30.length) fail("执行级 E30：CBY 防护与同桌好感（" + e30.slice(0, 4).join("；") + "）");
+		else ok("执行级 E30：CBY 防护（无来源 / 单笔超 10 亿 一律拒收 · 全部入账调用点带字符串来源）+ 同桌好感（notePlay 无冷却 · 三处发放点）");
+	}
+
+	/* E31（v6.8 新增 · 防作弊的"体感"纪律）：作者原话——
+	   「防作弊可能会让玩家不爽，所以要让玩家不能不适。」
+	   技术上的拦截可以静默、可以只写调试日志；但**凡是玩家可能看到的文字，一律不许带指控**。
+	   本门禁扫全部成品页（剥注释后），禁止出现指责性字眼。
+	   注：「未检测到…」这类**空态描述**不算指控（它说的是"没找到某个游戏内容"），
+	   所以白名单里显式放行「未检测到」，只禁「检测到你」这种指向人的说法。 */
+	{
+		const e31 = [];
+		const BAD31 = /作弊|违规|非法|可疑|封禁|黑名单|篡改|数值异常|检测到你|异常的数值|不许|禁止刷/;
+		const gdir = path.join(ROOT, "games");
+		const pages31 = [];
+		for (const f of fs.readdirSync(gdir)) {
+			const p0 = path.join(gdir, f);
+			if (fs.statSync(p0).isDirectory()) {
+				for (const g of fs.readdirSync(p0)) if (/\.html$/.test(g)) pages31.push(path.join(p0, g));
+			} else if (/\.html$/.test(f)) pages31.push(p0);
+		}
+		for (const p0 of pages31) {
+			const rel = path.relative(ROOT, p0).replace(/\\/g, "/");
+			const src = fs.readFileSync(p0, "utf8")
+				.replace(/<!--[\s\S]*?-->/g, "")
+				.replace(/\/\*[\s\S]*?\*\//g, "")
+				.replace(/^[ \t]*\/\/.*$/gm, "");
+			const m = BAD31.exec(src);
+			if (m) e31.push(rel + "：出现指责性字样「" + m[0] + "」");
+		}
+		if (e31.length) fail("执行级 E31：防作弊体感纪律（" + e31.slice(0, 3).join("；") + "）");
+		else ok("执行级 E31：防作弊体感纪律（" + pages31.length + " 个成品页零指责性字样——拦截静默、提示中性）");
+	}
+
+	/* E32（v6.9 新增 · 天下榜接线）：联机榜必须是**一个独立页**、与生涯大厅同级，
+	   且**玩家看不到服务器地址**（作者：「应该整合成一个榜，跟生涯大厅、讨伐录同级别」
+	   「服务器端口都不用让用户看到」）。
+	   通信必须走 Node 原生 http —— 游戏窗口是 file://（Chromium 安全上下文），
+   fetch 明文 http 会被拦；本项目 app/main.js 开了 nodeIntegration / nodeIntegrationInSubFrames
+   / webSecurity:false，所以渲染进程与 iframe 都能 require("http")。 */
+	{
+		const e32 = [];
+		const rp32 = path.join(ROOT, "games", "rank.html");
+		if (!fs.existsSync(rp32)) e32.push("缺 games/rank.html");
+		else {
+			const t32 = fs.readFileSync(rp32, "utf8");
+			if (!/var NET_BASE = "/.test(t32)) e32.push("rank.html 缺 NET_BASE 常量");
+			if (/id="net-url"|placeholder="https?:/.test(t32)) e32.push("rank.html 把服务器地址做成了输入框（玩家不该看到）");
+			if (!/window\.require/.test(t32)) e32.push("rank.html 未走 Node 原生 http（明文 http 会被安全上下文拦掉）");
+			if (t32.indexOf('NET_BASE.indexOf("https://") !== 0') >= 0)
+				e32.push("rank.html 仍在明文 http 下直接放弃 fetch —— 手机端没有 Node，必须允许尝试（失败静默）");
+		}
+		const rg32 = fs.readFileSync(path.join(ROOT, "core", "csh_registry.js"), "utf8");
+		if (!/key: "rank", title: "/.test(rg32)) e32.push("registry 缺 rank 条目");
+		/* 非游戏页要进 all()（否则 shell 侧 META 里没有它 ⇒ open 恒失败）。
+		   断言"rank 在这个 concat 列表里"，不绑死整串写法 —— 后来加行囊时才发现
+		   原来写的是全串精确匹配（加一个条目就红），这种断言绑的是**写法**不是**语义**。 */
+		const allLine32 = (rg32.match(/ORDER\.concat\(\[[^\]]*\]\)/) || [""])[0];
+		if (allLine32.indexOf('"rank"') < 0) e32.push("registry.all() 未并入 rank");
+		if (allLine32.indexOf('"bossbook"') < 0) e32.push("registry.all() 未并入 bossbook");
+		const gm32 = fs.readFileSync(path.join(ROOT, "core", "csh_games.js"), "utf8");
+		if (!/\t\trank: \{/.test(gm32)) e32.push("大厅 CARDS 缺 rank 展示文案（大厅自检会报错）");
+		const cr32 = fs.readFileSync(path.join(ROOT, "games", "career.html"), "utf8");
+		if (/bd-net-cby/.test(cr32)) e32.push("career.html 还留着旧的联机子页签（职责应收敛到天下榜）");
+		/* ★ 大厅入口卡是**手写**的（生涯大厅 / 讨伐录 两张 + games.forEach 循环四款游戏），
+		   非游戏页不进 ORDER ⇒ 只加 registry 条目**不会出现卡片**。
+		   这条断言就是为那次真事故加的：只查注册表 = 漏掉真正的可见性。 */
+		const db32 = fs.readFileSync(path.join(ROOT, "core", "csh_debug.js"), "utf8");
+		if (!/gb-rank/.test(db32) || !/cshGames\.open\("rank"/.test(db32))
+			e32.push("大厅缺天下榜的手写入口卡（只加 registry 条目不会出卡片）");
+		if (e32.length) fail("执行级 E32：天下榜接线（" + e32.slice(0, 4).join("；") + "）");
+		else ok("执行级 E32：天下榜（独立页 · 与生涯大厅同级 · 玩家只见昵称不见地址 · Node http 通道）");
+	}
+
+	/* E33（v2 · 2026-10-15 新增 · 留名机制契约）：
+	   作者实机发现同一台机器能占两个位置（清一次浏览器数据 ⇒ 新 uid ⇒ 新一行）。
+	   v2 把"身份"的判定权交回服务端（机器指纹 / 出口网络），客户端必须把这些**送上去**，
+	   并且把服务端"认领了哪一行"的结果**接住**——否则"留完只能改名"在页面上根本不成立。
+	   同时补齐体验缺口：不在前 N 名也要看得见自己排第几。 */
+	{
+		const e33 = [];
+		const t33 = fs.readFileSync(path.join(ROOT, "games", "rank.html"), "utf8");
+		if (!/require\("os"\)/.test(t33) || !/machineFp/.test(t33))
+			e33.push("缺机器指纹（Electron 可 require('os')，清了浏览器数据也认得出同一台）");
+		if (!/fp: NET\.fp/.test(t33)) e33.push("submit 未带 fp（服务端无法按机器认领）");
+		if (!/seg: NET\.seg/.test(t33)) e33.push("submit 未带 seg（官阶，真源是钱包 RANKS，页面不许另抄一份表）");
+		if (!/uid=/.test(t33) || !/NET\.me/.test(t33))
+			e33.push("拉榜未带 uid / 未接 me（不在前 N 名就看不到自己排第几）");
+		if (!/renderMeBar/.test(t33)) e33.push("缺「我的名次」常驻条");
+		if (!/r\.adopted/.test(t33)) e33.push("未处理服务端的认领结果（adopted = same/fp/ip/new）");
+		if (!/NET\.uid = r\.uid/.test(t33))
+			e33.push("认领后未回存 uid（之后「我的那条」高亮会错位）");
+		if (!/name-taken/.test(t33)) e33.push("未处理名字已被占用的情况");
+		if (!/r\.ignored/.test(t33)) e33.push("未处理服务端静默忽略（会让玩家以为点了个死按钮）");
+		/* v2.1（打榜 + 签名）：扣费必须在宿主单一账本（shell-cheer），服务端只做聚合 */
+		if (!/id="sg"/.test(t33) || !/sig: NET\.sig/.test(t33))
+			e33.push("缺个性签名（≤10 字，随留名上送）");
+		if (!/shell-cheer-list/.test(t33) || !/shell-cheer"/.test(t33))
+			e33.push("打榜未走宿主桥（扣费必须走钱包单一账本，页面不许自己扣）");
+		if (!/\/cheer/.test(t33) || !/\/girls/.test(t33))
+			e33.push("打榜未接服务端聚合接口（/cheer · /girls）");
+		/* 玩家侧文案：可以说明规则，但不得出现任何指责/内部术语（E31 的同源纪律） */
+		if (/作弊|违规|非法|封禁|黑名单|数值异常/.test(t33))
+			e33.push("页面出现指责性或内部术语字样（玩家不该看见）");
+		if (e33.length) fail("执行级 E33：天下榜留名契约（" + e33.slice(0, 4).join("；") + "）");
+		else ok("执行级 E33：天下榜留名契约（机器指纹 + 认领回存 + 我的名次 + 重复名中性提示 · 拦截静默）");
+	}
+
+	/* E34（2026-10-15 新增 · 魔王可见性 fail-loud）：
+	   事故：懒人包（作者报版本 1.11.51）导入本扩展后，**挑战模式看不到魔王，控制台零提示**。
+	   链路：NAME ∈ lib.config.characters → 引擎 loadCharacter 写进 lib.character →
+	   引擎 mode/boss.js 只枚举 lib.character 且只认 info.isBoss —— **任一环不落地都是静默**：
+	     · character/boss.js 顶层登记失败 → 原本只有一句 console.warn（失败即无声）；
+	     · main/bossmode.js 条目全缺 → 原本 warn + return，且 content.js 随后
+	       delete lib.characterPack[NAME]，现场证据一并消失。
+	   → 固化为两条常驻判据：① character/boss.js 必须有对 lib.config.characters 的
+	   **幂等**登记动作；② main/bossmode.js 必须有可整条搜索的前缀串 [池子魔将][BOSS-诊断]。 */
+	{
+		const e34 = [];
+		const cb34 = fs.readFileSync(path.join(ROOT, "character", "boss.js"), "utf8");
+		if (!/lib\.config\.characters\s*.\s*add\s*\(/.test(cb34))
+			e34.push("character/boss.js 缺 lib.config.characters 的登记动作（魔王一个都进不了 lib.character）");
+		if (!/lib\.config\.characters\s*.\s*includes\s*\(/.test(cb34))
+			e34.push("character/boss.js 的登记缺少幂等 includes 判断（重复 add 会污染已启用角色包列表）");
+		if (!cb34.includes("[池子魔将][BOSS-诊断]"))
+			e34.push("character/boss.js 缺同前缀的诊断输出（登记失败会退回静默）");
+		const mb34 = fs.readFileSync(path.join(ROOT, "main", "bossmode.js"), "utf8");
+		if (!mb34.includes("[池子魔将][BOSS-诊断]"))
+			e34.push("main/bossmode.js 缺可搜索的前缀串 [池子魔将][BOSS-诊断]（魔王条目全缺时会静默）");
+		if (e34.length) fail("执行级 E34：魔王可见性 fail-loud（" + e34.slice(0, 4).join("；") + "）");
+		else ok("执行级 E34：魔王可见性 fail-loud（lib.config.characters 幂等登记 + 失败后自愈补登记 + [池子魔将][BOSS-诊断] 双处可搜前缀）");
+	}
+
+	/* E35（v6.7 新增 · 妖灵中文名单一真源）：
+	   作者实机：妖灵图鉴（games/codex.html）把 50 位妖灵显示成原始 id
+	   （如 csh_boss_minion_eve）。根因 = 中文名只有一个来源 lib.translate，
+	   那是 boss 角色包被引擎 loadCharacter 之后才落地的（懒人包/旧版客户端不加载
+	   ⇒ 全池回退成 id）；同时旧回退链末级 `return id` 是**静默**的，没人知道它掉了。
+	   固化为三条常驻判据：数据层 50 名齐且互异 · 页面/模块不再把 translate 放在第一顺位
+	   · 兜底必须留可搜索的 warn。 */
+	{
+		const e35 = [];
+		const MN = BD.MINION_NAMES || null;
+		const ids = Object.keys(BD.MINIONS || {});
+		/* ① 数据层：50 条全部带非空 name */
+		const noName = ids.filter(k => !BD.MINIONS[k] || typeof BD.MINIONS[k].name !== "string" || !BD.MINIONS[k].name.trim());
+		if (ids.length !== 50) e35.push("MINIONS 条目数不是 50（实际 " + ids.length + " 条）");
+		if (noName.length) e35.push("缺 name：" + noName.slice(0, 4).join("、") + " 等 " + noName.length + " 条");
+		/* ② 两两可不同名（重名会让图鉴/日志指认错人） */
+		const seen = new Map(), dupName = [];
+		for (const k of ids) {
+			const n = BD.MINIONS[k] && BD.MINIONS[k].name;
+			if (typeof n !== "string" || !n) continue;
+			if (seen.has(n)) { if (dupName.indexOf(n) < 0) dupName.push(n); }
+			else seen.set(n, k);
+		}
+		if (dupName.length) e35.push("重名：" + dupName.slice(0, 4).join("、"));
+		/* ③ MINION_NAMES 导出必须与 MINIONS.name 逐项一致（单一真源） */
+		if (!MN) e35.push("core/csh_bossdata.js 未导出 MINION_NAMES（页面拿不到数据层名单）");
+		else {
+			const mk = Object.keys(MN);
+			const diff2 = ids.filter(k => MN[k] !== BD.MINIONS[k].name);
+			if (mk.length !== ids.length || diff2.length)
+				e35.push("MINION_NAMES 与 MINIONS 不一致（" + diff2.slice(0, 3).join("、") + "）");
+		}
+		/* ④ 接线：页面通道（lib.cshMarket.MINION_NAMES） + 妖灵条目自带 name */
+		const mk35 = fs.readFileSync(path.join(ROOT, "core", "csh_market.js"), "utf8");
+		if (!/MINION_NAMES/.test(mk35)) e35.push("core/csh_market.js 未把 MINION_NAMES 转交给页面");
+		const built35 = BD.buildBossEntries(mock, mockTrans, mockTitles);
+		const meBad = Object.keys(built35.minionEntries || {})
+			.filter(mid => !(built35.minionEntries[mid] && built35.minionEntries[mid].name));
+		if (meBad.length) e35.push("minionEntries 未带 name（引擎侧 lib.character[妖灵].name 恒空 · " + meBad.length + " 条）");
+		/* ⑤ 模块侧不许再把 lib.translate 放在第一顺位（防止下一轮又冒出第二个来源）
+		   —— 判定口径：同一条赋值语句里，数据层的读取位置必须在 translate 之前。 */
+		const br35 = fs.readFileSync(path.join(ROOT, "core", "csh_bossrecord.js"), "utf8");
+		const lines35 = br35.split(/\r?\n/);
+		const orderBad35 = [];
+		for (const raw of lines35) {
+			const tNO = raw.indexOf("lib.translate["), tIS = raw.indexOf("MINION_NAMES[");
+			if (tNO >= 0 && raw.indexOf("lib.translate[minionId]") >= 0) {
+				if (!(tIS >= 0 && tIS < tNO)) orderBad35.push("recordMinion 的日志/结算");
+			}
+			if (tNO >= 0 && raw.indexOf("lib.translate[mid]") >= 0) {
+				if (!(tIS >= 0 && tIS < tNO)) orderBad35.push("summary().minions[].name");
+			}
+		}
+		const noOrder35 = [...new Set(orderBad35)];
+		if (noOrder35.length) e35.push("仍有读取点把 translate 排在数据层之前：" + noOrder35.join("、"));
+		/* ⑥ 页面回退链：数据层优先 + 末级必须留可搜索 warn（不许再静默） */
+		const cx35 = fs.readFileSync(path.join(ROOT, "games", "codex.html"), "utf8");
+		const nm35 = (cx35.match(/function nameOf[\s\S]*?\n\}/) || [""])[0];
+		if (!nm35) e35.push("games/codex.html 找不到 nameOf()");
+		else {
+			const iData = nm35.indexOf("names[id]"), iTrans = nm35.indexOf("L.translate[id]");
+			if (iData < 0) e35.push("nameOf() 未读数据层名单（MINION_NAMES）");
+			if (iTrans < 0) e35.push("nameOf() 未保留 lib.translate 兜底");
+			if (iData >= 0 && iTrans >= 0 && iData > iTrans)
+				e35.push("nameOf() 顺序错：lib.translate 排在数据层之前");
+			if (!/\[池子魔将\]\[图鉴\] 缺名 id:/.test(nm35))
+				e35.push("末级回退缺可搜索的 warn（需要 \"[池子魔将][图鉴] 缺名 id:\"）");
+		}
+		if (e35.length) fail("执行级 E35：妖灵中文名单一真源（" + e35.slice(0, 4).join("；") + "）");
+		else ok("执行级 E35：妖灵中文名单一真源（50 条全带非空 name · 零重名 · 页面/结算均取自 MINION_NAMES · 末级回退留 [池子魔将][图鉴] 缺名 id: warn）");
+	}
+
+	/* E36（2026-10-15 新增 · 引擎全局的显式 import）：
+	   ★ 真事故回归守卫 —— skills/boss.js **零 import**，却在函数体里用了 160 次引擎全局
+	   （game. 138 / lib. 13 / get. 7 / ai. 2 / ui. 1 / _status. 2）。ESM 模块作用域没有这些
+	   隐式全局 ⇒ 作者实机在 arrangeTrigger 阶段吃到 `game is not defined`（787 行）。
+	   静态门禁与 simulate_world 都抓不到（不真跑那条技能路径）。这条断言扫 skills/ 下
+	   所有 .js：**只要用到某个引擎全局，就必须有对应的具名 import**。 */
+	{
+		const e36 = [];
+		const skDir = path.join(ROOT, "skills");
+		const ENGINE_IDS = ["lib", "game", "ui", "get", "ai", "_status"];
+		let scanned36 = 0;
+		if (fs.existsSync(skDir)) {
+			const walk36 = (dir) => {
+				for (const ent of fs.readdirSync(dir, { withFileTypes: true })) {
+					const fp = path.join(dir, ent.name);
+					if (ent.isDirectory()) { walk36(fp); continue; }
+					if (!/\.js$/.test(ent.name)) continue;
+					scanned36++;
+					const t36 = fs.readFileSync(fp, "utf8");
+					/* 注释掉的代码不算：先剥块注释与整行 // */
+					const body = t36.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+					const rel = path.relative(ROOT, fp).replace(/\\/g, "/");
+					for (const id of ENGINE_IDS) {
+						const used = new RegExp("(?<![\\w$.])" + id + "\\.").test(body);
+						if (!used) continue;
+						/* 具名 import / 动态解构 / 全局挂载（lib.x = …）之外的引用都要能解析 */
+						const hasNamed = new RegExp("import\\s*\\{[^}]*\\b" + id + "\\b[^}]*\\}\\s*from").test(body);
+						const hasNs = /import\s+\*\s+as\s+\w+\s+from/.test(body);
+						const isGlobalDef = new RegExp("(^|[^\\w$.])" + id + "\\s*=", "m").test(body);
+						if (!hasNamed && !hasNs && !isGlobalDef)
+							e36.push(rel + " 用了 " + id + ". 但没有 import");
+					}
+				}
+			};
+			walk36(skDir);
+		}
+		if (scanned36 < 2) e36.push("skills/ 下只扫到 " + scanned36 + " 个 js（扫描器可能失效）");
+		if (e36.length) fail("执行级 E36：引擎全局必须显式 import（" + e36.slice(0, 3).join("；") + "）");
+		else ok("执行级 E36：skills/ 下 " + scanned36 + " 个模块的引擎全局引用全部有显式 import");
+	}
+
+	/* E37（2026-10-15 新增 · 图片文件名全 ASCII 化守护）：
+	   ★ 作者批准把 50 只妖灵的 100 张**中文名**立绘永久改成 ASCII 名
+	     （命名规则 = 妖灵主名 = MINION 键去掉 csh_boss_minion_ 前缀）。
+	     起因：中文文件名在部分客户端/打包链路上会被"自动修正乱码"改名
+	     （疑为安卓端启动卡顿源，此假设未经证实，故仅作背景、不作判据）。
+	   两条常驻判据：
+	     ① image/ 目录（含子目录）下 **零非 ASCII 文件名**；
+	     ② 数据层 MINIONS 的每一条 img/face 路径**逐条真实存在**（50 × 2 = 100 条全在位）。 */
+	{
+		const e37 = [];
+		/* ① 扫 image/ 全目录：文件名不许含非 ASCII 字符 */
+		const imgDir37 = path.join(ROOT, "image");
+		const nonAscii37 = [];
+		if (fs.existsSync(imgDir37)) {
+			const walk37 = (dir) => {
+				for (const ent of fs.readdirSync(dir, { withFileTypes: true })) {
+					const fp = path.join(dir, ent.name);
+					if (ent.isDirectory()) { walk37(fp); continue; }
+					if (/[^\x00-\x7F]/.test(ent.name))
+						nonAscii37.push(path.relative(ROOT, fp).replace(/\\/g, "/"));
+				}
+			};
+			walk37(imgDir37);
+		} else e37.push("image/ 目录不存在");
+		if (nonAscii37.length)
+			e37.push("image/ 下仍有非 ASCII 文件名 " + nonAscii37.length + " 个：" + nonAscii37.slice(0, 5).join("、"));
+
+		/* ② 数据层 100 条 img/face 路径逐条存在且为 ASCII */
+		let checked37 = 0;
+		const missing37 = [];
+		for (const mid in BD.MINIONS) {
+			const m = BD.MINIONS[mid] || {};
+			for (const which of ["img", "face"]) {
+				const rel = String(m[which] || "").replace(/^extension\/池子魔将\//, "");
+				checked37++;
+				if (!rel || /[^\x00-\x7F]/.test(rel)) { missing37.push(mid + "." + which + "（路径空或非 ASCII）"); continue; }
+				if (!fs.existsSync(path.join(ROOT, rel))) missing37.push(mid + "." + which + "（文件缺失：" + rel + "）");
+			}
+		}
+		if (checked37 !== 100) e37.push("数据层 img/face 应 100 条，实际 " + checked37 + " 条");
+		if (missing37.length) e37.push("立绘文件缺失 " + missing37.length + " 条：" + missing37.slice(0, 5).join("；"));
+
+		if (e37.length) fail("执行级 E37：图片文件名未全 ASCII 化（" + e37.slice(0, 3).join("；") + "）");
+		else ok("执行级 E37：image/ 目录零非 ASCII 文件名；数据层 img/face 100 条路径逐条存在（50 只 × 主图/人像）");
+	}
+	/* E38（2026-10-15 · 云功能「单点可切换 + 离线可降级」硬约束）：
+	   ★ 真事故回归守卫 —— 手机端「未连接」的根因就是明文 http：安卓端页面 origin 是
+	   https://localhost（androidScheme=https）且 usesCleartextTraffic=false，
+	   https 页面请求明文 http 会被混合内容拦掉。因此断言：
+	     ① 成品页网络基址必须是 https；
+	     ② 必须保留 Node 通道（桌面）与 fetch 兜底（手机没有 window.require）；
+	     ③ 换服务器只改 NET_BASE 一行（这就是「单点可切换」）。 */
+	{
+		const e38 = [];
+		const gdir = path.join(ROOT, "games");
+		const walk38 = (dir) => {
+			for (const ent of fs.readdirSync(dir, { withFileTypes: true })) {
+				const fp = path.join(dir, ent.name);
+				if (ent.isDirectory()) { walk38(fp); continue; }
+				if (!ent.name.endsWith(".html")) continue;
+				const t = fs.readFileSync(fp, "utf8");
+				if (t.indexOf("NET_BASE") < 0) continue;
+				const rel = path.relative(ROOT, fp);
+				const m = t.match(/var NET_BASE = "([^"]*)"/);
+				if (!m) e38.push(rel + " 有 NET_BASE 但写法无法静态核对");
+				else if (m[1].indexOf("https://") !== 0) e38.push(rel + " 基址不是 https（手机端会被拦）：" + m[1]);
+				if (t.indexOf("window.require") < 0) e38.push(rel + " 缺 Node 通道（桌面端取不到数据）");
+				if (t.indexOf("fetch(") < 0) e38.push(rel + " 缺 fetch 兜底（手机端唯一通道）");
+			}
+		};
+		if (fs.existsSync(gdir)) walk38(gdir);
+		if (e38.length) fail("执行级 E38：云功能基址与双通道（" + e38.slice(0, 3).join("；") + "）");
+		else ok("执行级 E38：云功能基址全 https + Node/fetch 双通道齐全（手机端混合内容拦截不再复发）");
+	}
+
+	/* E39（2026-10-15 · 天下榜 P6 观赏层「四件套」守卫；2026-10-16 主推位并入花魁三席）：
+	   P6 四项（花魁展示 / 行头像 / 照片墙 / 懒加载）全部是**加在成品页上的表现层**，
+	   最容易在后续改版里被顺手删掉或改坏。逐条钉死：
+	     ① 花魁展示：花魁三席（renderChiefs + 席位卡 + 素材路径规则 csh_face_<主名>.webp）
+	        —— 2026-10-16 作者定案「花魁只列前三名的详细情况」，原独立主推位（.hero/paintHero）
+	        已并入第一席，故断言随之改指三席；
+	     ② 行头像：币/功勋榜的姓氏印章（sealOf）+ 花榜的真头像（data-bg 懒加载）；
+	     ③ 照片墙：.wall 网格 + 分批渲染游标（WALL.batch / renderWall）
+	        —— 三席为默认，但**全 50 位必须仍然可达**（否则其余 47 位再没人能打赏）；
+	     ④ 懒加载：data-bg 必须成对出现「写入点」与「IntersectionObserver 读取点」，
+	        且必须有「无 IO 环境全量落位」的兜底（极老 WebView 不残）。
+	   另：素材映射必须与 MINION_POOL 全对齐（50 只 id 去前缀 → image/csh_face_<主名>.webp 全在位），
+	   否则花榜会出现空头像格。 */
+	{
+		const e39 = [];
+		const rk = path.join(ROOT, "games", "rank.html");
+		if (!fs.existsSync(rk)) e39.push("找不到 games/rank.html");
+		else {
+			const t = fs.readFileSync(rk, "utf8");
+			const need = [
+				["花魁三席", ["function renderChiefs", "function seatCardHtml", "class=\"chief", "csh_face_", "tops"]],
+				["行头像", ["function sealOf", "class=\"av seal\"", "class=\"av\" data-bg="]],
+				["照片墙", ["class=\"wall\"", "function renderWall", "WALL.batch"]],
+				["懒加载", ["data-bg", "IntersectionObserver", "function lazyBg", "removeAttribute(\"data-bg\")"]],
+				["版式切换", ["id=\"viewbar\"", "id=\"v-chief\"", "function setView", "function preferView"]],
+			];
+			for (const [name, keys] of need)
+				for (const k of keys) if (t.indexOf(k) < 0) e39.push("P6「" + name + "」缺 " + k);
+			/* 懒加载必须同时有"写入"与"读取"，只有 data-bg 没有 IO 读取点 = 图永远不落 */
+			if (t.indexOf("data-bg") >= 0 && t.indexOf("IntersectionObserver") < 0)
+				e39.push("有 data-bg 写入点但没有 IntersectionObserver 读取点（头像/立绘永不落图）");
+			/* 无 IO 兜底：极老 WebView 上必须全量落位，否则整页没图 */
+			if (t.indexOf("typeof IntersectionObserver === \"undefined\"") < 0)
+				e39.push("缺「无 IntersectionObserver 环境全量落位」兜底");
+			/* ★ 三席是默认，但全 50 位必须仍然可达：否则其余 47 位再没人能打赏（功能缺失，
+			   不是"简化"）。既然"只列前三"是作者要求，这条就是它的**边界守卫**。 */
+			for (const k of ["renderCheerList", "WALL.rows.length", "照片墙 / 名录"])
+				if (t.indexOf(k) < 0) e39.push("全榜入口不完整（缺 " + k + "）——" +
+					"只留三席会让其余 47 位无法被打赏");
+			/* ★ 兼容契约：老服务端不返回 tops（服务端上了新版本才有）——
+			   页面必须能降级，否则"页面已经依赖、服务端还没上"的那段时间花榜会空白。 */
+			if (t.indexOf("(c && c.tops) ? c.tops : []") < 0)
+				e39.push("缺 tops 降级（老服务端没有该字段时三席会空）");
+		}
+		/* 素材映射：MINION_POOL 每只都要有对应的人像图 */
+		try {
+			const bd = fs.readFileSync(path.join(ROOT, "core", "csh_bossdata.js"), "utf8");
+			const pool = bd.match(/export const MINION_POOL = \[([\s\S]*?)\]/);
+			if (!pool) e39.push("取不到 MINION_POOL（素材映射无法核对）");
+			else {
+				const ids = (pool[1].match(/csh_boss_minion_[a-z0-9_]+/g) || []);
+				const imgDir = path.join(ROOT, "image");
+				const miss = [];
+				for (const id of ids) {
+					const f = "csh_face_" + id.replace("csh_boss_minion_", "") + ".webp";
+					if (!fs.existsSync(path.join(imgDir, f))) miss.push(f);
+				}
+				if (miss.length) e39.push("花榜人像缺失 " + miss.length + " 张（如 " + miss.slice(0, 3).join("、") + "）");
+			}
+		} catch (e39b) { e39.push("素材映射核对异常：" + e39b.message); }
+		if (e39.length) fail("执行级 E39：天下榜花榜层（" + e39.slice(0, 3).join("；") + "）");
+		else ok("执行级 E39：花魁三席 + 全榜入口 + 行头像 + 照片墙/懒加载齐备（50 只人像全在位）");
+	}
+
+	/* E40（2026-10-15 · 「行囊」存档总口接线）：
+	   作者定案：「这次做的导入导出要涵盖全部的玩家数据，做成跟生涯大厅、讨伐录平级」，
+	   且「原先位置的那些导入导出……除了生涯大厅的，其他都保留」。
+	   本断言钉四件事：
+	     ① 新页在册且是大厅平级（registry 条目 lobby:true + all() 并入 + CARDS 文案 + 手写入口卡）；
+	     ② 宿主桥齐备（export / import / backups / rollback / reset / inventory）；
+	     ③ 页面**只走桥**：不自己去读 localStorage 里的业务键（那正是旧版读错后端的病根）；
+	     ④ 生涯大厅那边**搬干净了**（mig- 元素与绑定全无残留），但其余入口（调试面板的
+	        技能方案导入导出、胜负统计自带导入导出、导出日志）保留。 */
+	{
+		const e40 = [];
+		const sv = path.join(ROOT, "games", "save.html");
+		const rg40 = fs.readFileSync(path.join(ROOT, "core", "csh_registry.js"), "utf8");
+		const db40 = fs.readFileSync(path.join(ROOT, "core", "csh_debug.js"), "utf8");
+		const gm40 = fs.readFileSync(path.join(ROOT, "core", "csh_games.js"), "utf8");
+		const sh40 = fs.readFileSync(path.join(ROOT, "core", "csh_shell.js"), "utf8");
+		const cr40 = fs.readFileSync(path.join(ROOT, "games", "career.html"), "utf8");
+		if (!fs.existsSync(sv)) e40.push("缺 games/save.html");
+		else {
+			const t = fs.readFileSync(sv, "utf8");
+			/* ③ 只走桥：不许出现"页面自己读业务键" */
+			const forbidden = ["csh_wallet", "csh_rank", "csh_affection", "csh_ledger",
+				"extension_池子魔将_bossKill", "extension_池子魔将_goldfish", "extension_池子魔将_winrateData"];
+			for (const k of forbidden) if (t.indexOf(k) >= 0) e40.push("save.html 自己碰了业务键 " + k + "（应全程走桥）");
+			for (const b of ["shell-mig-export", "shell-mig-import", "shell-mig-backups",
+				"shell-mig-rollback", "shell-mig-reset", "shell-mig-inventory"])
+				if (t.indexOf(b) < 0) e40.push("save.html 未接桥命令 " + b);
+			/* 导入必须**先预检再执行**（dryRun），否则一次误点就覆盖了一身家当 */
+			if (t.indexOf("dryRun") < 0) e40.push("save.html 缺 dryRun 预检（导入前必须先看差异）");
+			if (t.indexOf("window.confirm") < 0) e40.push("save.html 缺二次确认");
+			/* 文案纪律（与天下榜同款）：页面上的字只从文案表 T 取 */
+			if (!/var T = \{/.test(t)) e40.push("save.html 缺文案表 T");
+			/* ★ 「调试」二字不许出现在成品页（E28 已管，这里再钉一次是因为本页
+			     天生容易把宿主的内部域名叫出来） */
+			if (/调试/.test(t.replace(/<!--[\s\S]*?-->/g, "").replace(/\/\*[\s\S]*?\*\//g, "")))
+				e40.push("save.html 可见文本出现「调试」字样");
+		}
+		if (!/key: "save", title: "行囊"/.test(rg40)) e40.push("registry 缺 save 条目");
+		if (!/lobby: true/.test((rg40.match(/save: \{[\s\S]*?\n\t\t\},/) || [""])[0])) e40.push("registry 的 save 条目不是 lobby（会走收费屏）");
+		const allLine40 = (rg40.match(/ORDER\.concat\(\[[^\]]*\]\)/) || [""])[0];
+		if (allLine40.indexOf('"save"') < 0) e40.push("registry.all() 未并入 save");
+		if (!/\t\tsave: \{/.test(gm40)) e40.push("大厅 CARDS 缺 save 展示文案（大厅自检会报错）");
+		if (!/gb-save/.test(db40) || !/cshGames\.open\("save"/.test(db40))
+			e40.push("大厅缺行囊的手写入口卡（只加 registry 条目不会出卡片）");
+		if (db40.indexOf('if (cmd === "shell-mig-inventory")') < 0 && sh40.indexOf('if (cmd === "shell-mig-inventory")') < 0)
+			e40.push("宿主缺 shell-mig-inventory 桥命令（家当清点拿不到）");
+		/* ④ 生涯大厅搬干净 */
+		if (/mig-export|mig-apply|mig-text|bindMigrate|migrow/.test(cr40)) e40.push("career.html 还有迁移残留（应已搬去行囊）");
+		if (cr40.indexOf("bindMigrate") >= 0) e40.push("career.html 还调用着已删除的 bindMigrate");
+		if (cr40.indexOf('$("#md-close")') < 0) e40.push("career.html 的弹窗关闭丢了（摘区块时误删）");
+		/* 其余入口必须保留（作者：「除了生涯大厅的，其他都保留」） */
+		if (db40.indexOf("导入 / 导出") < 0 && db40.indexOf("导入（合并）") < 0) e40.push("调试面板的技能方案导入导出被误删（应保留）");
+		const wr40 = fs.readFileSync(path.join(ROOT, "core", "csh_winrate.js"), "utf8");
+		if (wr40.indexOf("exportData") < 0 || wr40.indexOf("导入") < 0) e40.push("胜负统计自带的导入导出被误删（应保留）");
+		if (e40.length) fail("执行级 E40：行囊存档总口（" + e40.slice(0, 4).join("；") + "）");
+		else ok("执行级 E40：行囊在册且大厅平级（桥六件齐 · 先预检后覆盖 · 生涯大厅已搬净 · 其余导入导出保留）");
+	}
+
+	/* E41（2026-10-15 · 存档覆盖度：**扫源码比对白名单**）：
+	   ★ 这条门禁的由来：这一轮做「涵盖全部玩家数据」时，靠人工 grep 才发现
+	     `csh_affection`（好感度）、讨伐录/扮演魔王/金鳞市（lib.config 域）、
+	     以及一个**只写不读的死键** `csh_ddz_good`。靠人不靠机器 = 下次还会漏。
+	   规则：把扩展里所有"自己持久化"的键挖出来（localStorage.* 字面量 / ls*(字面量) /
+	   lib.config[字面量] / saveConfig(字面量) / 以及 "K_XXX = 字面量" 常量被上述调用引用），
+	   要求每个键**要么在 csh_migrate 的键表里，要么在下面这份带理由的豁免表里**。
+	   豁免表只收"设置项"与"内部前缀"，且必须写明理由 —— 加一条要动这里的注释。 */
+	{
+		const e41 = [];
+		const MIG_IGNORE = {
+			"extension_池子魔将_csh_debug_menu": "无名杀设置项（lib.config 配置项，走引擎设置界面与自身存档）",
+			"extension_池子魔将_csh_dev_log": "无名杀设置项（同上）",
+			"extension_池子魔将_csh_effect_announce": "无名杀设置项（同上）",
+			"extension_池子魔将_csh_enable_pingxing": "无名杀设置项（同上）",
+			"extension_池子魔将_csh_eg_group_scroll": "无名杀设置项（同上 · 2026-10-16 新增：选将势力面板滚动条开关，engine-compat C4）",
+		};
+		const walkDirs = ["core", "main", "games", "character", "skills"];
+		const files41 = [];
+		const walk41 = (d) => {
+			if (!fs.existsSync(d)) return;
+			for (const ent of fs.readdirSync(d, { withFileTypes: true })) {
+				const fp = path.join(d, ent.name);
+				if (ent.isDirectory()) walk41(fp);
+				else if (/\.(js|html)$/.test(ent.name)) files41.push(fp);
+			}
+		};
+		walkDirs.forEach((d) => walk41(path.join(ROOT, d)));
+		const found = new Map();
+		const consts41 = new Map();
+		const note = (k, where) => { if (!found.has(k)) found.set(k, new Set()); found.get(k).add(where); };
+		for (const fp of files41) {
+			const rel = path.relative(ROOT, fp).replace(/\\/g, "/");
+			const t = fs.readFileSync(fp, "utf8");
+			for (const m of t.matchAll(/\b(?:var|let|const)\s+([A-Za-z_$][\w$]*)\s*=\s*["']([^"']+)["']/g)) consts41.set(m[1], m[2]);
+			for (const m of t.matchAll(/(?:localStorage|sessionStorage)\.(?:setItem|getItem|removeItem)\(\s*["']([^"']+)["']/g)) note(m[1], rel);
+			for (const m of t.matchAll(/\b(?:lsSet|lsPut|lsGet|lsDel|lsJSON)\(\s*["']([^"']+)["']/g)) note(m[1], rel);
+			for (const m of t.matchAll(/lib\.config\[\s*["']([^"']+)["']\s*\]/g)) note(m[1], rel);
+			for (const m of t.matchAll(/saveConfig\(\s*["']([^"']+)["']/g)) note(m[1], rel);
+			for (const m of t.matchAll(/(?:localStorage\.(?:setItem|getItem|removeItem)|lsSet|lsPut|lsGet|lsDel|lsJSON|lib\.config\[|saveConfig\()\s*\(?\s*([A-Za-z_$][\w$]*)/g)) {
+				const v = consts41.get(m[1]);
+				if (v && /^(csh_|extension_池子魔将_)/.test(v)) note(v, rel);
+			}
+		}
+		/* 迁移模块声明了哪些键（含键族成员与通配族主键） */
+		const mig41 = fs.readFileSync(path.join(ROOT, "core", "csh_migrate.js"), "utf8");
+		const declared = new Set(["csh_bgm_on"]);
+		for (const m of mig41.matchAll(/["']((?:csh_|extension_池子魔将_)[a-z0-9_]+)["']/gi)) declared.add(m[1]);
+		const missed = [];
+		for (const k of found.keys()) {
+			if (!/^(csh_|extension_池子魔将_)/.test(k)) continue;
+			if (declared.has(k) || MIG_IGNORE[k]) continue;
+			missed.push(k + "（" + [...found.get(k)].slice(0, 2).join(", ") + "）");
+		}
+		if (missed.length) e41.push("有键没登记：" + missed.slice(0, 4).join("；"));
+		/* 反向：白名单里声明的 localStorage 键，若全项目再无任何读写点 ⇒ 也是坏账 */
+		const lsk = ["csh_affection", "csh_ledger", "csh_wallet_hist", "csh_wallet_snap",
+			"csh_bossbook_seen", "csh_boss_hide_killed", "csh_ddz_name", "csh_uno_name"];
+		for (const k of lsk) if (!found.has(k)) e41.push("白名单声明了 " + k + " 但全项目没有读写点（坏账）");
+		if (e41.length) fail("执行级 E41：存档覆盖度（" + e41.slice(0, 3).join("；") + "）");
+		else ok("执行级 E41：存档覆盖度 —— 旧有 " + found.size + " 个持久化键全部有名有姓（键表或带理由的豁免），无漏登、无坏账");
+	}
+
+	/* E42（2026-10-16 · 死亡段技能守卫）：凡"死时触发"的 csh 技能（trigger 域 player/global
+	   的 die / dieAfter / dieBegin）——触发时**持有者自己已是 dead**，必须写 forceDie: true，
+	   否则会被 lib.filter.filterTrigger 的 `!info.forceDie && player.isDead()` 静默拦截 ⇒
+	   永不发动（2026-10-16 实证：讨伐记录 csh_boss_watch 的"击破魔王 / 应战负场"与池悯
+	   csh_boss_chi 等 10 处曾全部"死技"）。新增死亡段技能时把技能名加进下方清单。 */
+	{
+		const e42 = [];
+		const dieSkillList = {
+			"skills/boss.js": ["csh_boss_watch", "csh_boss_watch_ext", "csh_boss_chi", "csh_boss_feng_fengshi_die",
+				"csh_boss_kui_qiansi_die", "csh_boss_you_cannian", "csh_boss_wangzhi_die", "csh_boss_guiku"],
+			"skills/index.js": ["csh_karl_clear"],
+		};
+		for (const f of Object.keys(dieSkillList)) {
+			const src = fs.readFileSync(path.join(ROOT, f), "utf8");
+			for (const nm of dieSkillList[f]) {
+				const re = new RegExp("(?:\\n|^)\\s*[\\\"']?" + nm + "[\\\"']?\\s*:\\s*\\{");
+				const m42 = src.match(re);
+				if (!m42) { e42.push(nm + " 未找到定义"); continue; }
+				/* 从"匹配串结束处"起算（含多空行时若用 at+1 会把自己的定义行当"下一个边界"→ 块变空误报） */
+				const rest = src.slice(m42.index + m42[0].length);
+				const nxt = rest.search(/\n\s*[\"']?csh_[a-z0-9_]+[\"']?\s*:\s*\{/);
+				const block = nxt >= 0 ? rest.slice(0, nxt) : rest.slice(0, 3000);
+				/* ★ 剥注释再判定：注释里的 `forceDie: true` 不算数（负测试抓出的漏洞：注掉标注会被误判为已有） */
+				const clean = block.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
+				if (!/forceDie\s*:\s*true/.test(clean)) e42.push(nm + " 缺 forceDie（死亡段技能会被 filterTrigger 拦截，永不发动）");
+			}
+		}
+		/* 萨科「die」子技（无 csh_ 前缀名）：按唯一串定位——forceDie 须出现在其 filter 之前
+		   （注意用带 game.hasPlayer 的完整形态：全文件唯一，早先的短串会撞到 24368 行的 countPlayer 处） */
+		{
+			const src = fs.readFileSync(path.join(ROOT, "skills", "index.js"), "utf8");
+			const z = src.indexOf("game.hasPlayer((cur) => cur.storage.csh_zhali_box");
+			if (z >= 0 && !/forceDie/.test(src.slice(Math.max(0, z - 800), z))) e42.push("萨科 die 子技缺 forceDie");
+		}
+		if (e42.length) fail("执行级 E42：死亡段技能 forceDie 守卫（" + e42.slice(0, 3).join("；") + "）");
+		else ok("执行级 E42：死亡段技能 forceDie 守卫 —— 9 个死技 + 萨科子技全部标注（讨伐记录/池悯不再静默不发动）");
+	}
+
+	/* E43（2026-10-16 晚 · 收尾记录通道守护 · 第四批根因修复）：
+	   根因：讨伐记录挂在 dieAfter（die 事件的 After 阶段），而「击破魔王 / 应战负 / 应战胜」
+	   三种该记录的死亡都在同一死亡事件的更早步骤里 game.checkResult()→game.over() 收尾
+	   （mode/boss.js:463/471-472 · 1718-1724），After 阶段推进不到 ⇒ 讨伐录恒 0。
+	   修法：包装 game.over 补记三种结局（+外传），与 dieAfter 通道用 boss._cshBossRecorded 哨兵互斥。 */
+	{
+		const rb43 = fs.readFileSync(path.join(ROOT, "core", "csh_bossrecord.js"), "utf8");
+		const bj43 = fs.readFileSync(path.join(ROOT, "skills", "boss.js"), "utf8");
+		if (!/function recordOnOver\s*\(/.test(rb43)) fail("执行级 E43：csh_bossrecord 缺 recordOnOver（收尾记录通道未实现）");
+		else if (!/game\._csh_bossOverOriginal\s*=\s*game\.over/.test(rb43)) fail("执行级 E43：未按包装纪律保存上一层 game.over（_csh_bossOverOriginal）");
+		else if (!/game\.over\s*=\s*function/.test(rb43)) fail("执行级 E43：csh_bossrecord 未包装 game.over（收尾记录未接线）");
+		else if (!/_cshBossRecorded/.test(rb43) || !/_cshBossRecorded/.test(bj43)) fail("执行级 E43：两通道哨兵（boss._cshBossRecorded）缺失——会重复记账");
+		else if (!/recordAsBoss\(false\)/.test(rb43) || !/recordAsBoss\(true\)/.test(rb43) || !/recordExt\(nm/.test(rb43)) fail("执行级 E43：收尾通道未覆盖三种结局 + 外传（recordAsBoss 双向 / recordExt）");
+		else if (!/game\._csh_bossOverCapture/.test(rb43)) fail("执行级 E43：包装体内未走 game 属性入口（联机安全红线：不得引用闭包变量）");
+		else ok("执行级 E43：收尾记录通道在位（game.over 包装 · 击破魔王/应战双向/外传 · 哨兵互斥 · 包装纪律合规）");
+	}
+
+	/* E44（2026-10-16 深夜三 · 契约/誓约 + 三新互动守护）：
+	   满羁绊 88000 结契（星砂 ×2 + 偏爱礼物 ×3 → 契约台词）；
+	   三新互动（递杯茶 C / 并肩看星 A / 专属称呼 S · 先复用既存台词池）；
+	   导入导出必须带契约字段（migrate 清洗）；图鉴必须有结契按钮与契约横幅。 */
+	{
+		const af44 = fs.readFileSync(path.join(ROOT, "core", "csh_affection.js"), "utf8");
+		const al44 = fs.readFileSync(path.join(ROOT, "core", "csh_aff_lines.js"), "utf8");
+		const cx44 = fs.readFileSync(path.join(ROOT, "games", "codex.html"), "utf8");
+		const mg44 = fs.readFileSync(path.join(ROOT, "core", "csh_migrate.js"), "utf8");
+		if (!/export function oath\s*\(/.test(af44)) fail("执行级 E44：缺 oath()（契约机制）");
+		else if (!/OATH_COST/.test(af44) || !/结契/.test(af44)) fail("执行级 E44：契约消耗/理由缺失");
+		else if (!/export const OATH_LINES/.test(al44)) fail("执行级 E44：契约台词表（OATH_LINES）缺失");
+		else if (!/key: "tea"/.test(af44) || !/key: "stars"/.test(af44) || !/key: "callname"/.test(af44)) fail("执行级 E44：三新互动缺档");
+		else if (!/oath: isPastStamp\(e\.oath\)/.test(mg44)) fail("执行级 E44：迁移清洗未带契约字段（导入导出会丢契约）");
+		else if (!/oathbtn/.test(cx44) || !/oathov/.test(cx44) || !/tableQuip/.test(af44)) fail("执行级 E44：图鉴契约 UI / 对局互动接线缺失");
+		else ok("执行级 E44：契约机制在位（oath + OATH_LINES + 三新互动 + 迁移字段 + 图鉴 UI + tableQuip）");
+	}
+
+	/* E45（2026-10-16 深夜四 · 本体兼容注入 + 懒人包自愈；深夜七 · 实机重做锚）：
+	   ① 选将势力面板滚动条必须在 content 加载时即注入（曾误挂 kill-fx 懒注入块——要等第一次
+	      击杀特效才生效，等于没装）；② 必须有设置开关（csh_eg_group_scroll → __cshEgScrollApply）；
+	   ③ 懒人包自愈补载（cshBossSelfLoad）已导出且在 bossmode 接线；
+	   ④ ★ 滚动必须交还原生 `.content-container`（对话框封顶 70vh），不得再退回「截断 .buttons」
+	      方案 —— 实机（2026-10-16 深夜七）已证：按钮盒子 54vh 比对话框 45% 还高，外层滚动
+	      范围塌缩成固定 ~120px 小段（作者「滚不动 / 范围固定」的根因）。 */
+	{
+		const ct45 = fs.readFileSync(path.join(ROOT, "main", "content.js"), "utf8");
+		const cf45 = fs.readFileSync(path.join(ROOT, "main", "config.js"), "utf8");
+		const bm45 = fs.readFileSync(path.join(ROOT, "main", "bossmode.js"), "utf8");
+		const cb45 = fs.readFileSync(path.join(ROOT, "character", "boss.js"), "utf8");
+		const i45 = ct45.indexOf("_inject: function");
+		const fx45 = i45 >= 0 ? ct45.slice(i45, i45 + 3200) : "";
+		if (!/function cshEgScrollApply\s*\(/.test(ct45)) fail("执行级 E45：缺 cshEgScrollApply（本体兼容注入）");
+		else if (!/cshEgScrollApply\(\);/.test(ct45)) fail("执行级 E45：cshEgScrollApply 未在 content 加载时调用");
+		else if (fx45.indexOf(":has(.card.button)") >= 0) fail("执行级 E45：选将滚动条又挂回击杀特效懒注入块（要等第一次特效才生效）");
+		else if (ct45.indexOf(".buttons:has(.card.button){max-height:54vh") >= 0) fail("执行级 E45：滚动退回 .buttons 截断（实机会塌缩成固定小段）");
+		else if (!/max-height:70vh/.test(ct45) || !/content-container/.test(ct45)) fail("执行级 E45：缺对话框封顶 / 原生滚动容器接管（深夜七实机重做）");
+		else if (!/csh_eg_group_scroll/.test(cf45) || !/__cshEgScrollApply/.test(cf45)) fail("执行级 E45：设置开关未接线（csh_eg_group_scroll → __cshEgScrollApply）");
+		/* ★ 深夜八·修「关了他又自动打开」：引擎（optionsMenu.js:305 / exetensionMenu.js:135）
+		   对**有自定义 onclick 的选项不代存**（默认保存回调只在 `if (!cfg.onclick)` 时装）——
+		   本项 onclick 必须自行落盘，否则存值永远缺失、每次回落到默认 init:true。 */
+		else if (!/csh_eg_group_scroll[\s\S]{0,420}saveExtensionConfig/.test(cf45)) fail("执行级 E45：滚动条开关又没落盘（有自定义 onclick 的选项引擎不代存——会「关掉又自动打开」）");
+		else if (!/export function cshBossSelfLoad\s*\(/.test(cb45)) fail("执行级 E45：缺 cshBossSelfLoad（懒人包自愈补载）");
+		else if (!/cshBossSelfLoad/.test(bm45)) fail("执行级 E45：bossmode 未接自愈补载");
+		else ok("执行级 E45：本体兼容注入在位（加载即注入 + 原生容器接管 + 设置开关 + 懒人包自愈补载 · 击杀块无残留）");
+	}
+	log("");
+}
+
+/* ------------------------------------------------------------------ *
  * 主流程
  * ------------------------------------------------------------------ */
 log("池子魔将 · 改动门禁");
@@ -711,6 +2519,7 @@ log("项目根：" + ROOT);
 log("");
 
 if (!ONLY_VERSIONS) { runSyntax(); runFreeVars(); runImports(); runConsistency(); }
+if (!ONLY_SYNTAX && !ONLY_VERSIONS) await runBossChecks();
 if (!ONLY_SYNTAX) runVersions();
 
 log("----------------------------------------");

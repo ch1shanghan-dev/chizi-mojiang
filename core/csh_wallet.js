@@ -47,7 +47,19 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 	var K_LEGACY_BANK = "csh_texas_bank";
 
 	var PC_START = 2000;            // 初始池子币（§F.2）
-	var PC_CAP = 100000000000;      // 上限 1000 亿（2026-10-01 用户指定：由 1 亿上调；仍防溢出，2^53 内安全）
+	var PC_CAP = 100000000000;
+	/* ★ v6.7 CBY 防护（作者："作弊确实可以不管，只做一个 CBY 防护吧，别人怎么用漏洞刷，
+	   只封闭最简单的链路"，且"不能让玩家感觉不适"）。
+	   只拦两条**正常玩法绝不可能命中**的路径，因此普通玩家零感知：
+	     ① 未提供来源 / 来源不是字符串 —— 项目里 11 类入账全部带原因前缀（结算: / 成就: /
+	        讨伐妖灵: / 她的回礼: / 入场: / 送礼: …），控制台里最傻瓜的 `wallet.add(99999999)`
+	        正是这一条；
+	     ② 单笔超过 SINGLE_ADD_CAP —— 只有控制台刷钱才会这么大（正常单笔最大量级是
+	        讨伐 1 万 / 星砂 68 万 / 一手结算的带入量级，离 10 亿差着好几个数量级）。
+	   明确**不做**：来源白名单（会误伤动态 reason）、加密存档、反调试 —— 防不住还挡自己。
+	   门禁 E30 会扫描 core/ 与 games/ 里所有 `.wallet.add(` 调用点，确保今后新增来源都带
+	   字符串前缀，不会因这一层静默丢钱。 */
+	var SINGLE_ADD_CAP = 1000000000;   // 单笔硬上限 10 亿（PC_CAP 是总量上限，这里是单笔）      // 上限 1000 亿（2026-10-01 用户指定：由 1 亿上调；仍防溢出，2^53 内安全）
 	var RELIEF_AMOUNT = 800;        // 破产救济（§F.4）
 	var SIGN_BASE = 1200;           // 签到基础（§F.4）
 	var SIGN_STEP = 200;            // 每连签 +200
@@ -416,10 +428,18 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 	function addPC(n, reason) {
 		n = Math.floor(Number(n) || 0);
 		if (n <= 0) return 0;
+		if (typeof reason !== "string" || !reason.trim()) {
+			logInfo("拒绝入账 " + n + "：未提供来源（CBY 防护 · 见 addPC 注释）");
+			return 0;
+		}
+		if (n > SINGLE_ADD_CAP) {
+			logInfo("拒绝入账 " + n + "：单笔超过硬上限 " + SINGLE_ADD_CAP + "（" + reason + "）");
+			return 0;
+		}
 		var before = wallet.pc;
 		wallet.pc = clampNum(before + n, 0, PC_CAP);
 		var got = wallet.pc - before;
-		if (got > 0) appendChain(got);
+		if (got > 0) { appendChain(got); pushLedger(got, reason, wallet.pc); }
 		scheduleSave();
 		logInfo("入账 " + got + " CBY（" + (reason || "") + "）→ " + wallet.pc);
 		return got;
@@ -431,6 +451,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 		if (wallet.pc < n) return false;
 		wallet.pc -= n;
 		appendChain(-n);
+		pushLedger(-n, reason, wallet.pc);
 		scheduleSave();
 		logInfo("出账 " + n + " CBY（" + (reason || "") + "）→ " + wallet.pc);
 		return true;
@@ -1175,6 +1196,111 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 		return Array.isArray(h) ? h : [];
 	}
 
+	/* ============================================================
+	   ★ 账本（v6.2 · 2026-10-15 作者：「CBY 需要有一个地方写清楚来源和去处，就是做账，
+	     参考 GitHub 成熟设计，做成可以查看详细来源」）
+	   ------------------------------------------------------------
+	   与 `wallet.chain` 的区别：chain 是**防篡改哈希链**（只有 {s,d,b,h}，人看不懂）；
+	   账本是**给人看的一本账**：时间 / 分类 / 说明 / 收支 / 结余。
+	   ★ 单一写入点：全项目资金流动只走 addPC / spendPC 两个函数 ——
+	     在这两处记账，账本天然**全量、不可能漏记**（不必在各业务点各写一次）。
+	   ★ 容量：滚动窗口 LEDGER_MAX 条（超出的从尾部丢弃），localStorage 只留最近一本。
+	   ★ 分类：由 reason 前缀推导（catOf），页面据此做分类汇总与过滤，
+	     业务侧无需改任何调用签名。 */
+	var K_LEDGER = "csh_ledger";
+	var LEDGER_MAX = 400;
+	function catOf(reason) {
+		var r = String(reason == null ? "" : reason);
+		if (r.indexOf("讨伐首杀") === 0) return "讨伐首杀";
+		if (r.indexOf("每日首战") === 0) return "每日首战";
+		if (r.indexOf("讨伐妖灵") === 0) return "妖灵讨伐";
+		if (r.indexOf("连签") === 0 || r.indexOf("签到") === 0) return "签到";
+		if (r.indexOf("破产救济") === 0) return "破产救济";
+		if (r.indexOf("每日任务") === 0) return "每日任务";
+		if (r.indexOf("成就") === 0) return "成就奖励";
+		if (r.indexOf("金鳞市买入") === 0) return "股市买入";
+		if (r.indexOf("金鳞市卖出") === 0) return "股市卖出";
+		if (r.indexOf("金鳞市分红") === 0) return "股市分红";
+		if (r.indexOf("她的回礼") === 0) return "她的回礼";
+		if (r.indexOf("门票") === 0) return "门票";
+		if (r.indexOf("入场") === 0) return "牌桌带入";
+		if (r.indexOf("结算") === 0) return "牌桌结算";
+		if (r.indexOf("兑换") === 0) return "兑换码";
+		if (r.indexOf("应战") === 0 || r.indexOf("亲征") === 0) return "亲征";
+		return "其它";
+	}
+	function dayKeyOf(ts) {
+		try {
+			var d = new Date(Number(ts) || Date.now());
+			var m = d.getMonth() + 1, dd = d.getDate();
+			return d.getFullYear() + "-" + (m < 10 ? "0" : "") + m + "-" + (dd < 10 ? "0" : "") + dd;
+		} catch (e) { return ""; }
+	}
+	function pushLedger(delta, reason, balAfter) {
+		try {
+			var d = Math.floor(Number(delta) || 0);
+			if (!d) return;
+			var list = lsJSON(K_LEDGER, null);
+			if (!Array.isArray(list)) list = [];
+			list.unshift({
+				t: Date.now(), d: d,
+				r: String(reason == null ? "" : reason).slice(0, 40),
+				c: catOf(reason), b: Math.max(0, Math.floor(Number(balAfter) || 0)),
+			});
+			if (list.length > LEDGER_MAX) list.length = LEDGER_MAX;
+			lsPut(K_LEDGER, list);
+		} catch (e) { /* 账本异常不阻断业务（与 chain 同纪律） */ }
+	}
+	/* 读账本：opt = {cat, kind:"in"|"out", since:ms, limit} */
+	function ledger(opt) {
+		opt = opt || {};
+		var list = lsJSON(K_LEDGER, null);
+		if (!Array.isArray(list)) list = [];
+		var out = [];
+		for (var i = 0; i < list.length; i++) {
+			var e = list[i];
+			if (!e || typeof e !== "object") continue;
+			if (!(typeof e.d === "number" && isFinite(e.d) && e.d !== 0)) continue;
+			if (opt.cat && e.c !== opt.cat) continue;
+			if (opt.kind === "in" && e.d < 0) continue;
+			if (opt.kind === "out" && e.d > 0) continue;
+			if (opt.since && e.t < opt.since) continue;
+			out.push({ t: e.t, d: e.d, r: e.r || "", c: e.c || "其它", b: e.b || 0 });
+			if (opt.limit && out.length >= opt.limit) break;
+		}
+		return out;
+	}
+	/* 账本汇总：累计入/出 · 净额 · 分类聚合 · 近 N 天日聚合（热力格用连续日历轴） */
+	function ledgerSummary(days) {
+		days = Math.max(1, Math.floor(Number(days) || 30));
+		var all = ledger({}), inc = 0, outc = 0, cats = {}, daily = {}, first = 0;
+		for (var i = 0; i < all.length; i++) {
+			var e = all[i];
+			if (e.d > 0) inc += e.d; else outc += -e.d;
+			var c = e.c || "其它";
+			if (!cats[c]) cats[c] = { cat: c, in: 0, out: 0, n: 0 };
+			cats[c].n++;
+			if (e.d > 0) cats[c].in += e.d; else cats[c].out += -e.d;
+			var dk = dayKeyOf(e.t);
+			if (!daily[dk]) daily[dk] = { day: dk, in: 0, out: 0, n: 0 };
+			daily[dk].n++;
+			if (e.d > 0) daily[dk].in += e.d; else daily[dk].out += -e.d;
+			if (!first || e.t < first) first = e.t;
+		}
+		var axis = [], now = Date.now();
+		for (var k = days - 1; k >= 0; k--) {
+			var dk2 = dayKeyOf(now - k * 86400000);
+			axis.push(daily[dk2] || { day: dk2, in: 0, out: 0, n: 0 });
+		}
+		var catList = [];
+		for (var ck in cats) if (Object.prototype.hasOwnProperty.call(cats, ck)) catList.push(cats[ck]);
+		catList.sort(function (a, b) { return (b.in + b.out) - (a.in + a.out); });
+		return { inc: inc, out: outc, net: inc - outc, n: all.length, cats: catList, daily: axis, first: first };
+	}
+	function ledgerClear() {
+		try { lsPut(K_LEDGER, []); return true; } catch (e) { return false; }
+	}
+
 	/* 兑换（同步前置检查 + 异步验签）→ Promise<{ok,...}> */
 	/* CDK 终身兑换计数（2026-09-28 成就系统数据源）：
 	   recent() 是截断列表，数不了总量；这里单独存一份 {count, gained}。
@@ -1377,7 +1503,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 		   不再各自另写一份（2026-10-01 收敛）。 */
 		KEYS: {
 			wallet: K_WALLET, rank: K_RANK, used: K_USED, snap: K_SNAP,
-			dev: K_DEV, devbind: K_DEVBIND, hist: K_HIST, task: K_TASK,
+			dev: K_DEV, devbind: K_DEVBIND, hist: K_HIST, task: K_TASK, ledger: K_LEDGER,
 			legacyBank: K_LEGACY_BANK,
 		},
 		const: {
@@ -1403,7 +1529,10 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 			},
 			pc: function () { return wallet.pc; },
 			peak: function () { return wallet.pcPeak; },
-			add: addPC, spend: spendPC,
+			add: addPC, spend: spendPC, SINGLE_ADD_CAP: SINGLE_ADD_CAP,
+			/* v6.2 账本（来源与去处） */
+			ledger: ledger, ledgerSummary: ledgerSummary, ledgerClear: ledgerClear,
+			catOf: catOf,
 			ticketOf: ticketOf, payTicket: payTicket,
 			capOf: capOf, settle: settle, settleRun: settleRun, planOf: planOf,
 			sign: sign, canSign: canSign, signAmount: signAmount,

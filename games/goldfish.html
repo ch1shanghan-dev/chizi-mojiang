@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<!-- ============================================================
+     金鳞市（讨伐录平级的池子休闲小游戏 · 2026-10-14 批次 B · galgame 风）
+     ------------------------------------------------------------
+     · 五十位妖灵挂牌上市：卡面 = 人像图（csh_face_*），点开 = galgame 角色面板
+       （大立绘 + 台词气泡 + 人设简介 + 持仓/行情 + 买入/卖出）
+     · 数据双通道：桥 shell-goldfish / shell-trade → 兜底父窗 CSH.market
+     · 视觉：暗金 × 深底（与讨伐录同档精品页面标准）
+     ============================================================ -->
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>金鳞市</title>
+<script src="../core/csh_selftest.js" data-csh-selftest="auto"></script>
+<script src="../core/csh_page.js"></script>
+<style>
+@font-face{font-family:'ZMX3';src:url("../font/csh_fx_font_3.woff2") format("woff2");font-display:swap}
+:root{
+  /* ---------- 字体四档（2026-10-15 统一 · 照 docs/art-direction.md §4.1）----------
+     ① 标题宋 / ② 正文黑 / ③ 数字牌 —— 三档**全项目一致**（此前本页把 78 字的
+     游戏内横幅子集字体 ZMX/LC 塞进 --ff-title 首位 → 任何不在子集内的字逐字回退
+     系统宋体 → 同一个人名里混排两种字体；作者实机截图确认，本轮修正）；
+     ④ 书法点缀 --ff-callig：**全覆盖子集**（csh_fx_font_3.woff2，4058 字，由开源
+     Zhi Mang Xing 完整版子集化）——只用于招牌字/封面/卷号等"装饰性短词"，
+     人名与正文一律走规范栈，保证永不混排。 */
+  --ff-title:"Noto Serif SC","Source Han Serif SC","Songti SC","STSong","SimSun",serif;
+  --ff-body:"Noto Sans SC","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+  --ff-num:ui-monospace,"Cascadia Mono",Consolas,"SF Mono",Menlo,monospace;
+  --ff-callig:"ZMX3","Zhi Mang Xing","Kaiti SC","STKaiti",KaiTi,var(--ff-title);
+  --bg:#191512; --bg2:#221c17; --panel:#2a231c; --panel2:#332b21;
+  --ink:#efe6cf; --ink-dim:rgba(239,230,207,.62); --ink-faint:rgba(239,230,207,.36);
+  --gold:#d8bd7a; --gold-2:#b08d3e; --line:rgba(216,189,122,.28); --line-2:rgba(216,189,122,.14);
+  --up:#ff6b57; --down:#57c78a;                       /* A 股口径：红涨绿跌 */
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;overflow:hidden}
+body{background:
+  radial-gradient(120% 80% at 50% 0%,rgba(216,189,122,.06),transparent 55%),
+  linear-gradient(170deg,var(--bg2),var(--bg));
+  color:var(--ink);font-family:var(--ff-body);font-size:14px}
+#app{display:flex;flex-direction:column;height:100%;padding:8px 12px 6px 30px}
+
+/* ---------- 顶部资产条 ---------- */
+.topbar{flex:0 0 auto;display:flex;align-items:center;gap:10px;min-height:42px;padding-right:200px}
+.brand{font-family:var(--ff-callig);font-size:24px;letter-spacing:.2em;color:var(--gold)}
+.brand small{font-size:12px;letter-spacing:.1em;color:var(--ink-faint);margin-left:8px;font-family:var(--ff-body)}
+.stats{margin-left:auto;display:flex;gap:8px;font-family:var(--ff-num);font-size:14px;font-variant-numeric:tabular-nums}
+.stat{background:rgba(216,189,122,.10);border:1px solid var(--line-2);border-radius:999px;padding:4px 12px;white-space:nowrap}
+.stat b{color:var(--gold);font-weight:600}
+.stat .up{color:var(--up)} .stat .down{color:var(--down)}
+
+/* ---------- 挂牌网格 ---------- */
+/* v6.3「她的消息」：亲近(B)及以上持仓，每交易日一条涨跌倾向（好感回报之一） */
+.tips{flex:0 0 auto;display:none;gap:6px;overflow-x:auto;padding:0 0 6px;scrollbar-width:none}
+.tips.on{display:flex}
+.tipchip{flex:0 0 auto;display:flex;align-items:center;gap:5px;font-size:11px;
+  border:1px solid rgba(240,112,156,.30);background:rgba(240,112,156,.08);color:#f7c9d9;
+  border-radius:999px;padding:3px 9px;white-space:nowrap}
+.tipchip b{font-family:var(--ff-title);letter-spacing:.04em;color:#fff}
+.tipchip i{font-style:normal;font-family:var(--ff-num)}
+.tipchip.up{color:#ffb3b3;border-color:rgba(255,120,120,.34);background:rgba(255,120,120,.08)}
+.tipchip.down{color:#9fd8b0;border-color:rgba(120,200,150,.32);background:rgba(120,200,150,.07)}
+.tipchip .dir{font-size:12px}
+.gridwrap{flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:8px 2px 10px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px}
+.card{position:relative;border:1px solid var(--line-2);border-radius:12px;overflow:hidden;
+  background:linear-gradient(180deg,var(--panel2),var(--panel));cursor:pointer;
+  transition:transform .16s ease,border-color .16s ease}
+.card:active{transform:scale(.97)}
+.card:hover{border-color:var(--line)}
+.face{position:relative;width:100%;aspect-ratio:4/5;overflow:hidden;background:#141110}
+.face img{width:100%;height:100%;object-fit:cover;object-position:50% 12%;display:block}
+/* 人像/主立绘都缺失时的名字占位（对齐 codex 的 .gph 范式，避免破图图标） */
+.gf-noimg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  font-family:var(--ff-title);font-size:34px;letter-spacing:.1em;color:rgba(239,230,207,.30)}
+.face::after{content:"";position:absolute;inset:auto 0 0 0;height:64px;
+  background:linear-gradient(180deg,transparent,rgba(25,21,18,.94))}
+.hold-tag{position:absolute;left:7px;top:7px;font-family:var(--ff-num);font-size:12px;
+  background:rgba(25,21,18,.80);border:1px solid var(--line);color:var(--gold);border-radius:999px;padding:2px 8px}
+.heat-tag{position:absolute;right:7px;top:7px;font-size:12px;color:#ffd98a;
+  background:rgba(25,21,18,.80);border:1px solid var(--line-2);border-radius:999px;padding:2px 8px}
+.cinfo{position:absolute;left:0;right:0;bottom:0;padding:7px 10px;display:flex;align-items:baseline;gap:8px}
+.cname{font-family:var(--ff-title);font-size:19px;font-weight:600;letter-spacing:.06em;
+  text-shadow:0 1px 3px rgba(0,0,0,.85);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cprice{margin-left:auto;font-family:var(--ff-num);font-size:15px;color:var(--gold);
+  text-shadow:0 1px 3px rgba(0,0,0,.85)}
+.csub{position:relative;display:flex;align-items:center;gap:8px;padding:6px 10px;font-size:13px;color:var(--ink-dim)}
+.cdev{font-family:var(--ff-num);font-size:13px;font-variant-numeric:tabular-nums}
+.cdev.up{color:var(--up)} .cdev.down{color:var(--down)}
+.cdev.flat{color:var(--ink-faint)}
+
+/* ---------- galgame 角色面板 ---------- */
+#panel{position:fixed;inset:0;z-index:40;display:none;background:rgba(12,10,9,.90);backdrop-filter:blur(3px)}
+#panel.on{display:flex}
+.pwrap{position:relative;margin:auto;width:min(96%,860px);height:min(94%,560px);
+  display:flex;gap:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;
+  background:linear-gradient(150deg,var(--panel2),var(--bg2));box-shadow:0 20px 60px rgba(0,0,0,.6)}
+.pclose{position:absolute;right:8px;top:8px;z-index:3;width:36px;height:36px;border-radius:999px;
+  border:1px solid var(--line);background:rgba(25,21,18,.7);color:var(--gold);font-size:17px;cursor:pointer}
+/* 左：立绘 */
+.pstage{flex:0 0 44%;position:relative;background:#141110;overflow:hidden}
+.pstage img{width:100%;height:100%;object-fit:cover;object-position:50% 8%;display:block;animation:fin .5s ease}
+@keyframes fin{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.pstage::after{content:"";position:absolute;inset:0;box-shadow:inset -40px 0 60px -30px rgba(25,21,18,.95)}
+/* 右：信息与操作 */
+.pinfo{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;padding:14px 16px 12px;gap:8px;overflow-y:auto}
+.pname{font-family:var(--ff-title);font-size:28px;letter-spacing:.12em;color:var(--ink)}
+.ptag{font-size:13.5px;color:var(--gold);letter-spacing:.14em}
+.pbio{font-size:14px;line-height:1.8;color:var(--ink-dim);border-left:2px solid var(--line);padding-left:9px}
+/* 台词气泡（galgame 核心） */
+.say{position:relative;margin-top:2px;background:rgba(216,189,122,.08);border:1px solid var(--line-2);
+  border-radius:10px;padding:11px 13px;font-size:15px;line-height:1.75;min-height:60px;
+  animation:sayIn .28s ease}
+@keyframes sayIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.say::before{content:"";position:absolute;left:16px;top:-6px;width:10px;height:10px;transform:rotate(45deg);
+  background:rgba(216,189,122,.08);border-left:1px solid var(--line-2);border-top:1px solid var(--line-2)}
+.say .who{display:block;font-size:12px;color:var(--gold);letter-spacing:.14em;margin-bottom:3px}
+/* 数据格 */
+.facts{flex:0 0 auto;display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:2px}
+.fact{background:rgba(255,255,255,.03);border:1px solid var(--line-2);border-radius:9px;padding:7px 9px}
+.fact .k{font-size:12px;color:var(--ink-faint);letter-spacing:.06em}
+.fact .v{font-family:var(--ff-num);font-size:16px;color:var(--ink)}
+.fact .v.up{color:var(--up)} .fact .v.down{color:var(--down)}
+/* 操作区 */
+.ops{margin-top:auto;display:flex;flex-direction:column;gap:8px}
+.qty{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.qbtn{border:1px solid var(--line-2);background:transparent;color:var(--ink-dim);border-radius:8px;
+  font-family:var(--ff-num);font-size:13.5px;padding:5px 11px;cursor:pointer}
+.qbtn.on{color:#fff;background:var(--gold-2);border-color:var(--gold-2)}
+.act{display:flex;gap:8px}
+.act button{flex:1;height:42px;border-radius:10px;font-size:15px;letter-spacing:.1em;cursor:pointer;border:1px solid transparent}
+.buy{background:linear-gradient(180deg,#e2c078,#c39a45);color:#241d12;font-weight:700}
+.sell{background:transparent;border-color:var(--line);color:var(--gold)}
+.act button:disabled{opacity:.38;cursor:not-allowed}
+.cost-hint{font-family:var(--ff-num);font-size:13.5px;color:var(--ink-dim);text-align:right}
+
+/* ---------- 提示 & 底部 ---------- */
+#toast{position:fixed;left:50%;bottom:52px;transform:translateX(-50%);z-index:60;pointer-events:none;
+  background:rgba(42,35,28,.96);border:1px solid var(--line);color:var(--ink);border-radius:999px;
+  padding:8px 18px;font-size:14px;opacity:0;transition:opacity .2s ease;max-width:92%;text-align:center}
+#toast.on{opacity:1}
+.foot{flex:0 0 auto;font-size:12.5px;color:var(--ink-faint);letter-spacing:.06em;padding:5px 2px 2px;display:flex;gap:10px}
+.foot .dot{color:var(--gold-2)}
+@media (max-width:720px){
+  .pwrap{flex-direction:column;height:min(96%,660px)}
+  .pstage{flex:0 0 40%}
+  .pstage::after{box-shadow:inset 0 -40px 60px -30px rgba(25,21,18,.95)}
+  .pinfo{padding:10px 12px 10px}
+  .pname{font-size:23px}
+  .grid{grid-template-columns:repeat(auto-fill,minmax(148px,1fr))}
+  .topbar{padding-right:190px}
+}
+
+/* ---------- 好感度（v6.2）—— 卡面角标 + 面板整条 ---------- */
+.affbadge{position:absolute;right:7px;bottom:30px;display:flex;align-items:center;gap:3px;
+  font-family:var(--ff-num);font-size:11.5px;padding:1px 7px 1px 5px;border-radius:999px;
+  background:rgba(25,21,18,.82);border:1px solid rgba(240,112,156,.34);color:#ffb9d2;
+  text-shadow:0 0 8px rgba(240,112,156,.55)}
+.affbadge svg{width:13px;height:12px;display:block;overflow:visible}
+.affbadge.s{color:#ffd9e6;border-color:rgba(240,112,156,.72);
+  box-shadow:0 0 12px rgba(240,112,156,.55);animation:affPulse 2.4s ease-in-out infinite}
+@keyframes affPulse{0%,100%{opacity:.92}50%{opacity:1}}
+.affbox{position:relative;flex:0 0 auto;            /* ★v6.3 修：有 overflow:hidden 的 flex 项
+  min-height:auto 失效，会被同栏内容挤成一条 ⇒ 必须固定不收缩 */
+  background:linear-gradient(135deg,rgba(240,112,156,.10),rgba(216,189,122,.05) 60%,transparent);
+  border:1px solid rgba(240,112,156,.22);border-radius:11px;padding:9px 11px 10px;overflow:hidden;flex:0 0 auto}
+.affbox::before{content:"";position:absolute;inset:-40% -60% auto auto;width:200px;height:200px;
+  background:radial-gradient(circle,rgba(240,112,156,.22),transparent 62%);
+  animation:affHalo 7s ease-in-out infinite;pointer-events:none}
+@keyframes affHalo{0%,100%{transform:scale(.85);opacity:.5}50%{transform:scale(1.12);opacity:.95}}
+.affbox.sTier::after{content:"";position:absolute;inset:-70%;pointer-events:none;
+  background:conic-gradient(from 0deg,rgba(240,112,156,.20),transparent 22%,rgba(216,189,122,.18) 44%,transparent 66%,rgba(240,112,156,.20));
+  animation:affSpin 9s linear infinite;filter:blur(2px)}
+@keyframes affSpin{to{transform:rotate(360deg)}}
+.affhead{position:relative;display:flex;align-items:center;gap:8px;z-index:2}
+/* v6.3 修：原来 filter:drop-shadow + background-clip:text 在 Chromium 下会让文字
+   **只渲染出一部分**（作者实机：「亲密有一部分文字不可见」）。改为
+   ① 兜底色（不支持 clip 时也是亮粉色，永远看得见）
+   ② 只在支持 background-clip:text 时才切渐变（并且不再用 filter，改 glow 光晕） */
+.afftitle{font-family:var(--ff-callig);font-size:17px;letter-spacing:.16em;line-height:1.55;
+  color:#ff9dbe;text-shadow:0 0 10px rgba(240,112,156,.55),0 1px 2px rgba(0,0,0,.55);
+  padding:1px 0}
+@supports ((-webkit-background-clip:text) or (background-clip:text)){
+  .afftitle{background:linear-gradient(92deg,#f0709c,#ffd9e6 46%,#e6cf9a);
+    -webkit-background-clip:text;background-clip:text;
+    -webkit-text-fill-color:transparent;color:transparent;text-shadow:none;
+    padding:1px 0 2px}
+}
+.afflv{margin-left:auto;font-family:var(--ff-title);font-size:13.5px;letter-spacing:.1em;color:#f0709c}
+.affval{font-family:var(--ff-num);font-size:13px;color:var(--ink-dim);font-variant-numeric:tabular-nums}
+.affhearts{position:relative;display:flex;align-items:center;gap:5px;margin:8px 0 7px;z-index:2}
+.affheart{width:30px;height:28px;display:block;flex:0 0 auto;overflow:visible}
+.affheart.on .b{filter:drop-shadow(0 0 3px rgba(240,112,156,.95)) drop-shadow(0 0 7px rgba(240,112,156,.45))}
+.affheart.on{animation:affBeat 2.6s ease-in-out infinite}
+.affheart.on:nth-child(2){animation-delay:.18s}
+.affheart.on:nth-child(3){animation-delay:.36s}
+.affheart.on:nth-child(4){animation-delay:.54s}
+.affheart.on:nth-child(5){animation-delay:.72s}
+@keyframes affBeat{0%,100%{transform:scale(1)}12%{transform:scale(1.16)}24%{transform:scale(1)}36%{transform:scale(1.08)}50%{transform:scale(1)}}
+.affbar{position:relative;height:9px;border-radius:999px;background:rgba(255,255,255,.07);
+  overflow:hidden;z-index:2;border:1px solid rgba(255,255,255,.06)}
+.affbar i{display:block;height:100%;border-radius:999px;
+  background:linear-gradient(90deg,#b8456e,#f0709c 46%,#f7cfae 82%,#e6cf9a);
+  box-shadow:0 0 12px rgba(240,112,156,.6);transition:width .5s cubic-bezier(.2,.8,.3,1)}
+.affbar::after{content:"";position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(100deg,transparent 20%,rgba(255,255,255,.42) 50%,transparent 80%);
+  transform:translateX(-120%);animation:affSheen 2.8s ease-in-out infinite}
+@keyframes affSheen{0%{transform:translateX(-120%)}55%,100%{transform:translateX(120%)}}
+.affmeta{position:relative;display:flex;gap:8px;margin-top:6px;z-index:2;font-size:11.5px;color:var(--ink-dim)}
+.affops{position:relative;display:flex;gap:6px;margin-top:8px;z-index:2;flex-wrap:wrap}
+.affbtn{border:1px solid rgba(240,112,156,.36);background:linear-gradient(180deg,rgba(240,112,156,.18),rgba(240,112,156,.06));
+  color:#ffd9e6;border-radius:8px;font-size:12px;padding:5px 10px;cursor:pointer;transition:box-shadow .2s ease,transform .14s ease}
+.affbtn:hover{box-shadow:0 0 14px rgba(240,112,156,.5);transform:translateY(-1px)}
+.affbtn[disabled]{opacity:.34;cursor:not-allowed;box-shadow:none;transform:none}
+.affbtn.gold{border-color:var(--line);background:linear-gradient(180deg,rgba(216,189,122,.18),rgba(216,189,122,.05));color:var(--gold)}
+/* v6.5 折叠式好感回报（减少啰嗦） */
+.pkbox{position:relative;z-index:2;margin-top:10px;border-top:1px dashed rgba(216,189,122,.22);padding-top:8px}
+.pkbox>summary{list-style:none;cursor:pointer;font-size:12.5px;color:var(--gold);letter-spacing:.04em}
+.pkbox>summary::-webkit-details-marker{display:none}
+.pkbox>summary::before{content:"\25B8 ";color:var(--gold-2)}
+.pkbox[open]>summary::before{content:"\25BE "}
+.pkbox .affperk{margin-top:3px}
+/* v6.3 互动动作 / 礼物 / 好感回报 */
+.affnote{position:relative;z-index:2;margin-top:6px;font-size:12px;color:var(--ink-faint);letter-spacing:.03em}
+.affgifts{position:relative;display:flex;gap:6px;margin-top:7px;z-index:2;flex-wrap:wrap}
+.affgifts .affbtn{display:flex;align-items:baseline;gap:5px}
+.affgifts .affbtn .cost{font-family:var(--ff-num);font-size:10.5px;color:rgba(255,240,200,.62);font-style:normal}
+.affperks{position:relative;margin-top:10px;z-index:2;border-top:1px dashed rgba(216,189,122,.22);padding-top:8px}
+.affperks .pktitle{font-size:12px;color:var(--gold);letter-spacing:.12em;margin-bottom:5px}
+.affperk{display:flex;align-items:baseline;gap:6px;font-size:13px;padding:3px 0;opacity:.55}
+.affperk.on{opacity:1}
+.affperk .tk{flex:0 0 auto;font-size:11px;color:#1a130a;background:var(--ink-faint);border-radius:4px;padding:0 5px}
+.affperk.on .tk{background:var(--gold-line)}
+.affperk .tn{flex:0 0 auto;color:var(--ink);letter-spacing:.04em}
+.affperk .td{flex:1 1 auto;color:var(--ink-dim);font-size:11.5px;min-width:0}
+.affperk .ts{flex:0 0 auto;font-size:11.5px;color:var(--ink-faint)}
+.affperk.on .ts{color:var(--ok)}
+.affheat{margin-top:6px;font-size:12.5px;color:#ffd98a}
+/* v6.4：相处全部收归图鉴，这里只留一句引导（不可点：跨页跳转要过门票，反而添乱） */
+.affjump{margin-top:9px;font-size:12.5px;color:var(--gold);letter-spacing:.04em;
+  border-top:1px dashed rgba(216,189,122,.22);padding-top:7px;line-height:1.6}
+.affbtn.soft{border-color:rgba(147,166,187,.45);background:linear-gradient(180deg,rgba(147,166,187,.16),rgba(147,166,187,.05));color:#d8e4f0}
+.affhint{position:relative;z-index:2;margin-top:6px;font-size:11.5px;color:#f7c9d9;min-height:15px}
+.affhint.good{color:var(--up)} .affhint.bad{color:var(--ink-dim)}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="topbar">
+    <div class="brand">金鳞市<small>池中金鳞 · 坐地生金</small></div>
+    <div class="stats" id="stats"></div>
+  </div>
+  <div class="tips" id="tips"></div>
+  <div class="gridwrap"><div class="grid" id="grid"></div></div>
+  <div class="foot">
+    <span>每交易日结算一次（跨日首访）</span><span class="dot">·</span>
+    <span>持仓日分红 1.5%</span><span class="dot">·</span>
+    <span>讨伐妖灵可抬升她的基本面</span><span class="dot">·</span>
+    <span>买卖各收 2% 手续费</span>
+  </div>
+</div>
+
+<div id="panel">
+  <div class="pwrap">
+    <button class="pclose" id="pclose" type="button">✕</button>
+    <div class="pstage"><img id="pimg" alt=""></div>
+    <div class="pinfo">
+      <div>
+        <div class="pname" id="pname">—</div>
+        <div class="ptag" id="ptag"></div>
+      </div>
+      <div class="say" id="psay"><span class="who" id="pwho">金鳞市</span><span id="ptext"></span></div>
+      <div class="pbio" id="pbio"></div>
+      <div class="affbox" id="affbox"></div>
+      <div class="facts">
+        <div class="fact"><div class="k">现价</div><div class="v" id="fPrice">—</div></div>
+        <div class="fact"><div class="k">趋势偏离</div><div class="v" id="fDev">—</div></div>
+        <div class="fact"><div class="k">讨伐热度</div><div class="v" id="fHeat">—</div></div>
+        <div class="fact"><div class="k">我的持仓</div><div class="v" id="fHold">—</div></div>
+        <div class="fact"><div class="k">成本</div><div class="v" id="fCost">—</div></div>
+        <div class="fact"><div class="k">浮动盈亏</div><div class="v" id="fPnL">—</div></div>
+      </div>
+      <div class="ops">
+        <div class="qty" id="qty"></div>
+        <div class="cost-hint" id="qHint"></div>
+        <div class="act">
+          <button class="buy" id="bBuy" type="button">买 入</button>
+          <button class="sell" id="bSell" type="button">卖 出</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<div id="toast"></div>
+
+<script>
+/* ============================================================
+   桥（照 bossbook 双通道：桥优先 · 父窗兜底）
+   ============================================================ */
+var Bridge = (function () {
+  try {
+    var T = CSHPage.transport({ closeName: 'goldfish-close', timeout: 2500 });
+    return { active: !!T.active, call: T.call };
+  } catch (e) { return { active: false, call: function (_, __, cb) { cb && cb(false, null); } }; }
+})();
+function $(s) { return document.querySelector(s); }
+function el(t, c, x) { var e = document.createElement(t); if (c) e.className = c; if (x != null) e.textContent = x; return e; }
+function fmt(n) { return String(Math.round(Number(n) || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, ","); }
+
+var Data = { snap: null, cur: null, qty: 10 };
+
+/* ---------- 数据获取（桥 → 父窗兜底） ---------- */
+function parentMarket() {
+  try {
+    var P = window.parent;
+    if (P && P.CSH && P.CSH.market) return P.CSH.market;
+    if (P && P.lib && P.lib.cshMarket) return P.lib.cshMarket;
+  } catch (e) {}
+  return null;
+}
+function loadSnap(cb) {
+  if (Bridge.active) {
+    Bridge.call("shell-goldfish", null, function (ok, snap) {
+      if (ok && snap && snap.list && snap.list.length) { cb(snap); return; }
+      var M = parentMarket();
+      cb(M ? M.snapshot() : null);
+    });
+  } else {
+    var M = parentMarket();
+    cb(M ? M.snapshot() : null);
+  }
+}
+function doTrade(id, n, side, cb) {
+  /* ★ 2026-10-14 审计修复（真 BUG）：桥模式下**不做本地重放兜底**。
+     原因：Bridge.call 超时也会回调 (false, null)（见 core/csh_page.js:114-125 的超时分支），
+     而宿主可能只是"慢"——它那边的交易已经落账。此时再走父窗 M.trade() 就会**买/卖两次**
+     （真金白银的双花）。故桥模式下失败即如实报错并刷新快照，让玩家自己确认持仓。
+     本地兜底只保留给"非桥环境"（file:// 直开预览）这一条真实需要。 */
+  if (Bridge.active) {
+    Bridge.call("shell-trade", { id: id, n: n, side: side }, function (ok, res) {
+      if (ok && res) { cb(res); return; }
+      cb({ ok: false, msg: "交易通道超时，已放弃本次操作——请确认持仓后重试" });
+    });
+    return;
+  }
+  var M = parentMarket();
+  cb(M ? M.trade(id, n, side) : { ok: false, msg: "通道不可用" });
+}
+
+/* ---------- 提示 ---------- */
+var toastTimer = null;
+function toast(msg) {
+  var t = $("#toast");
+  t.textContent = msg; t.classList.add("on");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function () { t.classList.remove("on"); }, 1800);
+}
+
+/* ---------- 渲染：顶部资产 ---------- */
+function renderStats() {
+  var s = Data.snap || {};
+  var box = $("#stats");
+  box.innerHTML = "";
+  var val = (s.marketValue || 0), cost = (s.cost || 0);
+  var pnl = val - cost;
+  /* ★ 2026-10-15 作者指令：「有 CBY 的地方不要写『现金』之类的词汇」——
+     本页原本写"现金 N"，与"资产/池子币/CBY"三套叫法并存。统一为「池子币」。 */
+  box.appendChild(el("span", "stat", "池子币 ")).appendChild(el("b", "", fmt(s.pc || 0)));
+  var mv = el("span", "stat", "持仓 "); mv.appendChild(el("b", "", fmt(val))); box.appendChild(mv);
+  var p = el("span", "stat", "浮盈 ");
+  var pb = el("b", pnl >= 0 ? "up" : "down", (pnl >= 0 ? "+" : "") + fmt(pnl));
+  p.appendChild(pb); box.appendChild(p);
+  var e = el("span", "stat", "累计分红 ");
+  e.appendChild(el("b", "", fmt(s.earned || 0))); box.appendChild(e);
+}
+
+/* ---------- 渲染：挂牌网格 ----------
+   ★ 2026-10-14 审计修复（真 BUG）：空态以前写在启动回调里，紧接着无条件调用本函数 →
+   本函数的 `g.innerHTML = ""` 把刚写好的空态**立刻清掉**（页面全白、无任何解释）。
+   现在空态由本函数统一出口渲染 —— 卡列表为空就出空态，单一真源，不再被清屏。 */
+function renderTips(snap) {
+  var box = $("#tips");
+  if (!box) return;
+  var t = (snap && snap.tips) || [];
+  box.innerHTML = "";
+  if (!t.length) { box.className = "tips"; return; }
+  box.className = "tips on";
+  var names = {};
+  ((snap && snap.list) || []).forEach(function (x) { names[x.id] = x.name; });
+  t.forEach(function (x) {
+    var c = el("div", "tipchip" + (x.dir === "up" ? " up" : x.dir === "down" ? " down" : ""));
+    c.appendChild(el("span", "dir", x.dir === "up" ? "\u2197" : x.dir === "down" ? "\u2198" : "\u2192"));
+    c.appendChild(el("b", "", names[x.id] || x.id));
+    c.appendChild(el("i", "", x.dir === "up" ? "她说最近顺" : x.dir === "down" ? "她让你小心" : "她说再等等"));
+    box.appendChild(c);
+  });
+}
+
+function renderGrid() {
+  var s = Data.snap || { list: [] };
+  renderTips(s);                            /* v6.3「她的消息」条 */
+  var g = $("#grid");
+  g.innerHTML = "";
+  var list = s.list || [];
+  if (!list.length) {
+    var box = el("div", "gf-empty");
+    box.style.cssText = "grid-column:1/-1;text-align:center;padding:48px 12px;color:var(--ink-dim)";
+    var t1 = el("div", "", "金鳞市 · 静候开市");
+    t1.style.cssText = "font-family:var(--ff-title);font-size:22px;letter-spacing:.3em;color:var(--gold)";
+    var t2 = el("div", "", "五十位妖灵在此挂牌——请从「池子休闲」进入，或确认扩展已加载");
+    t2.style.cssText = "margin-top:10px;font-size:12px;letter-spacing:.06em";
+    box.appendChild(t1); box.appendChild(t2);
+    g.appendChild(box);
+    return;
+  }
+  list.forEach(function (it) {
+    var c = el("div", "card");
+    c.setAttribute("data-id", it.id);
+    var f = el("div", "face");
+    var img = el("img");
+    img.loading = "lazy"; img.alt = it.name;
+    img.src = "../image/" + String(it.face || it.img || "").split("/").pop();
+    /* 人像缺失 → 退到主立绘 → 再退到名字占位（不再显示破图图标） */
+    img.addEventListener("error", function onF() {
+      var deep = String(it.img || "").split("/").pop();
+      if (deep && img.src.indexOf(deep) < 0) { img.src = "../image/" + deep; return; }
+      img.style.display = "none";
+      f.appendChild(el("div", "gf-noimg", it.name || "?"));
+    }, false);
+    f.appendChild(img);
+    if (it.hold > 0) f.appendChild(el("div", "hold-tag", "持 " + it.hold));
+    if (it.heat > 0) f.appendChild(el("div", "heat-tag", "热度 +" + it.heat + "%"));
+    c.appendChild(f);
+    var info = el("div", "cinfo");
+    /* ★ 2026-10-15 修复（作者截图："有个红色的东西重叠了"）：.cinfo 是
+       position:absolute;bottom:0 —— 必须挂进 **.face**（position:relative），
+       才是"贴在人像底部"；此前挂在 .card 上 → 跑到整卡最底、**压在 .csub
+       （涨跌/趋势行）上面**，把红色涨跌标签盖住一半（.face::after 那道底部渐变
+       本来正是为这行名帖准备的）。 */
+    f.appendChild(info);
+    info.appendChild(el("span", "cname", it.name));
+    info.appendChild(el("span", "cprice", fmt(it.price)));
+    var sub = el("div", "csub");
+    /* 涨跌标签：>0 红涨 / <0 绿跌 / ==0 中性（原实现 dev>=0 一律标红，0% 也显示
+       红色 ▲+0% —— 语义错误，正是作者看到那个"红东西"） */
+    var devCls = it.dev > 0 ? "up" : (it.dev < 0 ? "down" : "flat");
+    var devTxt = it.dev > 0 ? ("▲ +" + it.dev + "%") : (it.dev < 0 ? ("▼ " + it.dev + "%") : "— 0.0%");
+    var dev = el("span", "cdev " + devCls, devTxt);
+    sub.appendChild(dev);
+    sub.appendChild(el("span", "", "趋势 " + fmt(it.trend)));
+    c.appendChild(sub);
+    renderCardAff(c, it);
+    c.addEventListener("click", function () { openGirl(it.id); }, false);
+    g.appendChild(c);
+  });
+}
+
+/* ============================================================
+   好感度（v6.2）· 卡面角标 + 面板整条（爱心为 SVG，非文字）
+   ============================================================ */
+var AFFLV = [
+  { min: 90, key: "S", name: "羁绊" }, { min: 70, key: "A", name: "信赖" },
+  { min: 45, key: "B", name: "亲近" }, { min: 20, key: "C", name: "相识" },
+  { min: 0, key: "D", name: "陌路" }
+];
+/* v6.3：礼物四档（涨价）+ 三种互动动作 + 四档经济回报（与宿主 csh_affection 同源同值） */
+var AFFPERK = [
+  { level: "C", key: "fee1", tag: "相识", name: "挂单折扣", desc: "该股手续费 −0.3%" },
+  { level: "B", key: "tip", tag: "亲近", name: "她的消息", desc: "每交易日一条涨跌倾向" },
+  { level: "A", key: "fee2", tag: "信赖", name: "深度挂单", desc: "手续费再 −0.4%" },
+  { level: "S", key: "div", tag: "羁绊", name: "共担风险", desc: "日分红 +0.5%" }
+];
+function affApi() {
+  try {
+    var P = window.parent;
+    return (P && P.lib && P.lib.cshAffection) ? P.lib.cshAffection
+         : (P && P.CSH && P.CSH.affection) ? P.CSH.affection : null;
+  } catch (e) { return null; }
+}
+function affLevel(v) { for (var i = 0; i < AFFLV.length; i++) if (v >= AFFLV[i].min) return AFFLV[i]; return AFFLV[AFFLV.length - 1]; }
+function affOf(id) {
+  var A = affApi();
+  if (A && A.get) { try { var g = A.get(id); if (g) return g; } catch (e) {} }
+  return { id: id, v: 0, level: "D", levelName: "陌路", toNext: 20, mood: "cold", perks: [], heat: 0 };
+}
+/* ---------- 爱心（v6.4 重写）----------
+   ★ 根因：上一版把 <defs><linearGradient>/<filter> 用 innerHTML 塞进运行期创建的
+     <svg>，再用 fill="url(#hgXXXX)" 引用。运行期解析不稳，**未解析的 paint 在 Chromium 里
+     会画成纯黑** —— 作者实机截图：实心爱心变成一颗黑心。
+   ★ 现在只画「形状」，不引用任何 url(#id)、不用 SVG filter：
+       实心 = 深粉底 + 内层浅粉光（缩放 0.58 的同一路径）+ 左上高光弧
+       光晕 = CSS drop-shadow（即使它失效，爱心本身照样是粉的，不会变黑） */
+var AFFHEARTD = "M16 27.5C9 22 2.5 17.2 2.5 11.4 2.5 6.6 6.1 3 10.4 3c2.5 0 4.4 1.2 5.6 3.1C17.2 4.2 19.1 3 21.6 3 25.9 3 29.5 6.6 29.5 11.4c0 5.8-6.5 10.6-13.5 16.1z";
+function svgNode(tag, attrs) {
+  var e = document.createElementNS("http://www.w3.org/2000/svg", tag);
+  if (attrs) for (var k in attrs) if (attrs[k] != null) e.setAttribute(k, String(attrs[k]));
+  return e;
+}
+function heartEl(filled) {
+  var svg = svgNode("svg", { viewBox: "0 0 32 30", class: "affheart" + (filled ? " on" : "") });
+  if (!filled) {
+    svg.appendChild(svgNode("path", { d: AFFHEARTD, fill: "none", stroke: "rgba(240,112,156,.34)", "stroke-width": "1.6" }));
+    return svg;
+  }
+  svg.appendChild(svgNode("path", { d: AFFHEARTD, fill: "#e2598c", class: "b",
+    stroke: "rgba(255,214,232,.62)", "stroke-width": "1.4" }));
+  svg.appendChild(svgNode("path", { d: AFFHEARTD, fill: "#ffb6d2", opacity: ".85", class: "g",
+    transform: "translate(16 15) scale(.58) translate(-16 -15)" }));
+  svg.appendChild(svgNode("path", { d: "M10.5 8.2c1.1-1.3 2.6-1.9 4-1.7",
+    stroke: "rgba(255,255,255,.85)", "stroke-width": "1.5", fill: "none", "stroke-linecap": "round" }));
+  return svg;
+}
+
+function renderCardAff(card, it) {
+  var st = affOf(it.id);
+  if (!st.v) return;
+  var lv = affLevel(st.v);
+  var b = el("div", "affbadge" + (lv.key === "S" ? " s" : ""));
+  b.appendChild(heartEl(true));
+  b.appendChild(document.createTextNode(String(st.v)));
+  b.title = "好感 " + st.v + " · " + lv.name;
+  card.querySelector(".face").appendChild(b);
+  /* v6.3：亲近(B)及以上，她的消息会以一枚倾向角标挂在卡面 */
+  if (it && it.tip) {
+    var t = el("div", "tipdot " + it.tip);
+    t.textContent = it.tip === "up" ? "\u2197" : (it.tip === "down" ? "\u2198" : "\u2192");
+    t.title = "她的消息：" + (it.tip === "up" ? "她最近状态好" : it.tip === "down" ? "她最近不太顺" : "她说再等等");
+    card.querySelector(".face").appendChild(t);
+  }
+}
+
+/* ---------- 好感（v6.4 · 只读结果）----------
+   ★ 作者：「金鳞市的亲密可以去除…只保留图鉴里的就可以了」「现在有重复功能模块了」。
+     ⇒ 金鳞市**不再有互动**（打招呼/说话/摸头/送礼全部收归妖灵图鉴），
+       这里只显示**关系带来的钱**：手续费折扣 / 分红加成 / 基本面热度 / 她的消息。
+   ★ 卡面的心形角标保留（那是"结果"不是"入口"）。 */
+function renderPanelAff(it) {
+  var box = $("#affbox");
+  if (!box) return;
+  box.innerHTML = "";
+  var st = affOf(it.id);
+  var lv = affLevel(st.v);
+  var filled = Math.max(0, AFFLV.length - 1 - AFFLV.indexOf(lv));
+  box.className = "affbox" + (lv.key === "S" ? " sTier" : "");
+
+  var head = el("div", "affhead");
+  head.appendChild(el("div", "afftitle", "亲 密"));
+  head.appendChild(el("div", "afflv", lv.name + " · " + lv.key));
+  head.appendChild(el("div", "affval", st.v + " / 100"));
+  box.appendChild(head);
+
+  var hs = el("div", "affhearts");
+  for (var i = 0; i < 5; i++) hs.appendChild(heartEl(i < filled));
+  box.appendChild(hs);
+  var bar = el("div", "affbar"); var bi = el("i");
+  bi.style.width = Math.max(2, Math.round(st.v)) + "%"; bar.appendChild(bi);
+  box.appendChild(bar);
+
+  var meta = el("div", "affmeta");
+  meta.appendChild(el("div", "", st.level === "S" ? "已到最高档「羁绊」" : ("距离下一档还差 " + st.toNext)));
+  meta.appendChild(el("div", "grow", st.mood === "cool" ? "久未相见" : ""));
+  box.appendChild(meta);
+
+  var pk = document.createElement("details");
+  pk.className = "pkbox";
+  var pksum = document.createElement("summary");
+  pksum.textContent = "她在盘口替你做的事 · 已生效 " + (st.perks || []).length + " / " + AFFPERK.length;
+  pk.appendChild(pksum);
+  var have = st.perks || [];
+  AFFPERK.forEach(function (p) {
+    var on = have.indexOf(p.key) >= 0;
+    var row = el("div", "affperk" + (on ? " on" : ""));
+    row.appendChild(el("span", "tk", p.tag));
+    row.appendChild(el("span", "tn", p.name));
+    row.appendChild(el("span", "td", p.desc));
+    row.appendChild(el("span", "ts", on ? "已生效" : "未解锁"));
+    pk.appendChild(row);
+  });
+  if (typeof st.heat === "number" && st.heat > 0) {
+    pk.appendChild(el("div", "affheat", "基本面加成 +" + st.heat.toFixed(2) + "%"));
+  }
+  box.appendChild(pk);
+
+  var jump = el("div", "affjump", "陪她说话 · 摸头 · 送礼 —— 都在【妖灵图鉴】里");
+  jump.title = "金鳞市只管钱；与她的相处全部收归妖灵图鉴（避免两个页面重复）";
+  box.appendChild(jump);
+}
+
+/* ---------- 台词抽取 ---------- */
+function pickLine(girl, it) {
+  if (!girl || !girl.lines) return "……";
+  var L = girl.lines;
+  var pool;
+  if (it.hold > 0) {
+    pool = (it.dev >= 0 ? L.up : L.down);
+    if (!pool || !pool.length) pool = L.hold;
+    if (Math.random() < 0.35 && L.hold && L.hold.length) pool = L.hold;   /* 偶尔说持仓常态台词 */
+  } else {
+    pool = L.first;
+  }
+  if (!pool || !pool.length) pool = L.hold || L.first || ["……"];
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+/* ---------- galgame 角色面板 ---------- */
+function openGirl(id) {
+  var s = Data.snap || { list: [] };
+  var it = (s.list || []).filter(function (x) { return x.id === id; })[0];
+  if (!it) return;
+  Data.cur = it; Data.qty = 10;
+  $("#pname").textContent = it.name;
+  $("#ptag").textContent = (it.girl && it.girl.tag) || "金鳞市挂牌";
+  $("#pbio").textContent = (it.girl && it.girl.bio) || "";
+  var img = $("#pimg");
+  img.src = "../image/" + String(it.img || "").split("/").pop();
+  img.alt = it.name;
+  sayLine();
+  renderFacts();
+  renderQty();
+  renderPanelAff(it);
+  $("#panel").classList.add("on");
+}
+function sayLine(force) {
+  var it = Data.cur; if (!it) return;
+  var txt = (force && typeof force === "string") ? force : pickLine(it.girl, it);
+  $("#pwho").textContent = it.name;
+  $("#ptext").textContent = txt;
+  var say = $("#psay");
+  say.style.animation = "none"; void say.offsetWidth; say.style.animation = "";
+}
+function closeGirl() { $("#panel").classList.remove("on"); }
+
+function renderFacts() {
+  var it = Data.cur; if (!it) return;
+  $("#fPrice").textContent = fmt(it.price);
+  var dev = $("#fDev");
+  dev.textContent = (it.dev >= 0 ? "+" : "") + it.dev + "%";
+  dev.className = "v " + (it.dev >= 0 ? "up" : "down");
+  $("#fHeat").textContent = it.heat > 0 ? ("+" + it.heat + "%") : "—";
+  $("#fHold").textContent = it.hold > 0 ? (it.hold + " 股") : "—";
+  $("#fCost").textContent = it.cost > 0 ? fmt(it.cost) : "—";
+  var pnl = it.hold * it.price - it.cost;
+  var pEl = $("#fPnL");
+  pEl.textContent = it.hold > 0 ? ((pnl >= 0 ? "+" : "") + fmt(pnl)) : "—";
+  pEl.className = "v " + (pnl >= 0 ? "up" : "down");
+  updateQtyHint();
+}
+function renderQty() {
+  var box = $("#qty");
+  box.innerHTML = "";
+  [1, 5, 10, 25, 50].forEach(function (n) {
+    var b = el("button", "qbtn" + (Data.qty === n ? " on" : ""), String(n));
+    b.type = "button";
+    b.addEventListener("click", function () { Data.qty = n; renderQty(); }, false);
+    box.appendChild(b);
+  });
+  var it = Data.cur;
+  if (it && it.hold > 0) {
+    var all = el("button", "qbtn", "全卖");
+    all.type = "button";
+    all.addEventListener("click", function () {
+      Data.qty = it.hold; renderQty();
+    }, false);
+    box.appendChild(all);
+  }
+  updateQtyHint();
+}
+function updateQtyHint() {
+  var it = Data.cur; if (!it) return;
+  var n = Data.qty | 0;
+  var need = Math.round(it.price * n * 1.02);
+  var got = Math.round(it.price * n * 0.98);
+  $("#qHint").textContent = "买 " + n + " 股需 " + fmt(need) + " CBY（含 2% 手续费） · 卖可得 " + fmt(got);
+}
+
+/* ---------- 买卖 ---------- */
+function tradeAct(side) {
+  var it = Data.cur; if (!it) return;
+  var n = Data.qty | 0;
+  if (n <= 0) { toast("请选择股数"); return; }
+  doTrade(it.id, n, side, function (res) {
+    if (!res || !res.ok) { toast((res && res.msg) || "交易失败"); return; }
+    toast(res.msg + " @ " + fmt(res.price));
+    loadSnap(function (snap) {
+      Data.snap = snap;
+      renderStats(); renderGrid(); refreshView();
+      /* galgame 反馈：买/卖后她说一句 */
+      if (side === "buy") sayLine("……好。那就一起走一段吧。");
+      else sayLine("……成交。下次再来。");
+    });
+  });
+}
+function refreshView() {
+  var it = Data.cur; if (!it) return;
+  var s = Data.snap || { list: [] };
+  var fresh = (s.list || []).filter(function (x) { return x.id === it.id; })[0];
+  if (fresh) {
+    Data.cur = fresh;
+    renderFacts(); renderQty();
+  }
+}
+
+/* ---------- 事件绑定 ---------- */
+$("#pclose").addEventListener("click", closeGirl, false);
+$("#panel").addEventListener("click", function (e) { if (e.target === $("#panel")) closeGirl(); }, false);
+$("#bBuy").addEventListener("click", function () { tradeAct("buy"); }, false);
+$("#bSell").addEventListener("click", function () { tradeAct("sell"); }, false);
+document.addEventListener("keydown", function (e) { if (e.key === "Escape") closeGirl(); }, false);
+
+/* ---------- 启动 ---------- */
+renderStats();
+loadSnap(function (snap) {
+  Data.snap = snap;
+  /* 空态由 renderGrid 统一渲染（数据未就绪 / 非游戏环境直开预览） */
+  if (!snap || !snap.list || !snap.list.length) toast("金鳞市尚未开市（数据未就绪）");
+  renderStats();
+  renderGrid();
+});
+</script>
+</body>
+</html>

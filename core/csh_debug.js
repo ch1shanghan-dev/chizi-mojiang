@@ -1852,6 +1852,25 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                 "button.csh-dbg-gamebtn.gb-career .gb-top{margin-bottom:2px!important;}",
                 "button.csh-dbg-gamebtn.gb-career{position:relative!important;overflow:hidden!important;}",
                 "button.csh-dbg-gamebtn.gb-career::before{content:''!important;position:absolute!important;left:-4px!important;top:-6px!important;bottom:-6px!important;width:5px!important;background:linear-gradient(180deg,var(--csh-accent),rgba(var(--csh-accent-rgb),.12))!important;transform:skewY(-10deg)!important;}",
+                /* 讨伐录卡（2026-10-13 · 批次 4a）：朱砂印意象（与生涯大厅的金染区分）+ 未阅红点 */
+                "button.csh-dbg-gamebtn.gb-bossbook{background:linear-gradient(160deg,rgba(155,34,52,.14),rgba(155,34,52,.03) 60%)!important;border-color:rgba(155,34,52,.42)!important;position:relative!important;overflow:hidden!important;}",
+                "button.csh-dbg-gamebtn.gb-bossbook .gb-name{font-size:16px!important;letter-spacing:.06em!important;}",
+                "button.csh-dbg-gamebtn.gb-bossbook .gb-mid{font-size:12px!important;color:#d06a6a!important;letter-spacing:.03em!important;opacity:.9!important;}",
+                "button.csh-dbg-gamebtn.gb-bossbook::before{content:''!important;position:absolute!important;left:-4px!important;top:-6px!important;bottom:-6px!important;width:5px!important;background:linear-gradient(180deg,#9b2234,rgba(155,34,52,.12))!important;transform:skewY(-10deg)!important;}",
+                "button.csh-dbg-gamebtn.gb-bossbook.gb-unread::after{content:''!important;position:absolute!important;right:10px!important;top:10px!important;width:8px!important;height:8px!important;border-radius:50%!important;background:#e24b4a!important;}",
+                /* 天下榜（v6.9）：青蓝斜杠，与讨伐录的朱砂斜杠区分开 */
+                "button.csh-dbg-gamebtn.gb-rank{background:linear-gradient(160deg,rgba(64,120,176,.14),rgba(64,120,176,.03) 60%)!important;border-color:rgba(64,120,176,.42)!important;position:relative!important;overflow:hidden!important;}",
+                "button.csh-dbg-gamebtn.gb-rank .gb-name{font-size:16px!important;letter-spacing:.06em!important;}",
+                "button.csh-dbg-gamebtn.gb-rank::before{content:''!important;position:absolute!important;left:-4px!important;top:-6px!important;bottom:-6px!important;width:5px!important;background:linear-gradient(180deg,#4078b0,rgba(64,120,176,.12))!important;transform:skewY(-10deg)!important;}",
+                /* 天下榜中部行（2026-10-15 · 下一轮交接打磨）：与讨伐录 gb-mid 同规格，
+                   色相取青蓝系的浅色调（base #4078b0），与朱砂 #d06a6a 区分 */
+                "button.csh-dbg-gamebtn.gb-rank .gb-mid{font-size:12px!important;color:#6f9fd0!important;letter-spacing:.03em!important;opacity:.9!important;}",
+                /* 行囊（v6.10 · 2026-10-15）：墨绿斜杠 —— 与生涯大厅的金、讨伐录的朱砂、
+                   天下榜的青蓝各走一路；"行囊"是装东西的，取沉着不抢眼的色。 */
+                "button.csh-dbg-gamebtn.gb-save{background:linear-gradient(160deg,rgba(88,128,102,.15),rgba(88,128,102,.03) 60%)!important;border-color:rgba(88,128,102,.44)!important;position:relative!important;overflow:hidden!important;}",
+                "button.csh-dbg-gamebtn.gb-save .gb-name{font-size:16px!important;letter-spacing:.06em!important;}",
+                "button.csh-dbg-gamebtn.gb-save::before{content:''!important;position:absolute!important;left:-4px!important;top:-6px!important;bottom:-6px!important;width:5px!important;background:linear-gradient(180deg,#588066,rgba(88,128,102,.12))!important;transform:skewY(-10deg)!important;}",
+                "button.csh-dbg-gamebtn.gb-save .gb-mid{font-size:12px!important;color:#88ac93!important;letter-spacing:.03em!important;opacity:.9!important;}",
                 "button.csh-dbg-gamebtn:active{transform:translateY(0)!important;}",
                 "button.csh-dbg-gamebtn .gb-top{display:flex!important;align-items:center!important;gap:8px!important;width:100%!important;}",
                 "button.csh-dbg-gamebtn .gb-name{flex:0 1 auto!important;font-size:15px!important;font-weight:600!important;color:var(--csh-bg)!important;line-height:1.3!important;",
@@ -3273,6 +3292,17 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                成熟做法：**这张卡本身就是按钮**（整块可点、无独立「开始」、大小一致）。
                生涯大厅与四款游戏同格并列（它同样是入口），用胶囊标签区分类型。
                网格 auto-fill + minmax：列数由可用宽度自己算 —— 一套布局同时服务桌面与手机。 */
+            /* ★ 数字格式化（2026-10-15 补）：**本文件此前没有 fmt**，生涯大厅卡那句
+               `fmt(WS.fundSum)` 一直在抛 ReferenceError 被 try/catch 吞掉 ⇒
+               「在场 N 人 · 桌面资金 X」中部行从来没显示过。现在提到面板作用域共用一份，
+               写法与天下榜页（rank.html）一致（万/亿简写），卡上与榜上显示同一个样子。 */
+            function fmt(n) {
+                n = Math.floor(Number(n) || 0);
+                if (n >= 100000000) return (n / 100000000).toFixed(2) + " 亿";
+                if (n >= 10000) return (n / 10000).toFixed(2) + " 万";
+                return String(n);
+            }
+
             function gameButton(title, desc, tag, onClick, locked) {
                 var b = document.createElement("button");
                 b.type = "button";
@@ -3343,6 +3373,158 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                         }
                     }
                     list.appendChild(cb1);
+                })();
+
+            /* 讨伐录（2026-10-13 · 批次 4a）：BOSS 模式击破手记，与生涯大厅平级的非游戏页。
+               文案读 registry 单源；卡面实时统计「已讨 X / 总量」（总量走 summary().total 动态）；
+               未阅红点读 csh_bossbook_seen（bossbook 页自持，与页面同一判定源）。 */
+                (function () {
+                    var bbDesc = "魔王的击破实录";
+                    try {
+                        var rg2 = (typeof window !== "undefined" && window.CSH && window.CSH.registry) || null;
+                        var b0 = rg2 && typeof rg2.get === "function" ? rg2.get("bossbook") : null;
+                        if (b0 && b0.desc) bbDesc = String(b0.desc);
+                    } catch (eRB) {}
+                    var midTxt2 = "";
+                    var unread = false;
+                    try {
+                        var BR = lib.cshBossRecord && lib.cshBossRecord.summary ? lib.cshBossRecord.summary() : null;
+                        if (BR) {
+                            midTxt2 = "已讨 " + BR.kill + " / " + (BR.total || 0) + " 位";
+                            /* v4.2：速通与应战（扮演魔王）战绩一并在入口卡上露出 */
+                            var ab0 = BR.asBoss || {};
+                            if ((ab0.win || 0) + (ab0.lose || 0) > 0) midTxt2 += " · 亲征 " + (ab0.win || 0) + " 胜";
+                            if (BR.speed && BR.speed.all) midTxt2 += " · 最快 " + BR.speed.all + " 轮";
+                        }
+                        var seen = 0;
+                        try { seen = Number(localStorage.getItem("csh_bossbook_seen")) || 0; } catch (eLS) {}
+                        if (BR && BR.map) for (var kM in BR.map) {
+                            if (BR.map[kM] && BR.map[kM].last > seen) { unread = true; break; }
+                        }
+                    } catch (eB) {}
+                    var bb1 = gameButton("讨伐录", bbDesc, "手记", function () {
+                        try {
+                            if (lib.cshGames && typeof lib.cshGames.open === "function") { lib.cshGames.open("bossbook", {}); return; }
+                        } catch (eO) {}
+                        toast("讨伐录未就绪（shell 未加载？）");
+                    }, false);
+                    bb1.classList.add("gb-bossbook");
+                    if (unread) bb1.classList.add("gb-unread");
+                    if (midTxt2) {
+                        var mid2 = document.createElement("span");
+                        mid2.className = "gb-mid";
+                        mid2.textContent = midTxt2;
+                        var desc2 = bb1.querySelector(".gb-desc");
+                        if (desc2 && desc2.parentNode === bb1) {
+                            bb1.insertBefore(mid2, desc2);
+                            desc2.classList.add("gb-sub");
+                        }
+                    }
+                    list.appendChild(bb1);
+                })();
+
+                /* ★ 天下榜卡单独一个 IIFE（2026-10-15 修）：它此前被写在**讨伐录的 IIFE 内部**，
+                   而讨伐录那段（gameButton / DOM 操作，无 try）一旦抛错，天下榜卡会被连带带走
+                   —— 三张手写入口卡本来就该各自独立、互不影响。 */
+                (function () {
+                    /* 天下榜（v6.9）：与生涯大厅 / 讨伐录同级的手写入口卡。
+                       ★ 为什么还要手写：大厅的入口卡是**两张手写（生涯大厅 / 讨伐录）+ 一段
+                         games.forEach 循环（四款游戏，来自 registry.keys() = 纯游戏卡 ORDER）**。
+                         非游戏页不进 ORDER，所以必须在这里手写一张 —— 只加 registry 条目
+                         是**不会出现卡片**的（这一轮踩过：E32 只断言了注册表，没断言大厅卡片）。 */
+                    /* 文案读 registry 单源（与讨伐录同规矩，不抄第二份） */
+                    var rkDesc = "天下英雄的池子币与功勋";
+                    try {
+                        var rg3 = (typeof window !== "undefined" && window.CSH && window.CSH.registry) || null;
+                        var r0 = rg3 && typeof rg3.get === "function" ? rg3.get("rank") : null;
+                        if (r0 && r0.desc) rkDesc = String(r0.desc);
+                    } catch (eRD) {}
+                    /* 中部行（留名状态 + 本机身家）：与讨伐录的 gb-mid 同规格。
+                       ★ 两个数就是天下榜页内会上传的那两个（池子币 / 功勋）——
+                         大厅里拿不到 shell-stats 桥，所以只读宿主钱包与官阶（单一账本，
+                         桥那条路由在天下榜页内自己走）；格式化与 rank.html 的 fmt 同口径
+                         （万/亿简写），保证卡上与榜上显示一致。
+                       ★ 格式化函数必须本地自包含：本文件没有 fmt（生涯大厅卡那条
+                         `fmt(WS.fundSum)` 一直在静默抛错被 catch 吞掉，中部行从未显示），
+                         别再依赖一个不存在的函数。 */
+                    /* 数字走面板作用域的 fmt（与生涯大厅卡共用一份；万/亿简写，
+                       与天下榜页 rank.html 的显示口径一致） */
+                    var rkMid = "";
+                    try {
+                        var rkName = localStorage.getItem("csh_net_name") || "";
+                        var rkPC = 0, rkMerit = 0;
+                        try {
+                            var W0 = lib.cshWallet;
+                            if (W0 && W0.wallet && typeof W0.wallet.get === "function") {
+                                rkPC = Math.max(0, Math.floor(Number(W0.wallet.get().pc) || 0));
+                            }
+                            if (W0 && W0.rank && typeof W0.rank.get === "function") {
+                                rkMerit = Math.max(0, Math.floor(Number(W0.rank.get().merit) || 0));
+                            }
+                        } catch (eW0) {}
+                        rkMid = rkName ? ("留名 · " + rkName) : "尚未留名";
+                        if (rkPC > 0 || rkMerit > 0) rkMid += " · " + fmt(rkPC) + " 池子币 · " + fmt(rkMerit) + " 功勋";
+                    } catch (eRM) {}
+                    var rk1 = gameButton("天下榜", rkDesc, "联机", function () {
+                        try {
+                            if (lib.cshGames && typeof lib.cshGames.open === "function") { lib.cshGames.open("rank", {}); return; }
+                        } catch (eR2) {}
+                        toast("天下榜未就绪（shell 未加载？）");
+                    }, false);
+                    rk1.classList.add("gb-rank");
+                    if (rkMid) {
+                        var mid3 = document.createElement("span");
+                        mid3.className = "gb-mid";
+                        mid3.textContent = rkMid;
+                        var desc3 = rk1.querySelector(".gb-desc");
+                        if (desc3 && desc3.parentNode === rk1) {
+                            rk1.insertBefore(mid3, desc3);
+                            desc3.classList.add("gb-sub");
+                        }
+                    }
+                    list.appendChild(rk1);
+                })();
+
+                /* ★ 行囊卡（v6.10 · 2026-10-15）：存/取一身家当的总口。
+                   与天下榜卡同样的规矩：**独立 IIFE**（互不影响）、文案读 registry 单源、
+                   中部行给一句"攒了多少项家当"。
+                   ★ 为什么还要手写：非游戏页不进 registry.keys()（ORDER 保持纯游戏卡），
+                     只加 registry 条目**不会出卡片**（E32 就是为那次真事故加的断言）。 */
+                (function () {
+                    var svDesc = "一身家当，随身可带";
+                    try {
+                        var rg4 = (typeof window !== "undefined" && window.CSH && window.CSH.registry) || null;
+                        var s0 = rg4 && typeof rg4.get === "function" ? rg4.get("save") : null;
+                        if (s0 && s0.desc) svDesc = String(s0.desc);
+                    } catch (eSD) {}
+                    var svMid = "";
+                    try {
+                        /* 与 csh_games 的卡片统计同口径：数一数"已经积了多少项家当" */
+                        var MG = lib.cshMigrate;
+                        if (MG && typeof MG.inventory === "function") {
+                            var rows = MG.inventory() || [], nsv = 0;
+                            for (var q = 0; q < rows.length; q++) if (rows[q].has) nsv++;
+                            svMid = nsv ? ("已积 " + nsv + " 项家当") : "家当还没攒下";
+                        }
+                    } catch (eSM) {}
+                    var sv1 = gameButton("行囊", svDesc, "存档", function () {
+                        try {
+                            if (lib.cshGames && typeof lib.cshGames.open === "function") { lib.cshGames.open("save", {}); return; }
+                        } catch (eS2) {}
+                        toast("行囊未就绪（shell 未加载？）");
+                    }, false);
+                    sv1.classList.add("gb-save");
+                    if (svMid) {
+                        var mid4 = document.createElement("span");
+                        mid4.className = "gb-mid";
+                        mid4.textContent = svMid;
+                        var desc4 = sv1.querySelector(".gb-desc");
+                        if (desc4 && desc4.parentNode === sv1) {
+                            sv1.insertBefore(mid4, desc4);
+                            desc4.classList.add("gb-sub");
+                        }
+                    }
+                    list.appendChild(sv1);
                 })();
 
             games.forEach(function (g) {

@@ -315,6 +315,9 @@
     pointer-events: none; z-index: 6;
     animation: sayIn .16s ease-out both, sayOut .3s ease-in 1.1s both;
   }
+  /* 【2026-10-13 顶排翻下】座位上方放不下时由 JS 加 .below：锚点改为顶边、
+     不再向上位移（否则顶排气泡会超出屏幕被裁）。底排仍走默认的向上分支。 */
+  .say.below { transform: translate(-50%, 0); }
   @keyframes sayIn { from { transform: translate(-50%, -80%) scale(.85); opacity: 0; } }
   @keyframes sayOut { to { opacity: 0; } }
   .seat.allin .seat-chips { color: var(--gold-hi); }
@@ -1577,6 +1580,15 @@ function applyBlinds() {
 }
 function sbSeat() { return G.n === 2 ? G.dealer : (G.dealer + 1) % G.n; }
 function bbSeat() { return G.n === 2 ? (G.dealer + 1) % G.n : (G.dealer + 2) % G.n; }
+/* 庄家位轮换（2026-10-13 修复）：此前 G.dealer 开局随机一次后整场不再变化 ⇒
+   盲注位固定，非盲注座位每手弃牌零成本、可无限滞留（用户实测：约 1 个盲注量的
+   AI 长期留在牌局、牌局僵持）。现在每手前移到下一个还有筹码的座位，盲注随之轮换。 */
+function moveDealer() {
+  for (var k = 1; k <= G.n; k++) {
+    var i = (G.dealer + k) % G.n;
+    if ((G.players[i].chips || 0) > 0) { G.dealer = i; return; }
+  }
+}
 function firstToActPostflop() {
   for (var k = 1; k <= G.n; k++) {
     var i = (G.dealer + k) % G.n, p = G.players[i];
@@ -1613,6 +1625,8 @@ function startHand() {
   if (aliveCnt <= 1) { endSession('sweep'); return; }
   G.handNo++;
   applyBlinds();
+  /* 庄家/盲注位轮换：首手沿用随机起点，此后每手前移（见 moveDealer 注释） */
+  if (G.handNo > 1) moveDealer();
   /* 【2026-10-03 牌桌拟人】开场第一手，让一位同桌说句话（整场只说一次） */
   if (!quippedGreet && worldSeats && worldSeats.length) {
     quippedGreet = true;
@@ -1788,9 +1802,12 @@ function runOut() {
 function endHandByFold(winner) {
   if (!G || G.over) return;
   G.over = true;
-  if (winner) winner.chips += G.pot;
+  /* 【2026-10-13 修复】弃牌收池同样走统一结算入口：
+     此前直接 winner.chips += G.pot、不生成 G.ledger ⇒ 本手横幅「净变化」显示 0
+     （用户实测：筹码增加但提示"无变化"）。csh_pots.settle 的「只剩一人」分支
+     即是本场景：全池归赢家并带 byFold 标记，账本/守恒校验一并产出。 */
+  settleHand();
   G.winners = winner ? [winner] : [];
-  G.lastResults = [{ winners: winner ? [winner] : [], amount: G.pot, byFold: true }];
   G.tally = null;                       /* 无人摊牌：不给对比表（没摊牌就没有可比的东西） */
   if (winner && winner.isHuman) onHumanWin(G.pot, false);
   quipAfterHand(winner ? [winner] : []);   /* 【2026-10-03 牌桌拟人】赢家说一句 */
@@ -1851,6 +1868,16 @@ function showdown() {
    任何一处改动都要同步两遍，而漂移一旦发生就是最难查的错账。
    ============================================================ */
 function awardPots() {
+  settleHand();
+  return G.lastResults;
+}
+
+/* 统一结算入口（2026-10-13 重构）：
+   此前只有摊牌（showdown→awardPots）走账本；全员弃牌（endHandByFold）直接
+   `winner.chips += G.pot` —— 那一手 G.ledger 缺失，结算横幅「本手净变化」读到
+   undefined/上一手旧值，显示为 0（用户实测：筹码明明增加、结算提示"无变化"）。
+   现在两条路都在这里出账本，界面只读 G.ledger 的口径保持不变。 */
+function settleHand() {
   var i, P = window.CSHPots;
   /* 本手开始时的筹码 = 现筹码 + 本手已投入（payChips 只在这两者之间搬运） */
   var stacks = {};
@@ -1899,7 +1926,7 @@ function awardPots() {
       refund: !!pt.refund, potId: pt.id, eligible: pt.eligible.slice(), pay: pay,
     };
   });
-  return G.lastResults;
+  return res;
 }
 
 /* 玩家本手的实际到账：直接读账本，不再遍历分池求和
@@ -2130,10 +2157,26 @@ function announceAction(idx, text) {
   var b = document.createElement('div');
   b.className = 'say';
   b.textContent = p.surname + ' · ' + text;
-  b.style.left = (el.offsetLeft) + 'px';
-  /* .say 是 translate(-50%,-100%)，所以 top 要给「座位盒上沿」而不是座位中心 */
-  b.style.top = Math.max(2, el.offsetTop - halfH - 3) + 'px';
   seats.appendChild(b);
+  /* 【2026-10-13 边界定位修】默认悬于座位上方（.say = translate(-50%,-100%)）；
+     顶排座位上方空间不足时翻到座位下方（此前顶排气泡超出屏幕被裁）。
+     需先入 DOM 量出真实宽高（文本长度决定尺寸），再按**容器实际边界**定位：
+     垂直按可用空间选上/下（不是写死偏移），水平按座位层宽度钳制。 */
+  var hw = Math.ceil(b.offsetWidth / 2);
+  var hh = b.offsetHeight;
+  var cx = el.offsetLeft;
+  var seatsW = seats.clientWidth;
+  if (cx - hw < 2) cx = hw + 2;
+  else if (cx + hw > seatsW - 2) cx = seatsW - hw - 2;
+  b.style.left = cx + 'px';
+  if (el.offsetTop - halfH - 3 - hh >= 4) {
+    /* 上方放得下：底边贴座位盒上沿 */
+    b.style.top = (el.offsetTop - halfH - 3) + 'px';
+  } else {
+    /* 顶排：翻到座位下方，顶边贴座位盒下沿 */
+    b.classList.add('below');
+    b.style.top = (el.offsetTop + halfH + 3) + 'px';
+  }
   later(function () { if (b.parentNode) b.parentNode.removeChild(b); }, 1400);
 }
 
@@ -3172,7 +3215,7 @@ function showStart() {
     sweepLife();
     sfx.quota();
   }
-  if (r.rollback) toast('检测到日期早于上次进入，已跳过今日补足', 'bad');
+  if (r.rollback) toast('今日额度按上次记录计算', 'bad');
   if (Sign.canClaimToday(today)) showSignCard();
 
   /* ★ 2026-09-29：进页即同步真值 + 预取世界同桌（异步，回来后刷新界面）。

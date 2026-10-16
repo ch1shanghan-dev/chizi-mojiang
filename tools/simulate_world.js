@@ -36,7 +36,8 @@ const SEED = Math.floor(Number(flagVal("--seed", 20261003)) || 1);
 const MAX_DAYS = Math.max(1, Math.floor(Number(flagVal("--days", 5000)) || 5000));
 const LADDER = [1, 7, 30, 365, 1000, 5000].filter((d) => d <= MAX_DAYS);
 const NO_CHILD = argv.includes("--no-child");     // 子进程自调用时不再嵌套派生（防递归）
-const PERSONAS = ["aggro", "tight", "bluff", "math", "wild"];
+const PERSONAS = ["aggro", "tight", "bluff", "math", "wild", "chaser",
+    "trapper", "grinder", "bull", "maniac", "reader", "lucky"];   /* v6.3：5 → 12 牌风 */
 const CAP = 500000000;
 
 let pass = 0, failed = 0;
@@ -190,7 +191,9 @@ function invariants(w, label) {
     try { JSON.parse(JSON.stringify(w)); } catch (e) { serializable = false; }
     const rec = w.records || {};
 
-    eq(label + "：AI 数量正确", ai.length, ROSTER_SIZE || ai.length);
+    eq(label + "：AI 数量正确", ai.length, EXPECT_TOTAL);
+    /* v6.1：名册 = 武将(character/index.js) + 妖灵(csh_bossdata.MINIONS) 两层，
+       总数恒为 EXPECT_TOTAL（下面各不变式对本层合并后的整份名单生效）。 */
     eq(label + "：无负资金", neg, 0);
     eq(label + "：无 NaN/Infinity 数值", nan, 0);
     eq(label + "：资金不越上限", badPot, 0);
@@ -216,7 +219,9 @@ writeStub();
 installStorage();
 installClock(0);
 installRng(SEED);
-["core/csh_world.js", "core/csh_migrate.js", "core/csh_page.js"].forEach((rel) => mirror(rel));
+/* v6.1：csh_world.js 现在 import 了 core/csh_bossdata.js（妖灵名册单一真源），
+   必须在沙盒里镜像同一份 —— 否则 ERR_MODULE_NOT_FOUND。 */
+["core/csh_world.js", "core/csh_migrate.js", "core/csh_page.js", "core/csh_bossdata.js"].forEach((rel) => mirror(rel));
 provideCode("core/voices.js", "export const cshVoices = {};\nexport default {};\n");
 /* 名册来源：真实 character/index.js（完整工程）· 合成名册（--roster N）·
    或都不满足时自动合成 97 人（交付包里没有 character/index.js）—— 三种都在标题行注明。 */
@@ -250,6 +255,8 @@ globalThis.__store.set("csh_world", JSON.stringify({
 const W = (await import(pathToFileURL(path.join(EXT, "core", "csh_world.js")).href), globalThis.CSH.world);
 const rw = () => JSON.parse(globalThis.__store.get("csh_world"));
 const rosterN = W.const.AI_COUNT;
+/* v6.1：AI 总数 = 武将数 + 妖灵数（前者是真实名册或 --roster 合成名册，后者恒为 50） */
+const EXPECT_TOTAL = (ROSTER_SIZE || W.const.CITIZEN_COUNT) + W.const.MINION_COUNT;
 
 /* ---------- 1. 起手结构 ---------- */
 section("1. 起手名册与结构不变式（" + rosterN + " 人 · 未推演的起始资金）");
@@ -263,6 +270,28 @@ const bands = { t3: funds.filter((f) => f >= 20000000).length, t2: funds.filter(
 ok("四层起手人数：" + JSON.stringify(bands));
 eq("四层人数之和 = 名册规模", bands.t3 + bands.t2 + bands.t1 + bands.t0, rosterN);
 if (rosterN === 97) eq("97 人时四层恰为 8/18/41/30（与原写死值逐位一致）", bands.t3 + "/" + bands.t2 + "/" + bands.t1 + "/" + bands.t0, "8/18/41/30");
+
+/* ---------- 1a. 妖灵接入（v6.1 · 作者："把 50 个妖灵也做进 AI 世界"） ----------
+   名册 = 武将(character/index.js) + 妖灵(csh_bossdata.MINIONS) 两层；
+   妖灵必须**真的进了世界**（可被 3 款牌桌抽到）、主键前缀隔离、起始资金落在
+   穷桌~富桌（没有一位天生坐豪赌席，更不许有负资金）。 */
+{
+	const ai = rw().ai;
+	const citizens = ai.filter((a) => a.kind === "citizen");
+	const minions = ai.filter((a) => a.kind === "minion");
+	eq("妖灵层人数 = MINION_COUNT", minions.length, W.const.MINION_COUNT);
+	eq("武将层人数 = CITIZEN_COUNT", citizens.length, W.const.CITIZEN_COUNT);
+	eq("两层之和 = AI_COUNT", citizens.length + minions.length, W.const.AI_COUNT);
+	eq("妖灵主键前缀隔离（csh_boss_minion_）", minions.every((a) => /^csh_boss_minion_/.test(a.id)), true);
+	eq("妖灵起始资金全部落穷桌~富桌（无豪赌席）", minions.every((a) => a.fund >= 50000 && a.fund < 20000000), true);
+	/* 抽得到的才算"做进世界"：按每只妖灵的带入能力抽样 seat()，必须能抽中妖灵 */
+	const seen = new Set();
+	for (let i = 0; i < 400; i++) {
+		for (const s of W.seat(3, 120000, {})) if (s.kind === "minion") seen.add(s.id);
+	}
+	eq("seat() 能抽到妖灵同桌（400 轮 · 命中 " + seen.size + " 只不同妖灵）", seen.size > 5, true);
+	ok("妖灵接入就绪：" + W.const.CITIZEN_COUNT + " 武将 + " + W.const.MINION_COUNT + " 妖灵 = " + W.const.AI_COUNT + " 人");
+}
 
 /* ---------- 1b. 资金分层派生：四层之和恒等于名册规模（含极小名册边界） ----------
    2026-10-03 二次复核：此前 t0 也写了 max(1,…)，n=4 时四舍五入后的前三层已占满 4 人，
@@ -287,6 +316,50 @@ ok("n=4 → " + JSON.stringify(W.tierCountsFor(4)) + "（穷桌 0 人 = 该档�
     eq("本轮名册（" + rosterN + " 人）：起始资金全为正且有限", fundsNow.filter((f) => !(typeof f === "number" && isFinite(f) && f > 0)).length, 0);
     eq("本轮名册（" + rosterN + " 人）：起始资金两两不等", new Set(fundsNow).size, rosterN);
 })();
+
+/* ---------- 1c. 牌技重设计（v6.3 · 作者「把牌技重新打乱设计一下，资金不变」） ----------
+   要点：牌技不再由资金唯一决定 ⇒ 牌技榜必须与资金榜**不同序**，
+   否则玩家看到的就只是"又一个资金榜"，牌风标签也毫无意义。 */
+section("1c. 牌技（12 牌风 · 牌技榜 ≠ 资金榜）");
+{
+    const list = W.list();
+    const byFund = list.slice().sort((a, b) => b.fund - a.fund).map((a) => a.id);
+    const bySkill = list.slice().sort((a, b) => (b.skill - a.skill) || (a.id < b.id ? -1 : 1)).map((a) => a.id);
+    /* ① 两榜前 20 的重合度：完全同序 = 20；我们要它明显小于 20 */
+    const topF = byFund.slice(0, 20), topS = bySkill.slice(0, 20);
+    /* 不用 Set：本沙箱里 noname 的补丁动过内建原型，Set.has 实测不可靠 */
+    const overlap = topF.filter((x) => topS.indexOf(x) >= 0).length;
+    ok("两榜前 20 重合 " + overlap + " 人（资金榜 20 人里只有 " + overlap + " 人在牌技榜前 20）");
+    if (overlap >= 18) eq("牌技榜与资金榜必须不同序", overlap + " < 18", false);
+    else eq("牌技榜与资金榜不再同序", true, true);
+    /* ② 相邻位次的"逆序对"比例：同序时为 0% */
+    let inv = 0;
+    for (let i = 0; i < byFund.length; i++) if (byFund[i] !== bySkill[i]) inv++;
+    ok("位次不一致人数 " + inv + " / " + byFund.length + "（" + Math.round(inv / byFund.length * 100) + "%）");
+    if (inv / byFund.length < 0.35) eq("位次打乱比例 ≥ 35%", false, true);
+    else eq("位次打乱比例 ≥ 35%", true, true);
+    /* ③ 牌风分布：12 种都要有人用；妖灵 50 只的牌风必须两两可见差异化（≥8 种） */
+    const pc = {};
+    list.forEach((a) => { pc[a.persona] = (pc[a.persona] || 0) + 1; });
+    const used = Object.keys(pc).length;
+    ok("牌风分布：" + used + " / 12 种在场 · " + JSON.stringify(pc));
+    eq("12 种牌风全部有人使用", used, 12);
+    const minionPc = {};
+    list.filter((a) => a.kind === "minion").forEach((a) => { minionPc[a.persona] = (minionPc[a.persona] || 0) + 1; });
+    const minionKinds = Object.keys(minionPc).length;
+    ok("妖灵牌风 " + minionKinds + " / 12 种：" + JSON.stringify(minionPc));
+    if (minionKinds < 8) eq("妖灵牌风差异化 ≥ 8 种", false, true);
+    else eq("妖灵牌风差异化 ≥ 8 种", true, true);
+    /* ④ skill 区间与下限（穷 AI 不许是傻子） */
+    const sk = list.map((a) => a.skill);
+    eq("牌技下限 0.58（穷 AI 不降智）", Math.min(...sk) >= 0.58, true);
+    eq("牌技上限 1.00", Math.max(...sk) <= 1.0000001, true);
+    ok("牌技区间 " + Math.min(...sk).toFixed(3) + " ~ " + Math.max(...sk).toFixed(3) +
+        " · 均值 " + (sk.reduce((x, y) => x + y, 0) / sk.length).toFixed(3));
+    /* ⑤ 每个牌风都有"一句话人设"（UI 要显示） */
+    const noDesc = list.filter((a) => !a.personaDesc).length;
+    eq("每个 AI 都带牌风人设（personaDesc）", noDesc, 0);
+}
 
 /* ---------- 2. 经济阶梯 ---------- */
 section("2. 经济阶梯模拟（离线 tick：1 → " + MAX_DAYS + " 天）");

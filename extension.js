@@ -13,6 +13,7 @@ import { cshPrecontent } from "./main/precontent.js";
 import { cshConfig } from "./main/config.js";
 import { cshHelp } from "./main/help.js";
 import cshCharacter from "./character/index.js";
+import "./character/boss.js"; // 魔王角色（原生 game.import("character") → 引擎 loadCharacter 处理）
 import cshCard from "./card/index.js";
 import cshSkillPack from "./skills/index.js";
 
@@ -66,10 +67,10 @@ export default function(){
     },
     card: cshCard,
     skill: cshSkillPack,
-    intro: "<font color=#c9a84c>版本</font> <font color=#00FFFF>4.0.5</font>",
+    intro: "<font color=#c9a84c>版本</font> <font color=#00FFFF>4.0.6</font>",
     author: "池上寒",
     diskURL: "",
     forumURL: "",
-    version: "4.0.5"
+    version: "4.0.6"
 }}
 }

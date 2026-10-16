@@ -170,7 +170,7 @@ html,body{width:100%;height:100%;background:var(--ink-0);color:var(--text);-webk
   .agrid{grid-template-columns:repeat(auto-fill,minmax(76px,1fr));gap:6px}
   /* ★ 窄屏总览重排（A1.5 核心）：不删内容，改排布 —— 竖排五大块 → 「横幅 + 左窄右宽两列」。
        第 1 行（跨两列）：官阶焦点卡 —— 它本就是横排布局，当横幅正好
-       第 2 行：[左] 资产 · 今日（我现在的状态，窄栏够用）｜[右] 今日任务 + 数据迁移
+       第 2 行：[左] 资产 · 今日（我现在的状态，窄栏够用）｜[右] 今日任务
      为什么用 flex 而不是 grid：先前的 grid 版把三块放进同一行轨道，
      轨道高由最高的那块（今日任务 302px）决定 ⇒ 左列两块之间空出 227px 死白（实测）。
      flex 行内两列各自成栈、向上补齐，没有轨道概念，也就没有空档。
@@ -187,7 +187,8 @@ html,body{width:100%;height:100%;background:var(--ink-0);color:var(--text);-webk
   #rankFocus .name{font-size:calc(var(--fs-base) * 1.6)}
   #rankFocus .rf-id{gap:2px}
   #rankFocus .pc-big span{font-size:calc(var(--fs-base) * 1.7)}
-  #rankFocus .pc-big{margin-top:0;justify-content:flex-end}
+  #rankFocus .pc-big{margin-top:0;justify-content:flex-end;flex-direction:column;
+    align-items:flex-end;gap:0;row-gap:1px}
   #rankFocus .foot{font-size:var(--fs-tiny)}
   #rankFocus .bar{height:6px}
   .sect>h3{margin:2px 0 5px}
@@ -197,8 +198,8 @@ html,body{width:100%;height:100%;background:var(--ink-0);color:var(--text);-webk
   .tasks{gap:4px}
   .task{padding:5px 8px;min-height:34px;gap:6px}
   #ov-tasks-note{display:none}   /* 任务说明：标题已交代"五游戏共用"，这条属重复交代 */
-  .migrow{margin-top:6px;gap:6px}
-  .migrow .btn{padding:6px 11px}
+  .btnrow{margin-top:6px;gap:6px}
+  .btnrow .btn{padding:6px 11px}
   .diffbox{margin-top:4px;line-height:1.5}
   #ov-today{line-height:1.5}
   #body{padding:10px 10px 12px}
@@ -300,7 +301,8 @@ html,body{width:100%;height:100%;background:var(--ink-0);color:var(--text);-webk
   font-variant-numeric:tabular-nums;text-shadow:0 2px 14px rgba(216,180,106,.35)}
 /* 单位不许折行（A1.5）：窄栏里「池子币 CBY」被挤成三行会把整卡顶高一倍 —— 宁可让它溢出也不换行 */
 .pc-big small{font-size:var(--fs-xs);color:var(--text-dim);white-space:nowrap;flex:0 0 auto}
-.pc-big span{min-width:0}
+.pc-big span{min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#rankFocus .pc-big span{font-size:min(calc(var(--fs-base) * 1.7), 26px)}
 
 /* ---------- 排行 ---------- */
 .rows{display:flex;flex-direction:column}
@@ -340,11 +342,8 @@ html,body{width:100%;height:100%;background:var(--ink-0);color:var(--text);-webk
 .axlabel{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:4px}
 .axlabel span{text-align:center;font-size:var(--fs-xs);color:var(--text-dim)}
 
-/* ---------- 数据迁移（§J.5） ---------- */
-textarea{width:100%;min-height:96px;background:var(--ink-2);border:1px solid var(--line);
-  border-radius:var(--r-sm);color:var(--text);font-family:ui-monospace,Consolas,monospace;
-  font-size:16px;padding:10px;resize:vertical}
-.migrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+/* ---------- 通用按钮行（.btnrow）：总览里那些「一行排开的小按钮」共用 ---------- */
+.btnrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
 .btn{min-height:44px;padding:0 16px;border-radius:var(--r-sm);border:1px solid var(--gold-line);
   background:var(--gold-fill);color:var(--gold-hi);font-size:var(--fs-sm);font-family:inherit;cursor:pointer;
   /* A2：主操作按钮走"光影金"——垂直渐变 + 顶缘内高光，按下去有实体的感觉 */
@@ -389,12 +388,81 @@ textarea{width:100%;min-height:96px;background:var(--ink-2);border:1px solid var
 .wmax .wi:last-child{border-bottom:0}
 .wmax .wi .wk{color:var(--text-dim);font-size:var(--fs-xs);margin-right:8px;letter-spacing:.04em}
 .wmax .wi b{color:var(--gold-hi);font-weight:600}
+
+/* ============================================================
+   账本（v6.2）—— 池子币的来源与去处
+   视觉语言沿用全站暗金：米金 = 入账，赭红 = 支出（与"红涨绿跌"不冲突：
+   这里是**收支**语义，不是行情语义，故不走 A 股口径）。
+   ============================================================ */
+.lg-sum{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.lg-sum .wl{padding:8px 6px}
+.lg-sum .wl .v.in{color:var(--ok)}
+.lg-sum .wl .v.out{color:var(--warn)}
+.lg-sum .wl .v.net{color:var(--gold-hi)}
+.lg-heatwrap{overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:2px}
+.lg-heat{display:grid;grid-auto-flow:column;grid-template-rows:repeat(7,minmax(0,1fr));gap:3px;
+  min-width:260px}
+.lg-cell{width:100%;aspect-ratio:1/1;border-radius:3px;background:var(--ink-3);
+  border:1px solid rgba(255,255,255,.05);cursor:default;transition:transform .12s ease}
+.lg-cell:hover{transform:scale(1.28);z-index:2;box-shadow:0 2px 10px rgba(0,0,0,.6)}
+.lg-cell.lv1{background:rgba(127,183,160,.30)}
+.lg-cell.lv2{background:rgba(127,183,160,.52)}
+.lg-cell.lv3{background:rgba(127,183,160,.74)}
+.lg-cell.lv4{background:rgba(127,183,160,.96)}
+.lg-cell.neg1{background:rgba(201,138,106,.34)}
+.lg-cell.neg2{background:rgba(201,138,106,.62)}
+.lg-cell.neg3{background:rgba(201,138,106,.88)}
+.lg-legend{display:flex;align-items:center;gap:4px;justify-content:flex-end;
+  font-size:var(--fs-xs);color:var(--text-dim);margin-top:6px}
+.lg-legend .lg-swatch{width:11px;height:11px;border-radius:3px;background:var(--ink-3);
+  border:1px solid rgba(255,255,255,.06);display:inline-block}
+.lg-legend .lg-swatch.lv1{background:rgba(127,183,160,.30)}
+.lg-legend .lg-swatch.lv2{background:rgba(127,183,160,.52)}
+.lg-legend .lg-swatch.lv3{background:rgba(127,183,160,.74)}
+.lg-legend .lg-swatch.lv4{background:rgba(127,183,160,.96)}
+.lg-legend .lg-swatch.neg1{background:rgba(201,138,106,.34)}
+.lg-legend .lg-swatch.neg2{background:rgba(201,138,106,.62)}
+.lg-legend .lg-swatch.neg3{background:rgba(201,138,106,.88)}
+.lg-cats{display:flex;flex-direction:column;gap:7px}
+.lg-cat{display:grid;grid-template-columns:76px minmax(0,1fr) auto;gap:8px;align-items:center;
+  font-size:var(--fs-xs)}
+.lg-cat .k{color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lg-cat .bar{height:8px;border-radius:4px;background:var(--ink-3);overflow:hidden;display:flex}
+.lg-cat .bar i{display:block;height:100%}
+.lg-cat .bar i.in{background:linear-gradient(90deg,#4f8573,#7fb7a0)}
+.lg-cat .bar i.out{background:linear-gradient(90deg,#94573d,#c98a6a)}
+.lg-cat .val{font-family:var(--ff-num);font-variant-numeric:tabular-nums;text-align:right;
+  color:var(--text-dim);white-space:nowrap}
+.lg-cat .val b.in{color:var(--ok);font-weight:700}
+.lg-cat .val b.out{color:var(--warn);font-weight:700}
+.lg-list{display:flex;flex-direction:column}
+.lg-row{display:grid;grid-template-columns:64px 68px minmax(0,1fr) auto 76px;gap:7px;
+  align-items:center;padding:6px 2px;border-bottom:1px dashed var(--line);font-size:var(--fs-xs)}
+.lg-row:last-child{border-bottom:0}
+.lg-row .tm{font-family:var(--ff-num);color:var(--text-dim)}
+.lg-row .tag{font-size:var(--fs-xs);text-align:center;border-radius:999px;padding:1px 6px;
+  border:1px solid var(--gold-line);color:var(--gold);background:var(--gold-fill);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lg-row .rr{color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lg-row .dd{font-family:var(--ff-num);font-variant-numeric:tabular-nums;font-weight:700;text-align:right}
+.lg-row .dd.in{color:var(--ok)}
+.lg-row .dd.out{color:var(--warn)}
+.lg-row .bb{font-family:var(--ff-num);font-variant-numeric:tabular-nums;color:var(--text-dim);text-align:right}
+.lg-chip{font-size:var(--fs-xs);font-family:var(--ff-body);border-radius:999px;padding:3px 10px;
+  border:1px solid var(--line);background:var(--ink-1);color:var(--text-dim);cursor:pointer;margin:0 6px 6px 0}
+.lg-chip.on{border-color:var(--gold-line);color:var(--gold-hi);background:var(--gold-fill)}
+@media (max-width:640px){
+  .lg-sum{grid-template-columns:repeat(2,1fr)}
+  .lg-row{grid-template-columns:56px minmax(0,1fr) auto 68px}
+  .lg-row .tag{display:none}
+}
 </style>
 </head>
 <body>
 <div id="app">
   <div id="tabs">
     <button class="tab on" data-p="overview">总览<i class="tm" id="tm-overview"></i></button>
+    <button class="tab" data-p="ledger">账本<i class="tm" id="tm-ledger"></i></button>
     <button class="tab" data-p="tasks">任务<i class="tm" id="tm-tasks"></i></button>
     <button class="tab" data-p="ach">成就<i class="tm" id="tm-ach"></i></button>
     <button class="tab" data-p="rank">官阶<i class="tm" id="tm-rank"></i></button>
@@ -404,7 +472,7 @@ textarea{width:100%;min-height:96px;background:var(--ink-2);border:1px solid var
     <!-- 总览（2026-10-03 · 双栏化）
          宽屏（≥900px）左右两栏，一屏看完，不再上下滑：
            左 = 身份与资产（官阶焦点卡 / 资产 / 今日签到） —— "我现在的状态"
-           右 = 行动（快捷开局 / 今日任务 / 数据迁移） —— "我现在能做的事"
+           右 = 行动（快捷开局 / 今日任务） —— "我现在能做的事"
          窄屏退回单列（顺序不变）。池子币大数字只保留官阶卡里那一处
          （原「资产」格里是同一位数字的第二份渲染，违反一层原则，已删）。 -->
     <div class="page on" id="p-overview">
@@ -421,7 +489,10 @@ textarea{width:100%;min-height:96px;background:var(--ink-2);border:1px solid var
           <div class="bar"><i id="ov-rankbar" style="width:0%"></i></div>
           <div class="foot"><span id="ov-need">—</span><span id="ov-rankidx">—</span></div>
           <div class="foot"><span id="ov-merit">—</span><span class="segtag" id="ov-segtag">—</span></div>
-          <!-- 2026-09-28：池子币大字展示（用户反馈「没有一个可以查看池子币的地方」） -->
+          <!-- 2026-09-28：池子币大字展示（用户反馈「没有一个可以查看池子币的地方」）
+               2026-10-15 二次修：**不再当账本入口**（左侧导航已有「账本」页签），
+               并且把「数字 / 单位」改成上下两行 —— 原来挤在一行，长时间到七位数时
+               数字会盖住「池子币 CBY · 查账 ›」那行小字（作者实机截图）。 -->
           <div class="pc-big"><span id="ov-pc-big">—</span><small>池子币 CBY</small></div>
         </div>
       </div>
@@ -438,7 +509,7 @@ textarea{width:100%;min-height:96px;background:var(--ink-2);border:1px solid var
         <div class="sect"><h3>今日</h3>
           <div class="card">
             <div class="diffbox" id="ov-today">状态载入中…</div>
-            <div class="migrow">
+            <div class="btnrow">
               <button class="btn" id="ov-sign">签到领补给</button>
               <button class="btn ghost" id="ov-relief">领取救济</button>
             </div>
@@ -452,30 +523,43 @@ textarea{width:100%;min-height:96px;background:var(--ink-2);border:1px solid var
           <div class="diffbox" id="ov-tasks-note">与各游戏内看到的是同一份进度。</div>
         </div>
 
-        <div class="sect"><h3>数据迁移</h3>
-          <div class="card">
-            <!-- A1.5：这一屏是"低频操作"，说明文字在手机横屏折叠成 3 行占掉 60px。
-                 说明移入按钮 tooltip（信息不丢），面板标题已交代场景；桌面端用 CSS 还原这句说明。 -->
-            <div class="diffbox mig-note" id="mig-info">导出一份生涯存档（战绩 / 钱包 / 官阶 / AI 世界），可跨设备恢复。</div>
-            <div class="migrow">
-              <button class="btn" id="mig-export" title="导出一份生涯存档（战绩 / 钱包 / 官阶 / AI 世界），可跨设备恢复">导出存档</button>
-              <button class="btn ghost" id="mig-import" title="粘贴存档串，恢复一份生涯存档">导入</button>
-              <button class="btn ghost" id="mig-backups" title="查看本机保存的历史备份，可回滚">备份</button>
-            </div>
-            <div class="migrow" style="margin-top:10px">
-              <button class="btn" id="mig-reset" style="background:#a8442f;color:#fff;border-color:transparent">重置存档（回到初始状态）</button>
-            </div>
-            <div id="mig-panel" style="display:none;margin-top:10px">
-              <textarea id="mig-text" placeholder="粘贴存档串…"></textarea>
-              <div class="migrow">
-                <button class="btn" id="mig-apply">读取并确认覆盖</button>
-                <button class="btn ghost" id="mig-close">收起</button>
-              </div>
-              <div class="diffbox" id="mig-diff"></div>
-            </div>
-            <div id="mig-bkpanel" style="display:none;margin-top:10px"></div>
-          </div>
+      </div>
+    </div>
+
+    <!-- 账本（v6.2 · 2026-10-15 作者：「CBY 需要有一个地方写清楚来源和去处，就是做账，
+         参考 GitHub 成熟设计，做成可以查看详细来源」）
+         三段式：① 四个总额数字（像 GitHub 的 Insights 概览）
+                 ② 近 42 天收支热力格（GitHub 贡献图同款：7 行 = 星期，列 = 周）
+                 ③ 分类汇总 + 逐笔流水（可按分类过滤）
+         数据来自 shell-ledger（宿主侧 csh_wallet 账本，单一写入点 = add/spend）。 -->
+    <div class="page" id="p-ledger">
+      <div class="sect"><h3>池子币账本 · 来源与去处</h3>
+        <div class="lg-sum">
+          <div class="wl"><div class="k">累计入账</div><div class="v in" id="lg-inc">—</div></div>
+          <div class="wl"><div class="k">累计支出</div><div class="v out" id="lg-out">—</div></div>
+          <div class="wl"><div class="k">净额</div><div class="v net" id="lg-net">—</div></div>
+          <div class="wl"><div class="k">记账笔数</div><div class="v" id="lg-n">—</div></div>
         </div>
+        <div class="diffbox" id="lg-note">只记最近 400 笔（滚动窗口）。每一笔都由钱包唯一的入账 / 出账出口写下，不会漏记。</div>
+      </div>
+
+      <div class="sect"><h3>近 42 日收支</h3>
+        <div class="lg-heatwrap"><div class="lg-heat" id="lg-heat"></div></div>
+        <div class="lg-legend">
+          <span>支出</span><i class="lg-swatch neg3"></i><i class="lg-swatch neg2"></i><i class="lg-swatch neg1"></i>
+          <i class="lg-swatch"></i><i class="lg-swatch lv1"></i><i class="lg-swatch lv2"></i><i class="lg-swatch lv3"></i><i class="lg-swatch lv4"></i>
+          <span>入账</span>
+        </div>
+      </div>
+
+      <div class="sect"><h3>分类汇总</h3>
+        <div class="lg-cats" id="lg-cats"></div>
+      </div>
+
+      <div class="sect"><h3>逐笔流水</h3>
+        <div class="catchips" id="lg-chips"></div>
+        <div class="lg-list" id="lg-list"></div>
+        <div class="diffbox" id="lg-empty" style="display:none">还没有记账记录。去玩一局牌，或讨伐一位魔王试试。</div>
       </div>
     </div>
 
@@ -522,11 +606,18 @@ textarea{width:100%;min-height:96px;background:var(--ink-2);border:1px solid var
           <button class="bd-tab" data-bd="bd-pot">底池</button>
         </div>
         <div class="sect bd-view on" id="v-bd-fund"><h3>资金榜</h3><div class="rows" id="bd-fund"></div></div>
-        <div class="sect bd-view" id="v-bd-skill"><h3>牌技榜</h3><div class="rows" id="bd-skill"></div></div>
+        <div class="sect bd-view" id="v-bd-skill"><h3>牌技榜</h3>
+          <div class="bnote" style="font-size:var(--fs-cap);color:var(--text-dim);line-height:1.6;margin:-2px 0 6px">
+            牌技 = 资金底蕴 × <b style="color:var(--gold-hi)">牌风</b> × 个人偏差（12 种牌风；悬停看每个人的打法人设）——
+            所以它<b>不等于</b>资金榜：穷的「读牌师」能排到富的「疯子」前面。
+          </div>
+          <div class="rows" id="bd-skill"></div>
+        </div>
         <div class="sect bd-view" id="v-bd-win"><h3>胜率榜</h3><div class="rows" id="bd-win"></div></div>
         <div class="sect bd-view" id="v-bd-pot"><h3>最大底池榜</h3><div class="rows" id="bd-pot"></div></div>
-      </div>
-      <div class="sect"><h3>已退隐</h3><div class="rows" id="bd-out"></div></div>
+
+        <div class="diffbox">联机榜已独立成页 —— 见「池子休闲 → 天下榜」。</div>
+</div>
     </div>
   </div>
 </div>
@@ -661,9 +752,162 @@ function bindTabs() {
       var pages = document.querySelectorAll(".page");
       for (var k = 0; k < pages.length; k++) pages[k].className = "page";
       $("#p-" + p).className = "page on";
+      if (p === "ledger") loadLedger(false);   /* 账本按需拉取（不拖慢开局快照） */
     }, false);
   }
 }
+
+/* ============================================================
+   账本（v6.2）· 池子币的来源与去处
+   ------------------------------------------------------------
+   数据：Bridge.call("shell-ledger", {days}) → { sum, list }
+     sum  = { inc, out, net, n, cats:[{cat,in,out,n}], daily:[{day,in,out,n}] }
+     list = [{t(ms), d(±), r(说明), c(分类), b(结余)}]
+   渲染三段：总额 / GitHub 式热力格 / 分类 + 流水（可按分类过滤）。
+   ============================================================ */
+var LG = { sum: null, list: [], cat: "", loaded: false };
+
+function loadLedger(force) {
+  if (LG.loaded && !force) { renderLedger(); return; }
+  Bridge.call("shell-ledger", { days: 42 }, function (ok, r) {
+    LG.loaded = true;
+    if (!ok || !r) { LG.sum = null; LG.list = []; renderLedger(); return; }
+    LG.sum = r.sum || null;
+    LG.list = r.list || [];
+    renderLedger();
+  });
+}
+
+function lgFmt(n) {
+  var v = Math.round(Number(n) || 0);
+  var sign = v < 0 ? "-" : "";
+  v = Math.abs(v);
+  var t = String(v).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  return sign + t;
+}
+
+function renderLedger() {
+  var sum = LG.sum;
+  var tm = document.querySelector("#tm-ledger");
+  if (tm) tm.textContent = sum ? fmt(sum.net) : "";
+  if (!sum) {
+    $("#lg-inc").textContent = $("#lg-out").textContent = $("#lg-net").textContent = $("#lg-n").textContent = "—";
+    $("#lg-heat").innerHTML = ""; $("#lg-cats").innerHTML = ""; $("#lg-chips").innerHTML = "";
+    $("#lg-list").innerHTML = ""; $("#lg-empty").style.display = "block";
+    return;
+  }
+  $("#lg-inc").textContent = "+" + lgFmt(sum.inc);
+  $("#lg-out").textContent = "-" + lgFmt(sum.out);
+  $("#lg-net").textContent = (sum.net >= 0 ? "+" : "") + lgFmt(sum.net);
+  $("#lg-n").textContent = lgFmt(sum.n);
+
+  renderHeat(sum.daily || []);
+  renderCats(sum.cats || []);
+  renderChips(sum.cats || []);
+  renderRows();
+}
+
+/* ---------- ② GitHub 式热力格：7 行 = 星期，列 = 周 ---------- */
+function renderHeat(days) {
+  var box = $("#lg-heat");
+  box.innerHTML = "";
+  if (!days.length) return;
+  /* 每格强度：按当日"总流量"（入+出）分 4 档，方向按净额取色 */
+  var flows = days.map(function (d) { return (d.in || 0) + (d.out || 0); });
+  var maxF = Math.max.apply(null, flows.concat([1]));
+  /* 首日补空格，使每周从周一起排（GitHub 同款对齐） */
+  var first = new Date(days[0].day + "T00:00:00");
+  var pad = (first.getDay() + 6) % 7;
+  for (var p = 0; p < pad; p++) {
+    var padc = document.createElement("i");
+    padc.className = "lg-cell";
+    padc.style.visibility = "hidden";
+    box.appendChild(padc);
+  }
+  for (var i = 0; i < days.length; i++) {
+    var d = days[i];
+    var flow = (d.in || 0) + (d.out || 0);
+    var c = document.createElement("i");
+    var cls = "lg-cell";
+    if (flow > 0) {
+      var lv = flow >= maxF * 0.75 ? 4 : flow >= maxF * 0.45 ? 3 : flow >= maxF * 0.18 ? 2 : 1;
+      var net = (d.in || 0) - (d.out || 0);
+      cls += net >= 0 ? (" lv" + lv) : (" neg" + Math.min(3, lv));
+    }
+    c.className = cls;
+    c.title = d.day + "\n入账 +" + lgFmt(d.in || 0) + "\n支出 -" + lgFmt(d.out || 0) + "\n" + (d.n || 0) + " 笔";
+    box.appendChild(c);
+  }
+}
+
+/* ---------- ③ 分类汇总 ---------- */
+function renderCats(cats) {
+  var box = $("#lg-cats");
+  box.innerHTML = "";
+  if (!cats.length) { box.appendChild(el("div", "diffbox", "暂无分类数据。")); return; }
+  var maxV = 1;
+  cats.forEach(function (c) { maxV = Math.max(maxV, c.in || 0, c.out || 0); });
+  cats.forEach(function (c) {
+    var row = el("div", "lg-cat");
+    row.appendChild(el("div", "k", c.cat));
+    var bar = el("div", "bar");
+    var wi = Math.round((c.in || 0) / maxV * 100), wo = Math.round((c.out || 0) / maxV * 100);
+    var bi = el("i", "in"); bi.style.width = wi + "%";
+    var bo = el("i", "out"); bo.style.width = wo + "%";
+    bar.appendChild(bi); bar.appendChild(bo);
+    row.appendChild(bar);
+    var val = el("div", "val");
+    if (c.in > 0) { var b1 = el("b", "in", "+" + lgFmt(c.in)); val.appendChild(b1); }
+    if (c.out > 0) {
+      if (c.in > 0) val.appendChild(document.createTextNode(" / "));
+      val.appendChild(el("b", "out", "-" + lgFmt(c.out)));
+    }
+    val.appendChild(document.createTextNode("  " + c.n + " 笔"));
+    row.appendChild(val);
+    box.appendChild(row);
+  });
+}
+
+/* ---------- ③ 分类过滤 chips ---------- */
+function renderChips(cats) {
+  var box = $("#lg-chips");
+  box.innerHTML = "";
+  var mk = function (key, label) {
+    var b = el("button", "lg-chip" + (LG.cat === key ? " on" : ""), label);
+    b.addEventListener("click", function () {
+      LG.cat = (LG.cat === key) ? "" : key;
+      renderChips(cats); renderRows();
+    }, false);
+    return b;
+  };
+  box.appendChild(mk("", "全部"));
+  cats.forEach(function (c) { box.appendChild(mk(c.cat, c.cat + " " + c.n)); });
+}
+
+/* ---------- ③ 逐笔流水 ---------- */
+function renderRows() {
+  var box = $("#lg-list");
+  box.innerHTML = "";
+  var rows = LG.list.filter(function (e) { return !LG.cat || e.c === LG.cat; });
+  $("#lg-empty").style.display = rows.length ? "none" : "block";
+  for (var i = 0; i < rows.length; i++) {
+    var e = rows[i];
+    var r = el("div", "lg-row");
+    var d = new Date(Number(e.t) || 0);
+    r.appendChild(el("div", "tm", (d.getMonth() + 1) + "/" + d.getDate() + " " +
+      ("0" + d.getHours()).slice(-2) + ":" + ("0" + d.getMinutes()).slice(-2)));
+    r.appendChild(el("div", "tag", e.c || "其它"));
+    r.appendChild(el("div", "rr", e.r || "—"));
+    r.appendChild(el("div", "dd " + (e.d >= 0 ? "in" : "out"), (e.d >= 0 ? "+" : "") + lgFmt(e.d)));
+    r.appendChild(el("div", "bb", lgFmt(e.b)));
+    box.appendChild(r);
+  }
+}
+
+/* v6.3：总览的池子币大数字**不再是账本入口**（作者："既然做了账本左侧的按钮，
+   就不要通过这里点进去，有重叠的文字，不美观"）。账本只从左侧页签进入。
+   函数保留为空壳只是为了不惊动既有的初始化调用链。 */
+function bindPcLink() {}
 
 /* ============================================================
    总览
@@ -1081,7 +1325,9 @@ function renderBoard() {
   var tmB = document.querySelector("#tm-board");
   if (tmB) tmB.textContent = myIdx >= 0 ? ("第 " + (myIdx + 1) + " 名") : "";
   fillBoard("#bd-skill", ai.slice().sort(function (a, b) { return (b.skill || 0) - (a.skill || 0); }),
-    function (a) { return (a.skill || 0).toFixed(3); }, function (a) { return a.personaName || ""; });
+    function (a) { return (a.skill || 0).toFixed(3); },
+    function (a) { return a.personaName || ""; },
+    function (a) { return (a.personaName || "") + (a.personaDesc ? "：" + a.personaDesc : ""); });
   var withMePot = ai.concat([{ name: "你", biggestPot: meSnap.meBigPot || 0, bestStreak: 0, isMe: true }]);
   fillBoard("#bd-pot", withMePot.sort(function (a, b) { return (b.biggestPot || 0) - (a.biggestPot || 0); }),
     function (a) { return fmt(a.biggestPot || 0); }, function (a) { return a.isMe ? "CBY" : (a.bestStreak ? ("连胜 " + a.bestStreak) : ""); });
@@ -1198,7 +1444,7 @@ function renderNarrative() {
 function minFund(ai) { var m = Infinity; for (var i = 0; i < ai.length; i++) if ((ai[i].fund || 0) < m) m = ai[i].fund || 0; return m === Infinity ? 0 : m; }
 function maxFund(ai) { var m = 0; for (var i = 0; i < ai.length; i++) if ((ai[i].fund || 0) > m) m = ai[i].fund || 0; return m; }
 function maxSkill(ai) { var m = 0; for (var i = 0; i < ai.length; i++) if ((ai[i].skill || 0) > m) m = ai[i].skill || 0; return m; }
-function fillBoard(sel, arr, valFn, subFn) {
+function fillBoard(sel, arr, valFn, subFn, titleFn) {
   var box = $(sel);
   if (!box) return;
   box.innerHTML = "";
@@ -1208,6 +1454,8 @@ function fillBoard(sel, arr, valFn, subFn) {
   for (var i = 0; i < arr.length; i++) {
     var a = arr[i];
     var row = el("div", "row" + (a.isMe ? " me" : ""));
+    /* v6.3：牌风的一句话人设挂 title（鼠标悬停即读"这个人怎么打牌"） */
+    if (titleFn) { try { row.title = titleFn(a); } catch (eT) {} }
     if (a.isMe) setTimeout(function () { try { row.scrollIntoView({ block: "center" }); } catch (eS) {} }, 0);
     row.appendChild(el("div", "pvp", String(i + 1)));
     /* ★ 2026-09-29 修复：此前把 <span …> 拼进 textContent，
@@ -1230,100 +1478,6 @@ function fillBoard(sel, arr, valFn, subFn) {
   }
 }
 
-/* ============================================================
-   数据迁移（§J.5）
-   ============================================================ */
-function bindMigrate() {
-  $("#mig-export").addEventListener("click", function () {
-    Bridge.call("shell-mig-export", null, function (ok, data) {
-      if (ok && data && data.code) {
-        $("#mig-panel").style.display = "block";
-        $("#mig-text").value = data.code;
-        $("#mig-text").select();
-        $("#mig-diff").innerHTML = "已生成存档串（已全选，可复制或粘贴保存）。";
-      } else {
-        $("#mig-info").textContent = "导出失败：迁移模块未加载。";
-      }
-    });
-  }, false);
-  $("#mig-import").addEventListener("click", function () {
-    $("#mig-panel").style.display = "block";
-    $("#mig-bkpanel").style.display = "none";
-    $("#mig-text").value = "";
-    $("#mig-text").focus();
-    $("#mig-diff").textContent = "把存档串粘贴到上方，然后点「读取并确认覆盖」。";
-  }, false);
-  $("#mig-close").addEventListener("click", function () { $("#mig-panel").style.display = "none"; }, false);
-  $("#mig-apply").addEventListener("click", function () {
-    var code = $("#mig-text").value.trim();
-    if (!code) { $("#mig-diff").textContent = "内容为空。"; return; }
-    /* 先 dryRun 拿差异 */
-    Bridge.call("shell-mig-import", { code: code, dryRun: true }, function (ok, r) {
-      if (!ok || !r.ok) { $("#mig-diff").innerHTML = '<span style="color:var(--warn)">' + ((r && r.err) || "解析失败") + "</span>"; return; }
-      var d = r.diff || {};
-      var txt = "将覆盖当前生涯：<br>池子币 " + fmt(d.pc.from) + " → " + fmt(d.pc.to) +
-        "<br>官阶 " + d.rank.from + " → " + d.rank.to + "<br>确认覆盖？";
-      $("#mig-diff").innerHTML = txt;
-      if (!window.confirm("将覆盖当前生涯，确认？\n池子币 " + fmt(d.pc.from) + " → " + fmt(d.pc.to))) return;
-      Bridge.call("shell-mig-import", { code: code }, function (ok2, r2) {
-        if (ok2 && r2.ok) { $("#mig-diff").innerHTML = "已恢复（备份戳 " + r2.backup + "）。"; reloadAll(); }
-        else $("#mig-diff").innerHTML = '<span style="color:var(--warn)">导入失败：' + ((r2 && r2.err) || "未知") + "</span>";
-      });
-    });
-  }, false);
-  $("#mig-backups").addEventListener("click", function () {
-    Bridge.call("shell-mig-backups", null, function (ok, list) {
-      var box = $("#mig-bkpanel");
-      box.style.display = "block";
-      box.innerHTML = "";
-      if (!list || !list.length) { box.appendChild(el("div", "diffbox", "暂无备份")); return; }
-      for (var i = 0; i < list.length; i++) {
-        (function (b) {
-          var row = el("div", "row");
-          row.appendChild(el("div", "nm", new Date(b.time).toLocaleString()));
-          row.appendChild(el("div", "vl", fmt(b.pc) + " CBY"));
-          var rb = el("button", "btn ghost", "回滚");
-          rb.style.minHeight = "34px";
-          rb.addEventListener("click", function () {
-            Bridge.call("shell-mig-rollback", { stamp: b.stamp }, function (ok2) {
-              if (ok2) { box.innerHTML = "已回滚。"; reloadAll(); }
-            });
-          }, false);
-          row.appendChild(rb);
-          box.appendChild(row);
-        })(list[i]);
-      }
-    });
-  }, false);
-  $("#md-close").addEventListener("click", function () { $("#modal").className = ""; }, false);
-
-  /* 重置存档：清空全部进度，回到出厂初始态（2000 CBY / 平民）。
-     二次确认 + 清空后刷新整个客户端（各模块用默认值重新初始化）。 */
-  $("#mig-reset").addEventListener("click", function () {
-    var msg = "确定要「重置存档」吗？将清空以下全部数据：\n\n" +
-      "· 池子币（CBY）余额 → 回到 2000\n" +
-      "· 官阶功勋 → 回到「平民」0 功勋\n" +
-      "· 签到 / 每日任务 / 成就进度\n" +
-      "· 各游戏最佳纪录 / 胜负统计\n" +
-      /* 人数不写死：名册由武将表派生（当前 97 人），硬编码会在扩容后过期 */
-      "· AI 世界（" + (((State.world && State.world.ai) || []).length || "全部") + " 名角色的资金与战绩）\n" +
-      "· CDK 兑换记录（已兑换的码会失效，请自行保存）\n\n" +
-      "重置后游戏会自动刷新，此操作不可撤销。";
-    if (!window.confirm(msg)) return;
-    if (!window.confirm("再次确认：真的要推倒重来，回到全新初始状态吗？")) return;
-    Bridge.call("shell-mig-reset", null, function (ok, r) {
-      if (ok && r && r.ok) {
-        try { toast("存档已重置，正在刷新…"); } catch (e) {}
-        setTimeout(function () {
-          try { window.parent.location.reload(); }
-          catch (e) { try { location.reload(); } catch (e2) {} }
-        }, 600);
-      } else {
-        toast("重置失败：" + ((r && r.err) || "未知错误"));
-      }
-    });
-  }, false);
-}
 
 /* ============================================================
    数据加载
@@ -1470,7 +1624,10 @@ function bindActions() {
 
 /* ---------- 启动 ---------- */
 bindTabs();
-bindMigrate();
+bindPcLink();
+/* 弹窗关闭：原先挂在前一版的存档绑定函数里，摘掉那块时把这一行搬出来单独挂 */
+  $("#md-close").addEventListener("click", function () { $("#modal").className = ""; }, false);
+
 bindActions();
 renderTasksInto($("#ov-tasks"));
 renderTasksInto($("#tk-list"));

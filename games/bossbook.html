@@ -1,0 +1,1250 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
+<title>池子魔将 · 讨伐录</title>
+<!-- 讨伐录（定稿 §6.3）：封面 → 序 → 卷一~卷八 → 跋，一本真正的"册子"。
+     零外部资源 / 零网络请求 / 数据只读（唯一自持写 = 已读标记 csh_bossbook_seen）。
+     数据契约：权威通道 Bridge "shell-stats" 快照的 boss 字段；兜底直读父窗 lib.cshBossRecord.summary()。
+     视觉纪律照 docs/art-direction.md：三档字体 token、单一基数字号标尺、
+     紧凑断点一律 (max-height:640px),(max-width:899px)。 -->
+<script src="../core/csh_selftest.js" data-csh-selftest="auto"></script>
+<script src="../core/csh_page.js"></script>
+<style>
+/* ---------- 书法体注册（定稿 §6.3.5 红线 #2，字体栈写法照 main/content.js:1773）---------- */
+@font-face{font-family:'ZMX3';src:url("../font/csh_fx_font_3.woff2") format("woff2");font-display:swap}
+
+:root{
+  /* ---------- 纸色版内页色板（定稿 §6.3.5 红线 #3：深色封皮 × 暖白纸页）---------- */
+  --paper:#f5efe0;            /* 纸 */
+  --paper-2:#f2ecdd;          /* 纸（次） */
+  --ink:#2f2a22;              /* 墨字 */
+  --ink-dim:#7a7264;          /* 淡墨 */
+  --gold:#b08d3e;             /* 暗金 */
+  --gold-hi:#d8bd7a;          /* 亮金（金线高光用） */
+  --cinnabar:#9b2234;         /* 朱砂 */
+  --cover-bg:#3a2f24;         /* 封皮 */
+  --cover-deep:#2c2318;       /* 封皮（暗部） */
+  --line-ink:rgba(122,114,100,.32);   /* 纸上界线 */
+  /* ---------- 三档字体 token（art-direction §4.1）---------- */
+  --ff-title:"Noto Serif SC","Source Han Serif SC","Songti SC","STSong","SimSun",serif;
+  --ff-body:"Noto Sans SC","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+  --ff-num:ui-monospace,"Cascadia Mono",Consolas,"SF Mono",Menlo,monospace;
+  /* ④ 书法点缀 --ff-callig（2026-10-15 修）：原为 csh_fx_font_1/2 —— 那是 78/84 字的
+     **游戏内技能横幅**专用子集，封面书名「讨伐录」三字**全不在表内** → 实际一直显示
+     系统宋体（书法体零效果）。现改用全覆盖子集 csh_fx_font_3.woff2（4058 字，
+     由开源 Zhi Mang Xing 完整版子集化）→ 封面书名/卷号/序跋大字**真正成为书法体**，
+     且回退档为楷体（缺字不刺眼）。 */
+  --ff-callig:"ZMX3","Zhi Mang Xing","Kaiti SC","STKaiti",KaiTi,var(--ff-title);
+  /* ---------- 字号标尺（art-direction §4.2：单一基数派生，禁止裸字号）---------- */
+  /* 【2026-10-14 作者实机反馈：全书字号偏小、伤眼 → 基准 12.5 → 15px（+20%）
+     一次性整体放大（其余档位按比例派生，布局经三档冒烟复核）。
+     15px 基准在手机横屏（正文最低 12px 档位）与 PC 宽屏上都属舒适阅读区间。 */
+  --fs-base:15px;
+  --fs-tiny:calc(var(--fs-base) * .8);      /* 12px   角标 */
+  --fs-cap:calc(var(--fs-base) * .92);      /* 13.8px 辅助 */
+  --fs-body:var(--fs-base);                 /* 15px   正文 */
+  --fs-lead:calc(var(--fs-base) * 1.2);     /* 18px   导语 */
+  --fs-menu:calc(var(--fs-base) * 1.44);    /* 21.6px 菜单 */
+  --fs-title:calc(var(--fs-base) * 2.08);   /* 31.2px 标题 */
+  --fs-display:calc(var(--fs-base) * 2.32); /* 34.8px 数字牌 */
+  --st:env(safe-area-inset-top,0px);
+  --sb:env(safe-area-inset-bottom,0px);
+  /* 纸纹：SVG feTurbulence 噪点 data-uri（零图片文件，§6.3.3） */
+  --paper-noise:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .045 0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+  --cover-noise:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='m'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.7' numOctaves='2'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .06 0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23m)'/%3E%3C/svg%3E");
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:100%;height:100%;overflow:hidden;background:var(--cover-deep);color:var(--ink);
+  font-family:var(--ff-body);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;
+  -webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+#book{position:absolute;left:0;top:0;width:100%;height:100%;
+  padding-top:var(--st);padding-bottom:var(--sb);perspective:1400px}
+
+/* ============================================================
+   一页纸：纸色底 + 噪点纹理 + 暗角 + 左缘装订缝线
+   ============================================================ */
+.page{position:absolute;left:0;top:0;width:100%;height:100%;display:none;flex-direction:column;
+  background:
+    var(--paper-noise),
+    radial-gradient(130% 100% at 50% 0%, rgba(255,255,255,.5), transparent 55%),
+    radial-gradient(120% 120% at 50% 100%, rgba(58,47,36,.10), transparent 46%),
+    linear-gradient(180deg,var(--paper),var(--paper-2));
+  box-shadow:inset 0 0 64px -28px rgba(58,47,36,.55)}
+.page.on{display:flex}
+/* 装订缝线（书脊）：左缘一排点线 + 压暗 */
+.page::before{content:"";position:absolute;left:0;top:0;bottom:0;width:24px;pointer-events:none;z-index:2;
+  background:
+    repeating-linear-gradient(0deg, rgba(122,114,100,.20) 0 2px, transparent 2px 10px),
+    linear-gradient(90deg, rgba(0,0,0,.12), transparent)}
+
+/* ---------- 翻页动效（§6.3.4：3D 翻页；reduced-motion / 低端降级淡切）---------- */
+@keyframes bb-turn{from{transform:rotateY(-55deg);opacity:.25}to{transform:none;opacity:1}}
+@keyframes bb-fade{from{opacity:0}to{opacity:1}}
+.page.turn{animation:bb-turn .42s cubic-bezier(.2,.7,.3,1);transform-origin:left center}
+.page.turn-fade{animation:bb-fade .24s ease-out}
+@media (prefers-reduced-motion:reduce){
+  .page.turn{animation:bb-fade .24s ease-out}
+}
+
+/* ---------- 页眉：页名 + 页码（汉字）+ 返回封面 ---------- */
+.phead{flex:0 0 auto;display:flex;align-items:center;gap:8px;min-height:34px;
+  padding:6px 12px 4px 30px;position:relative;z-index:3}
+.pt-name{flex:1 1 auto;min-width:0;font-family:var(--ff-title);font-size:var(--fs-menu);
+  letter-spacing:.14em;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pt-name::after{content:"";display:block;margin-top:2px;height:1px;
+  background:linear-gradient(90deg,rgba(176,141,62,.55),rgba(176,141,62,.08) 62%,transparent)}
+.pt-num{flex:0 0 auto;font-family:var(--ff-title);font-size:var(--fs-cap);color:var(--ink-dim);letter-spacing:.3em}
+.pt-home{flex:0 0 auto;border:1px solid var(--line-ink);background:transparent;color:var(--ink-dim);
+  font-family:var(--ff-body);font-size:var(--fs-tiny);padding:3px 10px;border-radius:10px;cursor:pointer;letter-spacing:.1em}
+.pt-home:hover{color:var(--cinnabar);border-color:var(--cinnabar)}
+
+/* ---------- 页身 ---------- */
+.pbody{flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;
+  padding:8px 16px 10px 30px;position:relative;z-index:1}
+
+/* ---------- 页脚：翻页 + 卷快捷跳转 ---------- */
+.pfoot{flex:0 0 auto;display:flex;align-items:center;gap:8px;min-height:34px;
+  padding:4px 12px 6px 24px;border-top:1px solid transparent;
+  background-image:linear-gradient(90deg,transparent,rgba(176,141,62,.34) 22%,rgba(176,141,62,.34) 78%,transparent);
+  background-size:100% 1px;background-position:top left;background-repeat:no-repeat}
+.pg-btn{flex:0 0 auto;width:34px;height:28px;border:1px solid var(--line-ink);background:transparent;
+  color:var(--ink);font-family:var(--ff-title);font-size:var(--fs-lead);line-height:1;cursor:pointer;border-radius:5px}
+.pg-btn:hover{border-color:var(--gold);color:var(--gold)}
+.pg-btn:disabled{opacity:.28;cursor:not-allowed}
+.pg-jump{flex:1 1 auto;min-width:0;display:flex;justify-content:center;flex-wrap:wrap;gap:2px 6px}
+.pg-jump button{border:0;background:transparent;color:var(--ink-dim);font-family:var(--ff-title);
+  font-size:var(--fs-tiny);letter-spacing:.12em;padding:3px 7px;cursor:pointer;border-radius:8px}
+.pg-jump button:hover{color:var(--cinnabar)}
+.pg-jump button.on{color:#fff;background:var(--cinnabar)}
+
+/* ============================================================
+   封面（§6.3.1）：深色封皮 + 书名 + 副题 + 朱印进度章 + 翻开
+   ============================================================ */
+#cover{cursor:pointer;display:none;flex-direction:column;align-items:center;justify-content:center;gap:14px;
+  background:
+    var(--cover-noise),
+    radial-gradient(120% 90% at 50% 0%, rgba(255,255,255,.06), transparent 55%),
+    linear-gradient(160deg,var(--cover-bg),var(--cover-deep));
+  box-shadow:inset 0 0 120px -30px rgba(0,0,0,.8), inset 0 0 0 1px rgba(216,189,122,.14)}
+#cover.on{display:flex}
+#cover::before{content:"";position:absolute;left:0;top:0;bottom:0;width:24px;pointer-events:none;
+  background:repeating-linear-gradient(0deg, rgba(216,189,122,.10) 0 2px, transparent 2px 10px),
+    linear-gradient(90deg, rgba(0,0,0,.4), transparent)}
+.cv-frame{position:absolute;inset:12px;pointer-events:none;
+  border:1px solid rgba(216,189,122,.4);
+  box-shadow:inset 0 0 0 4px var(--cover-bg), inset 0 0 0 5px rgba(216,189,122,.28),
+    inset 0 1px 0 rgba(255,255,255,.08), inset 0 -18px 26px -20px rgba(0,0,0,.9)}
+.cv-inner{display:flex;align-items:center;gap:22px;min-height:0;animation:bb-fade .6s ease-out}
+.cv-title{writing-mode:vertical-rl;font-family:var(--ff-callig);font-weight:400;
+  font-size:calc(var(--fs-base) * 4.4);line-height:1.08;letter-spacing:.18em;color:#efe3c4;
+  text-shadow:0 2px 18px rgba(216,189,122,.28)}
+.cv-side{display:flex;flex-direction:column;align-items:center;gap:10px;height:100%}
+/* ★ 2026-10-15 真根因修复：竖排副题 19 字 × (13.8×1.22) ≈ 320px，比书名还高，且侧栏预算只有
+   `封面高 − 印章 − 计数 − 间距`，两头都不够 ⇒ 溢出被页面上下一裁、还压住「翻 开」。
+   治法不是"截断藏字"（那只是把丢字藏起来：实测 PC 也在丢），而是**把字距收进预算**：
+   `.22em → .10em` 后 19 字 ≈ 288px ≤ 293px（PC 预算），矮屏再由断点按 token 降一档 ≈ 245px ≤ 274px。
+   下面那条 max-height/overflow 只是**护栏**：设备系统字体度量与桌面不同时兜住，正常尺寸下不触发
+   （每次改完都用真实浏览器量过 scrollHeight ≤ clientHeight）。 */
+.cv-sub{font-family:var(--ff-title);font-size:var(--fs-cap);letter-spacing:.10em;color:rgba(232,226,209,.72);
+  writing-mode:vertical-rl}
+/* 竖排（vertical-rl）不折列 ⇒ 高度不够时只能截断，否则整块溢出：既被页面上下裁切，又压住
+   下方「翻 开」。统一规则（不分手机/桌面）：① min-height:0 让 .cv-inner 在矮容器里正常收缩
+   （flex 项默认 min-height:auto = 内容高度，拒绝收缩 → 溢出）；② .cv-side 取 height:100%，
+   百分比才有解析对象，矮容器里 .cv-sub 才能跟着收（max-height:100% 兜上限，overflow:hidden
+   把自动最小尺寸归零，flex 收缩才生效）。字号因此只需一套（--fs-base 派生），不必为手机分档。
+   桌面高度充足 ⇒ 百分比不触发 ⇒ 零截断、零变化。 */
+.cv-title,.cv-sub{max-height:100%;overflow:hidden}
+/* 朱印进度章（内联 SVG 由 JS 注入） */
+.cv-seal{width:64px;height:64px;filter:drop-shadow(0 2px 6px rgba(0,0,0,.5))}
+.cv-count{font-family:var(--ff-num);font-variant-numeric:tabular-nums;font-size:var(--fs-cap);
+  color:rgba(232,226,209,.8);letter-spacing:.06em}
+.cv-hint{margin-top:6px;font-family:var(--ff-title);font-size:var(--fs-body);letter-spacing:.5em;
+  color:var(--gold-hi);opacity:.85;animation:cv-breathe 2.2s ease-in-out infinite}
+@keyframes cv-breathe{0%,100%{opacity:.45}50%{opacity:.95}}
+.cv-line{width:120px;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(216,189,122,.6),transparent)}
+
+/* ============================================================
+   序 · 战功总览（§6.3.1）
+   ============================================================ */
+.pre-wrap{display:flex;flex-wrap:wrap;gap:12px 26px;align-items:flex-start}
+.pre-left{flex:1 1 240px;min-width:0;display:flex;flex-direction:column;gap:8px}
+.pre-right{flex:1 1 260px;min-width:0;display:flex;flex-direction:column;gap:10px}
+.pre-big{display:flex;align-items:baseline;gap:6px;font-family:var(--ff-num);font-variant-numeric:tabular-nums}
+.pre-big b{font-family:var(--ff-callig);font-weight:700;font-size:var(--fs-display);color:var(--cinnabar);line-height:1}
+.pre-big span{font-size:var(--fs-menu);color:var(--ink-dim)}
+.pre-tiers{display:flex;flex-wrap:wrap;gap:5px 10px}
+.tier-chip{display:flex;align-items:center;gap:5px;font-size:var(--fs-cap);color:var(--ink)}
+.tier-chip i{width:8px;height:8px;border-radius:2px;display:inline-block}
+.tier-chip b{font-family:var(--ff-num);font-variant-numeric:tabular-nums;font-weight:400;color:var(--ink-dim)}
+.pre-quote{font-family:var(--ff-title);font-size:var(--fs-lead);letter-spacing:.2em;color:var(--ink);opacity:.85}
+.pre-quote small{display:block;margin-top:4px;font-size:var(--fs-tiny);letter-spacing:.3em;color:var(--ink-dim)}
+.sect-cap{font-family:var(--ff-title);font-size:var(--fs-cap);letter-spacing:.2em;color:var(--ink-dim);
+  padding-left:7px;position:relative}
+.sect-cap::before{content:"";position:absolute;left:0;top:.1em;bottom:.1em;width:2px;background:var(--gold);transform:skewY(-10deg)}
+.sbars{display:flex;flex-direction:column;gap:5px}
+.srow{display:flex;align-items:center;gap:8px;min-width:0}
+.srow .sk{flex:0 0 34px;font-family:var(--ff-title);font-size:var(--fs-cap);letter-spacing:.1em;color:var(--ink)}
+.srow .sb{flex:1 1 40px;min-width:36px;height:5px;border-radius:3px;background:rgba(122,114,100,.18);overflow:hidden}
+.srow .sb i{display:block;height:100%;background:linear-gradient(90deg,var(--cinnabar),#c04a58);border-radius:3px;transition:width .4s ease-out}
+.srow .sv{flex:0 0 auto;font-family:var(--ff-num);font-variant-numeric:tabular-nums;font-size:var(--fs-tiny);color:var(--ink-dim)}
+.recent{display:flex;flex-direction:column}
+/* v4.2 速通榜（最快轮数）/ 魔王方战绩 / 隐藏开关 */
+.spd{display:flex;flex-direction:column}
+.spd-row{display:flex;align-items:baseline;gap:6px;padding:2px 0;border-bottom:1px dashed var(--line-2,rgba(140,120,80,.25));font-size:var(--fs-tiny)}
+.spd-row:last-child{border-bottom:0}
+.spd-rk{width:1.4em;color:var(--gold);font-family:var(--ff-num)}
+.spd-nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.spd-v{font-family:var(--ff-num);color:var(--ink);opacity:.85}
+.pre-note{margin-top:2px;font-size:var(--fs-tiny);color:var(--ink-dim);letter-spacing:.05em}
+.pre-note b{color:var(--ink);font-family:var(--ff-num)}
+.pre-toggle{margin-top:6px;padding-top:6px;border-top:1px dashed var(--line-2,rgba(140,120,80,.25));
+  font-size:var(--fs-tiny);color:var(--ink-dim);display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.pre-toggle input{accent-color:var(--gold)}
+.pre-toggle small{opacity:.7}
+.frow{display:flex;align-items:baseline;gap:8px;font-size:var(--fs-body);padding:5px 0;
+  border-bottom:1px solid transparent;
+  background-image:linear-gradient(90deg,transparent,rgba(122,114,100,.28) 18%,rgba(122,114,100,.28) 82%,transparent);
+  background-size:100% 1px;background-position:bottom left;background-repeat:no-repeat}
+.frow:last-child{background-image:none}
+.frow .fd{flex:0 0 auto;font-family:var(--ff-num);font-variant-numeric:tabular-nums;font-size:var(--fs-cap);color:var(--ink-dim)}
+.frow .fn{flex:1 1 auto;min-width:0;font-family:var(--ff-title);letter-spacing:.06em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.frow .ft{flex:0 0 auto;font-size:var(--fs-tiny);color:var(--ink-dim);letter-spacing:.08em}
+.frow .fdot{flex:0 0 auto;width:6px;height:6px;border-radius:50%;background:var(--cinnabar);align-self:center}
+/* 空态（数据未到 / 为空必须优雅空态） */
+.bb-empty{font-family:var(--ff-title);font-size:var(--fs-body);letter-spacing:.14em;color:var(--ink-dim);
+  padding:14px 4px;line-height:2}
+
+/* ============================================================
+   卷（卷扉 + 条目卡网格）
+   ============================================================ */
+.vol-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:8px}
+.vol-num{font-family:var(--ff-callig);font-size:calc(var(--fs-base) * 2.1);line-height:1;color:var(--ink)}
+.vol-name{font-family:var(--ff-title);font-weight:700;font-size:var(--fs-title);letter-spacing:.14em;color:var(--cinnabar)}
+.vol-hint{font-size:var(--fs-cap);letter-spacing:.08em;color:var(--ink-dim)}
+.vol-count{margin-left:auto;font-family:var(--ff-num);font-variant-numeric:tabular-nums;
+  font-size:var(--fs-cap);color:var(--ink-dim)}
+/* ★ v6.9：筛选 chips（分卷页） */
+.fchips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 8px}
+.fchip{border:1px solid var(--line);background:var(--paper-2);color:var(--ink-dim);border-radius:999px;
+  font-size:12px;padding:4px 12px;cursor:pointer;font-family:var(--ff-body);letter-spacing:.04em}
+.fchip.on{background:var(--cinnabar);border-color:var(--cinnabar);color:#fff;font-weight:600}
+.vgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+/* ---------- 外传 · 异界来客（批次 A）：外传卷内追加区块，沿用卷扉/名帖审美 ---------- */
+.ext-sect{margin-top:16px;padding-top:10px;
+  background-image:linear-gradient(90deg,transparent,rgba(176,141,62,.34) 22%,rgba(176,141,62,.34) 78%,transparent);
+  background-size:100% 1px;background-position:top left;background-repeat:no-repeat}
+.ext-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:8px}
+
+/* ---------- 条目卡（名帖）双态 + 翻卡背 ---------- */
+.bcard{position:relative;cursor:pointer;min-width:0;aspect-ratio:3/4.4;perspective:700px}
+.cin{position:relative;width:100%;height:100%;transform-style:preserve-3d;
+  transition:transform .5s cubic-bezier(.3,.7,.3,1)}
+.bcard.flipped .cin{transform:rotateY(180deg)}
+.cf{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;
+  display:flex;flex-direction:column;overflow:hidden;border-radius:7px}
+.cfront{background:linear-gradient(180deg,#fbf6e9,#efe7d2);border:1px solid var(--line-ink);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.5), inset 0 -14px 22px -18px rgba(58,47,36,.8)}
+.cback{transform:rotateY(180deg);background:linear-gradient(180deg,#332b21,#262017);color:#e8e2d2;
+  border:1px solid rgba(216,189,122,.3);padding:9px 10px;gap:5px;
+  box-shadow:inset 0 1px 0 rgba(216,189,122,.18)}
+.cimg{position:relative;flex:1 1 auto;min-height:0;overflow:hidden;background:#e7dfc9}
+.cimg img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:top;
+  transition:filter .3s ease}
+.bcard:not(.killed) .cimg img{filter:grayscale(.9) brightness(.45)}
+/* 立绘缺失回退：姓氏字格 */
+.surname{position:absolute;inset:0;display:none;align-items:center;justify-content:center;
+  font-family:var(--ff-callig);font-size:calc(var(--fs-base) * 2.6);color:var(--ink-dim);
+  background:linear-gradient(180deg,#efe7d2,#e0d6bc)}
+.noimg .surname{display:flex}
+.noimg img{display:none}
+.cinfo{flex:0 0 auto;display:flex;align-items:center;gap:5px;padding:5px 7px;min-width:0}
+.cname{flex:0 1 auto;min-width:0;font-family:var(--ff-title);font-weight:700;font-size:var(--fs-body);
+  letter-spacing:.06em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctier{flex:0 0 auto;font-size:var(--fs-tiny);color:#fff;padding:1px 6px;border-radius:3px;letter-spacing:.1em}
+.cmeta{flex:0 0 auto;display:flex;align-items:baseline;gap:6px;padding:0 7px 6px;min-height:15px}
+.cdate{font-family:var(--ff-num);font-variant-numeric:tabular-nums;font-size:var(--fs-tiny);color:var(--ink-dim)}
+.cnum{font-family:var(--ff-num);font-variant-numeric:tabular-nums;font-size:var(--fs-tiny);color:var(--cinnabar)}
+/* 未讨：虚线空印框 + 墨字 */
+.unseal{position:absolute;right:6px;bottom:6px;width:30px;height:30px;border:1.5px dashed rgba(122,114,100,.55);
+  border-radius:5px;display:flex;align-items:center;justify-content:center;
+  font-family:var(--ff-title);font-size:var(--fs-tiny);color:var(--ink-dim);letter-spacing:.05em}
+/* 已讨：朱砂「讨」印（斜盖 rotate(-8deg)） */
+.seal-t{position:absolute;right:6px;bottom:6px;width:30px;height:30px;border-radius:5px;
+  display:flex;align-items:center;justify-content:center;
+  background:var(--cinnabar);color:#fff;font-family:var(--ff-title);font-weight:700;
+  font-size:var(--fs-body);transform:rotate(-8deg);
+  box-shadow:0 1px 4px rgba(0,0,0,.35), inset 0 0 0 1.5px rgba(255,255,255,.28)}
+/* 墨迹未干（未阅新击破）：印以 1.6 倍落下微抖定格 + 微光（§6.3.4 最出彩时刻） */
+@keyframes stamp-in{0%{transform:scale(1.6) rotate(-8deg);opacity:0}62%{transform:scale(.94) rotate(-8deg);opacity:1}
+  78%{transform:scale(1.04) rotate(-8deg)}100%{transform:scale(1) rotate(-8deg);opacity:1}}
+@keyframes fresh-glow{0%,100%{box-shadow:0 1px 4px rgba(0,0,0,.35),0 0 4px rgba(155,34,52,.4)}
+  50%{box-shadow:0 1px 4px rgba(0,0,0,.35),0 0 14px rgba(155,34,52,.85)}}
+.bcard.fresh .seal-t{animation:stamp-in .5s cubic-bezier(.2,.7,.3,1) both, fresh-glow 1.8s ease-in-out .5s infinite}
+@media (prefers-reduced-motion:reduce){
+  .bcard.fresh .seal-t{animation:fresh-glow 1.8s ease-in-out infinite}
+}
+/* 卡背（档案） */
+.cb-title{font-family:var(--ff-title);font-size:var(--fs-lead);letter-spacing:.1em;color:#f0dfae;text-align:center}
+.cb-row{display:flex;justify-content:space-between;gap:8px;font-size:var(--fs-tiny);color:rgba(232,226,209,.85)}
+.cb-row b{font-family:var(--ff-num);font-variant-numeric:tabular-nums;font-weight:400;color:rgba(232,226,209,.95)}
+/* 未讨伐收尾语（v5.2）：去破折号分两行 + 楷体（"悬而未决"的碑刻感） */
+.cb-annal.annal-empty{font-family:"KaiTi","Kaiti SC","楷体",var(--ff-body);letter-spacing:.24em}
+.cb-annal{margin-top:auto;padding-top:6px;font-family:var(--ff-title);font-size:var(--fs-cap);
+  letter-spacing:.1em;line-height:1.7;color:#d8bd7a;text-align:center;border-top:1px solid transparent;
+  background-image:linear-gradient(90deg,transparent,rgba(216,189,122,.4) 22%,rgba(216,189,122,.4) 78%,transparent);
+  background-size:100% 1px;background-position:top left;background-repeat:no-repeat}
+
+/* ============================================================
+   跋（§6.3.1）：全收集金印「圆满」（总量动态读 roster）；未满 = 留待书写
+   ============================================================ */
+.epi{min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center}
+.epi-seal{width:110px;height:110px;filter:drop-shadow(0 2px 10px rgba(176,141,62,.4))}
+.epi-date{font-family:var(--ff-num);font-variant-numeric:tabular-nums;font-size:var(--fs-menu);color:var(--ink)}
+.epi-wait{font-family:var(--ff-title);font-size:var(--fs-title);letter-spacing:.4em;color:var(--ink-dim);opacity:.7}
+.epi-note{font-size:var(--fs-cap);letter-spacing:.2em;color:var(--ink-dim);line-height:2}
+
+/* ============================================================
+   丝带书签（§6.3）：朱红燕尾，停在第一个未完成卷的卷扉页顶
+   ============================================================ */
+.ribbon{position:absolute;top:0;right:22px;width:11px;height:70px;z-index:6;pointer-events:none;
+  background:linear-gradient(180deg,#b13547,var(--cinnabar));
+  clip-path:polygon(0 0,100% 0,100% 100%,50% calc(100% - 9px),0 100%);
+  box-shadow:0 2px 6px rgba(0,0,0,.35)}
+
+/* ============================================================
+   紧凑断点（art-direction §4.3：手机横屏 915×412 比桌面断点宽 —— 红线）
+   只做三件事：收留白 / 改密度 / 换档字号，不藏信息。
+   ============================================================ */
+@media (max-height:640px),(max-width:899px){
+  .phead{min-height:28px;padding:4px 10px 2px 26px}
+  .pt-name{font-size:var(--fs-lead)}
+  .pbody{padding:6px 10px 8px 26px}
+  .pfoot{min-height:30px;padding:3px 8px 4px 20px}
+  .pg-btn{width:30px;height:25px}
+  /* 封面：一屏完整（2026-10-15 作者实机反馈：手机横屏 915×412 封面竖排整块溢出、上下被裁
+     且压住「翻 开」——**真正的病根是 .cv-sub 副题（19 字竖排 ≈ 320px，比书名还高且毫无
+     高度约束）**，降书名治不了它。修法：把字距收进预算（.22em → .10em）+ 此处按 token 降一档，
+     实测两头都放得下、零截断（不是靠 overflow 藏字）。 */
+  .cv-seal{width:50px;height:50px}
+  .cv-inner{gap:14px}
+  .cv-sub{font-size:calc(var(--fs-cap) * .88);letter-spacing:.06em}
+  /* 序：左右两栏改上下紧凑排 */
+  .pre-big b{font-size:calc(var(--fs-base) * 1.9)}
+  .pre-wrap{gap:8px 18px}
+  /* 卷扉收档 */
+  .vol-num{font-size:calc(var(--fs-base) * 1.7)}
+  .vol-name{font-size:var(--fs-menu)}
+  /* ★ 2026-10-16 深夜（作者："画面利用率太低了"）：旧规则"竖屏 2 列 / 横屏 112px"在
+     中宽度窗口下只出 2 列（一张卡占半屏）——统一改**自适应密排**：列数随宽度吃满。 */
+  .vgrid{grid-template-columns:repeat(auto-fill,minmax(172px,1fr));gap:8px}
+  @media (min-width:900px){
+    .vgrid{grid-template-columns:repeat(auto-fill,minmax(172px,1fr))}
+  }
+  .bcard{aspect-ratio:3/4}
+  .ribbon{height:54px;right:16px}
+}
+</style>
+</head>
+<body>
+<div id="book"></div>
+
+<script>
+(function () {
+"use strict";
+
+/* ============================================================
+   桥（照 career.html 双通道先例：先桥后兜底）
+   ============================================================ */
+var Bridge = (function () {
+  try {
+    var T = CSHPage.transport({ closeName: 'bossbook-close', timeout: 2500 });
+    return { active: !!T.active, call: T.call };
+  } catch (e) { return { active: false, call: function () {} }; }
+})();
+
+function $(s) { return document.querySelector(s); }
+function el(t, c, x) { var e = document.createElement(t); if (c) e.className = c; if (x != null) e.textContent = x; return e; }
+function esc(s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
+/* 称号清洗（2026-10-14 · 作者实机："点开印后出现这个东西"——卡片背面把
+   lib.characterTitle 的 HTML 源码整段显示）：称号数据是引擎/十周年UI 风格的
+   内联 HTML（<b class='ct...'><i>铁铸亡魂</i></b> / 带 style 的谥号 <span>…</span>），
+   本页没有对应 CSS，textContent 渲染即显源码。清洗 = 剥标签（成对 <i> 之间用
+   空格分隔）+ 常见实体还原 + 空白压缩；本页按纯文本呈现（书册审美不需要花哨样式）。 */
+function cleanTitle(s) {
+  return String(s == null ? "" : s)
+    .replace(/<br\s*\/?>/gi, " ")
+    .replace(/<\/(i|b|span|em|strong)>/gi, " ")
+    .replace(/<[^>]*>/g, "")
+    .replace(/&lt;/gi, "<").replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"').replace(/&#39;/gi, "'").replace(/&nbsp;/gi, " ").replace(/&amp;/gi, "&")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/* ============================================================
+   静态表：八卷 / 四档 / 汉字
+   ============================================================ */
+var SERIES = [
+  { key: "cuifeng",  name: "摧锋", num: "壹", hint: "杀命中拆牌，清手处决" },
+  { key: "zhoutian", name: "周天", num: "贰", hint: "每轮自净判定区并回复" },
+  { key: "fulan",    name: "覆澜", num: "叁", hint: "停手者被夺走一张牌" },
+  { key: "huichuan", name: "汇川", num: "肆", hint: "多摸两张，手牌上限 +2" },
+  { key: "fuguang",  name: "浮光", num: "伍", hint: "每轮首刀砍在影子上" },
+  { key: "jinhuo",   name: "烬火", num: "陆", hint: "伤害点燃，回合开始灼烧" },
+  { key: "jingting", name: "惊霆", num: "柒", hint: "回合变换三形态" },
+  /* ★ key 必须与 summary().roster[].series 同源：那是 csh_bossdata 的 SERIES 键
+     **去掉 csh_ 前缀**（csh_qunyou_lunwai → qunyou_lunwai）。
+     此前这里写 "luanru"（= 系列技名 csh_boss_luanru 的后半），与数据键不同源 →
+     seriesList("luanru") 恒返回空数组 → 序页「外传 0/0」、卷八「此卷尚无名册」
+     且把平凡之人从卷八里整条吞掉（2026-10-15 作者截图实证）。 */
+  { key: "qunyou_lunwai", name: "外传", num: "捌", hint: "乱入者不循常理" }
+];
+var TIERS = [
+  { key: "ultimate", name: "究极", color: "#9b2234" },
+  { key: "lord",     name: "霸主", color: "#a07f2e" },
+  { key: "egg",      name: "彩蛋", color: "#7d5f8c" },
+  { key: "elite",    name: "精英", color: "#5a544a" }
+];
+var TIER_RANK = { ultimate: 0, lord: 1, egg: 2, elite: 3 };
+/* 外传角标（批次 A）：非池子魔将的 BOSS —— 黛蓝（与四档色均不撞） */
+var EXT_TIER = { name: "传", color: "#356a8a" };
+var CN = ["零", "一", "二", "三", "四", "五", "六", "七", "八", "九", "十"];
+var SEEN_KEY = "csh_bossbook_seen";
+var DWELL_MS = 600;
+
+/* ============================================================
+   数据与状态
+   ============================================================ */
+var Data = { boss: null, ext: null, seen: 0, fresh: {}, hollow: false };
+/* v4.2：隐藏已讨伐开关（与 main/bossmode.js 同键） */
+var HIDE_KEY = "csh_boss_hide_killed";
+var cur = -1;
+var pages = [];            /* {elm, name, num} */
+var dwellT = 0;
+var fxOK = (typeof window.matchMedia !== "function" || !window.matchMedia("(prefers-reduced-motion: reduce)").matches)
+  && (navigator.hardwareConcurrency == null || navigator.hardwareConcurrency > 2);
+
+function roster() { return (Data.boss && Data.boss.roster) || []; }
+function mapOf() { return (Data.boss && Data.boss.map) || {}; }
+function killRec(rec) {
+  var m = mapOf()[rec.id];
+  return (m && m.n > 0) ? m : null;
+}
+function killedCount() {
+  var r = roster(), m = mapOf(), n = 0;
+  for (var i = 0; i < r.length; i++) { var k = m[r[i].id]; if (k && k.n > 0) n++; }
+  return n;
+}
+/* 外传（批次 A）：{ kill, total, roster, map }——map = 击破明细（summary().ext） */
+function extData() { return Data.ext || { kill: 0, total: 0, roster: [], map: {} }; }
+function extRec(id) { var m = extData().map; var r = m && m[id]; return (r && r.n > 0) ? r : null; }
+function tierTotal(tk) { var n = 0, r = roster(); for (var i = 0; i < r.length; i++) if (r[i].tier === tk) n++; return n; }
+function tierKilled(tk) {
+  var n = 0, r = roster(), m = mapOf();
+  for (var i = 0; i < r.length; i++) if (r[i].tier === tk && m[r[i].id] && m[r[i].id].n > 0) n++;
+  return n;
+}
+function seriesList(sk) {
+  var out = [], r = roster();
+  for (var i = 0; i < r.length; i++) if (r[i].series === sk) out.push(r[i]);
+  /* 卷内按档位排序 ultimate > lord > egg > elite */
+  out.sort(function (a, b) { return (TIER_RANK[a.tier] || 9) - (TIER_RANK[b.tier] || 9); });
+  return out;
+}
+function getSeen() { try { return parseInt(localStorage.getItem(SEEN_KEY), 10) || 0; } catch (e) { return 0; } }
+function saveSeen(v) { try { localStorage.setItem(SEEN_KEY, String(v)); } catch (e) {} }
+
+/* ---------- 日期 ---------- */
+function p2(n) { return (n < 10 ? "0" : "") + n; }
+function fmtDate(ts) { var d = new Date(ts); return d.getFullYear() + "." + p2(d.getMonth() + 1) + "." + p2(d.getDate()); }
+function fmtMD(ts) { var d = new Date(ts); return p2(d.getMonth() + 1) + "." + p2(d.getDate()); }
+function seasonOf(d) {
+  var m = d.getMonth();                    /* 0-based：立春起算 */
+  if (m >= 1 && m <= 3) return "春";
+  if (m >= 4 && m <= 6) return "夏";
+  if (m >= 7 && m <= 9) return "秋";
+  return "冬";
+}
+function ganzhi(y) {
+  var S = "甲乙丙丁戊己庚辛壬癸", B = "子丑寅卯辰巳午未申酉戌亥";
+  return S.charAt(((y - 4) % 10 + 10) % 10) + B.charAt(((y - 4) % 12 + 12) % 12);
+}
+function cnNum(n) { return (n >= 0 && n <= 10) ? CN[n] : String(n); }
+
+/* ---------- 讨伐纪要（由数据生成，6 种模板按 n 与间隔选，§6.3.2）---------- */
+function annal(m) {
+  var n = Math.max(1, m.n || 1);
+  var d1 = new Date(m.first || m.last), d2 = new Date(m.last || m.first);
+  var span = Math.max(0, d2 - d1);
+  if (n === 1) return ganzhi(d1.getFullYear()) + "年" + seasonOf(d1) + " · 初讨即捷";
+  if (n === 2 && span < 86400000) return "同日再战 · 两讨连捷";
+  if (n === 2) return "再度交锋 · 亦克之";
+  if (n <= 4) return cnNum(n) + "度交锋 · 皆克之";
+  if (span < 86400000) return cnNum(n) + "连讨 · 一日尽克";
+  return "讨 " + n + " 次 · 屡战皆克";
+}
+
+/* ============================================================
+   程序化印章（内联 SVG，§6.3.3 零新资源）
+   ============================================================ */
+function sealSvg(txt, bg, fg, gradId) {
+  var fill = bg, extra = "";
+  if (gradId) {
+    fill = "url(#" + gradId + ")";
+    extra = "<defs><linearGradient id='" + gradId + "' x1='0' y1='0' x2='0' y2='1'>" +
+      "<stop offset='0' stop-color='#e8cf92'/><stop offset='1' stop-color='#a5822f'/></linearGradient></defs>";
+  }
+  var n = String(txt).length;
+  var fsz = n <= 1 ? 46 : (n === 2 ? 34 : 27);
+  return "<svg viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'>" + extra +
+    "<rect x='5' y='5' width='90' height='90' rx='9' fill='" + fill + "'/>" +
+    "<rect x='9' y='9' width='82' height='82' rx='6' fill='none' stroke='" + fg + "' stroke-opacity='.55' stroke-width='2'/>" +
+    "<text x='50' y='50' text-anchor='middle' dominant-baseline='central' dy='.04em' " +
+    "font-family='" + "Noto Serif SC,Source Han Serif SC,STSong,SimSun,serif' font-weight='700' " +
+    "font-size='" + fsz + "' fill='" + fg + "'>" + esc(txt) + "</text></svg>";
+}
+/* 金印「圆满」：两字竖排 */
+function goldSealSvg() {
+  return "<svg viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'>" +
+    "<defs><linearGradient id='bb-gold' x1='0' y1='0' x2='0' y2='1'>" +
+    "<stop offset='0' stop-color='#ecd9a0'/><stop offset='1' stop-color='#9c7c2c'/></linearGradient></defs>" +
+    "<rect x='4' y='4' width='92' height='92' rx='8' fill='url(#bb-gold)'/>" +
+    "<rect x='9' y='9' width='82' height='82' rx='5' fill='none' stroke='#fff' stroke-opacity='.5' stroke-width='2'/>" +
+    "<text x='50' y='31' text-anchor='middle' font-family='Noto Serif SC,STSong,SimSun,serif' font-weight='700' font-size='30' fill='#4a3a12'>圆</text>" +
+    "<text x='50' y='68' text-anchor='middle' font-family='Noto Serif SC,STSong,SimSun,serif' font-weight='700' font-size='30' fill='#4a3a12'>满</text></svg>";
+}
+
+/* ============================================================
+   骨架构建：封面 + 序 + 八卷 + 跋（共 11 页）
+   ============================================================ */
+function makePage(name, num) {
+  var p = el("section", "page");
+  var head = el("header", "phead");
+  /* 【2026-10-14 · 作者实机×2】「封面」从页眉右侧**移到最左**：
+     右上角与壳悬浮层（余额胶囊 + ✕）反复争夺像素，改由页面侧彻底让位——
+     封面按钮去左侧（返回类按钮的左上惯例），右上角整块交给壳（dock 右让规则保留兜底）。 */
+  var home = el("button", "pt-home", "封面");
+  home.type = "button";
+  home.addEventListener("click", function () { go(0); }, false);
+  head.appendChild(home);
+  head.appendChild(el("span", "pt-name", name));
+  head.appendChild(el("span", "pt-num", num ? "· " + num + " ·" : ""));
+  p.appendChild(head);
+
+  var body = el("div", "pbody");
+  p.appendChild(body);
+
+  var foot = el("footer", "pfoot");
+  var prev = el("button", "pg-btn", "‹"); prev.type = "button";
+  var next = el("button", "pg-btn", "›"); next.type = "button";
+  prev.addEventListener("click", function () { go(cur - 1); }, false);
+  next.addEventListener("click", function () { go(cur + 1); }, false);
+  var jump = el("nav", "pg-jump");
+  for (var i = 0; i < SERIES.length; i++) {
+    (function (si) {
+      var b = el("button", "", SERIES[si].name);
+      b.type = "button";
+      b.addEventListener("click", function () { go(2 + si); }, false);
+      jump.appendChild(b);
+    })(i);
+  }
+  foot.appendChild(prev); foot.appendChild(jump); foot.appendChild(next);
+  p.appendChild(foot);
+  p._body = body; p._prev = prev; p._next = next; p._jump = jump;
+  return p;
+}
+
+function buildAll() {
+  var book = $("#book");
+  book.innerHTML = "";
+
+  /* 封面 */
+  var cv = el("section", "page"); cv.id = "cover";
+  cv.appendChild(el("div", "cv-frame"));
+  var inner = el("div", "cv-inner");
+  inner.appendChild(el("div", "cv-title", "讨伐录"));
+  var side = el("div", "cv-side");
+  side.appendChild(el("div", "cv-sub", "池子魔将 · 挑战模式 · 全讨伐记录"));
+  var sealBox = el("div", "cv-seal"); sealBox.id = "cv-seal";
+  side.appendChild(sealBox);
+  var count = el("div", "cv-count", "—");
+  count.id = "cv-count";
+  side.appendChild(count);
+  inner.appendChild(side);
+  cv.appendChild(inner);
+  cv.appendChild(el("div", "cv-line"));
+  cv.appendChild(el("div", "cv-hint", "翻 开"));
+  cv.addEventListener("click", function () { go(1); }, false);
+  book.appendChild(cv);
+  pages.push({ elm: cv, name: "封面", num: "" });
+
+  /* 序 */
+  var pre = makePage("序 · 战功总览", CN[1]);
+  pre._body.id = "pre-body";
+  book.appendChild(pre);
+  pages.push({ elm: pre, name: "序 · 战功总览", num: CN[1] });
+
+  /* 八卷 */
+  for (var i = 0; i < SERIES.length; i++) {
+    var v = makePage("卷" + CN[i + 1] + " · " + SERIES[i].name, CN[i + 2]);
+    v._body.id = "vol-" + i;
+    book.appendChild(v);
+    pages.push({ elm: v, name: "卷" + CN[i + 1] + " · " + SERIES[i].name, num: CN[i + 2], vol: i });
+  }
+
+  /* 跋 */
+  var epi = makePage("跋", CN[10]);
+  epi._body.id = "epi-body";
+  book.appendChild(epi);
+  pages.push({ elm: epi, name: "跋", num: CN[10] });
+}
+
+/* ============================================================
+   渲染：全部页面内容（数据到达后一次；空态优雅呈现）
+   ============================================================ */
+function renderAll() {
+  Data.seen = getSeen();
+  /* 未阅新击破集合：map[*].last > seen */
+  Data.fresh = {};
+  var m = mapOf();
+  for (var id in m) {
+    if (Object.prototype.hasOwnProperty.call(m, id) && m[id] && m[id].last > Data.seen) Data.fresh[id] = 1;
+  }
+  renderCover();
+  renderPreface();
+  renderVolumes();
+  renderEpilogue();
+  renderRibbon();
+}
+
+function renderCover() {
+  var k = killedCount();
+  $("#cv-seal").innerHTML = sealSvg(String(k), "var(--cinnabar)", "#f7efdd");
+  var total = roster().length;
+  $("#cv-count").textContent = total ? ("已讨 " + k + " / " + total) : "册页封存";
+}
+
+function renderPreface() {
+  var box = $("#pre-body");
+  box.innerHTML = "";
+  var r = roster();
+  if (Data.hollow || !r.length) {
+    box.appendChild(el("div", "bb-empty", "册页封存 —— 战功数据尚未誊入。完成一局挑战，击破魔王后归来。"));
+    return;
+  }
+  var wrap = el("div", "pre-wrap");
+  var left = el("div", "pre-left");
+  var big = el("div", "pre-big");
+  var kb = el("b", "", String(killedCount()));
+  big.appendChild(kb);
+  big.appendChild(el("span", "", "/ " + r.length));
+  left.appendChild(big);
+  var tiers = el("div", "pre-tiers");
+  for (var t = 0; t < TIERS.length; t++) {
+    var chip = el("span", "tier-chip");
+    var dot = el("i"); dot.style.background = TIERS[t].color;
+    chip.appendChild(dot);
+    chip.appendChild(document.createTextNode(TIERS[t].name + " "));
+    chip.appendChild(el("b", "", tierKilled(TIERS[t].key) + "/" + tierTotal(TIERS[t].key)));
+    tiers.appendChild(chip);
+  }
+  left.appendChild(tiers);
+  var q = el("div", "pre-quote", "凡所过之处，皆留一印。");
+  q.appendChild(el("small", "", "—— 序"));
+  left.appendChild(q);
+  /* v4.2 魔王方战绩（应战模式：扮演魔王） */
+  (function () {
+    var ab = (Data.boss && Data.boss.asBoss) || {};
+    var w = Number(ab.win) || 0, l = Number(ab.lose) || 0;
+    var note = el("div", "pre-note", "");
+    note.appendChild(document.createTextNode("亲征（扮演魔王）："));
+    note.appendChild(el("b", "", String(w))); note.appendChild(document.createTextNode(" 胜 · "));
+    note.appendChild(el("b", "", String(l))); note.appendChild(document.createTextNode(" 负"));
+    if (w + l > 0) {
+      note.appendChild(document.createTextNode(" · 胜率 " + Math.round(w / (w + l) * 100) + "%"));
+    }
+    left.appendChild(note);
+  })();
+  /* v4.2 隐藏已讨伐的魔王（开关写入 localStorage，挑战模式选魔列表生效） */
+  (function () {
+    var hid = false;
+    try { hid = localStorage.getItem(HIDE_KEY) === "1"; } catch (e0) {}
+    var box2 = el("div", "pre-toggle");
+    var lab = el("label", "", "");
+    var cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.checked = hid;
+    var hint = el("small", "", hid ? "（已开启 · 下次进入挑战模式生效）" : "（选魔列表，下次进入挑战模式生效）");
+    cb.addEventListener("change", function () {
+      try { localStorage.setItem(HIDE_KEY, cb.checked ? "1" : "0"); } catch (e1) {}
+      hint.textContent = cb.checked ? "（已开启 · 下次进入挑战模式生效）" : "（已关闭 · 挑战列表显示全部魔王）";
+    });
+    lab.appendChild(cb);
+    lab.appendChild(document.createTextNode(" 隐藏已讨伐的魔王"));
+    box2.appendChild(lab);
+    box2.appendChild(hint);
+    left.appendChild(box2);
+  })();
+  wrap.appendChild(left);
+
+  var right = el("div", "pre-right");
+  right.appendChild(el("div", "sect-cap", "八系列战功"));
+  var bars = el("div", "sbars");
+  for (var s = 0; s < SERIES.length; s++) {
+    var list = seriesList(SERIES[s].key);
+    var killed = 0;
+    for (var j = 0; j < list.length; j++) if (killRec(list[j])) killed++;
+    var vTot = list.length;
+    /* ★ 2026-10-16 深夜：外传条并入异界来客（动态名册）——与卷八「已讨 x / y」同口径
+       （作者反馈："外传显示 0/1"）。 */
+    if (SERIES[s].key === "qunyou_lunwai") {
+      killed += (Data.boss && Data.boss.extKill) || 0;
+      vTot += (Data.boss && Data.boss.extTotal) || 0;
+    }
+    var row = el("div", "srow");
+    row.appendChild(el("span", "sk", SERIES[s].name));
+    var bar = el("span", "sb"); var fill = el("i");
+    fill.style.width = (vTot ? Math.round(killed / vTot * 100) : 0) + "%";
+    bar.appendChild(fill);
+    row.appendChild(bar);
+    row.appendChild(el("span", "sv", killed + "/" + vTot));
+    bars.appendChild(row);
+  }
+  right.appendChild(bars);
+  right.appendChild(el("div", "sect-cap", "最近讨伐"));
+  var recent = el("div", "recent");
+  var flat = [];
+  for (var i2 = 0; i2 < r.length; i2++) { var kk = killRec(r[i2]); if (kk) flat.push({ rec: r[i2], m: kk }); }
+  flat.sort(function (a, b) { return (b.m.last || 0) - (a.m.last || 0); });
+  if (!flat.length) {
+    recent.appendChild(el("div", "bb-empty", "尚无击破记录。"));
+  }
+  for (var f = 0; f < flat.length && f < 5; f++) {
+    var row2 = el("div", "frow");
+    row2.appendChild(el("span", "fd", fmtMD(flat[f].m.last)));
+    row2.appendChild(el("span", "fn", flat[f].rec.name || "未知魔将"));
+    row2.appendChild(el("span", "ft", tierName(flat[f].rec.tier)));
+    if (Data.fresh[flat[f].rec.id]) row2.appendChild(el("span", "fdot"));
+    recent.appendChild(row2);
+  }
+  right.appendChild(recent);
+  /* v4.2 速通榜：最快击破 Top5（按轮数升序；同轮数按讨伐次数降序） */
+  (function () {
+    var rows = [];
+    for (var i3 = 0; i3 < r.length; i3++) {
+      var best = r[i3].best;
+      if (typeof best !== "number" || best <= 0) continue;
+      rows.push({ rec: r[i3], best: best, n: r[i3].n || 0 });
+    }
+    if (!rows.length) return;
+    rows.sort(function (a, b) { return (a.best - b.best) || (b.n - a.n); });
+    right.appendChild(el("div", "sect-cap", "速通榜 · 最快击破"));
+    var box3 = el("div", "spd");
+    for (var i4 = 0; i4 < rows.length && i4 < 5; i4++) {
+      var row3 = el("div", "spd-row");
+      row3.appendChild(el("span", "spd-rk", String(i4 + 1)));
+      row3.appendChild(el("span", "spd-nm", rows[i4].rec.name || "未知"));
+      row3.appendChild(el("span", "spd-v", rows[i4].best + " 轮"));
+      box3.appendChild(row3);
+    }
+    right.appendChild(box3);
+  })();
+  wrap.appendChild(right);
+  box.appendChild(wrap);
+}
+
+function tierName(tk) { for (var i = 0; i < TIERS.length; i++) if (TIERS[i].key === tk) return TIERS[i].name; return tk || "—"; }
+function tierColor(tk) { for (var i = 0; i < TIERS.length; i++) if (TIERS[i].key === tk) return TIERS[i].color; return "#5a544a"; }
+
+/* ---------- ★ v6.9（作者："分卷密排后加筛选，93+78 张卡翻起来才不累"）----------
+   筛选 = 全局同态（翻卷保持）：全部 / 已讨 / 未讨 / 四档位；外传卷的"异界来客"区块不受档位筛选影响。 */
+var VOLF = "all";
+var VOLF_OPTS = [["all", "全部"], ["killed", "已讨"], ["alive", "未讨"],
+  ["ultimate", "究极"], ["lord", "霸主"], ["egg", "彩蛋"], ["elite", "精英"]];
+function volPass(rec) {
+  var m = killRec(rec);
+  if (VOLF === "killed") return !!m;
+  if (VOLF === "alive") return !m;
+  if (VOLF === "all") return true;
+  return (rec.tier || "elite") === VOLF;
+}
+function renderVolumes() {
+  for (var i = 0; i < SERIES.length; i++) {
+    var box = $("#vol-" + i);
+    if (!box) continue;
+    box.innerHTML = "";
+    var list = seriesList(SERIES[i].key);
+    /* 卷扉 */
+    var killed = 0;
+    for (var j = 0; j < list.length; j++) if (killRec(list[j])) killed++;
+    /* ★ v6.9：筛选 chips（全局同态） */
+    var fr = el("div", "fchips");
+    VOLF_OPTS.forEach(function (opt) {
+      var ch = el("button", "fchip" + (VOLF === opt[0] ? " on" : ""), opt[1]);
+      ch.addEventListener("click", function () { VOLF = opt[0]; renderVolumes(); }, false);
+      fr.appendChild(ch);
+    });
+    box.appendChild(fr);
+    var head = el("div", "vol-head");
+    head.appendChild(el("span", "vol-num", "卷" + SERIES[i].num));
+    head.appendChild(el("span", "vol-name", SERIES[i].name));
+    head.appendChild(el("span", "vol-hint", SERIES[i].hint));
+    head.appendChild(el("span", "vol-count", list.length ? ("已讨 " + killed + " / " + list.length) : ""));
+    box.appendChild(head);
+    if (Data.hollow || !list.length) {
+      box.appendChild(el("div", "bb-empty", "此卷尚无名册。"));
+    } else {
+      /* 条目卡网格 */
+      var grid = el("div", "vgrid");
+      var shown = 0;
+      for (var c = 0; c < list.length; c++) {
+        if (!volPass(list[c])) continue;
+        grid.appendChild(buildCard(list[c], c)); shown++;
+      }
+      if (!shown) grid.appendChild(el("div", "bb-empty", "没有符合筛选的条目。"));
+      box.appendChild(grid);
+    }
+    /* 外传卷（捌）：卷内追加「异界来客」区块（非池子魔将的 BOSS · 动态枚举） */
+    if (SERIES[i].key === "qunyou_lunwai") renderExtSection(box);
+  }
+}
+
+function buildCard(rec, idx) {
+  var m = killRec(rec);
+  var card = el("div", "bcard" + (m ? " killed" : "") + (m && Data.fresh[rec.id] ? " fresh" : ""));
+  card.setAttribute("data-id", rec.id);
+  if (m && Data.fresh[rec.id]) card.setAttribute("data-fresh", "1");
+
+  var cin = el("div", "cin");
+  /* ---------- 正面（名帖） ---------- */
+  var front = el("div", "cf cfront");
+  var imgBox = el("div", "cimg");
+  imgBox.appendChild(el("span", "surname", (rec.name || "?").charAt(0)));
+  if (rec.img) {
+    var img = el("img");
+    img.setAttribute("loading", "lazy");           /* 按卷懒加载（§6.3.2） */
+    img.setAttribute("alt", rec.name || "");
+    var webp = "../image/" + rec.img + ".webp";
+    var jpg = "../image/" + rec.img + ".jpg";
+    img.addEventListener("error", function onW() {
+      img.removeEventListener("error", onW);
+      img.src = jpg;
+      img.addEventListener("error", function () { imgBox.classList.add("noimg"); }, false);
+    }, false);
+    img.src = webp;
+    imgBox.appendChild(img);
+  } else {
+    imgBox.classList.add("noimg");
+  }
+  /* 朱印 / 空印框 */
+  if (m) {
+    var seal = el("div", "seal-t", "讨");
+    if (Data.fresh[rec.id]) seal.style.animationDelay = (idx % 12) * 120 + "ms";   /* 逐条依次补盖 */
+    imgBox.appendChild(seal);
+  } else {
+    imgBox.appendChild(el("div", "unseal", "印"));
+  }
+  front.appendChild(imgBox);
+  var info = el("div", "cinfo");
+  info.appendChild(el("span", "cname", rec.name || "未知"));
+  var tg = el("span", "ctier", tierName(rec.tier));
+  tg.style.background = tierColor(rec.tier);
+  info.appendChild(tg);
+  front.appendChild(info);
+  var meta = el("div", "cmeta");
+  if (m) {
+    if (m.first) meta.appendChild(el("span", "cdate", fmtDate(m.first)));
+    if (m.n >= 2) meta.appendChild(el("span", "cnum", m.n + " 讨"));
+    if (typeof m.best === "number" && m.best > 0) meta.appendChild(el("span", "cnum", "最快 " + m.best + " 轮"));
+  } else {
+    meta.appendChild(el("span", "cdate", "未 讨"));
+  }
+  front.appendChild(meta);
+  cin.appendChild(front);
+
+  /* ---------- 背面（档案） ---------- */
+  var back = el("div", "cf cback");
+  /* 称号展示（2026-10-14 修复）：清洗 HTML 再显示；超长称号（谥号流 40+ 字，
+     如「开天行道肇纪立极…」）按长度动态缩字号 + 限高可滚，防止撑爆卡片背面。 */
+  var titleTxt = cleanTitle(rec.title) || rec.name || "—";
+  var titleEl = el("div", "cb-title", titleTxt);
+  if (titleTxt.length > 16) {
+    titleEl.style.fontSize = Math.max(9, Math.floor(18 * 16 / titleTxt.length)) + "px";
+    titleEl.style.letterSpacing = "0.04em";
+    titleEl.style.lineHeight = "1.5";
+    titleEl.style.maxHeight = "4.5em";
+    titleEl.style.overflowY = "auto";
+  }
+  back.appendChild(titleEl);
+  var mkRow = function (k, v) {
+    var row = el("div", "cb-row");
+    row.appendChild(el("span", "", k));
+    var b = el("b", "", v);
+    row.appendChild(b);
+    return row;
+  };
+  back.appendChild(mkRow("档位", tierName(rec.tier)));
+  back.appendChild(mkRow("技能", (rec.skillCount != null ? rec.skillCount : "—") + " 个"));
+  /* v6.1 难度分（百分制 · 数据层 difficultyOf 派生，页面只读不重算） */
+  if (typeof rec.diff === "number") back.appendChild(mkRow("难度", rec.diff + " · " + (rec.diffName || "")));
+  if (m) {
+    back.appendChild(mkRow("讨伐", (m.n || 1) + " 次"));
+    back.appendChild(mkRow("首讨", m.first ? fmtDate(m.first) : "—"));
+    back.appendChild(mkRow("末讨", m.last ? fmtDate(m.last) : "—"));
+    back.appendChild(mkRow("最快", (typeof m.best === "number" && m.best > 0) ? (m.best + " 轮") : "—"));
+    back.appendChild(el("div", "cb-annal", annal(m)));
+  } else {
+    /* 【2026-10-14 · 作者实机】未讨伐收尾语：去破折号、分两行、换楷体（碑刻感） */
+    var annalBox = el("div", "cb-annal annal-empty");
+    annalBox.appendChild(el("div", "", "尚未讨伐"));
+    annalBox.appendChild(el("div", "", "悬而未决"));
+    back.appendChild(annalBox);
+  }
+  cin.appendChild(back);
+
+  card.appendChild(cin);
+  card.addEventListener("click", function () { card.classList.toggle("flipped"); }, false);
+  return card;
+}
+
+/* ============================================================
+   外传 · 异界来客（批次 A）：卷内附加区块
+   收录 lib.character 中 isBoss 且非 csh_ 的角色（本体挑战 BOSS + 他扩展 isBoss）。
+   数据经双通道：桥 snap.bossExt（roster/kill/total）+ 父窗兜底 extRoster()/summary().ext。
+   ============================================================ */
+
+/* 外传立绘候选链（页面位于 <app>/extension/池子魔将/games/ 下）：
+   ① rec.img —— 数据层给出的**无名杀根相对**路径（本体挑战 BOSS 由缩包写入
+      image/mode/boss/character/<id>.jpg；他扩展角色由引擎写 extension/<ext>/<id>.jpg）。
+      从 games/ 到根要退三层 → "../../../"。
+   ② 兜底按本体挑战模式约定拼 image/mode/boss/character/<id>.jpg（数据层 img 缺失时）。
+   逐条 onerror 试错，全失败才落 noimg（姓氏占位）。 */
+function extImgCandidates(rec) {
+  var out = [];
+  var raw = String(rec && rec.img || "").trim()
+    .replace(/^ext:/, "extension/")     /* 引擎 ext: 前缀 → 根相对 */
+    .replace(/^db:/, "");               /* db: 前缀剥离 */
+  if (raw) {
+    out.push("../../../" + raw);
+    if (!/\.[a-z0-9]+$/i.test(raw)) {
+      out.push("../../../" + raw + ".jpg");
+      out.push("../../../" + raw + ".png");
+    }
+  }
+  if (rec && rec.id) out.push("../../../image/mode/boss/character/" + rec.id + ".jpg");
+  return out;
+}
+function renderExtSection(box) {
+  var ex = extData();
+  var list = ex.roster || [];
+  var kill = ex.kill || 0;
+  var total = ex.total || 0;
+
+  var sect = el("div", "ext-sect");
+  var head = el("div", "ext-head");
+  head.appendChild(el("span", "sect-cap", "异界来客"));
+  head.appendChild(el("span", "vol-count", list.length ? ("已讨 " + kill + " / " + total) : ""));
+  sect.appendChild(head);
+
+  if (!list.length) {
+    sect.appendChild(el("div", "bb-empty", "外传虚位以待 · 未检测到异界的魔王"));
+    box.appendChild(sect);
+    return;
+  }
+  var grid = el("div", "vgrid");
+  for (var i = 0; i < list.length; i++) grid.appendChild(buildExtCard(list[i], i));
+  sect.appendChild(grid);
+  box.appendChild(sect);
+}
+
+function buildExtCard(rec, idx) {
+  var m = extRec(rec.id);
+  var card = el("div", "bcard" + (m ? " killed" : ""));
+  card.setAttribute("data-id", rec.id);
+
+  var cin = el("div", "cin");
+  /* ---------- 正面（名帖） ---------- */
+  var front = el("div", "cf cfront");
+  var imgBox = el("div", "cimg");
+  imgBox.appendChild(el("span", "surname", (rec.name || "?").charAt(0)));
+  var cands = extImgCandidates(rec);
+  if (cands.length) {
+    var img = el("img");
+    img.setAttribute("loading", "lazy");
+    img.setAttribute("alt", rec.name || "");
+    var ci = 0;
+    var next = function () {
+      img.removeEventListener("error", next, false);
+      if (ci >= cands.length) { imgBox.classList.add("noimg"); try { img.remove(); } catch (eR) {} return; }
+      img.addEventListener("error", next, false);
+      img.src = cands[ci++];
+    };
+    next();
+    imgBox.appendChild(img);
+  } else {
+    imgBox.classList.add("noimg");
+  }
+  if (m) {
+    imgBox.appendChild(el("div", "seal-t", "讨"));
+  } else {
+    imgBox.appendChild(el("div", "unseal", "印"));
+  }
+  front.appendChild(imgBox);
+  var info = el("div", "cinfo");
+  info.appendChild(el("span", "cname", rec.name || "未知"));
+  var tg = el("span", "ctier", EXT_TIER.name);
+  tg.style.background = EXT_TIER.color;
+  info.appendChild(tg);
+  front.appendChild(info);
+  var meta = el("div", "cmeta");
+  if (m) {
+    if (m.first) meta.appendChild(el("span", "cdate", fmtDate(m.first)));
+    if (m.n >= 2) meta.appendChild(el("span", "cnum", m.n + " 讨"));
+    if (typeof m.best === "number" && m.best > 0) meta.appendChild(el("span", "cnum", "最快 " + m.best + " 轮"));
+  } else {
+    meta.appendChild(el("span", "cdate", "未 讨"));
+  }
+  front.appendChild(meta);
+  cin.appendChild(front);
+
+  /* ---------- 背面（档案） ---------- */
+  var back = el("div", "cf cback");
+  var titleTxt = cleanTitle(rec.title) || rec.name || "—";
+  var titleEl = el("div", "cb-title", titleTxt);
+  if (titleTxt.length > 16) {
+    titleEl.style.fontSize = Math.max(9, Math.floor(18 * 16 / titleTxt.length)) + "px";
+    titleEl.style.letterSpacing = "0.04em";
+    titleEl.style.lineHeight = "1.5";
+    titleEl.style.maxHeight = "4.5em";
+    titleEl.style.overflowY = "auto";
+  }
+  back.appendChild(titleEl);
+  var mkRow = function (k, v) {
+    var row = el("div", "cb-row");
+    row.appendChild(el("span", "", k));
+    row.appendChild(el("b", "", v));
+    return row;
+  };
+  back.appendChild(mkRow("来历", "异界"));
+  back.appendChild(mkRow("技能", (rec.skillCount != null ? rec.skillCount : "—") + " 个"));
+  /* v6.1 难度分：本体/他扩展 BOSS 由体力 + 技数派生（数据层 difficultyOfForeign） */
+  if (typeof rec.diff === "number") back.appendChild(mkRow("难度", rec.diff + " · " + (rec.diffName || "")));
+  if (m) {
+    back.appendChild(mkRow("讨伐", (m.n || 1) + " 次"));
+    back.appendChild(mkRow("首讨", m.first ? fmtDate(m.first) : "—"));
+    back.appendChild(mkRow("末讨", m.last ? fmtDate(m.last) : "—"));
+    back.appendChild(mkRow("最快", (typeof m.best === "number" && m.best > 0) ? (m.best + " 轮") : "—"));
+    back.appendChild(el("div", "cb-annal", annal(m)));
+  } else {
+    var annalBox = el("div", "cb-annal annal-empty");
+    annalBox.appendChild(el("div", "", "尚未讨伐"));
+    annalBox.appendChild(el("div", "", "悬而未决"));
+    back.appendChild(annalBox);
+  }
+  cin.appendChild(back);
+
+  card.appendChild(cin);
+  card.addEventListener("click", function () { card.classList.toggle("flipped"); }, false);
+  return card;
+}
+
+function renderEpilogue() {
+  var box = $("#epi-body");
+  box.innerHTML = "";
+  var wrap = el("div", "epi");
+  var r = roster(), total = r.length, k = killedCount();
+  var full = total > 0 && k >= total;
+  if (full) {
+    var seal = el("div", "epi-seal");
+    seal.innerHTML = goldSealSvg();
+    wrap.appendChild(seal);
+    wrap.appendChild(el("div", "epi-note", "册中魔将 " + total + " 位，尽数讨平。"));
+    /* 全收集日期 = map 中 max(last) */
+    var mx = 0, m = mapOf();
+    for (var id in m) if (Object.prototype.hasOwnProperty.call(m, id) && m[id] && m[id].last > mx) mx = m[id].last;
+    if (mx) wrap.appendChild(el("div", "epi-date", fmtDate(mx)));
+    wrap.appendChild(el("div", "epi-note", "此录圆满，功业长存。"));
+  } else {
+    wrap.appendChild(el("div", "epi-wait", "留待书写"));
+    wrap.appendChild(el("div", "epi-note",
+      "跋者，终篇之文也。册中魔将未尽数讨平，此页暂缺。" +
+      (total ? "（已讨 " + k + " / " + total + "）" : "")));
+  }
+  box.appendChild(wrap);
+}
+
+/* 丝带书签：停在第一个未完成卷的卷扉页顶 */
+function renderRibbon() {
+  for (var i = 0; i < pages.length; i++) {
+    var p = pages[i].elm;
+    var old = p.querySelector ? p.querySelector(".ribbon") : null;
+    if (old && old.parentNode) old.parentNode.removeChild(old);
+  }
+  var r = roster(), m = mapOf();
+  if (!r.length) return;
+  for (var s = 0; s < SERIES.length; s++) {
+    var list = seriesList(SERIES[s].key), killed = 0;
+    for (var j = 0; j < list.length; j++) { var k = m[list[j].id]; if (k && k.n > 0) killed++; }
+    if (killed < list.length) {
+      var pg = pages[2 + s].elm;
+      if (pg.appendChild) pg.appendChild(el("div", "ribbon"));
+      return;
+    }
+  }
+}
+
+/* ============================================================
+   翻页导航（§6.3.4）
+   ============================================================ */
+function go(i) {
+  var n = pages.length;
+  i = Math.max(0, Math.min(n - 1, i));
+  if (i === cur) { updateNav(); return; }
+  cur = i;
+  for (var p = 0; p < n; p++) pages[p].elm.classList.toggle("on", p === cur);
+  var pg = pages[cur].elm;
+  if (fxOK) {
+    var cls = pg.id === "cover" ? "" : "turn";
+    if (cls) {
+      pg.classList.add(cls);
+      (function (node) { setTimeout(function () { node.classList.remove(cls); }, 480); })(pg);
+    }
+  } else {
+    pg.classList.add("turn-fade");
+    (function (node) { setTimeout(function () { node.classList.remove("turn-fade"); }, 260); })(pg);
+  }
+  updateNav();
+  scheduleDwell();
+}
+function updateNav() {
+  for (var p = 0; p < pages.length; p++) {
+    var pg = pages[p].elm;
+    if (!pg._prev) continue;
+    pg._prev.disabled = p === 0;
+    pg._next.disabled = p === pages.length - 1;
+    var btns = pg._jump.children || [];
+    for (var b = 0; b < btns.length; b++) btns[b].classList.toggle("on", pages[p].vol === cur - 2);
+  }
+}
+
+/* ---------- 已读标记（§6.4⑤）：翻到所在页停留 >600ms 后批量置读 ---------- */
+function scheduleDwell() {
+  if (dwellT) { clearTimeout(dwellT); dwellT = 0; }
+  dwellT = setTimeout(function () {
+    dwellT = 0;
+    var pg = pages[cur] && pages[cur].elm;
+    if (!pg || !pg.querySelectorAll) return;
+    var freshEls = pg.querySelectorAll("[data-fresh]");
+    var mx = 0, m = mapOf(), ids = [];
+    for (var i = 0; i < freshEls.length; i++) {
+      var id = freshEls[i].getAttribute("data-id");
+      var rec = m[id];
+      if (rec && rec.last > mx) mx = rec.last;
+      ids.push(id);
+      freshEls[i].classList.remove("fresh");
+      freshEls[i].removeAttribute("data-fresh");
+    }
+    if (mx > Data.seen) {
+      Data.seen = mx;
+      saveSeen(mx);          /* 页面只负责写；入口红点由外部读此键 */
+      for (var k = 0; k < ids.length; k++) delete Data.fresh[ids[k]];
+    }
+  }, DWELL_MS + 60);
+}
+
+/* ---------- 键盘 ← → 与触屏 swipe ---------- */
+document.addEventListener("keydown", function (e) {
+  if (e && e.key === "ArrowRight") go(cur + 1);
+  else if (e && e.key === "ArrowLeft") go(cur - 1);
+}, false);
+(function () {
+  var sx = 0, sy = 0, on = false;
+  var book = $("#book");
+  book.addEventListener("touchstart", function (e) {
+    if (e && e.touches && e.touches.length) { sx = e.touches[0].clientX; sy = e.touches[0].clientY; on = true; }
+  }, { passive: true });
+  book.addEventListener("touchend", function (e) {
+    if (!on) return;
+    on = false;
+    var t = e && e.changedTouches && e.changedTouches[0];
+    if (!t) return;
+    var dx = t.clientX - sx, dy = t.clientY - sy;
+    if (Math.abs(dx) > 42 && Math.abs(dx) > Math.abs(dy) * 1.4) go(dx < 0 ? cur + 1 : cur - 1);
+  }, { passive: true });
+})();
+
+/* ============================================================
+   数据加载（双通道：桥 shell-stats → 兜底父窗 lib.cshBossRecord.summary）
+   ============================================================ */
+function fallbackBoss() {
+  try {
+    var L = window.parent && window.parent.lib;
+    if (L && L.cshBossRecord && typeof L.cshBossRecord.summary === "function") {
+      var s = L.cshBossRecord.summary();
+      if (s && s.roster && s.roster.length) return s;
+    }
+  } catch (e) {}
+  return null;
+}
+/* 外传数据（批次 A）：优先桥 snap.bossExt，兜底父窗——页面 iframe 内不能 import 模块，
+   故 extRosterAll()/summary() 只能由父窗调用（同 fallbackBoss 的兜底范式）。
+   ★ 用 extRosterAll（boss 局内快照 ∪ 当场枚举 ∪ 已记录 id）：池子休闲里 lib.character
+     不含本体 BOSS，纯当场枚举会恒为空 → 外传卷会永远显示空态。 */
+function extFromParent() {
+  try {
+    var R = window.parent && window.parent.lib && window.parent.lib.cshBossRecord;
+    if (R) {
+      var fn = (typeof R.extRosterAll === "function") ? R.extRosterAll
+             : (typeof R.extRoster === "function") ? R.extRoster : null;
+      if (fn) {
+        var list = fn() || [];
+        var sum = (typeof R.summary === "function") ? R.summary() : null;
+        return { kill: (sum && sum.extKill) || 0, total: (sum && sum.extTotal) || list.length, roster: list, map: (sum && sum.ext) || {} };
+      }
+    }
+  } catch (e) {}
+  return null;
+}
+function adopt(b) {
+  if (!Data.ext) Data.ext = extFromParent();     /* 桥未透传时兜底（两者都无 → 空态） */
+  if (b && b.roster && b.roster.length) {
+    Data.boss = b; Data.hollow = false;
+  } else {
+    Data.boss = b || null;
+    Data.hollow = true;        /* 数据未到 / 为空 → 优雅空态 */
+  }
+  renderAll();
+}
+function loadBoss(round) {
+  round = round || 0;
+  if (Bridge.active) {
+    Bridge.call("shell-stats", null, function (ok, snap) {
+      var b = (ok && snap) ? snap.boss : null;
+      /* 外传（批次 A）：桥返回的 bossExt.roster 是数组（页面不能自己枚举） */
+      if (ok && snap && snap.bossExt) {
+        Data.ext = {
+          kill: snap.bossExt.kill || 0, total: snap.bossExt.total || 0,
+          roster: snap.bossExt.roster || [], map: (b && b.ext) || {}
+        };
+      }
+      if (b && b.roster && b.roster.length) { adopt(b); return; }
+      if (round === 0) { setTimeout(function () { loadBoss(1); }, 1500); return; }
+      var fb = fallbackBoss();
+      adopt(fb);               /* fb 为 null 时走空态 */
+    });
+  } else {
+    adopt(fallbackBoss());     /* 非桥环境（file:// 直开等）：直接兜底或空态 */
+  }
+}
+
+/* ---------- 启动 ---------- */
+buildAll();
+go(0);
+loadBoss();
+})();
+</script>
+</body>
+</html>

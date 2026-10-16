@@ -1,0 +1,1133 @@
+<!DOCTYPE html>
+<!-- ============================================================
+     妖灵图鉴（讨伐录平级的档案页 · 2026-10-14 批次 C · galgame 风）
+     ------------------------------------------------------------
+     · 五十位妖灵的大图档案：左栏竖排名录（人像缩略 + 名字 + 讨伐次数），
+       右栏 = 主立绘 + 名字/定位 + 简介 + 台词全集（初见/持有/上涨/下跌）+ 数据格
+     · 数据双通道：父窗直读优先（CSH.market.GIRLS / lib.cshBossRecord.summary），
+       兜底走桥 shell-stats 的 snap.boss（仅在父窗缺失时）
+     · 视觉：暗金 × 深底 —— 与 games/goldfish.html 同一套 CSS 变量与卡片语言
+     · 纯展示：本页无任何写操作
+     ============================================================ -->
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>妖灵图鉴</title>
+<script src="../core/csh_selftest.js" data-csh-selftest="auto"></script>
+<script src="../core/csh_page.js"></script>
+<style>
+/* 书法体注册：ZMX3 = **全覆盖子集**（4058 字 · 由开源 Zhi Mang Xing 完整版子集化，
+   2026-10-15）。此前本页误把 csh_fx_font_1/2（78/84 字的**游戏内技能横幅**专用子集）
+   放进 --ff-title 首位 → 任何不在子集内的字逐字回退系统宋体 → 同一个人名里混排两种
+   字体（作者实机截图确认）。现按 docs/art-direction.md §4.1 回归三档规范，
+   书法体降为独立的点缀档 --ff-callig。 */
+@font-face{font-family:'ZMX3';src:url("../font/csh_fx_font_3.woff2") format("woff2");font-display:swap}
+
+:root{
+  --bg:#191512; --bg2:#221c17; --panel:#2a231c; --panel2:#332b21;
+  --ink:#efe6cf; --ink-dim:rgba(239,230,207,.62); --ink-faint:rgba(239,230,207,.36);
+  --gold:#d8bd7a; --gold-2:#b08d3e; --line:rgba(216,189,122,.28); --line-2:rgba(216,189,122,.14);
+  /* 字体四档（全项目一致）：① 标题宋 ② 正文黑 ③ 数字牌 ④ 书法点缀 */
+  --ff-title:"Noto Serif SC","Source Han Serif SC","Songti SC","STSong","SimSun",serif;
+  --ff-body:"Noto Sans SC","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+  --ff-num:ui-monospace,"Cascadia Mono",Consolas,"SF Mono",Menlo,monospace;
+  --ff-callig:"ZMX3","Zhi Mang Xing","Kaiti SC","STKaiti",KaiTi,var(--ff-title);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;overflow:hidden}
+body{background:
+  radial-gradient(120% 80% at 50% 0%,rgba(216,189,122,.06),transparent 55%),
+  linear-gradient(170deg,var(--bg2),var(--bg));
+  color:var(--ink);font-family:var(--ff-body);font-size:14px}
+#app{display:flex;flex-direction:column;height:100%;padding:8px 12px 6px 30px}
+
+/* ---------- 顶部条 ----------
+   ★ padding-right = 给宿主右上角的「CBY 胶囊 + 关闭按钮」留的避让带。
+   2026-10-15 作者截图：'图鉴/已讨/总讨伐' 三个胶囊贴得太右，被金钱胶囊压住 ——
+   避让带由 150 → 268px（三枚胶囊整体左移约 118px），仍留足余量不贴边。 */
+.topbar{flex:0 0 auto;display:flex;align-items:center;gap:10px;min-height:42px;padding-right:268px}
+.brand{font-family:var(--ff-callig);font-size:24px;letter-spacing:.2em;color:var(--gold)}
+.brand small{font-size:12px;letter-spacing:.1em;color:var(--ink-faint);margin-left:8px;font-family:var(--ff-body)}
+.stats{margin-left:auto;display:flex;gap:8px;font-family:var(--ff-num);font-size:14px;font-variant-numeric:tabular-nums}
+.stat{background:rgba(216,189,122,.10);border:1px solid var(--line-2);border-radius:999px;padding:4px 12px;white-space:nowrap}
+.stat b{color:var(--gold);font-weight:600}
+
+/* ---------- 主体：左名录 + 右档案 ---------- */
+.main{flex:1 1 auto;min-height:0;display:flex;gap:12px;padding:8px 0 6px}
+.rolodexwrap{flex:0 0 196px;min-height:0}
+.rolodex{height:100%;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;
+  display:flex;flex-direction:column;gap:6px;padding-right:4px}
+.gitem{display:flex;align-items:center;gap:8px;padding:5px 7px;cursor:pointer;
+  border:1px solid var(--line-2);border-radius:10px;background:rgba(255,255,255,.02);
+  transition:transform .14s ease,border-color .14s ease,background .14s ease}
+.gitem:hover{border-color:var(--line)}
+.gitem:active{transform:scale(.98)}
+.gitem.on{border-color:var(--gold);background:rgba(216,189,122,.10);
+  box-shadow:inset 0 0 0 1px rgba(216,189,122,.18)}
+.gface{position:relative;flex:0 0 44px;width:44px;height:55px;border-radius:7px;overflow:hidden;background:#141110}
+.gface img{width:100%;height:100%;object-fit:cover;object-position:50% 12%;display:block}
+.gph{position:absolute;inset:0;display:none;align-items:center;justify-content:center;
+  font-family:var(--ff-title);font-size:19px;color:var(--ink-faint)}
+.gface.noimg img{display:none}
+.gface.noimg .gph{display:flex}
+.gmeta{flex:1 1 auto;min-width:0}
+.gname{font-family:var(--ff-title);font-size:15.5px;letter-spacing:.06em;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gitem.on .gname{color:var(--gold)}
+.gsub{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-dim);margin-top:3px}
+.gsub .gk{font-family:var(--ff-num)}
+.gsub .gh{font-family:var(--ff-num);font-size:12px;color:#f0709c;background:rgba(240,112,156,.14);
+  border:1px solid rgba(240,112,156,.30);border-radius:999px;padding:0 6px;line-height:16px}
+.gsub.aff-s .gh{color:#fff;background:rgba(240,112,156,.34)}
+
+/* ---------- 右：档案主体（galgame 面板） ---------- */
+.dossier{flex:1 1 auto;min-width:0;display:flex;border:1px solid var(--line);border-radius:14px;
+  overflow:hidden;background:linear-gradient(150deg,var(--panel2),var(--bg2));
+  box-shadow:0 14px 40px rgba(0,0,0,.42);animation:cf-in .4s ease}
+@keyframes cf-in{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.dstage{position:relative;flex:0 0 40%;background:#141110;overflow:hidden}
+.dstage img{width:100%;height:100%;object-fit:cover;object-position:50% 8%;display:block;animation:cf-in .5s ease}
+.dstage.noimg img{display:none}
+.dph{position:absolute;inset:0;display:none;align-items:center;justify-content:center;
+  font-family:var(--ff-title);font-size:44px;letter-spacing:.2em;color:var(--ink-faint);
+  background:linear-gradient(180deg,var(--panel2),var(--panel))}
+.dstage.noimg .dph{display:flex}
+.dstage::after{content:"";position:absolute;inset:0;pointer-events:none;
+  box-shadow:inset -40px 0 60px -30px rgba(25,21,18,.95)}
+.dinfo{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:8px;
+  padding:14px 16px 12px;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+.dname{font-family:var(--ff-title);font-size:30px;letter-spacing:.12em;color:var(--ink)}
+.dtag{font-size:13.5px;color:var(--gold);letter-spacing:.14em;margin-top:3px}
+.dbio{font-size:14px;line-height:1.85;color:var(--ink-dim);
+  border-left:2px solid var(--line);padding-left:10px}
+
+/* 台词全集 */
+.dlines{flex:0 0 auto;display:flex;flex-direction:column;gap:8px;margin-top:2px}
+.lgroup{background:rgba(216,189,122,.06);border:1px solid var(--line-2);border-radius:10px;padding:9px 11px}
+.lglabel{font-size:12px;color:var(--gold);letter-spacing:.18em;margin-bottom:5px}
+.lline{font-size:14px;line-height:1.8;color:var(--ink);opacity:.92;
+  padding-left:12px;position:relative}
+.lline::before{content:"”";position:absolute;left:0;top:0;color:var(--gold-2);font-family:var(--ff-title)}
+
+/* 数据格 */
+.dfacts{flex:0 0 auto;display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:auto;padding-top:4px}
+.fact{background:rgba(255,255,255,.03);border:1px solid var(--line-2);border-radius:9px;padding:8px 10px}
+.fact .k{font-size:12px;color:var(--ink-faint);letter-spacing:.06em}
+.fact .v{font-size:17px;color:var(--ink);margin-top:3px}
+.fact .v.num{font-family:var(--ff-num)}
+
+/* ---------- 底部 ---------- */
+.foot{flex:0 0 auto;font-size:12.5px;color:var(--ink-faint);letter-spacing:.06em;padding:5px 2px 2px;display:flex;gap:10px}
+.foot .dot{color:var(--gold-2)}
+
+/* ---------- 空态 ---------- */
+#empty{display:none;flex:1 1 auto;flex-direction:column;align-items:center;justify-content:center;gap:12px;text-align:center;padding:40px 16px}
+body.empty #empty{display:flex}
+body.empty .main{display:none}
+body.empty .foot{display:none}
+#empty .e1{font-family:var(--ff-title);font-size:28px;letter-spacing:.34em;color:var(--gold)}
+#empty .e2{font-size:13.5px;letter-spacing:.08em;color:var(--ink-dim);line-height:1.9;max-width:560px}
+#empty .eline{width:150px;height:1px;background:linear-gradient(90deg,transparent,var(--line),transparent)}
+
+/* ---------- 窄屏：上下堆叠 ---------- */
+@media (max-width:720px){
+  #app{padding:8px 10px 6px 16px}
+  .topbar{padding-right:190px}
+  .brand{font-size:17px}
+  .main{flex-direction:column;gap:8px}
+  .rolodexwrap{flex:0 0 auto}
+  .rolodex{flex-direction:row;overflow-x:auto;overflow-y:hidden;gap:8px;padding:0 0 6px}
+  .gitem{flex:0 0 auto;min-width:136px}
+  .dossier{flex-direction:column}
+  .dstage{flex:0 0 40%}
+  .dstage::after{box-shadow:inset 0 -40px 60px -30px rgba(25,21,18,.95)}
+  .dname{font-size:21px}
+  .dinfo{padding:11px 12px 10px}
+  .dfacts{padding-top:0}
+}
+@media (max-height:430px){
+  .foot{display:none}
+}
+
+/* ============================================================
+   好感度（v6.2）—— 爱心不用文字，用会呼吸的形状
+   ------------------------------------------------------------
+   设计语言：暗底 + 品红金渐变 + 呼吸光晕。
+   · 空心心 = 未达档位（描边，低不透明度）
+   · 实心心 = 已达档位（渐变填充 + 外发光 + 呼吸脉动，逐颗错峰）
+   · S 档：整排加一层缓慢旋转的锥形光晕 + 星点
+   ============================================================ */
+.affbox{position:relative;flex:0 0 auto;            /* ★v6.3 修：有 overflow:hidden 的 flex 项
+  min-height:auto 失效，会被同栏内容挤成一条 ⇒ 必须固定不收缩 */
+  background:linear-gradient(135deg,rgba(240,112,156,.10),rgba(216,189,122,.05) 60%,transparent);
+  border:1px solid rgba(240,112,156,.22);border-radius:12px;padding:10px 12px 11px;overflow:hidden;
+  --affc:#f0709c}
+.affbox::before{content:"";position:absolute;inset:-40% -60% auto auto;width:220px;height:220px;
+  background:radial-gradient(circle,rgba(240,112,156,.22),transparent 62%);
+  animation:affHalo 7s ease-in-out infinite;pointer-events:none}
+@keyframes affHalo{0%,100%{transform:scale(.85);opacity:.5}50%{transform:scale(1.12);opacity:.95}}
+.affbox.sTier::after{content:"";position:absolute;inset:-70%;pointer-events:none;
+  background:conic-gradient(from 0deg,rgba(240,112,156,.20),transparent 22%,rgba(216,189,122,.18) 44%,transparent 66%,rgba(240,112,156,.20));
+  animation:affSpin 9s linear infinite;filter:blur(2px)}
+@keyframes affSpin{to{transform:rotate(360deg)}}
+.affhead{position:relative;display:flex;align-items:center;gap:8px;z-index:2}
+/* v6.3 修：原来 filter:drop-shadow + background-clip:text 在 Chromium 下会让文字
+   **只渲染出一部分**（作者实机：「亲密有一部分文字不可见」）。改为
+   ① 兜底色（不支持 clip 时也是亮粉色，永远看得见）
+   ② 只在支持 background-clip:text 时才切渐变（并且不再用 filter，改 glow 光晕） */
+.afftitle{font-family:var(--ff-callig);font-size:18px;letter-spacing:.16em;line-height:1.55;
+  color:#ff9dbe;text-shadow:0 0 10px rgba(240,112,156,.55),0 1px 2px rgba(0,0,0,.55);
+  padding:1px 0}
+@supports ((-webkit-background-clip:text) or (background-clip:text)){
+  .afftitle{background:linear-gradient(92deg,#f0709c,#ffd9e6 46%,#e6cf9a);
+    -webkit-background-clip:text;background-clip:text;
+    -webkit-text-fill-color:transparent;color:transparent;text-shadow:none;
+    padding:1px 0 2px}
+}
+.afflv{margin-left:auto;font-family:var(--ff-title);font-size:13.5px;letter-spacing:.1em;color:var(--affc)}
+.affval{font-family:var(--ff-num);font-size:13px;color:var(--ink-dim);font-variant-numeric:tabular-nums}
+.affhearts{position:relative;display:flex;align-items:center;gap:5px;margin:8px 0 7px;z-index:2}
+.affheart{width:30px;height:28px;display:block;flex:0 0 auto;overflow:visible}
+.affheart path{transition:fill .35s ease,stroke .35s ease}
+.affheart.on .b{filter:drop-shadow(0 0 3px rgba(240,112,156,.95)) drop-shadow(0 0 7px rgba(240,112,156,.45))}
+.affheart.on{animation:affBeat 2.6s ease-in-out infinite}
+.affheart.on:nth-child(2){animation-delay:.18s}
+.affheart.on:nth-child(3){animation-delay:.36s}
+.affheart.on:nth-child(4){animation-delay:.54s}
+.affheart.on:nth-child(5){animation-delay:.72s}
+@keyframes affBeat{0%,100%{transform:scale(1)}12%{transform:scale(1.16)}24%{transform:scale(1)}36%{transform:scale(1.08)}50%{transform:scale(1)}}
+.affbar{position:relative;height:9px;border-radius:999px;background:rgba(255,255,255,.07);
+  overflow:hidden;z-index:2;border:1px solid rgba(255,255,255,.06)}
+.affbar i{display:block;height:100%;border-radius:999px;
+  background:linear-gradient(90deg,#b8456e,#f0709c 46%,#f7cfae 82%,#e6cf9a);
+  box-shadow:0 0 12px rgba(240,112,156,.6);transition:width .5s cubic-bezier(.2,.8,.3,1)}
+.affbar::after{content:"";position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(100deg,transparent 20%,rgba(255,255,255,.42) 50%,transparent 80%);
+  transform:translateX(-120%);animation:affSheen 2.8s ease-in-out infinite}
+@keyframes affSheen{0%{transform:translateX(-120%)}55%,100%{transform:translateX(120%)}}
+.affmeta{position:relative;display:flex;align-items:center;gap:8px;margin-top:6px;z-index:2;
+  font-size:12.5px;color:var(--ink-dim)}
+.affmeta .grow{margin-left:auto;font-family:var(--ff-num)}
+.affops{position:relative;display:flex;gap:6px;margin-top:9px;z-index:2;flex-wrap:wrap}
+/* v6.5：整体字号上调（作者："这些字太小了，很啰嗦"） */
+.affbtn{border:1px solid rgba(240,112,156,.36);background:linear-gradient(180deg,rgba(240,112,156,.18),rgba(240,112,156,.06));
+  color:#ffd9e6;border-radius:9px;font-size:13.5px;padding:7px 13px;cursor:pointer;font-family:var(--ff-body);
+  display:inline-flex;align-items:baseline;gap:5px;
+  transition:transform .14s ease,box-shadow .2s ease,opacity .2s ease}
+.affbtn .gain{font-family:var(--ff-num);font-style:normal;font-size:11.5px;color:#ffd0e2;opacity:.9}
+.affbtn .lk{font-style:normal;font-size:11px;color:var(--ink-faint);letter-spacing:.02em}
+.affbtn[disabled]{opacity:.5}
+.affbtn.close{border-color:rgba(255,190,120,.42);background:linear-gradient(180deg,rgba(255,190,120,.16),rgba(255,190,120,.05));color:#ffe2bd}
+.affbtn:hover{box-shadow:0 0 14px rgba(240,112,156,.5);transform:translateY(-1px)}
+.affbtn[disabled]{opacity:.34;cursor:not-allowed;box-shadow:none;transform:none}
+.affbtn.gold{border-color:var(--gold-line);background:linear-gradient(180deg,rgba(216,189,122,.18),rgba(216,189,122,.05));color:var(--gold-hi)}
+.affhint{position:relative;z-index:2;margin-top:7px;font-size:11.5px;color:#f7c9d9;min-height:16px}
+.affhint.good{color:var(--ok)}
+.affhint.bad{color:var(--warn)}
+.affsay{position:relative;z-index:2;margin:10px 0 2px;background:rgba(255,255,255,.035);
+  border:1px solid rgba(240,112,156,.20);border-radius:10px;padding:8px 10px;min-height:44px;
+  font-size:14px;line-height:1.75;color:var(--ink);animation:sayIn .3s ease}
+.affsay.idle{color:var(--ink-faint);display:flex;align-items:center;justify-content:center}
+.affsay .up{color:#ffd98a;font-family:var(--ff-title);font-size:13.5px;margin-bottom:4px}
+.affsay.good{border-color:rgba(240,112,156,.42);box-shadow:0 0 14px rgba(240,112,156,.16)}
+.affsay.levelup{border-color:var(--gold-line);box-shadow:0 0 20px rgba(216,189,122,.30);
+  background:linear-gradient(180deg,rgba(216,189,122,.10),rgba(240,112,156,.08))}
+.affsay.bad{border-color:rgba(200,120,120,.35);color:#f0c9c9}
+.affnote{position:relative;z-index:2;margin-top:6px;font-size:12px;color:var(--ink-faint);letter-spacing:.03em}
+/* v6.7：未讨伐锁定横幅（解锁条件明示 · 成熟收集类做法） */
+.afflock{position:relative;z-index:2;margin-top:9px;padding:7px 10px;border-radius:9px;
+  font-size:12px;color:#f0d79a;background:rgba(240,215,154,.10);border:1px dashed rgba(240,215,154,.45);letter-spacing:.02em}
+/* v6.8：置顶按钮（好感排序 · 手动置顶）与偏爱角标（雀魂 ×1.5 口径） */
+.pinbtn{margin-left:auto;border:1px solid rgba(216,189,122,.42);background:rgba(216,189,122,.08);
+  color:var(--gold-hi);border-radius:999px;font-size:11.5px;padding:3px 10px;cursor:pointer;font-family:var(--ff-body)}
+.pinbtn.on{background:var(--gold);border-color:var(--gold);color:#fff;font-weight:600}
+.affbtn .favmk{font-style:normal;font-size:10.5px;color:#ffd98a;letter-spacing:.02em}
+/* ★ v6.9 契约/誓约：铭牌 / 结契按钮 / 横幅 / 立绘金框 / 列表金环 */
+.oathbar{position:relative;z-index:2;margin-top:10px;padding:7px 10px;border-radius:9px;font-size:12.5px;
+  color:#ffe9b0;background:linear-gradient(90deg,rgba(216,189,122,.20),rgba(240,112,156,.10));
+  border:1px solid rgba(216,189,122,.55);letter-spacing:.03em}
+.oathbox{position:relative;z-index:2;margin-top:10px;padding:9px 10px;border-radius:10px;text-align:center;
+  background:linear-gradient(180deg,rgba(216,189,122,.16),rgba(216,189,122,.04));border:1px dashed rgba(216,189,122,.5)}
+.oathnote{font-size:12px;color:#f0d79a;margin-bottom:7px}
+.oathbtn{border:1px solid var(--gold);background:linear-gradient(180deg,#d8bd7a,#b08d3e);color:#221708;
+  font-family:var(--ff-title);font-weight:700;font-size:15px;letter-spacing:.3em;padding:8px 20px 8px 24px;
+  border-radius:999px;cursor:pointer;box-shadow:0 2px 14px rgba(216,189,122,.45)}
+.oathbtn:hover{box-shadow:0 3px 20px rgba(216,189,122,.7)}
+.dstage.oath{position:relative}
+.dstage.oath::after{content:"";position:absolute;inset:0;pointer-events:none;border-radius:10px;
+  border:2px solid rgba(216,189,122,.75);box-shadow:inset 0 0 26px rgba(216,189,122,.35),inset 0 0 4px rgba(255,236,180,.8)}
+.gitem.oath .gface{box-shadow:0 0 0 2px rgba(216,189,122,.85),0 0 10px rgba(216,189,122,.45)}
+.oathov{position:fixed;inset:0;z-index:80;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  background:radial-gradient(ellipse at center,rgba(216,189,122,.22),rgba(18,12,8,.90));animation:oathIn .5s ease}
+.oathov.out{opacity:0;transition:opacity .7s ease}
+.oathbig{font-family:var(--ff-callig,serif);font-size:min(15vmin,72px);letter-spacing:.22em;color:#ffe9b0;
+  text-shadow:0 0 22px rgba(216,189,122,.85),0 4px 14px rgba(0,0,0,.9)}
+.oathsub{margin-top:10px;font-family:var(--ff-title);font-size:14px;color:#f0d79a;letter-spacing:.3em}
+@keyframes oathIn{from{opacity:0;transform:scale(.97)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.oathov{animation:none}}
+.affgifts{position:relative;display:flex;gap:6px;margin-top:7px;z-index:2;flex-wrap:wrap}
+.affgifts .affbtn{display:flex;align-items:baseline;gap:5px}
+.affgifts .affbtn .cost{font-family:var(--ff-num);font-size:10.5px;color:rgba(255,240,200,.62);font-style:normal}
+.affperks{position:relative;margin-top:10px;z-index:2;border-top:1px dashed rgba(216,189,122,.22);padding-top:8px}
+.affperks .pktitle{font-size:12px;color:var(--gold);letter-spacing:.12em;margin-bottom:5px}
+.affperk{display:flex;align-items:baseline;gap:6px;font-size:13px;padding:3px 0;opacity:.55}
+.affperk.on{opacity:1}
+.affperk .tk{flex:0 0 auto;font-size:11px;color:#1a130a;background:var(--ink-faint);border-radius:4px;padding:0 5px}
+.affperk.on .tk{background:var(--gold-line)}
+.affperk .tn{flex:0 0 auto;color:var(--ink);letter-spacing:.04em}
+.affperk .td{flex:1 1 auto;color:var(--ink-dim);font-size:11.5px;min-width:0}
+.affperk .ts{flex:0 0 auto;font-size:11.5px;color:var(--ink-faint)}
+.affperk.on .ts{color:var(--ok)}
+.affheat{margin-top:6px;font-size:12.5px;color:#ffd98a}
+.affbtn.soft{border-color:rgba(147,166,187,.45);background:linear-gradient(180deg,rgba(147,166,187,.16),rgba(147,166,187,.05));color:#d8e4f0}
+@keyframes sayIn{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+/* 好感回报（v6.5 折叠） */
+.pkbox{position:relative;z-index:2;margin-top:10px;border-top:1px dashed rgba(216,189,122,.22);padding-top:8px}
+.pkbox>summary{list-style:none;cursor:pointer;font-size:12.5px;color:var(--gold);letter-spacing:.04em}
+.pkbox>summary::-webkit-details-marker{display:none}
+.pkbox>summary::before{content:"\25B8 ";color:var(--gold-2)}
+.pkbox[open]>summary::before{content:"\25BE "}
+.pkbox .affperk{margin-top:3px}
+.ecbar{position:relative;height:6px;border-radius:999px;background:rgba(255,255,255,.07);overflow:hidden;margin:6px 0 2px}
+.ecbar i{display:block;height:100%;border-radius:999px;
+  background:linear-gradient(90deg,#b8456e,#f0709c 60%,#d8bd7a);transition:width .4s ease}
+/* 回响 · 台词汇编（v6.4） */
+.echead{position:relative;display:flex;align-items:baseline;gap:8px}
+.ectitle{font-family:var(--ff-callig);font-size:15px;letter-spacing:.16em;color:var(--gold)}
+.ecnum{margin-left:auto;font-family:var(--ff-num);font-size:12px;color:var(--ink-dim);font-variant-numeric:tabular-nums}
+.ecnote{font-size:12px;color:var(--ink-faint);line-height:1.7;margin-top:3px}
+.ecbook{margin-top:6px;border:1px solid var(--line-2);border-radius:10px;background:rgba(255,255,255,.02);overflow:hidden}
+.ecbook>summary{list-style:none;cursor:pointer;padding:7px 10px;font-size:12px;color:var(--gold);
+  letter-spacing:.06em;background:rgba(216,189,122,.06)}
+.ecbook>summary::-webkit-details-marker{display:none}
+.ecbook>summary::before{content:"\25B8 ";color:var(--gold-2)}
+.ecbook[open]>summary::before{content:"\25BE "}
+.ecsec{padding:6px 10px 7px;border-top:1px solid rgba(255,255,255,.05)}
+.ecslabel{font-size:11.5px;color:var(--ink-faint);letter-spacing:.1em;margin-bottom:4px}
+.ecsec.full .ecslabel{color:var(--gold)}
+.ecline{font-size:13px;line-height:1.78;color:var(--ink);opacity:.94}
+.ecline.lock{color:var(--ink-faint);opacity:.5;letter-spacing:.12em}
+/* 台词解锁状态 */
+.lgroup.locked{opacity:.42;filter:grayscale(.5)}
+.lgroup.locked .lline{filter:blur(3.5px);user-select:none}
+.lglock{font-size:11px;color:var(--ink-faint);letter-spacing:.1em}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="topbar">
+    <div class="brand">妖灵图鉴<small>池中五十 · 各具其形</small></div>
+    <div class="stats" id="stats"></div>
+  </div>
+
+  <div class="main">
+    <div class="rolodexwrap"><div class="rolodex" id="rolodex"></div></div>
+
+    <div class="dossier" id="dossier">
+      <div class="dstage">
+        <img id="dimg" alt="">
+        <div class="dph" id="dph"></div>
+      </div>
+      <div class="dinfo">
+        <div class="dhead">
+          <div class="dname" id="dname">—</div>
+          <div class="dtag" id="dtag"></div>
+        </div>
+        <!-- 花榜·魁首题壁（v2.2）：该只妖灵的魁首（累计缠头第一）留的那句话。
+             样式用行内：本页 <style> 里没有稳定的插入锚点，避免为四条装饰属性去动大段 CSS。 -->
+        <div id="dchief" hidden style="font-size:13px;color:#b08d3e;border-left:2px solid #b08d3e;padding-left:10px;margin-top:6px;line-height:1.6"></div>
+        <div class="dbio" id="dbio"></div>
+        <div class="affbox" id="affbox"></div>
+        <div class="dlines" id="dlines"></div>
+        <div class="dfacts">
+          <div class="fact"><div class="k">讨伐次数</div><div class="v num" id="fN">—</div></div>
+          <div class="fact"><div class="k">金鳞市热度</div><div class="v num" id="fHeat">—</div></div>
+          <div class="fact"><div class="k">挂牌状态</div><div class="v" id="fList">—</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="foot">
+    <span>讨伐妖灵 → 累计次数与金鳞市热度</span><span class="dot">·</span>
+    <span>点击左栏切换档案</span><span class="dot">·</span>
+    <span>← / → 翻页</span>
+  </div>
+</div>
+
+<div id="empty">
+  <div class="e1">图鉴未开 · 妖灵尚未现身</div>
+  <div class="eline"></div>
+  <div class="e2">五十位妖灵在金鳞市挂牌、在魔王麾下出没。<br>请从「池子休闲」进入，或确认扩展已加载后重试。</div>
+</div>
+
+<script>
+(function () {
+"use strict";
+
+/* ============================================================
+   桥（照 bossbook / goldfish 双通道：桥优先 · 父窗兜底）
+   ============================================================ */
+var Bridge = (function () {
+  try {
+    var T = CSHPage.transport({ closeName: "codex-close", timeout: 2500 });
+    return { active: !!T.active, call: T.call };
+  } catch (e) { return { active: false, call: function (_, __, cb) { cb && cb(false, null); } }; }
+})();
+
+function $(s) { return document.querySelector(s); }
+function el(t, c, x) { var e = document.createElement(t); if (c) e.className = c; if (x != null) e.textContent = x; return e; }
+function fmt(n) { return String(Math.round(Number(n) || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, ","); }
+/* ---------- 花榜·魁首题壁（v2.2）----------
+   只读 `GET /girls`（该只的 chief_name / chief_sig），失败一律静默（E31 纪律：不弹错、不阻塞）。
+   传输与 rank.html 同构：桌面优先 Node 原生 http，手机端（无 Node）走 fetch —— 安卓页面 origin 是
+   https://localhost，所以基址必须是 **https**（明文 http 会被混合内容拦掉）。 */
+var NET_BASE = "https://chishanghan.duckdns.org";
+var SHARE = {};
+function netReq2(path, cb) {
+  var done = false;
+  function fin(ok, o) { if (done) return; done = true; cb(ok, o); }
+  var req = null;
+  try { req = (typeof window !== "undefined" && window.require) ? window.require : null; } catch (e0) {}
+  if (req) {
+    try {
+      var http = req(/^https:/.test(NET_BASE) ? "https" : "http"), url = req("url"), u = url.parse(NET_BASE + path);
+      var r = http.request({ hostname: u.hostname, port: u.port || (/^https:/.test(NET_BASE) ? 443 : 80), path: u.path, method: "GET", timeout: 6000 },
+        function (res) {
+          var buf = ""; res.setEncoding("utf8");
+          res.on("data", function (d) { buf += d; });
+          res.on("end", function () { try { fin(res.statusCode < 300, JSON.parse(buf)); } catch (e) { fin(false, null); } });
+        });
+      r.on("error", function () { fin(false, null); });
+      r.on("timeout", function () { try { r.destroy(); } catch (e) {} fin(false, null); });
+      r.end();
+      return;
+    } catch (eN) {}
+  }
+  try {
+    var to = setTimeout(function () { fin(false, null); }, 6000);
+    fetch(NET_BASE + path, { cache: "no-store" }).then(function (res) {
+      return res.text().then(function (t) { clearTimeout(to); try { fin(res.ok, JSON.parse(t)); } catch (e) { fin(false, null); } });
+    }).catch(function () { clearTimeout(to); fin(false, null); });
+  } catch (e2) { fin(false, null); }
+}
+function fetchShare(cb) {
+  /* ★ 只在**真实页面**里发请求：离线冒烟/沙箱环境拿不到 location.protocol ⇒ 直接回空，
+     不发网络请求（否则沙箱里会把 Node 的 fetch 打崩，本项目既有纪律同此）。 */
+  try {
+    var real = !!(typeof window !== "undefined" && window.location && window.location.protocol)
+      && /^(https?|file):$/.test(window.location.protocol);
+    if (!real) { if (cb) cb(); return; }
+  } catch (eR) { if (cb) cb(); return; }
+  netReq2("/girls", function (ok, r) {
+    SHARE = {};
+    if (ok && r && r.ok) { var L = r.girls || []; for (var i = 0; i < L.length; i++) SHARE[L[i].girl] = L[i]; }
+    if (cb) cb();
+  });
+}
+
+var Data = { items: [], cur: -1, bridgeMinions: null };
+
+/* 台词四类 → 中文标签（台词内容一律来自 GIRLS，不在此编造） */
+var LINEDEF = [
+  { key: "first", label: "初见" },
+  { key: "hold",  label: "持有" },
+  { key: "up",    label: "上涨" },
+  { key: "down",  label: "下跌" }
+];
+
+/* ============================================================
+   数据：父窗直读（同源可用 · 与 goldfish 一致）
+   ============================================================ */
+function parentData() {
+  try {
+    var P = window.parent;
+    var M = (P && P.CSH && P.CSH.market) ? P.CSH.market
+          : (P && P.lib && P.lib.cshMarket ? P.lib.cshMarket : null);
+    var R = (P && P.lib && P.lib.cshBossRecord) ? P.lib.cshBossRecord : null;
+    return { market: M || null, rec: R || null, lib: (P && P.lib) ? P.lib : null };
+  } catch (e) { return {}; }
+}
+
+/* 讨伐统计：summary().minions = {id:{n,heat,name}}（仅含已讨伐者 · 未讨即空） */
+function minionMap(R) {
+  try {
+    if (R && typeof R.summary === "function") {
+      var s = R.summary();
+      if (s && s.minions && typeof s.minions === "object") return s.minions;
+    }
+  } catch (e) {}
+  return null;
+}
+
+/* 名字：数据层真源 → 讨伐统计 → translate → character.name → id 原键（保证不空）
+   ------------------------------------------------------------------
+   ★ v6.7 修复（作者实机：50 位妖灵全部显示成英文原始 id 而非中文名）：
+     旧链第一顺位是 summary().minions[id].name（**未讨伐即空**），第二顺位是 lib.translate
+     ——那是 boss 角色包被引擎 loadCharacter 之后才落地的，懒人包/旧版客户端拿不到
+     ⇒ 兜底 return id。现在把**数据层静态名单**（core/csh_bossdata.js 的 MINION_NAMES，
+     由金鳞市转交）提到最前：零加载时序依赖，translate 降级为兜底。
+   ★ 末级回退必须留痕：静默回退是本项目反复复发的坑，这里打一条可搜索的 warn。 */
+function nameOf(id, names, minions, L) {
+  try { if (names && names[id]) return names[id]; } catch (e) {}
+  try { if (minions && minions[id] && minions[id].name) return minions[id].name; } catch (e) {}
+  try { if (L && L.translate && L.translate[id]) return L.translate[id]; } catch (e) {}
+  try {
+    if (L && L.character && L.character[id] && L.character[id].name) return L.character[id].name;
+  } catch (e) {}
+  try { console.warn("[池子魔将][图鉴] 缺名 id: " + id); } catch (e) {}
+  return id;
+}
+
+/* 立绘路径：优先取 lib.character[id].img/.face 的 basename（扩展角色条目存了完整路径）；
+   iframe 拿不到 bossdata，故兜底按 id 拼 —— 立绘文件名 = 妖灵主名（id 去掉前缀）。 */
+function pathOf(id, name, L, which) {
+  try {
+    var ch = L && L.character && L.character[id];
+    var full = ch && (which === "face" ? ch.face : ch.img);
+    if (full) {
+      var base = String(full).split("/").pop();
+      if (base) return "../image/" + base;
+    }
+  } catch (e) {}
+  var main = String(id == null ? "" : id).replace(/^csh_boss_minion_/, "");
+  return "../image/" + (which === "face" ? "csh_face_" : "csh_minion_") + main + ".webp";
+}
+
+/* 采集：market 提供人设（GIRLS）与挂牌顺序（LISTED）；minions 提供次数/热度 */
+function collect() {
+  var d = parentData();
+  var M = d.market, L = d.lib;
+  var G = (M && M.GIRLS) ? M.GIRLS : null;
+  var LISTED = (M && M.LISTED) ? M.LISTED : null;
+  if (!G || !LISTED || !LISTED.length) return null;
+  var minions = minionMap(d.rec);
+  if (!minions) minions = Data.bridgeMinions || {};
+  /* 数据层名字（csh_bossdata.MINION_NAMES 由金鳞市转交）——与 GIRLS/LISTED 同源同时可用 */
+  var names = (M && M.MINION_NAMES) ? M.MINION_NAMES : null;
+  return { G: G, LISTED: LISTED, minions: minions, names: names, lib: L };
+}
+
+/* 按 LISTED 顺序成表（只列 GIRLS 里有的人设 · 无任何硬编码名单） */
+function buildItems(c) {
+  var out = [];
+  for (var i = 0; i < c.LISTED.length; i++) {
+    var id = c.LISTED[i];
+    var girl = c.G[id];
+    if (!girl) continue;
+    var rec = c.minions[id] || null;
+    var name = nameOf(id, c.names, c.minions, c.lib);
+    out.push({
+      id: id, name: name,
+      tag: girl.tag || "", bio: girl.bio || "",
+      lines: girl.lines || null,
+      aff: affLines(id),                          /* v6.3 好感台词（950 句库，逐人考据） */
+      affState: affOf(id),                        /* v6.2 好感度状态 */
+      n: (rec && rec.n > 0) ? rec.n : 0,
+      heat: (rec && typeof rec.heat === "number") ? rec.heat : null,
+      img: pathOf(id, name, c.lib, "img"),
+      face: pathOf(id, name, c.lib, "face")
+    });
+  }
+  return out;
+}
+
+/* ============================================================
+   好感度（v6.2）· 数据 + 交互
+   ------------------------------------------------------------
+   数据源：父窗 lib.cshAffection（同源直读）；写操作走桥 shell-aff-do，
+   父窗缺失时降级为「只读」——不静默失败，界面会如实标注。
+   ============================================================ */
+var AFF = {
+  /* ★ 2026-10-16 深夜 · 雀魂移植（与宿主 csh_affection 同源同值）：
+     五段累计 2000/8000/18000/38000/88000（满羁绊）；礼物 200/1000/5000/12000 · 偏好 ×1.5。 */
+  max: 88000,
+  levels: [
+    { min: 38000, key: "S", name: "羁绊" },
+    { min: 18000, key: "A", name: "信赖" },
+    { min: 8000, key: "B", name: "亲近" },
+    { min: 2000, key: "C", name: "相识" },
+    { min: 0, key: "D", name: "陌路" }
+  ],
+  /* v6.3：礼物四档（涨价）+ 三种互动动作 + 四档经济回报（与宿主 csh_affection 同源同值） */
+  gifts: [
+    { key: "wine", name: "一杯烈酒", cost: 6000, add: 200 },
+    { key: "rose", name: "一束夜蔷薇", cost: 28000, add: 1000 },
+    { key: "relic", name: "一枚旧徽章", cost: 120000, add: 5000 },
+    { key: "stardust", name: "一捧星砂", cost: 680000, add: 12000 }
+  ],
+  acts: [
+    { key: "greet", name: "打个招呼", gain: 0, hint: "不计好感、不冷却——只是想听她说话" },
+    { key: "talk", name: "说说话", gain: 1, hint: "每天一次 +1" },
+    { key: "head", name: "摸摸头", gain: 1, hint: "每天一次 +1" }
+  ],
+  perks: [
+    { level: "C", key: "fee1", tag: "相识", name: "挂单折扣", desc: "手续费 −0.3%" },
+    { level: "B", key: "tip", tag: "亲近", name: "她的消息", desc: "每交易日一条涨跌倾向" },
+    { level: "A", key: "fee2", tag: "信赖", name: "深度挂单", desc: "手续费再 −0.4%" },
+    { level: "S", key: "div", tag: "羁绊", name: "共担风险", desc: "日分红 +0.5%" }
+  ],
+  gain: { hunt: 6, hold: 2, talk: 1, head: 1 },
+  say: null,
+  cache: null,
+  api: null
+};
+
+function affApi() {
+  if (AFF.api) return AFF.api;
+  try {
+    var P = window.parent;
+    AFF.api = (P && P.lib && P.lib.cshAffection) ? P.lib.cshAffection
+            : (P && P.CSH && P.CSH.affection) ? P.CSH.affection : null;
+  } catch (e) { AFF.api = null; }
+  return AFF.api;
+}
+
+/* 整份好感台词（逐条列出 + 未解锁占位）；宿主缺失时返回 null */
+function affLines(id) {
+  var A = affApi();
+  if (A && typeof A.linesOf === "function") { try { return A.linesOf(id); } catch (e) {} }
+  return null;
+}
+function affLevel(v) {
+  for (var i = 0; i < AFF.levels.length; i++) if (v >= AFF.levels[i].min) return AFF.levels[i];
+  return AFF.levels[AFF.levels.length - 1];
+}
+function affNext(v) {
+  var cur = affLevel(v), idx = AFF.levels.indexOf(cur);
+  return idx > 0 ? AFF.levels[idx - 1] : null;
+}
+/* 某只妖灵的好感状态（无数据 = 陌路 0） */
+function affOf(id) {
+  var A = affApi();
+  if (A && typeof A.get === "function") {
+    try { var g = A.get(id); if (g) return g; } catch (e) {}
+  }
+  return { id: id, v: 0, level: "D", levelName: "陌路", toNext: 2000, pct: 0, mood: "cold", perks: [], heat: 0, oath: 0 };
+}
+function refreshAff(id) {
+  AFF.cache = null;
+  var it = Data.items[Data.cur];
+  if (it) it.affState = affOf(it.id);
+  return it ? it.affState : null;
+}
+
+/* 五颗心（v6.4 重写）：不引用任何 url(#id)、不用 SVG filter —— 理由同金鳞市：
+   innerHTML 塞 defs + url() 引用在运行期不稳，未解析的 paint 会被画成纯黑。 */
+function svgNode(tag, attrs) {
+  var e = document.createElementNS("http://www.w3.org/2000/svg", tag);
+  if (attrs) for (var k in attrs) if (attrs[k] != null) e.setAttribute(k, String(attrs[k]));
+  return e;
+}
+var AFFHEARTD = "M16 27.5C9 22 2.5 17.2 2.5 11.4 2.5 6.6 6.1 3 10.4 3c2.5 0 4.4 1.2 5.6 3.1C17.2 4.2 19.1 3 21.6 3 25.9 3 29.5 6.6 29.5 11.4c0 5.8-6.5 10.6-13.5 16.1z";
+function heartSvg(filled) {
+  var svg = svgNode("svg", { viewBox: "0 0 32 30", class: "affheart" + (filled ? " on" : "") });
+  if (!filled) {
+    svg.appendChild(svgNode("path", { d: AFFHEARTD, fill: "none", stroke: "rgba(240,112,156,.34)", "stroke-width": "1.6" }));
+    return svg;
+  }
+  svg.appendChild(svgNode("path", { d: AFFHEARTD, fill: "#e2598c", class: "b",
+    stroke: "rgba(255,214,232,.62)", "stroke-width": "1.4" }));
+  svg.appendChild(svgNode("path", { d: AFFHEARTD, fill: "#ffb6d2", opacity: ".85", class: "g",
+    transform: "translate(16 15) scale(.58) translate(-16 -15)" }));
+  svg.appendChild(svgNode("path", { d: "M10.5 8.2c1.1-1.3 2.6-1.9 4-1.7",
+    stroke: "rgba(255,255,255,.85)", "stroke-width": "1.5", fill: "none", "stroke-linecap": "round" }));
+  return svg;
+}
+
+function renderAff(it) {
+  var box = $("#affbox");
+  box.innerHTML = "";
+  var st = it.affState || affOf(it.id);
+  var lv = affLevel(st.v);
+  var filled = Math.max(0, AFF.levels.length - 1 - AFF.levels.indexOf(lv));
+  if (st.v >= AFF.max) filled = 5;   /* 满羁绊 88000 = 五心圆满（雀魂五星口径） */
+  box.className = "affbox" + (lv.key === "S" ? " sTier" : "");
+
+  var head = el("div", "affhead");
+  head.appendChild(el("div", "afftitle", "亲 密"));
+  /* ★ 2026-10-16 深夜（作者："相识·C 这个·C 纯属多余"）：只留档位名，不再缀字母键 */
+  head.appendChild(el("div", "afflv", lv.name));
+  head.appendChild(el("div", "affval", st.v + " / " + AFF.max));
+  /* 置顶（v6.8 · 作者："可以手动给喜欢的置顶"） */
+  var pb = el("button", "pinbtn" + (isPinned(it.id) ? " on" : ""), isPinned(it.id) ? "已置顶" : "置顶");
+  pb.title = isPinned(it.id) ? "取消置顶（列表回到好感排序）" : "把她钉在列表最前";
+  pb.addEventListener("click", function () { togglePin(it.id); }, false);
+  head.appendChild(pb);
+  box.appendChild(head);
+
+  var hs = el("div", "affhearts");
+  for (var i = 0; i < 5; i++) hs.appendChild(heartSvg(i < filled));
+  box.appendChild(hs);
+
+  var bar = el("div", "affbar");
+  var bi = document.createElement("i");
+  bi.style.width = Math.max(2, Math.round(st.v)) + "%";
+  bar.appendChild(bi);
+  box.appendChild(bar);
+
+  var meta = el("div", "affmeta");
+  var nxt = affNext(st.v);
+  meta.appendChild(el("div", "", nxt ? ("距离「" + nxt.name + "」还差 " + st.toNext) : "已到最高档「羁绊」"));
+  if (st.mood === "cool") meta.appendChild(el("div", "grow", "久未相见"));
+  box.appendChild(meta);
+
+  /* ---------- 她说的话 ---------- */
+  var say = el("div", "affsay");
+  var sp = (AFF.say && AFF.say.id === it.id) ? AFF.say : null;
+  if (sp && (sp.line || sp.up)) {
+    say.className = "affsay " + (sp.tone || "good");
+    if (sp.up) say.appendChild(el("div", "up", sp.up));
+    if (sp.line) say.appendChild(el("div", "ln", "\u201C" + sp.line + "\u201D"));
+  } else {
+    say.className = "affsay idle";
+    say.appendChild(el("div", "ph", "点下面的按钮，听她说话。"));
+  }
+  box.appendChild(say);
+
+  /* ---------- 互动（v6.5：直接画锁定态，不再"点了才知道"） ---------- */
+  /* v6.7（2026-10-16 晚 · 作者："未讨伐的妖灵不能进行互动；金鳞市仍可购买"）：
+     未讨伐前互动面板整体锁定——参考成熟收集类做法：**面板不隐藏**（保留收集目标感），
+     但全部按钮置灰 + 明示解锁条件；宿主侧 csh_affection.interact/gift 同锁（单一出口）。 */
+  var hunted = !!(it.n > 0);
+  if (!hunted) {
+    box.appendChild(el("div", "afflock", "🔒 未讨伐 · 先到「挑战模式」击破她，才能开始互动"));
+  }
+  var acts = st.acts || {};
+  function mkAct(key, name, gain, cls) {
+    var a = acts[key] || { ok: true };
+    var b = el("button", "affbtn" + (cls ? (" " + cls) : ""), name);
+    if (!hunted) {
+      b.setAttribute("disabled", "1");
+      b.appendChild(el("i", "lk", "🔒 未讨伐"));
+      b.title = "先在挑战模式击破她，才能开始互动";
+    } else if (a.locked) {
+      b.setAttribute("disabled", "1");
+      b.appendChild(el("i", "lk", "🔒 需好感 " + (a.need || 8000)));
+      b.title = "亲近（好感 " + (a.need || 8000) + "）以上才解锁 —— 先陪她说话";
+    } else if (!a.ok) {
+      b.setAttribute("disabled", "1");
+      b.appendChild(el("i", "lk", "今日已做"));
+      b.title = "这项每天一次";
+    } else if (gain) {
+      b.appendChild(el("i", "gain", gain));
+    }
+    b.addEventListener("click", function () { doAff(it.id, key, null); }, false);
+    return b;
+  }
+  var ops = el("div", "affops");
+  ops.appendChild(mkAct("greet", "打个招呼", "", "soft"));
+  ops.appendChild(mkAct("talk", "说说话", "+5", ""));
+  ops.appendChild(mkAct("head", "摸摸头", "+5", "soft"));
+  ops.appendChild(mkAct("close", "贴近一点", "+10", "close"));
+  /* ★ v6.9（作者："随好感解锁新互动"）：三档递进互动——锁态由宿主 acts 数据自带 */
+  ops.appendChild(mkAct("tea", "递杯茶", "+3", ""));
+  ops.appendChild(mkAct("stars", "并肩看星", "+8", "close"));
+  ops.appendChild(mkAct("callname", "专属称呼", "+12", "close"));
+  box.appendChild(ops);
+  box.appendChild(el("div", "affnote", "互动每日各一次 · 送礼不限次数（偏爱 ×1.5）"));
+
+  /* ---------- 礼物 ---------- */
+  var grows = el("div", "affgifts");
+  var favKey = "";
+  try { var A2 = affApi(); if (A2 && typeof A2.favOf === "function") favKey = A2.favOf(it.id) || ""; } catch (eFav) {}
+  AFF.gifts.forEach(function (g) {
+    var isFav = (favKey === g.key);
+    var b = el("button", "affbtn gold" + (isFav ? " fav" : ""), g.name);
+    b.title = isFav ? ("她的偏爱 —— 好感 +" + Math.round(g.add * 1.5) + "（×1.5）· 不限次数")
+                    : ("好感 +" + g.add + " · 不限次数");
+    b.appendChild(el("i", "cost", fmt(g.cost)));
+    if (isFav) b.appendChild(el("i", "favmk", "♥ 偏爱"));
+    if (!hunted) {
+      b.setAttribute("disabled", "1");
+      b.appendChild(el("i", "lk", "🔒 未讨伐"));
+      b.title = "先在挑战模式击破她，才能开始互动";
+    }
+    b.addEventListener("click", function () { doAff(it.id, "gift", g.key); }, false);
+    grows.appendChild(b);
+  });
+  box.appendChild(grows);
+
+  /* ---------- 好感回报（v6.5：默认折叠，减少啰嗦） ---------- */
+  var pk = document.createElement("details");
+  pk.className = "pkbox";
+  var have = st.perks || [];
+  var sum = document.createElement("summary");
+  var stxt = "好感回报 · 已生效 " + have.length + " / " + AFF.perks.length;
+  if (st.giveSum > 0) stxt += " · 她给过你 " + fmt(st.giveSum) + " CBY";
+  sum.textContent = stxt;
+  pk.appendChild(sum);
+  AFF.perks.forEach(function (p) {
+    var on = have.indexOf(p.key) >= 0;
+    var row = el("div", "affperk" + (on ? " on" : ""));
+    row.appendChild(el("span", "tk", p.tag));
+    row.appendChild(el("span", "tn", p.name));
+    row.appendChild(el("span", "td", p.desc));
+    row.appendChild(el("span", "ts", on ? "已生效" : "未解锁"));
+    pk.appendChild(row);
+  });
+  if (typeof st.heat === "number" && st.heat > 0) {
+    pk.appendChild(el("div", "affheat", "基本面加成 +" + st.heat.toFixed(2) + "%（好感越高，她的行情越稳）"));
+  }
+  box.appendChild(pk);
+
+  /* ---------- ★ 契约/誓约（v6.9 · 2026-10-16 深夜三）----------
+     满羁绊 88000 → 「结契」（星砂 ×2 + ♥偏爱礼物 ×3）；已结契 → 誓约铭牌 + 立绘金框。 */
+  try {
+    var ds = document.querySelector(".dstage");
+    if (ds) ds.className = "dstage" + (st.oath ? " oath" : "");
+  } catch (eDS) {}
+  if (st.oath) {
+    box.appendChild(el("div", "oathbar", "\u269C 誓约 · " + new Date(Number(st.oath) || 0).toLocaleDateString() + " —— 你们已立下契约"));
+  } else if (st.v >= AFF.max && hunted) {
+    var obox = el("div", "oathbox");
+    obox.appendChild(el("div", "oathnote", "羁绊已满 · 立下誓约（星砂 ×2 + \u2665 偏爱礼物 ×3）"));
+    var obtn = el("button", "oathbtn", "\u269C 结 契");
+    obtn.title = "与她立下誓约 —— 完成后获得契约台词与专属铭牌";
+    obtn.addEventListener("click", function () { doOath(it.id); }, false);
+    obox.appendChild(obtn);
+    box.appendChild(obox);
+  }
+
+  /* 【v6.5 作者指令】此前的「重置她的记录（调试）」按钮已移除 —— 这是**成品**页面，
+     玩家不该看见任何调试入口（作者：「现在应该是完全版成品才对，不应该让玩家知道的
+     就隐去相关内容」）。
+     重置能力本身没有删，只是收回到调试侧：控制台执行
+       lib.cshAffection.reset("<妖灵ID>")        // 单只
+       lib.cshAffection.reset()                  // 全部
+     或改用主页面「技能」调试页的存档清理入口。 */
+
+  var msg = (AFF.say && AFF.say.id === it.id && AFF.say.msg) ? AFF.say.msg : "";
+  var hint = el("div", "affhint" + (affApi() ? "" : " bad"), affApi() ? msg : "宿主未连接，仅可查看");
+  box.appendChild(hint);
+}
+
+/* ★ v6.9 结契（直调宿主；宿主缺失给中性提示） */
+function doOath(id) {
+  var A = affApi();
+  var res = null;
+  try { if (A && typeof A.oath === "function") res = A.oath(id); } catch (e) {}
+  if (!res || !res.ok) {
+    var WHYo = {
+      "need-max": "羁绊还差一节——满 88000 才能立誓。",
+      "already": "你们已经立过誓约了。",
+      "poor": "星砂或偏爱礼物不够（需 星砂 ×2 + \u2665偏爱礼物 ×3）。",
+      "need-hunt": "先在挑战模式击破她，才能走到这一步。",
+      "no-wallet": "钱包未就绪。"
+    };
+    AFF.say = { id: id, msg: (WHYo[res && res.reason] || "这一步没能走成。"), tone: "bad" };
+    refreshAff(id);
+    var it0 = Data.items[Data.cur];
+    if (it0) { renderAff(it0); renderList(); }
+    return;
+  }
+  oathBanner(id);
+  AFF.say = { id: id, line: res.line || "", up: "\u269C 誓约成立 · 花费 " + fmt(res.cost) + " CBY", tone: "levelup", msg: "" };
+  try { Bridge.call("shell-pc", null, function () {}); } catch (eP) {}
+  refreshAff(id);
+  var it = Data.items[Data.cur];
+  if (it) { renderAff(it); renderEcho(it); renderList(); }
+}
+/* ★ v6.9 契约横幅（书法体大字 + 名字 · 纯 DOM 零新资源 · 2.9s 收场） */
+function oathBanner(id) {
+  try {
+    var nm = "";
+    var it = Data.items[Data.cur];
+    if (it && it.id === id) nm = it.name || "";
+    var ov = el("div", "oathov");
+    ov.appendChild(el("div", "oathbig", "契 约"));
+    ov.appendChild(el("div", "oathsub", (nm ? nm + " · " : "") + "誓约成立"));
+    document.body.appendChild(ov);
+    setTimeout(function () { ov.classList.add("out"); }, 2200);
+    setTimeout(function () { if (ov.parentNode) ov.parentNode.removeChild(ov); }, 2950);
+  } catch (e) {}
+}
+
+function doAff(id, act, giftKey) {
+  var WHY = {
+    cool: "久未相见（她这边过了些日子）——陪她说说话就好，好感不会掉。",
+    daily: "今天已经做过了，明天再来。",
+    "need-level": "好感还不够，她不会让你靠那么近。",
+    "need-hunt": "先在挑战模式击破她，才能开始互动。",
+    poor: "池子币不够。",
+    "no-wallet": "钱包未就绪。",
+    fail: "没能送到她手上。",
+    "no-gift": "没有这份礼物。",
+    "bad-id": "找不到她。",
+    "bad-act": "这个动作不存在。",
+    error: "出了点岔子。"
+  };
+  var done = function (res) {
+    res = res || {};
+    var ok = res.ok !== false;
+    var msgs = [];
+    if (res.gain) msgs.push("好感 +" + res.gain);
+    if (res.cost) msgs.push("花费 " + fmt(res.cost) + " CBY");
+    if (res.leveledUp) msgs.push("★ 升入「" + (res.upLevel || res.levelName || "") + "」");
+    if (!ok) msgs.push(WHY[res.reason] || "没能如愿。");
+    /* 回礼只在这条醒目气泡上说一次，不再在下面小字里重复（作者嫌啰嗦） */
+    var top = "";
+    if (res.give) top = "✦ 她塞给你 " + fmt(res.give) + " CBY" + (res.upLine ? "（" + res.upLine + "）" : "");
+    else if (res.upLine) top = "✦ " + res.upLine;
+    AFF.say = {
+      id: id, line: res.giveLine || res.line || "", up: top,
+      tone: ok ? (res.leveledUp || res.give ? "levelup" : "good") : "bad",
+      msg: msgs.filter(Boolean).join(" · ")
+    };
+    /* 收到回礼 → 让宿主刷新右上角的 CBY 胶囊 */
+    if (res.give) { try { Bridge.call("shell-pc", null, function () {}); } catch (eP) {} }
+    refreshAff(id);
+    var it = Data.items[Data.cur];
+    if (it) { renderAff(it); renderEcho(it); renderList(); }
+  };
+  /* ① 同源直读：直接调宿主 API（父窗缺失时才是桥） */
+  var A = affApi();
+  if (A) {
+    try {
+      if (act === "gift" && typeof A.gift === "function") { done(A.gift(id, giftKey)); return; }
+      if (typeof A.interact === "function") { done(A.interact(id, act)); return; }
+    } catch (e) {}
+  }
+  /* ② 桥兜底 */
+  Bridge.call("shell-aff-do", { id: id, act: act, gift: giftKey }, function (ok, res) { done(res); });
+}
+
+/* ============================================================
+   渲染
+   ============================================================ */
+function renderStats() {
+  var box = $("#stats");
+  box.innerHTML = "";
+  var total = Data.items.length, kills = 0, killed = 0;
+  for (var i = 0; i < total; i++) {
+    kills += Data.items[i].n;
+    if (Data.items[i].n > 0) killed++;
+  }
+  var s1 = el("span", "stat", "图鉴 "); s1.appendChild(el("b", "", String(total))); box.appendChild(s1);
+  var s2 = el("span", "stat", "已讨 "); s2.appendChild(el("b", "", String(killed))); box.appendChild(s2);
+  var s3 = el("span", "stat", "总讨伐 "); s3.appendChild(el("b", "", fmt(kills))); box.appendChild(s3);
+}
+
+/* ---------- 排序与置顶（2026-10-16 深夜 · 作者："好感度高的优先排列？…可以手动给喜欢的置顶？"） ----------
+   排序 = 手动置顶（按置顶先后）→ 好感降序 → 原始次序。PINS 存 localStorage。
+   纪律：**就地重排 Data.items**（选中索引 Data.cur 与列表索引同源，不能影子数组）。 */
+var PINS = [];
+try { PINS = JSON.parse(pinLS("csh_codex_pins") || "[]") || []; } catch (eP2) { PINS = []; }
+if (!Array.isArray(PINS)) PINS = [];
+function pinLS(k, v) { try { if (v === undefined) return localStorage.getItem(k) || ""; localStorage.setItem(k, v); } catch (e) { return ""; } }
+function pinSave() { pinLS("csh_codex_pins", JSON.stringify(PINS)); }
+function isPinned(id) { return PINS.indexOf(id) >= 0; }
+function sortItems() {
+  var orig = {};
+  Data.items.forEach(function (it, i) { orig[it.id] = i; });
+  Data.items.sort(function (a, b) {
+    var pa = isPinned(a.id), pb = isPinned(b.id);
+    if (pa !== pb) return pa ? -1 : 1;
+    if (pa && pb) return PINS.indexOf(a.id) - PINS.indexOf(b.id);
+    var va = (a.affState && a.affState.v) || 0, vb = (b.affState && b.affState.v) || 0;
+    if (va !== vb) return vb - va;
+    return orig[a.id] - orig[b.id];
+  });
+}
+function togglePin(id) {
+  var i = PINS.indexOf(id);
+  if (i >= 0) PINS.splice(i, 1); else PINS.unshift(id);
+  pinSave();
+  sortItems();
+  renderList();
+  var it = Data.items[Data.cur];
+  if (it && it.id === id) renderAff(it);
+}
+function renderList() {
+  sortItems();   /* 置顶 → 好感降序 → 原始（每次重渲染都随好感实时重排） */
+  var box = $("#rolodex");
+  box.innerHTML = "";
+  Data.items.forEach(function (it, idx) {
+    var row = el("div", "gitem" + (idx === Data.cur ? " on" : ""));
+    if (it.affState && it.affState.oath) row.classList.add("oath");   /* ★ v6.9：契约金环 */
+    row.setAttribute("data-idx", String(idx));
+    var f = el("div", "gface");
+    var img = el("img"); img.alt = it.name;
+    /* 图片兜底：失败则隐去影像、露出首字占位，避免裂图 */
+    img.onerror = function () { f.classList.add("noimg"); };
+    f.appendChild(img);
+    f.appendChild(el("span", "gph", String(it.name).slice(0, 1)));
+    img.src = it.face;
+    row.appendChild(f);
+    var meta = el("div", "gmeta");
+    meta.appendChild(el("div", "gname", it.name));
+    var st = it.affState || affOf(it.id);
+    var lv = affLevel(st.v);
+    var gs = el("div", "gsub" + (lv.key === "S" ? " aff-s" : ""));
+    gs.appendChild(el("span", "gk", it.n > 0 ? ("×" + it.n) : "未讨"));
+    if (st.v > 0) {
+      var hb = el("span", "gh", "\u2665 " + st.v);
+      hb.title = "她对你的好感 " + st.v + " / 100（" + lv.name + "）";
+      gs.appendChild(hb);
+    }
+    meta.appendChild(gs);
+    row.appendChild(meta);
+    row.addEventListener("click", function () { select(idx); }, false);
+    box.appendChild(row);
+  });
+}
+
+/* ---------- 回响 · 台词汇编（v6.4）----------
+   ★ 作者：台词全列出来"会减少新鲜度"，"有些内容没必要让玩家看到"。
+     ⇒ 不再预播全部台词：只显示**她真的说过的那几句**，没说过的是「？？？」。
+       台词由 csh_affection 的 heard 记录，选句时**优先挑没听过的**。
+   ★ 顺带把金鳞市的"人设台词"也一并收进来，图鉴只当档案与收集册，不再当台词表。 */
+var ECHO_SEC = [
+  ["greet", "打招呼"],
+  ["talk", "闲聊"],
+  ["head", "摸头"],
+  ["close", "贴近 · 亲近 8000 起"],
+  ["give", "她的回礼"],
+  ["gift", "礼物 · 四档"],
+  ["up", "升档 · 2000 / 8000 / 18000 / 38000"],
+  ["top", "羁绊 · 38000 起"],
+  ["cool", "疏远"]
+];
+function echoRows(kind, heard) {
+  if (!heard) return [];
+  if (kind === "gift" || kind === "up") {
+    var o = heard[kind] || {}, out = [];
+    for (var k in o) out.push(o[k] ? ("「" + o[k] + "」") : "「？？？」");
+    return out;
+  }
+  if (kind === "top" || kind === "cool") {
+    return [heard[kind] ? ("「" + heard[kind] + "」") : "「？？？」"];
+  }
+  return (heard[kind] || []).map(function (t) { return t ? ("「" + t + "」") : "「？？？」"; });
+}
+function renderEcho(it) {
+  var box = $("#dlines");
+  if (!box) return;
+  box.innerHTML = "";
+  var A = affApi();
+  var prog = (A && typeof A.heardOf === "function") ? A.heardOf(it.id) : null;
+  var heard = (A && typeof A.heardLines === "function") ? A.heardLines(it.id) : null;
+
+  var head = el("div", "echead");
+  head.appendChild(el("div", "ectitle", "回 响"));
+  if (prog) head.appendChild(el("div", "ecnum", prog.got + " / " + prog.all));
+  box.appendChild(head);
+  box.appendChild(el("div", "ecnote", "她说过的话会留在这里。没说过的不剧透。"));
+  if (prog) {
+    var pb = el("div", "ecbar");
+    var pbi = document.createElement("i");
+    pbi.style.width = Math.max(2, Math.round(prog.got / Math.max(1, prog.all) * 100)) + "%";
+    pb.appendChild(pbi);
+    box.appendChild(pb);
+  }
+
+  if (!prog || !prog.all) {
+    box.appendChild(el("div", "ecnote", A ? "还没有和她说过话。" : "宿主未连接，暂不可用。"));
+    return;
+  }
+  var det = document.createElement("details");
+  det.className = "ecbook";
+  var sum = document.createElement("summary");
+  sum.textContent = "展开台词汇编（" + prog.got + " / " + prog.all + "）";
+  det.appendChild(sum);
+  ECHO_SEC.forEach(function (def) {
+    var row = (prog.list || []).filter(function (x) { return x.kind === def[0]; })[0];
+    if (!row) return;
+    var rows = echoRows(def[0], heard);
+    var sec = el("div", "ecsec" + (row.got >= row.all ? " full" : ""));
+    sec.appendChild(el("div", "ecslabel", def[1] + " · " + row.got + " / " + row.all));
+    rows.forEach(function (t) {
+      sec.appendChild(el("div", "ecline" + (t === "「？？？」" ? " lock" : ""), t));
+    });
+    det.appendChild(sec);
+  });
+  box.appendChild(det);
+}
+
+function renderDossier(it) {
+  var stage = $(".dstage");
+  stage.classList.remove("noimg");
+  var img = $("#dimg");
+  img.alt = it.name;
+  img.onerror = function () { stage.classList.add("noimg"); };   /* 大图兜底：占位名 */
+  img.src = it.img;
+  $("#dph").textContent = it.name;
+  $("#dname").textContent = it.name;
+  $("#dtag").textContent = it.tag || "金鳞市挂牌";
+  /* 花榜·魁首题壁：该只的魁首留的话（接口失败时 SHARE 为空 ⇒ 整块隐藏，绝不显示占位噪声） */
+  var sh = SHARE[it.id], dc = $("#dchief");
+  if (dc) {
+    if (sh && sh.chief_name) {
+      dc.textContent = "魁首 " + sh.chief_name + " · 壁上：" + (sh.chief_sig || "未题壁");
+      dc.hidden = false;
+    } else dc.hidden = true;
+  }
+  $("#dbio").textContent = it.bio || "";
+  renderAff(it);
+  renderEcho(it);
+  $("#fN").textContent = it.n > 0 ? (it.n + " 次") : "—";
+  $("#fHeat").textContent = (typeof it.heat === "number" && it.heat > 0) ? ("+" + it.heat + "%") : "—";
+  $("#fList").textContent = "已挂牌";
+}
+
+function select(idx) {
+  var n = Data.items.length;
+  if (!n) return;
+  if (idx < 0) idx = n - 1;
+  if (idx >= n) idx = 0;
+  Data.cur = idx;
+  var rows = $("#rolodex").children;
+  for (var i = 0; i < rows.length; i++) {
+    if (i === idx) rows[i].classList.add("on"); else rows[i].classList.remove("on");
+  }
+  renderDossier(Data.items[idx]);
+  /* 淡入：重触发 dossier 入场动画 */
+  var d = $("#dossier");
+  d.style.animation = "none"; void d.offsetWidth; d.style.animation = "";
+  try { if (rows[idx] && rows[idx].scrollIntoView) rows[idx].scrollIntoView({ block: "nearest" }); } catch (e) {}
+}
+
+function renderAll() {
+  renderStats();
+  if (!Data.items.length) { document.body.classList.add("empty"); return; }
+  document.body.classList.remove("empty");
+  renderList();
+  select(0);
+}
+
+/* ============================================================
+   启动（父窗直读优先 → 桥兜底 → 空态）
+   ============================================================ */
+function boot() {
+  var c = collect();
+  if (c) { Data.items = buildItems(c); renderAll(); return; }
+  if (Bridge.active) {
+    Bridge.call("shell-stats", null, function (ok, snap) {
+      if (ok && snap && snap.boss && snap.boss.minions && typeof snap.boss.minions === "object") {
+        Data.bridgeMinions = snap.boss.minions;
+      }
+      var c2 = collect();                 /* 人设仍需父窗 —— 拿不到则仍空态 */
+      Data.items = c2 ? buildItems(c2) : [];
+      renderAll();
+    });
+  } else {
+    Data.items = [];
+    renderAll();
+  }
+}
+
+/* 键盘翻页 */
+document.addEventListener("keydown", function (e) {
+  if (!Data.items.length) return;
+  if (e.key === "ArrowLeft") select(Data.cur - 1);
+  else if (e.key === "ArrowRight") select(Data.cur + 1);
+}, false);
+
+boot();
+/* 进页先取一次花榜（只读）；到手后把当前选中那只重绘一次，让魁首题壁出现（失败则沉默） */
+fetchShare(function () { try { if (Data.items.length && Data.cur >= 0) renderDossier(Data.items[Data.cur]); } catch (e) {} });
+})();
+</script>
+</body>
+</html>

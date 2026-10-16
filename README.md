@@ -1,4 +1,4 @@
-# 池子魔将 · 开发规范与路线图（v4.0.5）
+# 池子魔将 · 开发规范与路线图（v4.0.6）
 
 > 本文只留**常读**内容：红线 · 判定口径 · 防回归清单 · 门禁 · 路线图。
 > 细则与历史在 `docs/` 三件套（§8 索引，不随扩展打包）；更旧的 1832 行全文存档：
@@ -10,10 +10,10 @@
 
 | 项目 | 现值 |
 | --- | --- |
-| 这是什么 | 无名杀扩展：底座 = **武将 99 · 卡牌 24 · 技能**（联机可用）；衍生 = **池子休闲**（廿一点 / 德州为主）+ **AI 世界** + 成就 / 官阶 / 经济（单机）。演进目标：**池子世界**（§1、§7） |
-| 版本 | **4.0.5**（`package.js` / `info.json` / `extension.js` 三处含 intro 必须一致；**只有作者能定号**） |
+| 这是什么 | 无名杀扩展：底座 = **武将 99 · 卡牌 24 · 技能**（联机可用）；衍生 = **池子休闲**（德州 / 廿一点 / 斗地主 / UNO / **金鳞市** / **妖灵图鉴** + 生涯大厅 + 讨伐录）+ **BOSS 挑战模式**（93 魔王 + 50 妖灵）+ **AI 世界** + 成就 / 官阶 / 经济（单机）。演进目标：**池子世界**（§1、§7） |
+| 版本 | **4.0.6**（`package.js` / `info.json` / `extension.js` 三处含 intro 必须一致；**只有作者能定号**） |
 | 三处真值 | 小游戏目录 = `core/csh_registry.js` · 钱包与经济 = `core/csh_wallet.js` · AI 世界 = `core/csh_world.js` · 名册 = `character/index.js` |
-| 门禁 | `node tools/check.js`（语法 + 自由变量 + import 路径 + **技能/翻译/音频一致性** + 版本/files）· `node tools/simulate_world.js`（世界/存档/结算桥 + 五页内联脚本验收）—— 跑法见 §6 |
+| 门禁 | `node tools/check.js`（语法 + 自由变量 + import 路径 + **技能/翻译/音频一致性** + 版本/files + BOSS 断言组 E1~E29）· `node tools/simulate_world.js`（世界/存档/结算桥 + 八页内联脚本验收）—— 跑法见 §6 |
 | 实机 | 由作者测试；AI 只能声称「静态检查通过」 |
 | 路线 | **M1 100 武将 + P3 拆包 → M2 表现层三招牌 → M3 池子世界**（§7） |
 
@@ -108,6 +108,42 @@
   脱离无名杀的环境用 `tools/career_preview.html`（假宿主，按 shell 真实载荷应答桥协议）取真实数据渲染。
 - **根因优先，禁止保险层（2026-10-07 作者定则）**：发现要叠第二层"兜底/双保险"时，**停下**——多层保险是没找到根因的证据。先做对照实验找到一击解决的真因（如 `!important` 压制行内的浏览器实验），**然后删掉所有保险，收敛为单一实现**。保险本身是债：它掩盖根因、干扰排查、每次改动都要维护 N 份。
 
+### 4.1 「静默永不发动」五类判据（2026-10-14 · 4.0.5→4.0.6 回归审计沉淀）
+
+这一类 bug 的共性：**静态检查全绿、运行时不报错、就是没效果**。改技能/页面/经济前逐条对一次：
+
+| 类 | 症状 | 判据（必须回引擎源码确认） |
+| --- | --- | --- |
+| **触发角色写错** | 技能一次都不发动 | `player:` 要求 `event.player === 持有者`；**全局事件必须写 `global:`**。gameStart 是全局事件（本体一律 `global: "gameStart"`）；反之 `enterGame` 带 player。查法：grep 本体同事件怎么写。 |
+| **时点写错** | 技能发动了但无效果 | 改判/改值要看清引擎**读取目标的时刻**：`judge.directresult` 在 judge content 开头就被读走并亮牌，事后写它=没写——**改判必须替换 `player.judging[0]`**（本体 guidao/key/diy 范式：替换 + 弃旧牌）。 |
+| **事件字段写错** | 报错或 filter 崩 | 事件字段因事件而异：`useCardToTarget`/`useCardToPlayer`/`useCardToPlayered`/`useCardToTargeted` 由 `_triggerTo` 构造，**只有 player/target/card/cards，没有 source**；`damageEnd` 有 source；`die`/`dieAfter` 的 source 来自 reason。把 undefined 传给 `game.checkMod` 会 TypeError（末位参数要 `.getModableSkills()`）。 |
+| **键系不一致** | 计数/进度恒 0 | 生产者与消费者的键必须逐字对齐：`summary().series/seriesTotal` 的键**无 `csh_` 前缀**（与讨伐录系列表同契约）。跨模块消费一律容错双查（`pickSeries()` 范式），并把契约写成门禁断言。 |
+| **校验是死代码** | 脏数据能进存档 | 先确认判据**真的可能为假**：`tierOf()` 是 `ID2TIER[id] \|\| "elite"`，恒真 → `if (!tierOf(id))` 永不触发。校验要用白名单（`allBossIds()` / `MINIONS`），不要用"带兜底默认值的查询函数"。 |
+
+配套三条**副作用纪律**（钱/状态类，改前必对）：
+- **先入账再推进标记**：`写标记 → 发钱` 的顺序一旦发钱失败就**永久吞账**；一律 `if (pay(...)) 标记 = 完成`，失败挂 pending 下次补。
+- **桥超时 ≠ 失败**：`CSHPage.transport.call` 超时也回调 `(false,null)`，而宿主可能只是慢——**金额/持仓类命令绝不在超时后走本地重放**（会双花），只报错让玩家自查；本地兜底只留给"非桥环境"。
+- **空态必须单一出口**：空态写在启动回调里、后续又无条件调用"清屏+渲染"函数 → 空态被立刻抹掉（整页空白）。空态由渲染函数统一出口处理。
+
+### 4.2 字体纪律（2026-10-15 定案 · 照 `docs/art-direction.md` §4.1 扩充为四档）
+
+字体只有四个 token，**禁止裸写 font-family**（书法体除外，见下）：
+
+| token | 字体栈 | 用在哪 |
+| --- | --- | --- |
+| `--ff-title` | `Noto Serif SC / Source Han Serif SC / Songti SC / STSong / SimSun / serif` | 角色名 / 区块标题 / 官阶名 / 大数字 |
+| `--ff-body` | `Noto Sans SC / PingFang SC / Microsoft YaHei / system-ui / sans-serif` | 正文 / 台词 / 说明 / 按钮 |
+| `--ff-num` | `ui-monospace / Cascadia Mono / Consolas / SF Mono / Menlo / monospace` + `font-variant-numeric:tabular-nums` | 金额 / 价格 / 计数 |
+| `--ff-callig` | **`ZMX3`**（`font/csh_fx_font_3.woff2`，4058 字全覆盖子集）+ `Zhi Mang Xing / Kaiti SC / STKaiti / KaiTi` + `--ff-title` | **仅装饰性短词**：页面招牌字 / 封面书名 / 卷号 / 序跋大字 |
+
+- ★**书法体只用于"字表内确定有字形"的短词**：`csh_fx_font_1/2.woff2` 是 **78/84 字的游戏内技能横幅专用子集**，
+  **绝不可放进通用标题栈**——表外字会**逐字符回退系统字体**，同一个人名/标题里混排两种字体
+  （2026-10-15 作者实机截图确认的"字体不统一"根因，详见 `boss-design.md` §19.4）。
+- **人名、称号、台词一律走 `--ff-title` / `--ff-body`**，不做书法体（动态文本无法保证字表覆盖）。
+- 新增会以书法体呈现的文本（技能名/人名）→ **必须过门禁 E20**；字表在 `tools/font_charset.json`，
+  由 `python tools/make_font_subset.py <ZhiMangXing-Regular.ttf> --ext-root .` 重新生成
+  （字体为 SIL OFL 1.1 开源，许可随 `font/OFL-ZhiMangXing.txt` 打包）。
+
 ---
 
 ## 5. 结构与现状
@@ -115,10 +151,10 @@
 | 部分 | 内容 |
 | --- | --- |
 | `extension.js` | 入口（75 行）：noname import + 生命周期模块挂载 + `characterSubstitute` 皮肤表 |
-| `character/` · `card/` · `skills/` | 武将 99 · 卡牌 24 · 技能单文件 32332 行（名册/卡册唯一真值；P3 拆包见 §7 M1） |
-| `core/` | 19 个 `csh_*.js` 子模块 + `voices.js`（钱包/世界/壳/调试面板/目录/胜负/成就/官阶/CDK/音效/配乐/迁移/主题…） |
-| `main/` | 5 个生命周期模块（bootstrap / config / content / precontent / help） |
-| `games/` · `mobilefx/` | 4 款小游戏 + `career.html`（iframe 页）；手游位图特效播放器（M2 将泛化为动态立绘引擎） |
+| `character/` · `card/` · `skills/` | 武将 99 · 卡牌 24 · 技能单文件 ~33878 行（名册/卡册唯一真值；P3 拆包见 §7 M1） |
+| `core/` | 26 个 `csh_*.js` 子模块 + `voices.js`（钱包/世界/壳/调试面板/目录/胜负/成就/官阶/CDK/音效/配乐/迁移/主题/BOSS 数据·记录·金鳞市…） |
+| `main/` | 8 个生命周期模块（bootstrap / config / content / precontent / help / bossmode…） |
+| `games/` · `mobilefx/` | 6 款小游戏（德州/斗地主/廿一点/UNO/金鳞市/妖灵图鉴）+ 4 张 iframe 页（career 生涯大厅 / bossbook 讨伐录 / goldfish 金鳞市 / codex 妖灵图鉴）；手游位图特效播放器（M2 将泛化为动态立绘引擎） |
 | `tools/` · `docs/` | 门禁 / 验收 / 备份 / 体检；开发文档三件套 —— **两者均不进 package.js files 清单，不随扩展打包** |
 | `image/` · `audio/` · `font/` | 立绘·卡图 / 技能·阵亡·卡牌语音·特效横幅 / 毛笔字特效字体 |
 
@@ -134,11 +170,37 @@
 ```bash
 # 用 Electron 的 node 模式跑（本机没有独立 node）
 set ELECTRON_RUN_AS_NODE=1
-"D:\Noname\SHIJIAN(联机测试)\noname.exe" tools/check.js             # 语法 + 自由变量 + 版本三处一致 + files
-"D:\Noname\SHIJIAN(联机测试)\noname.exe" tools/simulate_world.js    # 世界/存档/结算桥 + 五页内联脚本（断言数以脚本实际输出为准）
+"D:\Noname\SHIJIAN(联机测试)\noname.exe" tools/check.js             # 语法 + 自由变量 + 版本三处一致 + files + BOSS 断言组 E1~E29
+"D:\Noname\SHIJIAN(联机测试)\noname.exe" tools/simulate_world.js    # 世界/存档/结算桥 + 八页内联脚本（断言数以脚本实际输出为准，现 169/0）
 "D:\Noname\SHIJIAN(联机测试)\noname.exe" tools/inventory.js         # 结构体检
 "D:\Noname\SHIJIAN(联机测试)\noname.exe" tools/backup.js --slim     # 改前备份（写到 _backup/）
 ```
+
+**BOSS 模式专项验证**（工作台 `D:/Noname/池子魔将-工作台/探针/_probe_v4/`，**必须 `node --preserve-symlinks`**——否则 junction 会解析到扩展真身、
+相对 import 逃进真 noname 而报 `Cannot find package 'vue'`）：
+
+```bash
+node --preserve-symlinks _probe_v4/probe.mjs                 # 真实数据端到端探针 39/0（角色注册/血量/醒魔/池悯/随机池/精英随机）
+node tools/simulate_world.js                                # 世界模拟 188/0（含 §1c 牌技：两榜不同序 98% / 12 牌风全覆盖）
+node --preserve-symlinks _probe_v4/verify_affection.mjs      # 好感度系统 130/0（五档/七互动含贴近/1600 句两两不同/疏远日键守卫/她的回礼/收集册/四档特权）
+node --preserve-symlinks _probe_v4/verify_minion_reward.mjs  # 妖灵讨伐收益 25/0（CBY/功勋/热度/幂等/通道纪律）
+node --preserve-symlinks _probe_v4/verify_goldfish.mjs       # 金鳞市 35/0（体验金/分红/手续费/长期看涨/边界）
+node --preserve-symlinks _probe_v4/verify_ext.mjs            # 外传卷 52/0（动态枚举/清洗/跨模式快照/键系）
+node --preserve-symlinks _probe_v4/verify_boss_over.mjs      # 讨伐收尾记录通道 19/0（game.over 包装 · 三结局+外传）
+# 渲染级（须先 cd 到扩展根再跑：脚本读 process.cwd()/games/bossbook.html）
+node "<工作区>/_probe_v4/verify_ext_page.cjs"         # 异界来客渲染 9/0
+node "<工作区>/_probe_v4/verify_ext_page.cjs" --empty # 异界来客空态 6/0
+```
+
+`tools/check.js` 的 BOSS 断言组（**E1~E27**）覆盖：键系统一 / 模拟引擎可达 / 无散落键转换 / 零手工写 lib.character /
+原生注册 / filter 参数纪律 / 包级隐藏 / 优先级两两不同 / 冷眼 global 装配 / 妖灵讨伐收益 / 金鳞市接线 /
+外传卷（含**立绘前缀三层**与跨模式快照）/ 妖灵图鉴 / **成就键系（vm 真跑引擎）** / **经济安全（扣款·入账·不重放）** /
+**三例「静默永不发动」回归守卫** / **书法体字表覆盖（E20）** / **人设↔挂牌一致（E21）** /
+**妖灵 50 技零重复 + 家族封顶（E22）** / **账本接线·入口只走左侧页签（E23）** /
+**好感度系统（E24：五档 · 七互动 · 送礼扣款 · 她的回礼 · 日键疏远守卫 · 收集册）** /
+**难度评分（E25）** / **台词库 1600 句 · 每人 32 句 · 全库两两不同（E26）** / **好感经济回报（E27）** /
+**成品页面卫生（E28）** / **濒死链路隔离（E29：功傲/刀锐不被魔王方濒死白嫖 · 反扑拆到 dyingAfter）**。
+
 失败判定：`✗[^0]|失败 [1-9]`；**不要拿 "error" 字样当失败**（`sfx("ui.error")` 会误报）。
 
 ---
@@ -146,7 +208,7 @@ set ELECTRON_RUN_AS_NODE=1
 ## 7. 路线图（目标：池子世界）
 
 ### M1 地基收敛（进行中）
-- **冲刺 100 武将**（现 98）：机器侧全就绪，写进 `character/index.js` 即自动收录世界与统计。
+- **冲刺 100 武将**（现 99）：机器侧全就绪，写进 `character/index.js` 即自动收录世界与统计。
 - **P3 技能拆包**：skills/index.js → `skill/batch_*.js`（单文件 <2000 行，先机械切分后语义归组）。
   **美化开工前必须完成** —— 表现阶段要高频往技能挂演出钩子，三万行单文件是合并事故最高发地带。
 - 拆分红线不变：不改版本号 / 不改技能逻辑 / 不改键名 / 一批一备份 / 每批过门禁。
@@ -171,8 +233,9 @@ set ELECTRON_RUN_AS_NODE=1
 - **对局 → CBY**：入口挂 `csh_winrate` 已有的 game.over 包装，结算走 `csh_wallet` settle + 哈希链；
   防刷用每日上限 / 衰减（参照负期望守护思路）；联机 no-op。
 - **AI 名将上牌桌**：`csh_world` 的性格 / 资金直接复用为德州 / 廿一点 AI —— 对局里的对手、牌桌上的同席、世界里的排行，同一个活的世界。
-- **小游戏收敛**：专耕 **廿一点 + 德州**；斗地主 / UNO **藏而不删**（摘入口、catalog 默认关、代码休眠，
-  成就与生涯历史数据不受影响）—— 待作者最终确认后执行。
+- **小游戏格局（2026-10-14 更新）**：现役 **6 款** = 德州 / 斗地主 / 廿一点 / UNO + **金鳞市**（galgame 股市 · 经济自管、不走牌桌结算）+ **妖灵图鉴**（纯档案展示）；
+  非游戏页 2 张 = 生涯大厅 / 讨伐录（registry `lobby:true` 免收费屏）。目录真值永远是 `core/csh_registry.js`（ORDER / CATALOG / LOBBY），
+  新增一款只改一处 + 补 `csh_games.js` 卡片文案（`selfTest()` 会核对一一对应）。
 - **309 名册**：持续推进（212 个真实武将设计，内容创作单独立项）。
 
 ### 排队优化（下一批一起做）
@@ -184,6 +247,23 @@ set ELECTRON_RUN_AS_NODE=1
 
 ### 里程碑纪律
 一批一备份一过门禁；M2 起新特效必须过「联机 no-op + 不污染全局」两道关；版本号仍只有作者能定。
+
+### 联动无名杀内置 BOSS 模式（魔王挑战）· **已落地（2026-10-13，版本 4.0.6）**
+
+> 目标：让池子魔将武将能作为**魔王 / 妖灵**进入无名杀**内置** BOSS 模式，且**只改本扩展、不改无名杀本体**。
+
+**结论：已落地。** **93 位魔王**（四档：究极 8 / 霸主 30 / 彩蛋 4 / 精英 51；另 6 人移出为可挑战者）+ **50 只妖灵**（六式 6 + 十二美 12 + 希里 + 春野樱 + **十卫 10 + 二十刑 20**；**全员 3 血 · 全员随机出场 · 50 技零重复、每只一个独立机制**）+ **80 个魔王主技 + 51 个 silent 挂靠子技**（`skills/boss.js` 共 131 条 · 系统层**疯魔/反扑**二技；全量清单见工作区 `池子魔将_BOSS模式技能总表.xlsx`）+ **魔王难度评分**（百分制 · `difficultyOf`）+ **讨伐录**（速通榜 / 亲征战绩 / 外传卷·异界来客）+ **成就「挑战」22 条** + CBY 首杀/每日/妖灵讨伐奖励（妖灵 **统一 800 CBY**（2026-10-16 晚四轮修正；挑战者/应战仍分流记录）+ 功勋 + 金鳞市热度）+ **池子币账本**（生涯大厅「账本」页 · 42 日收支热力格 · 逐笔流水 · 分类汇总）+ **金鳞市**（galgame 股市 · 五十位妖灵挂牌）+ **妖灵图鉴**（galgame 档案 · 五十位）+ **好感度系统**（五档 · **七种互动：打招呼/说说话/摸摸头/贴近/送礼×4/讨伐/持股** · **1600 句台词（每人 32 句、全库两两不同 · 收集册机制）** · **她的回礼**（陪伴类互动按概率回赠随机 CBY，S 档均值 ≈ 8400） · SVG 心跳爱心 · **四档经济回报**） + **AI 世界 149 人**（99 武将 + 50 妖灵，德州/斗地主/UNO 同桌 · **12 种牌风 · 牌技榜 ≠ 资金榜**）。设计全案见 **`docs/boss-design.md`**（§18 全量回归审计 / §19 v6 新批次与字体统一 / §20 v6.1 数值收束与妖灵入世 / §21 v6.2 技能去重·账本·好感度·立绘重构 / **§22 v6.3 技能二轮优化 · 难度正名 · 好感度大扩 · 牌技重设计 / §23 v6.4 功能去重（图鉴只管关系 · 金鳞市只管钱）· 台词收集册 · 黑心修复 / §24 v6.5 疏远误报修复 · 双向经济（她的回礼）· 台词 1600 句 / §25 v6.5.1 成品卫生 · 疯魔构成问题定位 / §26 v6.6 通用技重做 · 妖灵技重写 15 只 · 濒死链路隔离**），门禁 = `tools/check.js` 的 **runBossChecks 断言组（E1~E43）**。
+
+**注入机制（2026-10-13 源码级复核，修正本节 2026-10-11 旧调研）**：
+- **旧调研的"模式导出单例"（`lib.mode.boss` / `lib.imported.mode` 缓存）未复现**——实际加载链：`loadMode`（`noname/init/index.js:462`，`characterPack` 整体替换进 `lib.characterPack`）→ **扩展 `content`（:521-522，注入黄金位）** → `mode.start()`。模式导出对象是**每次 import 工厂新建**的，改单例的思路作废。
+- **实际注入（`main/bossmode.js`，`main/content.js` 挂载）**：判 `lib.config.mode === "boss"` 后——① 构造（`core/csh_bossdata.js` 纯数据单源）→ `lib.characterPack.mode_boss` **前插重建**（键序=列表顺序）+ **同步 `lib.character`**（loadMode 合并早已发生，改 pack 不进 character——漏这步开局 init 直接抛"武将不存在"）；② `lib.boss` 配置（chongzheng/minion/gameDraw）；③ `lib.translate` 名称；④ `forbidai.add` 加固；⑤ `lib.storage.current` 首进焦点。
+- **零污染实证**：挑战者选将排除 isBoss（`ui/create/index.js:1029`）；随机获技跳过（`get/index.js:4177`）；其它模式注入不执行。全套锚点见 `docs/boss-design.md` 附 C。
+
+**配套与红线**：① 魔王形态独立前缀 `csh_boss_`（普通形态不动）；② 势力统一「魔」（引擎原生 `devil`），列表身份牌保留出身色（`BOSS_GROUP` 开关一行回退）；③ 主公技在挑战模式被引擎整体剥离（`player.init` 过滤，属全局规则）；④ 门禁 = `node tools/check.js`（含 runBossChecks）。
+
+**注意事项**：十周年 UI 的「设置→选项→官方势力」（choose_group）开启时，神/魔势力角色开局会弹"请选择你的势力"（引擎神魔换势力机制，与本扩展无关）——魔王扮演者建议关闭该设置，即可正常显示并保持「魔」势力。
+
+**状态**：**已落地**（4.0.6，v4 平衡迭代见 CHANGELOG 五十九~六十一）。实机验收清单见工作区定稿 §8；数值校准全部集中 `core/csh_bossdata.js` / `core/csh_bossrecord.js` 单点。
 
 ---
 

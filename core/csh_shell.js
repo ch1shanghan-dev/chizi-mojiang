@@ -2,6 +2,7 @@ import { lib, game, ui } from "../../../noname.js";
 /* 游戏目录唯一真值（零 import，幂等）。extension.js 已先引；此处再引一次是为了
    把「本模块依赖目录」写成显式依赖，而不是靠 import 顺序的隐含约定。 */
 import "./csh_registry.js";
+import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-only，零依赖） */
 // 池子魔将 · 统一 Game Shell（§E.2 / §5.1 #2 · §5.5.5 任务 #4）
 //
 // 定位：5 款小游戏**共用一套**「入场收费屏 → 三带壳 → 暂停/关闭 → 结算回钱包」流程。
@@ -154,7 +155,7 @@ import "./csh_registry.js";
 	/* 旧版关闭协议白名单（显式，不再靠 `-close` 后缀猜）。
 	   历史上各页面自己发 "<key>-close"，现在统一为 shell-close；
 	   白名单方式可避免再出现「shell-close 被旧正则抢先吃掉」这类事故。 */
-	var LEGACY_CLOSE = { "uno-close": "uno", "doudizhu-close": "doudizhu", "texas-close": "texas", "blackjack-close": "blackjack", "career-close": "career" };
+	var LEGACY_CLOSE = { "uno-close": "uno", "doudizhu-close": "doudizhu", "texas-close": "texas", "blackjack-close": "blackjack", "career-close": "career", "bossbook-close": "bossbook", "goldfish-close": "goldfish", "codex-close": "codex" };
 
 	/* ---------- 工具 ---------- */
 	function docHost() { return document.documentElement || document.body; }
@@ -187,6 +188,49 @@ import "./csh_registry.js";
 		try { console.log("[池子魔将·壳] " + msg); } catch (e2) {}
 	}
 	function logInfo(m) { try { if (lib.cshDebug && lib.cshDebug.info) lib.cshDebug.info("shell: " + m); } catch (e) {} }
+
+	/* ---------- v6.7 同桌妖灵的好感度（作者 2026-10-15） ----------
+	   「池子休闲的小游戏，如果跟 50 个美女角色同桌游玩，也应该加 1 点好感度，无论输赢。
+	     可以反复刷。」
+	   实现取"壳层记账"这个口子（而不是改四个游戏页）：
+	     · `shell-seat` 成功时记下本次座位里的妖灵（id 前缀 csh_boss_minion_）；
+	     · 结算成功 / 关壳时给她们各 +1；同一个座位只加一次，关壳后重置 ⇒ 下一局可继续刷；
+	     · 好处：四款小游戏（德州 / 斗地主 / UNO / 廿一点）**零改动、全覆盖**
+	       （UNO 没有结算通道，靠关壳这一刀也能吃到）。 */
+	var TABLE_AFF = { minions: [], awarded: false };
+	function cshTableRecord(seats) {
+		try {
+			TABLE_AFF.minions = (seats || []).map(function (s2) { return s2 && s2.id; })
+				.filter(function (id) { return typeof id === "string" && id.indexOf("csh_boss_minion_") === 0; });
+			TABLE_AFF.awarded = false;
+		} catch (e0) { TABLE_AFF.minions = []; TABLE_AFF.awarded = false; }
+	}
+	function cshTableAward() {
+		try {
+			if (TABLE_AFF.awarded || !TABLE_AFF.minions.length) return 0;
+			TABLE_AFF.awarded = true;
+			var A = lib.cshAffection;
+			if (!A || typeof A.notePlay !== "function") return 0;
+			var n = 0;
+			TABLE_AFF.minions.forEach(function (id) { try { if (A.notePlay(id)) n++; } catch (e1) {} });
+			if (n) toast("同桌的 " + n + " 位妖灵各 +1 好感");
+			logInfo("同桌好感 +1 ×" + n + "（" + TABLE_AFF.minions.length + " 位同桌）");
+			/* ★ v6.9（作者："同桌游戏中小概率触发她的一句话"）：25% 概率一位同桌低声说句闲聊
+			   （复用好感台词库 · 未听过的优先 · 落 heard 收集册——宿主侧显示，四款游戏零改动）。 */
+			try {
+				if (Math.random() < 0.25) {
+					var AQ = lib.cshAffection;
+					var mq = TABLE_AFF.minions[Math.floor(Math.random() * TABLE_AFF.minions.length)];
+					var q = (AQ && typeof AQ.tableQuip === "function") ? AQ.tableQuip(mq) : null;
+					if (q && q.line) {
+						toast("「" + q.name + "」低声说：" + q.line);
+						logInfo("同桌台词：" + q.name + "：「" + q.line + "」");
+					}
+				}
+			} catch (eQ) {}
+			return n;
+		} catch (e2) { return 0; }
+	}
 	/* 音效（§4.7.1 统一总线）。拿不到总线就静默，绝不因音效影响壳流程。 */
 	function sfx(name, opt) {
 		try {
@@ -206,6 +250,14 @@ import "./csh_registry.js";
 	}
 	function wallet() { try { return lib.cshWallet || null; } catch (e) { return null; } }
 	/* ticketOf / buyInTiers 已在文件头定义（委托 csh_wallet，唯一门票表） */
+	/* 本地日期串（YYYY-MM-DD）：缠头「每日首次」日键用。字典序比较即按日切换；
+	   与页面文案的日期无关，纯宿主判定（失败给空串 ⇒ 视为非首次，宁可不免费也不误判）。 */
+	function cshRankDay() {
+		try {
+			var t = new Date(), m = t.getMonth() + 1, dd = t.getDate();
+			return t.getFullYear() + "-" + (m < 10 ? "0" + m : m) + "-" + (dd < 10 ? "0" + dd : dd);
+		} catch (e) { return ""; }
+	}
 	/* 顶带 CBY 余额刷新（2026-09-28 新增）：开局 / 带入 / 结算 / 兑换后都调 */
 	function paintPc() {
 		try {
@@ -257,12 +309,32 @@ import "./csh_registry.js";
    这就是 career 场景胶囊反复隐藏不掉的原因。display 是"可被程序意图覆盖"的属性，
    此处不加 !important；其余装饰属性保留 !important 无妨。 */
 			"#csh-shell-dock .csh-sh-pc{display:block;flex:0 0 auto!important;font-size:12.5px!important;font-weight:700!important;",
-			/* 生涯大厅 dock 形态唯一实现（2026-10-07）：类级声明式，无时序依赖。
-			   注意 display 不带 !important —— 该属性必须允许程序意图覆盖（postmortems #18）。 */
-			"body.csh-shell-career #csh-shell-dock .csh-sh-pc{display:none;}",
-			"body.csh-shell-career #csh-shell-dock{margin-right:96px;}",
 			"color:var(--csh-ink-plate)!important;white-space:nowrap!important;padding:5px 12px!important;border-radius:999px!important;font-weight:800!important;letter-spacing:.03em!important;box-shadow:0 2px 10px rgba(var(--csh-accent-rgb),.35)!important;",
 			"background:var(--csh-accent)!important;border:1px solid rgba(var(--csh-accent-rgb),.45)!important;}",
+			/* ============================================================
+			   ★★ 2026-10-14 实证修复（作者截图："右上角问题仍然存在"的真根因）
+			   下列三条规则此前位于**未闭合规则体**中间（`.csh-sh-pc{…` 的声明序列
+			   尚未闭合处）——CSS 解析器把它们当"块级垃圾声明"整块消费
+			   （consume-a-simple-block 错误恢复，吞到匹配 `}` 为止）→ **静默失效**。
+			   这解释了：
+			     · bossbook「右让」（上一轮所加）不生效 → 「封面」按钮与 ✕ 依旧重叠；
+			     · career「右让 + 胶囊隐藏」自 2026-10-07 起实际也从未生效
+			       （paintPc 注释写明"隐藏由 CSS 单一实现、不设保险层"——规则被吞
+			       即功能消失；design 意图=纯 CSS 真值，此处恢复它）。
+			   修复 = 移到 `.csh-sh-pc` 闭合之后（安全顶层区），右让改用
+			   `right:104px!important`（对基础 `right:8px!important` 以更高特异性
+			   胜出；104 = 8 + 96）。★ 勿再插回任何未闭合规则体中间。
+			   ============================================================ */
+			/* 生涯大厅（2026-10-07 设计 · 本次恢复生效）：隐藏 CBY 胶囊（页内官阶卡
+			   已有同值大字）+ 右让 96px。display 不带 !important——该属性必须允许
+			   程序意图（行内样式）覆盖（postmortems #18）。 */
+			"body.csh-shell-career #csh-shell-dock .csh-sh-pc{display:none;}",
+			"body.csh-shell-career #csh-shell-dock{right:104px!important;}",
+			/* 讨伐录：页眉右侧有页内控件【封面】按钮（.pt-home，right≈12px 起、
+			   宽约 45px）→ dock 右让 96px（封面按钮占 12~57px，让位后 ✕ 左缘在
+			   148px，间隙 91px 无重叠）。胶囊保持显示（余额有参考价值，不同于
+			   career 的官阶卡同值隐藏）。 */
+			"body.csh-shell-bossbook #csh-shell-dock{right:104px!important;}",
 			"#csh-shell-dock button{flex:0 0 auto!important;min-width:44px!important;height:44px!important;",
 			"padding:0!important;font-size:15px!important;line-height:1!important;cursor:pointer!important;user-select:none!important;",
 			"border-radius:999px!important;color:var(--csh-accent)!important;font-weight:800!important;background:rgba(var(--csh-bg-deep-rgb),.80)!important;",
@@ -654,20 +726,25 @@ import "./csh_registry.js";
 			if (lib.cshWorld && lib.cshWorld.stats) out.world = lib.cshWorld.stats();
 		} catch (e7) {}
 		/* 玩家终身战绩（2026-10-07）：排行榜让「你」上也上胜率/底池榜 ——
-		   胜率聚合从 csh_winrate 的 d.me.chars（按角色各记 games/win/lose）；
+		   胜率聚合从 csh_winrate 的 me.chars（按角色各记 games/win/lose）；
 		   最大底池取德州页持久化的生涯最佳（csh_texas_best）。
-		   两处都是同源 localStorage，只读不写、失败即缺省。 */
+		   ★ 2026-10-15 修：winrateData 的真值是 **lib.config 域**（csh_winrate 全程走
+		     game.saveConfig），此前只读 localStorage ⇒ 恒 null ⇒ 这张榜上"你"的胜率
+		     永远是 0（而成绩一直在攒）。改成 lib.config 优先、localStorage 兜底
+		     （与 csh_migrate v3 的 cfgGet 同口径）。 */
 		try {
 			var wr = 0, wg = 0;
-			var rawW = localStorage.getItem("extension_池子魔将_winrateData");
-			if (rawW) {
-				var wd = JSON.parse(rawW);
-				var mc = (wd && wd.me && wd.me.chars) || {};
-				for (var mk in mc) {
-					if (!Object.prototype.hasOwnProperty.call(mc, mk)) continue;
-					wg += mc[mk].games || 0;
-					wr += mc[mk].win || 0;
-				}
+			var wd = null;
+			try { if (lib.config && lib.config["extension_池子魔将_winrateData"]) wd = lib.config["extension_池子魔将_winrateData"]; } catch (eW0) {}
+			if (!wd) {
+				var rawW = localStorage.getItem("extension_池子魔将_winrateData");
+				if (rawW) wd = JSON.parse(rawW);
+			}
+			var mc = (wd && wd.me && wd.me.chars) || {};
+			for (var mk in mc) {
+				if (!Object.prototype.hasOwnProperty.call(mc, mk)) continue;
+				wg += mc[mk].games || 0;
+				wr += mc[mk].win || 0;
 			}
 			out.meWrWin = wr; out.meWrGames = wg;
 		} catch (eWr) {}
@@ -813,6 +890,45 @@ import "./csh_registry.js";
 		try {
 			if (lib.cshInteract && lib.cshInteract.stats) s.interactTotal = lib.cshInteract.stats().total || 0;
 		} catch (e5) {}
+		/* BOSS 讨伐（2026-10-13 · 批次 4a）：s.boss 复合体（bossbook 页渲染用）+
+		   扁平 5 字段 + s.bossSeries（成就「挑战」16 条判定用，csh_achv statProg 语法） */
+		try {
+			if (lib.cshBossRecord && typeof lib.cshBossRecord.summary === "function") {
+				var bs = lib.cshBossRecord.summary();
+				s.boss = bs;
+				s.bossKill = bs.kill || 0;
+				s.bossKillUlt = bs.killUlt || 0;
+				s.bossKillLord = bs.killLord || 0;
+				s.bossKillEgg = bs.killEgg || 0;
+				s.bossKillElite = bs.killElite || 0;
+				s.bossSeries = bs.series || {};
+				/* v4：档位/系列总量（动态）——成就「挑战」阈值与文案读它们，
+				   名单变动后成就仍数学上恒可达 */
+				s.bossTotal = bs.total || 0;
+				s.bossTotalUlt = bs.totalUlt || 0;
+				s.bossTotalLord = bs.totalLord || 0;
+				s.bossTotalEgg = bs.totalEgg || 0;
+				s.bossTotalElite = bs.totalElite || 0;
+				s.bossSeriesTotal = bs.seriesTotal || {};
+				/* v4.2：速通（各档最快轮数）与魔王方战绩（应战模式） */
+				s.bossSpeed = bs.speed || {};
+				s.bossAsBoss = bs.asBoss || { win: 0, lose: 0 };
+				s.bossAsBossWin = (bs.asBoss && bs.asBoss.win) || 0;
+				s.bossAsBossLose = (bs.asBoss && bs.asBoss.lose) || 0;
+				/* 外传（批次 A · 讨伐录外传卷）：击破计数 + 跨模式名册（页面经桥读快照渲染）。
+				   ★ 名册取 extRosterAll() = boss 局内快照 ∪ 当场枚举 ∪ 已记录 id——
+				     讨伐录是在**池子休闲**打开的，那里 lib.character 不含本体 BOSS
+				     （本体"挑战武将加入其它模式"选项默认关闭），当场枚举会恒为空。
+				   页面 iframe 不能 import 模块，必须由本快照透传；失败兜底空数组（页面走空态）。 */
+				var extRosterList = [];
+				try {
+					var RB = lib.cshBossRecord;
+					if (RB && typeof RB.extRosterAll === "function") extRosterList = RB.extRosterAll() || [];
+					else if (RB && typeof RB.extRoster === "function") extRosterList = RB.extRoster() || [];
+				} catch (eExt) { extRosterList = []; }
+				s.bossExt = { kill: bs.extKill || 0, total: bs.extTotal || 0, roster: extRosterList };
+			}
+		} catch (e6) {}
 		return s;
 	}
 	/* ⚠ 2026-09-29 删除两条**死通道**（架构收敛）：
@@ -1050,6 +1166,9 @@ import "./csh_registry.js";
 		/* dock 形态：唯一实现 = body 类 + 样式表规则（声明式，无时序依赖、无保险层）。
 		   career：隐藏 CBY 胶囊（页内官阶卡已有同值大字）+ 右让 96px 防与页内控件重叠。 */
 		try { document.body.classList.toggle("csh-shell-career", key === "career"); } catch (eDk) {}
+		/* 讨伐录（2026-10-13 · 批次 4a）：场景类预留（纸色版全书样式钩子；胶囊保持显示——
+		   首杀/每日奖励与 CBY 相关，顶带余额有参考价值） */
+		try { document.body.classList.toggle("csh-shell-bossbook", key === "bossbook"); } catch (eDk2) {}
 		setTitle(m.title);
 		paused = false; totalPaused = 0; enteredAt = Date.now();
 		paintTop();                      /* 顶带真实状态（带入 / 门票 / 余额 / 时长） */
@@ -1172,7 +1291,7 @@ import "./csh_registry.js";
 			   以 `-close` 结尾 ⇒ 被它先捕获，剥出前缀 "shell" 与 current 不相等
 			   ⇒ **`shell-close` 永远不会关壳**（下面那条分支成了不可达死代码）。
 			   修法：① 先判 `shell-close`；② 旧协议收敛为显式白名单，不再靠后缀猜。 */
-			if (cmd === "shell-close") { close("game"); return; }
+			if (cmd === "shell-close") { cshTableAward(); close("game"); return; }
 			if (typeof cmd === "string" && LEGACY_CLOSE[cmd]) {
 				if (!current || LEGACY_CLOSE[cmd] === current) close("game");
 				return;
@@ -1187,12 +1306,49 @@ import "./csh_registry.js";
 				   子页面若校验 data.ok 会把成功结算误判为失败（德州「实得 0」谎报的根因之一）。 */
 				r1.ok = true;
 				GUARD[gk1] = r1;
+				cshTableAward();
 				ackToGame("shell-settle", true, r1);
 				selfCloseAfterSettle(r1);   /* ★ 2026-09-30：委托关窗时，结算落地即关壳 */
 				return;
 			}
 			/* 经济桥（§4.1.1）：子页面请求宿主钱包快照 */
 			if (cmd === "shell-wallet") { ackToGame("shell-wallet", true, walletSnapshot()); return; }
+			/* ★ 账本（v6.2）：池子币的**来源与去处**（作者："就是做账，账本"）。
+			   d.days = 热力格天数（缺省 42 = 6 周，GitHub 贡献图同款口径）。
+			   单列一条命令而**不并进 walletSnapshot**：账本最多 400 条，
+			   而 walletSnapshot 是每局开局都拉的「轻快照」——并进去等于每次开局都搬 20~30KB。 */
+			if (cmd === "shell-ledger") {
+				var WL2 = wallet(), lres = { list: [], sum: null };
+				var ldays = (d && typeof d.days === "number") ? d.days : 42;
+				try { if (WL2 && WL2.wallet.ledgerSummary) lres.sum = WL2.wallet.ledgerSummary(ldays); } catch (eL1) {}
+				try { if (WL2 && WL2.wallet.ledger) lres.list = WL2.wallet.ledger({ limit: 300 }); } catch (eL2) {}
+				ackToGame("shell-ledger", true, lres);
+				return;
+			}
+			/* ★ 好感度（v6.2）：读快照 / 执行互动（说话 · 送礼）。送礼走钱包单一账本扣款。 */
+			if (cmd === "shell-aff") {
+				var AF = lib.cshAffection;
+				var ares = null;
+				try { ares = (AF && AF.summary) ? AF.summary() : null; } catch (eAF) {}
+				ackToGame("shell-aff", !!ares, ares);
+				return;
+			}
+			if (cmd === "shell-aff-do") {
+				/* v6.3：统一走 AF2.interact(id, act)（greet / talk / head），送礼另走 gift()。
+				   interact 自带"疏远 / 每日冷却 / 升档台词"的全部判定，页面只管显示。 */
+				var AF2 = lib.cshAffection, aout = { ok: false, reason: "no-module" };
+				try {
+					if (AF2 && d && d.act === "gift" && typeof AF2.gift === "function") {
+						aout = AF2.gift(d.id, d.gift) || aout;
+					} else if (AF2 && d && typeof AF2.interact === "function") {
+						aout = AF2.interact(d.id, d.act) || aout;
+					}
+				} catch (eAD) {}
+				ackToGame("shell-aff-do", !!aout.ok, aout);
+				/* 送礼扣款 / 她的回礼入账 → 都刷新余额胶囊 */
+				if (aout.ok || aout.give > 0) paintPc();
+				return;
+			}
 			if (cmd === "shell-sign") {
 				var W2 = wallet();
 				var s = null;
@@ -1214,6 +1370,23 @@ import "./csh_registry.js";
 			   只读聚合，不写任何状态；解锁奖励走 shell-ach-claim。 */
 			if (cmd === "shell-stats") {
 				ackToGame("shell-stats", true, buildStats());
+				return;
+			}
+			/* 金鳞市（2026-10-14 批次 B）：市场快照（应答前先执行每日结算——跨日首访开市）
+			   与买卖（走 lib.cshMarket.trade → csh_wallet 单一账本；成交后刷新余额胶囊）。 */
+			if (cmd === "shell-goldfish") {
+				var mkG = lib.cshMarket, outG = null;
+				try { if (mkG && mkG.ensureDay) mkG.ensureDay(); } catch (eG1) {}
+				try { outG = (mkG && mkG.snapshot) ? mkG.snapshot() : null; } catch (eG2) {}
+				if (outG) paintPc();
+				ackToGame("shell-goldfish", !!outG, outG);
+				return;
+			}
+			if (cmd === "shell-trade") {
+				var mkT = lib.cshMarket, resT = { ok: false, msg: "市场未就绪" };
+				try { if (mkT && mkT.trade) resT = mkT.trade(d.id, d.n, d.side); } catch (eT) {}
+				paintPc();
+				ackToGame("shell-trade", !!(resT && resT.ok), resT);
 				return;
 			}
 			/* 成就领奖：服务端（宿主侧）复核条件 → 入账 → 标记已领。
@@ -1293,6 +1466,8 @@ import "./csh_registry.js";
 					seats = (WSe && WSe.seat) ? WSe.seat(d.n, d.buyIn, { tier: d.tier }) : null;
 				} catch (eSe) {}
 				ackToGame("shell-seat", !!(seats && seats.length), { seats: seats || [] });
+				/* v6.7：记下本次同桌的妖灵（关壳 / 结算时给她们各 +1 好感） */
+				cshTableRecord(seats);
 				return;
 			}
 			/* 本场结算（2026-09-29 新增 · 德州用）：
@@ -1312,6 +1487,7 @@ import "./csh_registry.js";
 				   toast 谎报「本局未入账」，而钱包其实已正确入账）。 */
 				r2.ok = true;
 				GUARD[gk2] = r2;
+				cshTableAward();
 				ackToGame("shell-settle-session", true, r2);
 				selfCloseAfterSettle(r2);   /* ★ 2026-09-30：同上，牌桌类走这条 */
 				return;
@@ -1365,6 +1541,59 @@ import "./csh_registry.js";
 				return;
 			}
 			/* 生涯大厅「快捷开局」：真正开局（此前误发 shell-close，点了等于关页面） */
+			/* v6.5：页面里直接调宿主 API（同源直读）后，用它主动要求刷新余额胶囊 ——
+			   否则收到「她的回礼」时，右上角的 CBY 胶囊还停在旧数字上。 */
+			if (cmd === "shell-pc") {
+				paintPc();
+				ackToGame("shell-pc", true, {});
+				return;
+			}
+		/* 天下榜「缠头」：**扣费必须在宿主的单一账本**（页面拿不到钱包，也不该拿到）。
+		   单次 100 ~ 100 万 CBY；账本 reason 带妖灵名（钱花在哪，账本里看得见）。
+		   ★ v2.2（2026-10-15）每日首次免缠头：每位玩家每天第一次缠头**不扣池子币**，
+		     仅计 +1（象征量）。判定权在宿主（扣费在这里，页面不许自己扣）——
+		     日键 `csh_rank_cheer_day` 存本地日期（YYYY-MM-DD，字典序按日切换），
+		     只在本功能内读写，是**临时状态键**（不是玩家资产），故**不入迁移白名单**。 */
+		if (cmd === "shell-cheer") {
+			try {
+				var cGid = String(d.girl || "").replace(/[^0-9a-zA-Z_]/g, "").slice(0, 48);
+				var cAmt = Math.floor(Number(d.amt) || 0);
+				var cGn = String(d.gname || "").slice(0, 12);
+				var W1 = wallet();
+				if (!W1) { ackToGame("shell-cheer", false, { reason: "nowallet" }); return; }
+				if (!cGid || cAmt < 100 || cAmt > 1000000) { ackToGame("shell-cheer", false, { reason: "bad" }); return; }
+				var cFree = false;
+				try {
+					var cToday = cshRankDay();
+					cFree = !!cToday && (localStorage.getItem("csh_rank_cheer_day") || "") !== cToday;
+					if (cFree) localStorage.setItem("csh_rank_cheer_day", cToday);
+				} catch (eDay) { cFree = false; }
+				if (cFree) {
+					paintPc();
+					ackToGame("shell-cheer", true, { pc: W1.wallet.pc(), free: true, amt: 1 });
+					return;
+				}
+				var paid = W1.wallet.spend(cAmt, "缠头:" + (cGn || cGid));
+				if (paid !== true) { paintPc(); ackToGame("shell-cheer", false, { reason: "poor" }); return; }
+				paintPc();
+				ackToGame("shell-cheer", true, { pc: W1.wallet.pc(), free: false, amt: cAmt });
+			} catch (eCh) { logError("shell-cheer", eCh); ackToGame("shell-cheer", false, { reason: "error" }); }
+			return;
+		}
+		/* 缠头名单（id + 名字）：真源 = csh_bossdata.MINIONS（经 import 单点取用），页面不抄第二份 */
+			if (cmd === "shell-cheer-list") {
+				try {
+					var M2 = lib.cshMarket;
+					var L2 = (M2 && M2.LISTED) ? M2.LISTED : [];
+					var out2 = [];
+					for (var i2 = 0; i2 < L2.length; i2++) {
+						var id2 = L2[i2], m2 = MINIONS[id2];
+						out2.push({ id: id2, name: (m2 && m2.name) || id2 });
+					}
+					ackToGame("shell-cheer-list", true, { list: out2 });
+				} catch (eCL) { ackToGame("shell-cheer-list", false, {}); }
+				return;
+			}
 			if (cmd === "shell-open") {
 				var okOpen = !!(d.key && META[d.key]);
 				var bi = Math.max(0, Math.floor(Number(d.buyIn) || 0));
@@ -1436,10 +1665,25 @@ import "./csh_registry.js";
 			if (cmd === "shell-mig-reset") {
 				/* 重置存档：清空全部进度键（钱包/官阶/世界/胜率/成就/CDK/各游戏最佳）。
 				   清空后数据需页面刷新才重新初始化，故这里只做清空，
-				   刷新动作由调用方（career 大厅）在确认后触发。 */
+				   刷新动作由调用方（行囊页）在确认后触发。 */
 				var MX = migMod();
 				var rx = MX && typeof MX.reset === "function" ? MX.reset() : null;
 				ackToGame("shell-mig-reset", !!(rx && rx.ok), rx);
+				return;
+			}
+			/* 家当清点（v3 · 2026-10-15）：给「行囊」页一张"这次到底带走了什么"的清单。
+			   返回**纯数据**（逻辑键 + 有没有 + 数量 + 少量明细），键名外的文案由页面负责
+			   —— 与天下榜同一条纪律：对外可见的字只在页面的文案表里。 */
+			if (cmd === "shell-mig-inventory") {
+				var MV = migMod();
+				var inv = (MV && typeof MV.inventory === "function") ? MV.inventory() : null;
+				/* 顺带把"故意不带"的边界与格式版本一起回给页面（页面要如实告诉玩家） */
+				var excl = (MV && MV.EXCLUDED) ? MV.EXCLUDED : [];
+				ackToGame("shell-mig-inventory", !!inv, {
+					version: MV ? MV.VERSION : 0,
+					list: inv || [],
+					excluded: excl,
+				});
 				return;
 			}
 			if (cmd === "shell-badge-all") {
