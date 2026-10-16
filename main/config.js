@@ -49,7 +49,7 @@ export const cshConfig = {
                `if (!cfg.onclick)` 时装），而本项 onclick 当时只调了注入器 —— 存值永远缺失 →
                每次重开设置页/重启都回落到默认 init:true。修法 = onclick 里自行落盘（与引擎
                默认回调同键同法：extension_池子魔将_csh_eg_group_scroll）。E45 已加断言防回退。 */
-            "csh_eg_group_scroll":{"name":"选将势力面板滚动条","intro":"默认开启。神/魔武将选择势力时，势力按钮墙限高并加纵向滚动条（势力多时不再溢出被裁；本体升级后仍可用）。关闭则恢复本体原样。改动即时生效。","init":true,"onclick":function(bool){ try{ game.saveExtensionConfig("池子魔将","csh_eg_group_scroll",bool); }catch(e){} try{ if(typeof lib.__cshEgScrollApply==="function") lib.__cshEgScrollApply(bool); }catch(e){} }},
+            "csh_eg_group_scroll":{"name":"选将势力面板滚动条","intro":"默认开启。神/魔武将出现「选择势力」面板时，为面板加限高与纵向滚动条（势力多时不再溢出被裁）。卡牌形与按钮形的势力面板都已覆盖（2026-10-17 修复：斗地主那类按钮形面板此前漏掉，表现为面板溢出屏幕没有滚动条）。关闭则恢复本体原样。改动即时生效。","init":true,"onclick":function(bool){ try{ game.saveExtensionConfig("池子魔将","csh_eg_group_scroll",bool); }catch(e){} try{ if(typeof lib.__cshEgScrollApply==="function") lib.__cshEgScrollApply(bool); }catch(e){} }},
             /* 【2026-10-05】「开发者日志」设置项按需求移除；precontent 会把历史开启的存档一并复位。 */
             /* 【2026-10-05】联机手气卡：仅联机（connectMode）生效；实现见 main/precontent.js 的
                _csh_swReplaceHandCards 全局规则技。本功能为最高优先级：与懒人包/云中守望同类开局
@@ -65,6 +65,16 @@ export const cshConfig = {
             /* 分隔条：把下方扩展安装 / 引擎自带的「编辑此扩展 / 删除此扩展」与上方功能项隔开，避免误触。
              * clear:true + nopointer：纯占位不响应点击；内容长度 >= 15 使引擎把该行高度置为 auto。 */
             "csh_danger_sep":{"name":"<span class=\"csh-cfg-sep\">—— ⚠ 谨慎操作 ——</span>","clear":true,"nopointer":true,"intro":"以下为扩展安装、编辑与删除操作","onclick":function(){ return false; }},
+            /* 【2026-10-17 作者指令】「检查更新」与「其他扩展」同在「谨慎操作」分隔条之下；
+               因引擎设置页是**逐项一行**（无法横向并排），按作者要求把「其他扩展」放到最下面。 */
+            "csh_check_update":{"name":"<span class=\"csh-cfg-btn\">检查更新</span>","intro":"检查池子魔将是否有新版本；有则一键在线更新（源已内置，无需手动填写更新地址。更新完成后自动重启）。","clear":true,"onclick":function(){
+                if(lib.cshDebug && typeof lib.cshDebug.checkUpdate==="function"){ lib.cshDebug.checkUpdate(); return false; }
+                if(typeof lib.__cshLoadDebug==="function"){
+                    lib.__cshLoadDebug().then(function(){ try{ lib.cshDebug.checkUpdate(); }catch(e){ alert("检查更新打开失败："+((e&&e.message)||e)); } }).catch(function(e){ alert("检查更新未初始化：csh_debug.js 加载失败 "+((e&&e.message)||e)); });
+                    return false;
+                }
+                alert("检查更新未初始化：请确认 csh_debug.js 已随扩展加载，然后重启游戏"); return false;
+            }},
             "csh_extstore":{"name":"<span class=\"csh-cfg-btn\">其他扩展</span>","intro":"从 GitHub 在线安装精选扩展（武将包 / 功能扩展，清单由池子魔将维护，随版本更新上架新货）。","clear":true,"onclick":function(){
                 if(lib.cshDebug && typeof lib.cshDebug.openExtStore==="function"){ lib.cshDebug.openExtStore(); return false; }
                 if(typeof lib.__cshLoadDebug==="function"){

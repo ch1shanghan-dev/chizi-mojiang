@@ -532,16 +532,25 @@ export const MINION_POOL = [
 ];
 /* 全池 = MINIONS 键（顺序与 MINION_POOL 一致，门禁断言两者逐项相同） */
 export function allMinionIds() { return MINION_POOL.slice(); }
-export function pickMinions(tier) {
+export function pickMinions(tier, bounty) {
 	/* v6.1：三档统一「全池随机、互不重复」。任何档位都可能抽到任意妖灵，
-	   包括原先被锁死给精英的希里（作者指令：全部随机化）。 */
+	   包括原先被锁死给精英的希里（作者指令：全部随机化）。
+	   ★ 2026-10-17【指定讨伐令】（作者拍板 A 方案 · 1000 CBY）：第 2 参 bounty = 玩家悬赏的妖灵 id。
+	     三重守卫，**随机逻辑本身一行未改**，只在入口加一条有守卫的分支：
+	       ① 必须是池内合法 id（否则当没给，直接走原随机）；
+	       ② 「未讨伐」由调用方（csh_bossrecord.bountyGet）判定后才传进来；
+	       ③ 只影响「第一只」，究极档的第二只仍随机（不破坏搭配感）。 */
+	const want = (typeof bounty === "string" && MINION_POOL.indexOf(bounty) >= 0) ? bounty : "";
 	if (tier === "ultimate") {
 		const pool = MINION_POOL.slice();
-		const a = pool.splice(Math.floor(Math.random() * pool.length), 1)[0];
+		let a;
+		if (want) a = pool.splice(pool.indexOf(want), 1)[0];
+		else a = pool.splice(Math.floor(Math.random() * pool.length), 1)[0];
 		const b = pool.splice(Math.floor(Math.random() * pool.length), 1)[0];
 		return { 2: a, 8: b };
 	}
 	if (tier === "lord" || tier === "elite") {
+		if (want) return { 2: want };
 		return { 2: MINION_POOL[Math.floor(Math.random() * MINION_POOL.length)] };
 	}
 	return null;
@@ -751,14 +760,14 @@ export function ensureIndex(info) {
 /* ---------- 模式配置（lib.boss）——纯静态，不依赖角色条目 ----------
    由 main/bossmode.js 在挑战模式注入；角色/译名/称号一律走
    character/boss.js 的原生 game.import 注册（引擎 loadCharacter 处理）。 */
-export function buildBossConfig() {
+export function buildBossConfig(bounty) {
 	const cfg = {};
 	for (const bid of allBossIds()) {
 		const id = origIdOf(bid);
 		const tier = tierOf(id);
 		const c = { chongzheng: TIER_CHONGZHENG[tier], _csh_moxi: TIER_MOXI[tier], _csh_x: fullHpOf(id),
 			_csh_bati_lim: TIER_BATI_LIM[tier], _csh_monu_lim: TIER_MONU_LIM[tier] };
-		const minion = pickMinions(tier);        /* v5：随机搭配（每次生成重新洗牌） */
+		const minion = pickMinions(tier, bounty);        /* v5：随机搭配（每次生成重新洗牌）· 2026-10-17 带指定讨伐令 */
 		if (minion) c.minion = minion;
 		cfg[bid] = c;
 	}
@@ -773,7 +782,7 @@ export function buildBossConfig() {
    titles = { 原id -> 称号 }（pack.character.characterTitle，可选）
    返回 { entries, cfg, order, names, titlesMap, entryCount, minionEntries, minionNames, minionImg }
    —— order 与 entries/cfg/names 全部为【魔王 ID】键系。 */
-export function buildBossEntries(chars, trans, titles) {
+export function buildBossEntries(chars, trans, titles, bounty) {
 	const entries = {};
 	const cfg = {};
 	const names = {};
@@ -820,7 +829,7 @@ export function buildBossEntries(chars, trans, titles) {
 		if (t0) titlesMap[bid] = t0;
 		const c = { chongzheng: TIER_CHONGZHENG[tier], _csh_moxi: TIER_MOXI[tier], _csh_x: fullHpOf(id),
 		_csh_bati_lim: TIER_BATI_LIM[tier], _csh_monu_lim: TIER_MONU_LIM[tier] };
-		const minion = pickMinions(tier);        /* v5：随机搭配（每次生成重新洗牌） */
+		const minion = pickMinions(tier, bounty);        /* v5：随机搭配（每次生成重新洗牌）· 2026-10-17 带指定讨伐令 */
 		if (minion) c.minion = minion;
 		cfg[bid] = c;
 	}

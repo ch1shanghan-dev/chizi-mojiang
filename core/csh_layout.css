@@ -52,7 +52,7 @@
      与生涯大厅（games/career.html）**同一套字族名与同一套语义**：
        --ff-title 宋体系 —— 标题字：页标题 / 区块标题 / 结算大字
        --ff-body  黑体系 —— 正文：说明 / 按钮 / 标签
-       --ff-num   等宽数字 —— 数据：筹码 / 底池 / 计数，配 font-variant-numeric:tabular-nums
+       --ff-num   数字 —— 数据：筹码 / 底池 / 计数（2026-10-17 作者指令：由等宽改用 Times 衬线数字）
      ★ 写法：整条字体栈**内联在 var() 的默认值里**，不引用别处的变量 ——
        游戏页是自包含单文件（README 红线 #12），样式表加载顺序与是否被单独打开都不该影响它：
        var(--ff-title) 即使没人定义，也会退回这里这份完整栈，永远拿得到字体。
@@ -60,7 +60,7 @@
        推倒重来是拿真实可玩性去换一致性。裸字号逐步收编，清单见 docs/art-direction.md §4.6。 */
   --ff-title: "Noto Serif SC", "Source Han Serif SC", "Songti SC", "STSong", "SimSun", serif;
   --ff-body: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
-  --ff-num: ui-monospace, "Cascadia Mono", Consolas, "SF Mono", Menlo, monospace;
+  --ff-num: "Times New Roman", Times, "Nimbus Roman", "Songti SC", serif;
 
   /* ---------- 材质光影（A2 · 2026-10-07）----------
      与生涯大厅（games/career.html）同一套：发丝金线描边 + 金晕。同样**内联在 var() 默认值里**，

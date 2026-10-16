@@ -12,7 +12,7 @@
    ★ 数值单点（§6.7）：REWARD_FIRST / REWARD_DAILY 实机校准只改这里。
    ============================================================ */
 import { lib, game, _status } from "../../../noname.js";
-import { allBossIds, tierOf, seriesOf, SERIES, MINIONS, MINION_NAMES,
+import { allBossIds, allMinionIds, tierOf, seriesOf, SERIES, MINIONS, MINION_NAMES,
 	difficultyOf, diffBandOf, difficultyOfForeign } from "./csh_bossdata.js";
 
 const KEY = "extension_池子魔将_bossKill";
@@ -37,6 +37,42 @@ export const REWARD_DAILY = { elite: 200, lord: 400, ultimate: 800, egg: 300 };
      （挑战者/应战仍分开记），数值单点仍是这两个常量。 */
 export const MINION_CBY = 800;                   /* 挑战者击破妖灵的 CBY（2026-10-16 四改：10000 → 3000 → 800 · 单点可调） */
 export const MINION_CBY_ASBOSS = 800;            /* 作为 BOSS 应战时（自家妖灵被击破）的 CBY（2026-10-16 四改：1000 → 800） */
+
+/* ---------- 指定讨伐令（2026-10-17 · 作者拍板 A 方案：1000 CBY 指定一只未讨伐妖灵出战） ----------
+   存档键 = lib.config 的 extension_池子魔将_csh_bounty（**玩家数据** → 已入 csh_migrate 键表 / 行囊）。
+   ★ 三条纪律（作者担心「强制出战出 BUG」，故把风险关在最小范围）：
+     · 读侧一律经 bountyGet()：**池外 id 或已讨伐 → 一律视为「没有悬赏」**（脏数据绝不改变出怪）；
+     · 写侧 bountySet() 只接受**池内 + 未讨伐**的 id（非法直接拒，钱不会白扣）；
+     · 达成即消费：recordMinion 里发现命中的就是悬赏目标 → 立即清空标记（不会粘住下一次）。
+   注意：判定"已讨伐"用的是 summary().minions[id].n，与讨伐录同源，不另立一份账。 */
+const KEY_BOUNTY = "extension_池子魔将_csh_bounty";
+export const BOUNTY_COST = 1000;                 /* 单点价格（作者定：1000 CBY 一次） */
+function bountyRaw() {
+	try { return String((lib.config && lib.config[KEY_BOUNTY]) || ""); } catch (e) { return ""; }
+}
+export function bountyCheck(id) {
+	id = String(id || "");
+	if (allMinionIds().indexOf(id) < 0) return { ok: false, reason: "unknown" };
+	try {
+		const sm = summary();
+		if (sm && sm.minions && sm.minions[id] && sm.minions[id].n > 0) return { ok: false, reason: "hunted" };
+	} catch (e) { /* 读取异常按"可下单"处理，由 bountySet 再兜一次 */ }
+	return { ok: true, id: id };
+}
+export function bountyGet() {
+	const id = bountyRaw();
+	if (!id) return "";
+	return bountyCheck(id).ok ? id : "";
+}
+export function bountySet(id) {
+	const chk = bountyCheck(id);
+	if (!chk.ok) return chk;
+	try { game.saveConfig(KEY_BOUNTY, chk.id); return { ok: true, id: chk.id }; }
+	catch (e) { return { ok: false, reason: "error" }; }
+}
+export function bountyClear() {
+	try { game.saveConfig(KEY_BOUNTY, ""); return true; } catch (e) { return false; }
+}
 export const MINION_MERIT = 25;                  /* 每只妖灵的功勋（官阶线 · 日软上限内自然衰减） */
 export const MINION_HEAT = { first: 1.5, repeat: 0.3, cap: 50 };  /* 金鳞市基本面加成（%）：
                                                     首次 +1.5% / 重复 +0.3% 每次 / 软上限 +50% */
@@ -252,6 +288,9 @@ export function recordMinion(minionId, opts) {
 				lib.cshAffection.noteHunt(minionId);
 			}
 		} catch (eA) {}
+		/* 指定讨伐令：目标达成即消费（清空悬赏标记 —— 用**原始存档值**比对，不能用 bountyGet，
+		   因为此时 e.n 刚 ++，bountyGet 已把"已讨伐"目标过滤成空串了） */
+		try { if (bountyRaw() === minionId) bountyClear(); } catch (eBO) {}
 		return { n: e.n, cby: amt, merit: MINION_MERIT, heat: heatAdd, asBoss: asBoss };
 	} catch (e) {
 		console.warn("[池子魔将] 妖灵讨伐收益异常", e);
@@ -633,8 +672,7 @@ function recordOnOver() {
 
 export function installBossRecord() {
 	try {
-		if (lib.cshBossRecord) return;
-		lib.cshBossRecord = {
+		const api = {
 			record: record,
 			recordAsBoss: recordAsBoss,
 			recordMinion: recordMinion,
@@ -651,7 +689,22 @@ export function installBossRecord() {
 			MINION_CBY: MINION_CBY,
 			MINION_MERIT: MINION_MERIT,
 			MINION_HEAT: MINION_HEAT,
+			/* 2026-10-17 指定讨伐令：读 / 校验 / 下单 / 清空 + 价格（单一真源；宿主桥与出怪入口都从这里取） */
+			BOUNTY_COST: BOUNTY_COST,
+			bountyGet: bountyGet,
+			bountyCheck: bountyCheck,
+			bountySet: bountySet,
+			bountyClear: bountyClear,
 		};
+		if (lib.cshBossRecord) {
+			/* 已安装（老实例）：把**本次新增**的能力补挂上去 —— 幂等。
+			   ★ 踩坑实录（2026-10-17 作者实机「悬赏失败 · 明明有 CBY」）：
+			     旧写法是 `if (lib.cshBossRecord) return;` + 一份手写白名单 —— 新函数只要漏进白名单，
+			     宿主桥就取不到（返回 nomodule），玩家侧表现就是「点了没用」。现改为「白名单 + 缺失补挂」。 */
+			for (const k in api) if (lib.cshBossRecord[k] === undefined) lib.cshBossRecord[k] = api[k];
+			return;
+		}
+		lib.cshBossRecord = api;
 		try {
 			if (lib.cshDebug && typeof lib.cshDebug.info === "function") {
 				lib.cshDebug.info("bossrecord: 讨伐记录层就绪（存储 " + KEY + "）");

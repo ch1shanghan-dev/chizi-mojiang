@@ -2360,6 +2360,7 @@ async function runBossChecks() {
 			"extension_池子魔将_csh_effect_announce": "无名杀设置项（同上）",
 			"extension_池子魔将_csh_enable_pingxing": "无名杀设置项（同上）",
 			"extension_池子魔将_csh_eg_group_scroll": "无名杀设置项（同上 · 2026-10-16 新增：选将势力面板滚动条开关，engine-compat C4）",
+			"extension_池子魔将_version": "引擎写入的扩展版本号（架构级内部键，非玩家数据、不进行囊；2026-10-17 「检查更新」读它比对远端版本）",
 		};
 		const walkDirs = ["core", "main", "games", "character", "skills"];
 		const files41 = [];
@@ -2507,6 +2508,93 @@ async function runBossChecks() {
 		else if (!/export function cshBossSelfLoad\s*\(/.test(cb45)) fail("执行级 E45：缺 cshBossSelfLoad（懒人包自愈补载）");
 		else if (!/cshBossSelfLoad/.test(bm45)) fail("执行级 E45：bossmode 未接自愈补载");
 		else ok("执行级 E45：本体兼容注入在位（加载即注入 + 原生容器接管 + 设置开关 + 懒人包自愈补载 · 击杀块无残留）");
+	}
+
+	/* E46（2026-10-17 · 在线更新自动化 + 池子休闲框体分层）：
+	   作者诉求：「更新还是要别人先输入比较麻烦，能不能自动化，然后在扩展设置-池子魔将-里面做一个按钮」。
+	   ⇒ 更新源必须**硬编码**在扩展里（不读引擎的「获取扩展地址」设置项），
+	      且扩展设置页必须有「检查更新」按钮（config.js 的 csh_check_update）。
+	   作者诉求：「德州斗地主 UNO 廿一点就统一，其他的各具特色」。
+	   ⇒ 四款牌桌必须共用 gb-table；金鳞市/妖灵图鉴各有专属类（gb-goldfish/gb-codex），
+	      且**样式规则 + JS 挂类**两件都在位 —— 光加 CSS 不挂类是过去踩过的坑（E32/E40 同源）。 */
+	{
+		const e46 = [];
+		const db46 = fs.readFileSync(path.join(ROOT, "core", "csh_debug.js"), "utf8");
+		const cf46 = fs.readFileSync(path.join(ROOT, "main", "config.js"), "utf8");
+		/* ① 在线更新自动化 */
+		if (!/lib\.cshDebug\.checkUpdate\s*=\s*function/.test(db46)) e46.push("csh_debug.js 缺 checkUpdate（在线更新入口）");
+		else if (!/CSH_UPDATE_SRC\s*=\s*"https:\/\/raw\.githubusercontent\.com\/ch1shanghan-dev\/chizi-mojiang\/main\/"/.test(db46))
+			e46.push("更新源未硬编码为仓库 raw 根（自动化要求不依赖引擎「获取扩展地址」设置项）");
+		else if (/lib\.config\.extension_sources?\[/.test(db46)) e46.push("更新逻辑读了 lib.config.extension_sources（应由内置源接管）");
+		else if (!/game\.multiDownload/.test(db46) || !/game\.checkFileList/.test(db46))
+			e46.push("更新未复用引擎 game.multiDownload / game.checkFileList（逐文件下载）");
+		else if (!/extension\/"\s*\+\s*String\(cur\)\.slice\(CSH_UPDATE_SRC\.length\)/.test(db46))
+			e46.push("更新 URL→本地路径 映射缺失或写法不符（文件会落错位置）");
+		else if (!/csh_check_update/.test(cf46) || !/lib\.cshDebug\.checkUpdate/.test(cf46))
+			e46.push("扩展设置缺「检查更新」按钮接线（config.js → lib.cshDebug.checkUpdate）");
+		/* ② 框体分层 */
+		if (!/gb-table/.test(db46)) e46.push("缺牌桌统一框体 gb-table（四款应共用一套）");
+		if (!/texas:\s*"gb-table"[\s\S]*?uno:\s*"gb-table"/.test(db46))
+			e46.push("GAMECLASS 未把德州/斗地主/廿一点/UNO 全部归入 gb-table");
+		if (!/gb-goldfish/.test(db46)) e46.push("金鳞市缺专属框体 gb-goldfish");
+		if (!/gb-codex/.test(db46)) e46.push("妖灵图鉴缺专属框体 gb-codex");
+		if (!/GAMECLASS\[g\.key\]/.test(db46)) e46.push("games.forEach 未按 key 挂框体类（只加 CSS 不会生效）");
+		if (!/gb-career/.test(db46) || !/gb-bossbook/.test(db46) || !/gb-rank/.test(db46) || !/gb-save/.test(db46))
+			e46.push("既有四张特色卡（生涯大厅/讨伐录/天下榜/行囊）的类被误删");
+		/* ③ 势力面板「第二形态」通道（2026-10-17 · 作者实机：斗地主也有势力面板，
+		      旧选择器 :has(.card.button) 只认卡牌形 ⇒ 按钮形面板漏掉 = BUG）。 */
+		const ct46 = fs.readFileSync(path.join(ROOT, "main", "content.js"), "utf8");
+		if (!/csh-egdlg/.test(ct46)) e46.push("缺 .csh-egdlg 通道（按钮形势力面板会漏，斗地主的 BUG 会复发）");
+		else if (!/function cshEgGroupObserve\s*\(/.test(ct46) || !/MutationObserver/.test(ct46))
+			e46.push("势力面板打标器未接线（无 MutationObserver 则打不上标记、样式命不中）");
+		else if (!/cshEgGroupObserve\(on\)/.test(ct46)) e46.push("cshEgScrollApply 未随开关启用/停用打标器");
+		else if (!/group_"\s*\)\s*===\s*0|indexOf\("group_"\)/.test(ct46)) e46.push("打标器缺 link=group_* 兜底判据（标题措辞一变就漏）");
+		/* ④ 礼物价格字号（作者：价格数字字太小了） */
+		const cx46 = fs.readFileSync(path.join(ROOT, "games", "codex.html"), "utf8");
+		const cost46 = (cx46.match(/\.affgifts \.affbtn \.cost\{[^}]*font-size:([\d.]+)px/) || [])[1];
+		if (!cost46 || parseFloat(cost46) < 12.5) e46.push("礼物价格 .cost 字号过小（现 " + (cost46 || "缺") + "px，应 ≥12.5px）");
+		if (e46.length) fail("执行级 E46：在线更新自动化 + 框体分层 + 势力面板第二形态 + 价格字号（" + e46.slice(0, 4).join("；") + "）");
+		else ok("执行级 E46：更新已自动化（内置源 · 检查→确认→逐文件下载→重启）＋ 框体分层在位（牌桌四款统一 gb-table · 金鳞市/妖灵图鉴各具特色）＋ 势力面板两形态全覆盖（.csh-egdlg 打标器）＋ 礼物价格字号达标");
+	}
+
+	/* E47（2026-10-17 · 指定讨伐令 A 方案：1000 CBY 指定一只未讨伐妖灵出战）：
+	   作者担心「强制出战会出 BUG」⇒ 本门禁把风险边界**钉死**：
+	     ① pickMinions 必须带守卫（非法 id → 当没给，走原随机）；
+	     ② 出怪入口必须把 bountyGet() 传进去（不传 = 悬赏不生效）；
+	     ③ 存档键必须入 csh_migrate 键表（否则行囊不覆盖 + E41 会红）；
+	     ④ 下单必须先校验、再扣费、失败原额回滚（不白扣钱）；
+	     ⑤ 达成即消费（recordMinion 里清标记，不能粘住）。 */
+	{
+		const e47 = [];
+		const bd47 = fs.readFileSync(path.join(ROOT, "core", "csh_bossdata.js"), "utf8");
+		const br47 = fs.readFileSync(path.join(ROOT, "core", "csh_bossrecord.js"), "utf8");
+		const sh47 = fs.readFileSync(path.join(ROOT, "core", "csh_shell.js"), "utf8");
+		const bm47 = fs.readFileSync(path.join(ROOT, "main", "bossmode.js"), "utf8");
+		const mg47 = fs.readFileSync(path.join(ROOT, "core", "csh_migrate.js"), "utf8");
+		const cx47 = fs.readFileSync(path.join(ROOT, "games", "codex.html"), "utf8");
+		if (!/export function pickMinions\(tier, bounty\)/.test(bd47)) e47.push("pickMinions 未接 bounty 参数（指定讨伐令无处生效）");
+		else if (!/MINION_POOL\.indexOf\(bounty\) >= 0/.test(bd47)) e47.push("pickMinions 缺「非法 id → 走原随机」守卫（脏数据会改变出怪）");
+		if (!/BOUNTY_COST\s*=\s*1000/.test(br47)) e47.push("BOUNTY_COST ≠ 1000（作者定 1000 CBY 一次）");
+		if (!/export function bountyGet/.test(br47) || !/export function bountySet/.test(br47) || !/export function bountyClear/.test(br47) || !/export function bountyCheck/.test(br47))
+			e47.push("bountyGet/Set/Clear/Check 四件套不齐");
+		else if (!/bountyRaw\(\) === minionId\) bountyClear\(\)/.test(br47)) e47.push("recordMinion 未在达成后清空悬赏标记（会粘住下一次）");
+		/* ★ 2026-10-17 实机踩坑（「悬赏失败 · 明明有 CBY」）：installBossRecord 是**手写白名单**，
+		   新函数漏挂 → 宿主桥取不到 → 报 nomodule → 点了没用。必须白名单显式挂 + 缺失补挂。 */
+		else if (!/bountySet: bountySet/.test(br47) || !/bountyGet: bountyGet/.test(br47) || !/BOUNTY_COST: BOUNTY_COST/.test(br47))
+			e47.push("installBossRecord 白名单漏挂 bounty*（宿主桥会报 nomodule → 点了没用）");
+		else if (!/for \(const k in api\) if \(lib\.cshBossRecord\[k\] === undefined\)/.test(br47))
+			e47.push("installBossRecord 缺「缺失补挂」分支（已装老实例拿不到新能力）");
+		if (!/cmd === "shell-bounty"/.test(sh47) || !/BR1\.bountyCheck\(bId\)/.test(sh47)) e47.push("宿主缺 shell-bounty（或未先校验再扣费）");
+		else if (!/悬赏失败回滚/.test(sh47) || !/W4\.wallet\.spend\(BR1\.BOUNTY_COST/.test(sh47)) e47.push("shell-bounty 未走钱包扣费 / 未做失败回滚");
+		if (!/buildBossConfig\(\(lib\.cshBossRecord/.test(bm47)) e47.push("bossmode 未把 bountyGet() 传给 buildBossConfig（悬赏不会生效）");
+		if (!/K_CFG_BOUNTY\s*=\s*"extension_池子魔将_csh_bounty"/.test(mg47)) e47.push("存档键未登记 csh_migrate（行囊不覆盖 + E41 会红）");
+		else if (!/K_CFG_BOUNTY,/.test(mg47)) e47.push("K_CFG_BOUNTY 未进键表 / RESET_KEYS");
+		if (!/function doBounty/.test(cx47) || !/shell-bounty/.test(cx47)) e47.push("图鉴缺悬赏下单接线（doBounty → shell-bounty）");
+		else if (!/String\(Data\.bountyTarget/.test(cx47)) e47.push("图鉴未读宿主下发的 bounty（「已悬赏」态显示不出来）");
+		else if (!/afflock/.test(cx47)) e47.push("悬赏按钮未挂在未讨伐锁定行（应为零新增行）");
+		else if (!/snapS\.bounty/.test(sh47)) e47.push("shell-stats 未下发 bounty（图鉴拿不到当前悬赏）");
+		if (e47.length) fail("执行级 E47：指定讨伐令（" + e47.slice(0, 4).join("；") + "）");
+		else ok("执行级 E47：指定讨伐令在位（pickMinions 带守卫 · 出怪入口接线 · 先校验后扣费+回滚 · 达成即清 · 键入行囊 · 图鉴挂未讨伐行）");
 	}
 	log("");
 }

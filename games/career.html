@@ -25,13 +25,13 @@
   /* ---------- 字体三档规范（A1 · 2026-10-07）----------
      ① --ff-title  宋体系：宋祖有骨，撑「标题字」——菜单项 / 区块标题 / 官阶名 / 大数字；
      ② --ff-body   黑体系：笔画均匀，长文本与控件最耐看——正文 / 说明 / 按钮 / 标签；
-     ③ --ff-num    等宽数字：tabular 对齐，数据列不跳动——余额 / 榜值 / 计数 / 编号。
+     ③ --ff-num    数字：余额 / 榜值 / 计数 / 编号（2026-10-17 作者指令：等宽 → Times 衬线）。
      为什么分三档：中文界面里「宋 + 黑」的对比就是高级感的来源（标题呼吸、正文稳当），
-     而数字单列一档是因为界面里所有数字都要竖着对齐 —— 靠字体而非逐处 margin。
+     而数字单列一档是为了让界面里的数字有统一字形（2026-10-17 作者指令：由等宽字体改为 Times 衬线数字）。
      字体只按「语义」归类，不按大小：同一元素改了字号仍属于同一档。 */
   --ff-title:"Noto Serif SC","Source Han Serif SC","Songti SC","STSong","SimSun",serif;
   --ff-body:"Noto Sans SC","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
-  --ff-num:ui-monospace,"Cascadia Mono",Consolas,"SF Mono",Menlo,monospace;
+  --ff-num:"Times New Roman",Times,"Nimbus Roman","Songti SC",serif;
   /* 字号标尺（7 档，全部由 --fs-base 派生 —— 「改一个数字，全页按比例呼吸」）：
      **移动端优先**：基数 12.5px 直接按手机横屏（915×412，本页主战场）定档，
      桌面/平板用同一套值（不设第二套断点数字）—— 在手机上成立的密度，在桌面上必然成立。
@@ -1017,7 +1017,7 @@ function nextThreshold(cur, ranks) {
 function fallbackBadge(rank, color) {
   var n = Math.max(0, Math.min(50, rank));
   return '<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="44" fill="none" stroke="' + color + '" stroke-width="3"/>' +
-    '<text x="50" y="58" text-anchor="middle" font-size="26" font-family="ui-monospace,Consolas,monospace" fill="' + color + '">' + n + '</text></svg>';
+    '<text x="50" y="58" text-anchor="middle" font-size="26" font-family="\'Times New Roman\',Times,serif" fill="' + color + '">' + n + '</text></svg>';
 }
 
 function renderQuick() {

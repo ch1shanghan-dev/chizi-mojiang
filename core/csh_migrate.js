@@ -146,6 +146,7 @@ import { lib, game } from "../../../noname.js";
 	var K_CFG_BOSSKILL = "extension_池子魔将_bossKill";       /* 讨伐录（lib.config） */
 	var K_CFG_BOSSASBOSS = "extension_池子魔将_bossAsBoss";   /* 扮演魔王战绩（lib.config） */
 	var K_CFG_GOLDFISH = "extension_池子魔将_goldfish";       /* 金鳞市（lib.config） */
+	var K_CFG_BOUNTY = "extension_池子魔将_csh_bounty";       /* 指定讨伐令目标（lib.config · 2026-10-17） */
 	/* 键族（多键合成一个逻辑域）：UI 已阅类 / 玩家在各处留的名字 */
 	var GROUP_UI_SEEN = [["bossbookSeen", "csh_bossbook_seen"], ["bossHideKilled", "csh_boss_hide_killed"]];
 	var GROUP_NAMES = [["ddz", "csh_ddz_name"], ["uno", "csh_uno_name"],
@@ -826,6 +827,10 @@ import { lib, game } from "../../../noname.js";
 		["bossKill", K_CFG_BOSSKILL, cleanBossKill, 3],
 		["bossAsBoss", K_CFG_BOSSASBOSS, cleanBossAsBoss, 3],
 		["goldfish", K_CFG_GOLDFISH, cleanGoldfish, 3],
+		/* 指定讨伐令（2026-10-17）：只允许是合法妖灵 id，其余一律清空（脏数据不随行囊走） */
+		["bounty", K_CFG_BOUNTY, function (v) {
+			try { return (typeof v === "string" && /^csh_boss_minion_[a-z0-9_]+$/.test(v)) ? v : ""; } catch (e) { return ""; }
+		}, 3],
 		["ledger", K_LEDGER, cleanLedger, 0],
 		["walletHist", K_WALLET_HIST, cleanHist, 0],
 		["walletSnap", K_WALLET_SNAP, cleanSnap, 0],
@@ -931,7 +936,7 @@ import { lib, game } from "../../../noname.js";
 		K_WINRATE,
 		/* v3 新增：好感度 / 账本 / 讨伐录 / 扮演魔王 / 金鳞市 / UI 已阅 / 各处名字 */
 		K_AFFECTION, K_LEDGER,
-		K_CFG_BOSSKILL, K_CFG_BOSSASBOSS, K_CFG_GOLDFISH,
+		K_CFG_BOSSKILL, K_CFG_BOSSASBOSS, K_CFG_GOLDFISH, K_CFG_BOUNTY,
 		"csh_bossbook_seen", "csh_boss_hide_killed",
 		"csh_ddz_name", "csh_uno_name", "csh_net_name", "csh_net_sig",
 	];

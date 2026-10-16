@@ -31,7 +31,7 @@
   /* 字体四档（全项目一致）：① 标题宋 ② 正文黑 ③ 数字牌 ④ 书法点缀 */
   --ff-title:"Noto Serif SC","Source Han Serif SC","Songti SC","STSong","SimSun",serif;
   --ff-body:"Noto Sans SC","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
-  --ff-num:ui-monospace,"Cascadia Mono",Consolas,"SF Mono",Menlo,monospace;
+  --ff-num:"Times New Roman",Times,"Nimbus Roman","Songti SC",serif;
   --ff-callig:"ZMX3","Zhi Mang Xing","Kaiti SC","STKaiti",KaiTi,var(--ff-title);
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -242,7 +242,9 @@ body.empty .foot{display:none}
 .pinbtn{margin-left:auto;border:1px solid rgba(216,189,122,.42);background:rgba(216,189,122,.08);
   color:var(--gold-hi);border-radius:999px;font-size:11.5px;padding:3px 10px;cursor:pointer;font-family:var(--ff-body)}
 .pinbtn.on{background:var(--gold);border-color:var(--gold);color:#fff;font-weight:600}
-.affbtn .favmk{font-style:normal;font-size:10.5px;color:#ffd98a;letter-spacing:.02em}
+.affbtn .favmk{font-style:normal;font-size:11.5px;color:#ffd98a;letter-spacing:.02em}
+/* 2026-10-17 · 指定讨伐令按钮：内嵌在「未讨伐」锁定行里（复用 .affbtn 语言 · 零新增行） */
+.afflock .affbtn{margin-top:7px;display:inline-flex;font-size:12.5px;padding:5px 12px}
 /* ★ v6.9 契约/誓约：铭牌 / 结契按钮 / 横幅 / 立绘金框 / 列表金环 */
 .oathbar{position:relative;z-index:2;margin-top:10px;padding:7px 10px;border-radius:9px;font-size:12.5px;
   color:#ffe9b0;background:linear-gradient(90deg,rgba(216,189,122,.20),rgba(240,112,156,.10));
@@ -268,7 +270,7 @@ body.empty .foot{display:none}
 @media (prefers-reduced-motion:reduce){.oathov{animation:none}}
 .affgifts{position:relative;display:flex;gap:6px;margin-top:7px;z-index:2;flex-wrap:wrap}
 .affgifts .affbtn{display:flex;align-items:baseline;gap:5px}
-.affgifts .affbtn .cost{font-family:var(--ff-num);font-size:10.5px;color:rgba(255,240,200,.62);font-style:normal}
+.affgifts .affbtn .cost{font-family:var(--ff-num);font-size:13px;font-weight:600;color:rgba(255,240,200,.9);font-style:normal}
 .affperks{position:relative;margin-top:10px;z-index:2;border-top:1px dashed rgba(216,189,122,.22);padding-top:8px}
 .affperks .pktitle{font-size:12px;color:var(--gold);letter-spacing:.12em;margin-bottom:5px}
 .affperk{display:flex;align-items:baseline;gap:6px;font-size:13px;padding:3px 0;opacity:.55}
@@ -692,7 +694,17 @@ function renderAff(it) {
      但全部按钮置灰 + 明示解锁条件；宿主侧 csh_affection.interact/gift 同锁（单一出口）。 */
   var hunted = !!(it.n > 0);
   if (!hunted) {
-    box.appendChild(el("div", "afflock", "🔒 未讨伐 · 先到「挑战模式」击破她，才能开始互动"));
+    var lockRow = el("div", "afflock", "🔒 未讨伐 · 先到「挑战模式」击破她，才能开始互动");
+    /* 2026-10-17 · 指定讨伐令（A 方案 · 1000 CBY）：**就地复用这条锁定行**放一颗悬赏按钮
+       （零新增行 —— 应对交互区拥挤）。扣费在宿主单一账本，页面拿不到钱包；
+       真正生效在挑战模式的出怪入口（csh_bossdata.pickMinions），讨伐成功即自动消费。 */
+    var isBounty = (String(Data.bountyTarget || "") === it.id);
+    var bBtn = el("button", "affbtn", isBounty ? "已悬赏 · 待她现身" : ("悬赏 " + BOUNTY_COST + " CBY · 指定她出战"));
+    bBtn.title = "花 " + BOUNTY_COST + " CBY 指定：下一次进「挑战模式」必出这一只（击破除名即完成）";
+    if (isBounty) bBtn.setAttribute("disabled", "1");
+    bBtn.addEventListener("click", function () { doBounty(it.id, bBtn); }, false);
+    lockRow.appendChild(bBtn);
+    box.appendChild(lockRow);
   }
   var acts = st.acts || {};
   function mkAct(key, name, gain, cls) {
@@ -1099,6 +1111,29 @@ function renderAll() {
 /* ============================================================
    启动（父窗直读优先 → 桥兜底 → 空态）
    ============================================================ */
+/* 指定讨伐令（2026-10-17）：价格单点（与宿主 csh_bossrecord.BOUNTY_COST 一致，此处仅用于文案） */
+var BOUNTY_COST = 1000;
+/* 下单：**扣费与落标记全在宿主**（shell-bounty）——页面不碰钱包、不写存档；
+   宿主先校验（池外/已讨伐直接拒）再扣费，落标记失败原额回滚。 */
+function doBounty(id, btn) {
+  if (!Bridge.active) { return; }
+  btn.disabled = true;
+  btn.textContent = "下单中…";
+  Bridge.call("shell-bounty", { bid: id }, function (ok, res) {
+    if (!ok) {
+      var why = (res && res.reason) || "fail";
+      try { console.warn("[池子魔将][悬赏] 下单失败：reason=" + why); } catch (eW) {}
+      btn.disabled = false;
+      btn.textContent = (why === "poor") ? ("CBY 不够（需 " + BOUNTY_COST + "）")
+        : ((why === "hunted") ? "她已被讨伐" : "悬赏失败 · 点我再试");
+      return;
+    }
+    Data.bountyTarget = id;
+    btn.textContent = "已悬赏 · 待她现身";
+    btn.setAttribute("disabled", "1");
+    try { Bridge.call("shell-pc", null, function () {}); } catch (eP) {}
+  });
+}
 function boot() {
   var c = collect();
   if (c) { Data.items = buildItems(c); renderAll(); return; }
@@ -1107,6 +1142,7 @@ function boot() {
       if (ok && snap && snap.boss && snap.boss.minions && typeof snap.boss.minions === "object") {
         Data.bridgeMinions = snap.boss.minions;
       }
+      if (ok && snap) Data.bountyTarget = String(snap.bounty || "");
       var c2 = collect();                 /* 人设仍需父窗 —— 拿不到则仍空态 */
       Data.items = c2 ? buildItems(c2) : [];
       renderAll();

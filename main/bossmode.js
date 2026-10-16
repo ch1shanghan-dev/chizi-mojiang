@@ -91,7 +91,9 @@ export function cshBossModeInstall() {
 			} catch (eW0) {}
 			return;
 		}
-		const cfg = buildBossConfig();                            /* 纯静态：无需角色条目 */
+		/* 纯静态：无需角色条目 · 2026-10-17 带上「指定讨伐令」目标
+		   （未悬赏 / 目标非法 / 模块缺失时 bountyGet 返回空串 ⇒ 出怪与从前**完全一致**） */
+		const cfg = buildBossConfig((lib.cshBossRecord && typeof lib.cshBossRecord.bountyGet === "function") ? lib.cshBossRecord.bountyGet() : "");
 		/* ---------- v5：全局 mod 技登记（【冷眼】· 挑战者手牌上限-1） ----------
 		   checkMod 的遍历范围 = 自身技能 + lib.skill.global（game/index.js checkMod →
 		   getModableSkills 内 concat）。妖灵要让挑战者的手牌上限-1，必须把该 mod 技

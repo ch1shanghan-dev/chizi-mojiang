@@ -133,7 +133,7 @@
 | --- | --- | --- |
 | `--ff-title` | `Noto Serif SC / Source Han Serif SC / Songti SC / STSong / SimSun / serif` | 角色名 / 区块标题 / 官阶名 / 大数字 |
 | `--ff-body` | `Noto Sans SC / PingFang SC / Microsoft YaHei / system-ui / sans-serif` | 正文 / 台词 / 说明 / 按钮 |
-| `--ff-num` | `ui-monospace / Cascadia Mono / Consolas / SF Mono / Menlo / monospace` + `font-variant-numeric:tabular-nums` | 金额 / 价格 / 计数 |
+| `--ff-num` | `"Times New Roman", Times, "Nimbus Roman", "Songti SC", serif` | 金额 / 价格 / 计数 |
 | `--ff-callig` | **`ZMX3`**（`font/csh_fx_font_3.woff2`，4058 字全覆盖子集）+ `Zhi Mang Xing / Kaiti SC / STKaiti / KaiTi` + `--ff-title` | **仅装饰性短词**：页面招牌字 / 封面书名 / 卷号 / 序跋大字 |
 
 - ★**书法体只用于"字表内确定有字形"的短词**：`csh_fx_font_1/2.woff2` 是 **78/84 字的游戏内技能横幅专用子集**，

@@ -1369,7 +1369,14 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 			/* 成就系统（2026-09-28 新增）：聚合各模块统计 → 生涯大厅成就引擎评估。
 			   只读聚合，不写任何状态；解锁奖励走 shell-ach-claim。 */
 			if (cmd === "shell-stats") {
-				ackToGame("shell-stats", true, buildStats());
+				var snapS = buildStats();
+				/* 2026-10-17：把「指定讨伐令」当前目标随统计下发（图鉴的未讨伐行要显示「已悬赏」）。
+				   页面不写任何存档，只读这一份宿主应答。 */
+				try {
+					snapS.bounty = (lib.cshBossRecord && typeof lib.cshBossRecord.bountyGet === "function")
+						? lib.cshBossRecord.bountyGet() : "";
+				} catch (eBS) { snapS.bounty = ""; }
+				ackToGame("shell-stats", true, snapS);
 				return;
 			}
 			/* 金鳞市（2026-10-14 批次 B）：市场快照（应答前先执行每日结算——跨日首访开市）
@@ -1592,6 +1599,32 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 					}
 					ackToGame("shell-cheer-list", true, { list: out2 });
 				} catch (eCL) { ackToGame("shell-cheer-list", false, {}); }
+				return;
+			}
+			/* 指定讨伐令下单（2026-10-17 · A 方案）：顺序是**先校验 → 再扣费 → 再落标记** ——
+			   目标不合法（池外 / 已讨伐）直接拒（钱一分不动）；落标记若失败则**原额回滚**。
+			   定价与校验全部取自 csh_bossrecord（单一真源），页面只传一个 id。 */
+			if (cmd === "shell-bounty") {
+				try {
+					var bId = String(d.bid || "").replace(/[^0-9a-zA-Z_]/g, "").slice(0, 64);
+					var BR1 = lib.cshBossRecord;
+					var W4 = wallet();
+					if (!BR1 || typeof BR1.bountySet !== "function" || typeof BR1.bountyCheck !== "function") {
+						ackToGame("shell-bounty", false, { reason: "nomodule" }); return;
+					}
+					if (!W4) { ackToGame("shell-bounty", false, { reason: "nowallet" }); return; }
+					var chkB = BR1.bountyCheck(bId);
+					if (!chkB.ok) { ackToGame("shell-bounty", false, { reason: chkB.reason }); return; }
+					var paidB = W4.wallet.spend(BR1.BOUNTY_COST, "悬赏:" + bId);
+					if (paidB !== true) { paintPc(); ackToGame("shell-bounty", false, { reason: "poor", cost: BR1.BOUNTY_COST }); return; }
+					var setB = BR1.bountySet(bId);
+					if (!setB.ok) {
+						try { W4.wallet.add(BR1.BOUNTY_COST, "悬赏失败回滚:" + bId); } catch (eRB) {}
+						paintPc(); ackToGame("shell-bounty", false, { reason: setB.reason }); return;
+					}
+					paintPc();
+					ackToGame("shell-bounty", true, { id: bId, cost: BR1.BOUNTY_COST, pc: W4.wallet.pc() });
+				} catch (eB) { logError("shell-bounty", eB); ackToGame("shell-bounty", false, { reason: "error" }); }
 				return;
 			}
 			if (cmd === "shell-open") {

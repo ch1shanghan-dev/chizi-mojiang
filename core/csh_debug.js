@@ -1871,6 +1871,28 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                 "button.csh-dbg-gamebtn.gb-save .gb-name{font-size:16px!important;letter-spacing:.06em!important;}",
                 "button.csh-dbg-gamebtn.gb-save::before{content:''!important;position:absolute!important;left:-4px!important;top:-6px!important;bottom:-6px!important;width:5px!important;background:linear-gradient(180deg,#588066,rgba(88,128,102,.12))!important;transform:skewY(-10deg)!important;}",
                 "button.csh-dbg-gamebtn.gb-save .gb-mid{font-size:12px!important;color:#88ac93!important;letter-spacing:.03em!important;opacity:.9!important;}",
+                /* ---------- 框体分层（2026-10-17 · 作者：「德州斗地主 UNO 廿一点就统一，其他的各具特色」） ----------
+                   ① gb-table：四款牌桌**共用**一套材质 —— 青碧毡面 + 左斜条 + 右下角 ♠♥♦♣ 暗纹。
+                      四张卡只靠右上角 tag（牌桌/纸牌）与文案区分，不再各自造样式（这就是"统一"）。
+                   ② gb-goldfish：金鳞市 —— 琥珀铜（市集的铜钱色）+ ¤ 金钱暗纹。
+                   ③ gb-codex：妖灵图鉴 —— 墨紫（档案卷宗的墨色）+ ❖ 图鉴暗纹。
+                   色相与既有四张（金 / 朱砂 / 青蓝 / 墨绿）各区一路；写法沿用 gb-* 的
+                   「::before 左斜条 + 渐变底 + .gb-mid 配色」范式，零结构变化。 */
+                "button.csh-dbg-gamebtn.gb-table{background:linear-gradient(160deg,rgba(31,122,107,.18),rgba(31,122,107,.04) 60%)!important;border-color:rgba(31,122,107,.46)!important;position:relative!important;overflow:hidden!important;}",
+                "button.csh-dbg-gamebtn.gb-table .gb-name{font-size:16px!important;letter-spacing:.06em!important;}",
+                "button.csh-dbg-gamebtn.gb-table .gb-mid{font-size:12px!important;color:#6fc9b4!important;letter-spacing:.03em!important;opacity:.9!important;}",
+                "button.csh-dbg-gamebtn.gb-table::before{content:''!important;position:absolute!important;left:-4px!important;top:-6px!important;bottom:-6px!important;width:5px!important;background:linear-gradient(180deg,#1f7a6b,rgba(31,122,107,.12))!important;transform:skewY(-10deg)!important;}",
+                "button.csh-dbg-gamebtn.gb-table::after{content:'♠♥♦♣'!important;position:absolute!important;right:10px!important;bottom:-8px!important;font-size:28px!important;line-height:1!important;letter-spacing:-3px!important;color:#1f7a6b!important;opacity:.13!important;pointer-events:none!important;}",
+                "button.csh-dbg-gamebtn.gb-goldfish{background:linear-gradient(160deg,rgba(196,122,30,.18),rgba(196,122,30,.04) 60%)!important;border-color:rgba(196,122,30,.46)!important;position:relative!important;overflow:hidden!important;}",
+                "button.csh-dbg-gamebtn.gb-goldfish .gb-name{font-size:16px!important;letter-spacing:.06em!important;}",
+                "button.csh-dbg-gamebtn.gb-goldfish .gb-mid{font-size:12px!important;color:#d9a24f!important;letter-spacing:.03em!important;opacity:.9!important;}",
+                "button.csh-dbg-gamebtn.gb-goldfish::before{content:''!important;position:absolute!important;left:-4px!important;top:-6px!important;bottom:-6px!important;width:5px!important;background:linear-gradient(180deg,#c47a1e,rgba(196,122,30,.12))!important;transform:skewY(-10deg)!important;}",
+                "button.csh-dbg-gamebtn.gb-goldfish::after{content:'¤'!important;position:absolute!important;right:12px!important;bottom:-10px!important;font-size:34px!important;line-height:1!important;color:#c47a1e!important;opacity:.15!important;pointer-events:none!important;}",
+                "button.csh-dbg-gamebtn.gb-codex{background:linear-gradient(160deg,rgba(106,74,138,.18),rgba(106,74,138,.04) 60%)!important;border-color:rgba(106,74,138,.46)!important;position:relative!important;overflow:hidden!important;}",
+                "button.csh-dbg-gamebtn.gb-codex .gb-name{font-size:16px!important;letter-spacing:.06em!important;}",
+                "button.csh-dbg-gamebtn.gb-codex .gb-mid{font-size:12px!important;color:#b79cd6!important;letter-spacing:.03em!important;opacity:.9!important;}",
+                "button.csh-dbg-gamebtn.gb-codex::before{content:''!important;position:absolute!important;left:-4px!important;top:-6px!important;bottom:-6px!important;width:5px!important;background:linear-gradient(180deg,#6a4a8a,rgba(106,74,138,.12))!important;transform:skewY(-10deg)!important;}",
+                "button.csh-dbg-gamebtn.gb-codex::after{content:'❖'!important;position:absolute!important;right:12px!important;bottom:-10px!important;font-size:30px!important;line-height:1!important;color:#6a4a8a!important;opacity:.15!important;pointer-events:none!important;}",
                 "button.csh-dbg-gamebtn:active{transform:translateY(0)!important;}",
                 "button.csh-dbg-gamebtn .gb-top{display:flex!important;align-items:center!important;gap:8px!important;width:100%!important;}",
                 "button.csh-dbg-gamebtn .gb-name{flex:0 1 auto!important;font-size:15px!important;font-weight:600!important;color:var(--csh-bg)!important;line-height:1.3!important;",
@@ -3303,6 +3325,17 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                 return String(n);
             }
 
+            /* 卡片框体归属（2026-10-17 · 作者指令）：
+               「德州斗地主 UNO 廿一点就统一，其他的做出来各具特色」。
+               ⇒ 四款牌桌**共用**一套 gb-table（同毡面 / 同左斜条 / 同角落暗纹），
+                 四张只靠右上角 tag 与文案区分；金鳞市、妖灵图鉴各给一套专属框体。
+               ★ 生涯大厅 / 讨伐录 / 天下榜 / 行囊 的特色类仍在各自 IIFE 里手挂（不动）。
+               ★ 纯加类、零 DOM 结构变化；样式见本文件注入 CSS 段（gb-table/gb-goldfish/gb-codex）。 */
+            var GAMECLASS = {
+                texas: "gb-table", doudizhu: "gb-table", blackjack: "gb-table", uno: "gb-table",
+                goldfish: "gb-goldfish", codex: "gb-codex",
+            };
+
             function gameButton(title, desc, tag, onClick, locked) {
                 var b = document.createElement("button");
                 b.type = "button";
@@ -3528,13 +3561,16 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                 })();
 
             games.forEach(function (g) {
-                list.appendChild(gameButton(
+                var btn = gameButton(
                     g.title,
                     g.stat ? (g.stat + " · " + g.desc) : g.desc,
                     g.tag,
                     function () { openGame(g.key); },
                     false
-                ));
+                );
+                /* 框体分层：四款牌桌共用 gb-table；金鳞市 / 妖灵图鉴各具一套（见 GAMECLASS 处注释） */
+                if (GAMECLASS[g.key]) btn.classList.add(GAMECLASS[g.key]);
+                list.appendChild(btn);
             });
             planned.forEach(function (p) {
                 list.appendChild(gameButton(p.title, p.desc + "（筹备中）", p.tag, null, true));
@@ -6773,6 +6809,195 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
             }).then(function (j) {
                 render(j.extensions || []);
             }).catch(function () { render(FALLBACK); });
+            return true;
+        };
+
+        /* ============================================================
+           在线更新（2026-10-17 · 作者指令：「更新还是要别人先输入，比较麻烦，能不能自动化」）
+           ------------------------------------------------------------
+           背景：此前更新走引擎「设置→通用→添加获取扩展地址」——玩家要手填长 URL；
+                 且那一页的 intro 会把长地址与下一行标题叠在一起（源头在引擎
+                 noname/library/index.js:1567-1598 的渲染缺陷，属引擎，本扩展不改）。
+           做法：更新源**硬编码**在本模块，完全不读 lib.config.extension_sources；
+                 玩家只要点「检查更新」→ 拉远端 catalog.js → 比版本 →
+                 有新版则由玩家点「立即更新」→ 复用引擎 game.checkFileList / game.multiDownload
+                 逐文件下载 → 自动重启。**零手动输入、不再依赖那个引擎设置项。**
+           ⚠ 为什么不走引擎原生「更新扩展」：本仓库根目录＝扩展内容（见 tools/release.js 注释），
+             而引擎按 `<源><扩展名>/…` 拼下载 URL，与本布局不匹配 ⇒ 这里自行拼 URL（去掉扩展名前缀）。
+           文件策略：**代码全量下 + 素材只补缺失**
+             · 代码（.js/.json/.css/.html）= 每次必下（"改代码"是更新的主场景）；
+             · 素材（图片/音频/字体）= 只补本机缺失项（体积大、少变）——
+               走引擎 checkFileList 的语义：它会把已存在的文件就地剪枝，剩下的即"缺失"。
+           ============================================================ */
+        var CSH_UPDATE_SRC = "https://raw.githubusercontent.com/ch1shanghan-dev/chizi-mojiang/main/";
+        var CSH_UPDATE_EXT = "extension/池子魔将/";
+        function cshVerArr(v) {
+            var out = [], s = String(v == null ? "" : v).split(/[.\-+_]/);
+            for (var i = 0; i < s.length; i++) out.push(parseInt(s[i], 10) || 0);
+            return out;
+        }
+        function cshVerCmp(a, b) {
+            var A = cshVerArr(a), B = cshVerArr(b), n = Math.max(A.length, B.length);
+            for (var i = 0; i < n; i++) {
+                var x = A[i] || 0, y = B[i] || 0;
+                if (x !== y) return x > y ? 1 : -1;
+            }
+            return 0;
+        }
+        function cshIsCode(f) {
+            return /\.(js|json|css|html)$/i.test(f) || /^(LICENSE|README\.md)$/.test(f);
+        }
+        /* 更新面板自带样式（与「其他扩展」同一视觉语言；同样与主 CSS 解耦、幂等） */
+        function ensureUpdateStyle() {
+            if (document.getElementById("csh-update-css")) return;
+            var st = document.createElement("style");
+            st.id = "csh-update-css";
+            st.textContent = [
+                "@keyframes cshUpdFade{from{opacity:0;}to{opacity:1;}}",
+                "#csh-update-bg{position:fixed!important;left:0!important;top:0!important;width:100%!important;height:100%!important;",
+                "z-index:2147482999!important;background:rgba(8,6,4,.52)!important;animation:cshUpdFade .18s ease-out!important;",
+                "-webkit-backdrop-filter:blur(12px) saturate(130%)!important;backdrop-filter:blur(12px) saturate(130%)!important;}",
+                "#csh-update{display:block!important;position:fixed!important;left:50%!important;top:50%!important;",
+                "transform:translate(-50%,-50%)!important;z-index:2147483000!important;width:min(520px,92vw)!important;",
+                "max-height:calc(100dvh - 24px)!important;overflow-y:auto!important;padding:20px 20px 16px!important;border-radius:14px!important;box-sizing:border-box!important;",
+                "background:#f6f1e4!important;color:#2a2118!important;border:1px solid rgba(60,48,28,.25)!important;box-shadow:0 10px 44px rgba(0,0,0,.45)!important;",
+                "font-family:system-ui,-apple-system,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif!important;}",
+                /* 引擎全局给所有 div 设了 position:absolute;display:inline-block —— 面板内子元素必须复位 */
+                "#csh-update *{position:static!important;box-sizing:border-box!important;}",
+                "#csh-update .csh-ext-title{display:block!important;font-weight:700!important;font-size:15px!important;letter-spacing:.06em!important;margin-bottom:4px!important;}",
+                "#csh-update .csh-ext-sub{display:block!important;font-size:11px!important;opacity:.62!important;margin-bottom:10px!important;word-break:break-all!important;}",
+                "#csh-update .csh-ext-loading{display:block!important;font-size:12.5px!important;opacity:.78!important;padding:8px 2px!important;line-height:1.75!important;white-space:pre-wrap!important;}",
+                "#csh-update .csh-ext-row{display:flex!important;align-items:center!important;justify-content:flex-end!important;gap:10px!important;margin-top:12px!important;}",
+                "#csh-update .csh-ext-btn{flex:none!important;padding:8px 18px!important;cursor:pointer!important;border-radius:5px!important;font-weight:700!important;",
+                "background:#c9a84c!important;color:#1d1608!important;border:1px solid rgba(60,48,28,.2)!important;}",
+                "#csh-update .csh-ext-btn.ghost{background:#e8e0cc!important;color:#3a2f1c!important;}",
+                "#csh-update .csh-ext-btn:disabled{opacity:.55!important;cursor:default!important;}",
+            ].join("");
+            (document.head || document.documentElement).appendChild(st);
+        }
+        lib.cshDebug.checkUpdate = function () {
+            try { ensureUpdateStyle(); } catch (eSt) {}
+            var staleBg = document.getElementById("csh-update-bg");
+            if (staleBg && staleBg.parentNode) staleBg.parentNode.removeChild(staleBg);
+            var staleBox = document.getElementById("csh-update");
+            if (staleBox && staleBox.parentNode) staleBox.parentNode.removeChild(staleBox);
+
+            /* 挂 documentElement（与 openRedeem / openExtStore 同位）：
+               引擎给 body 设 transform:scale 形成独立层叠上下文，挂 body 的浮层会被压住。 */
+            var host = document.documentElement;
+            var bg = document.createElement("div");
+            bg.id = "csh-update-bg";
+            var box = document.createElement("div");
+            box.id = "csh-update";
+            function kill() {
+                try { document.removeEventListener("keydown", box.__esc, true); } catch (eE) {}
+                if (box.parentNode) box.parentNode.removeChild(box);
+                if (bg.parentNode) bg.parentNode.removeChild(bg);
+            }
+            box.__esc = function (e) {
+                if (e.key !== "Escape" && e.keyCode !== 27) return;
+                try { e.preventDefault(); e.stopPropagation(); } catch (_e) {}
+                kill();
+            };
+            document.addEventListener("keydown", box.__esc, true);
+            bg.addEventListener("click", kill, false);
+            host.appendChild(bg);
+            host.appendChild(box);
+
+            var t = document.createElement("div");
+            t.className = "csh-ext-title";
+            t.textContent = "池子魔将 · 检查更新";
+            box.appendChild(t);
+            var sub = document.createElement("div");
+            sub.className = "csh-ext-sub";
+            sub.textContent = "更新源：github.com/ch1shanghan-dev/chizi-mojiang（已内置，无需手动填写更新地址）";
+            box.appendChild(sub);
+            var status = document.createElement("div");
+            status.className = "csh-ext-loading";
+            status.textContent = "正在检查…";
+            box.appendChild(status);
+            var row = document.createElement("div");
+            row.className = "csh-ext-row";
+            box.appendChild(row);
+            var closeBtn = document.createElement("button");
+            closeBtn.type = "button";
+            closeBtn.className = "csh-ext-btn ghost";
+            closeBtn.textContent = "关闭";
+            closeBtn.addEventListener("click", kill, false);
+            row.appendChild(closeBtn);
+
+            var localVer = "";
+            try {
+                localVer = lib.config["extension_池子魔将_version"] ||
+                    (lib.extensionPack && lib.extensionPack["池子魔将"] && lib.extensionPack["池子魔将"].version) || "";
+            } catch (eV) {}
+
+            /* 逐文件更新：代码全量 + 素材补缺（复用引擎两件原语，零引擎改动） */
+            function startUpdate(info, remoteVer) {
+                status.textContent = "准备更新到 " + remoteVer + " …（代码重下 + 素材补缺）";
+                var files = (info.files || []).slice();
+                if (files.indexOf("extension.js") < 0) files.push("extension.js");
+                var code = [], mediaLocal = [];
+                for (var i = 0; i < files.length; i++) {
+                    var f = String(files[i]);
+                    if (cshIsCode(f)) code.push(f); else mediaLocal.push(CSH_UPDATE_EXT + f);
+                }
+                var proceed = function () {
+                    /* mediaLocal 已被 checkFileList 就地剪枝 → 只剩「本机缺失」的素材；转回相对路径 */
+                    var missing = [];
+                    for (var m = 0; m < mediaLocal.length; m++) missing.push(String(mediaLocal[m]).slice(CSH_UPDATE_EXT.length));
+                    var toGet = code.concat(missing);
+                    if (!toGet.length) { status.textContent = "没有需要更新的文件。"; return; }
+                    var urls = [];
+                    for (var u = 0; u < toGet.length; u++) urls.push(CSH_UPDATE_SRC + toGet[u]);
+                    var done = 0, total = urls.length;
+                    game.multiDownload(
+                        urls,
+                        function () { done++; status.textContent = "下载中 " + done + " / " + total + " …"; },
+                        function (e) { status.textContent = "更新失败：" + ((e && e.source) || "文件下载失败") + "\n可关闭后重试。"; },
+                        function () {
+                            status.textContent = "更新完成，正在重启游戏…";
+                            setTimeout(function () { try { game.reload(); } catch (eR) { location.reload(); } }, 1200);
+                        },
+                        function (cur) { return "extension/" + String(cur).slice(CSH_UPDATE_SRC.length); }
+                    );
+                };
+                /* checkFileList 只负责"素材补缺"；代码项不进这个名单，才能每次都重下 */
+                try { game.checkFileList(mediaLocal, proceed); } catch (eC) { proceed(); }
+            }
+
+            fetch(CSH_UPDATE_SRC + "catalog.js", { cache: "no-store", referrerPolicy: "no-referrer" }).then(function (r) {
+                if (!r.ok) throw new Error("HTTP " + r.status);
+                return r.text();
+            }).then(function (txt) {
+                /* catalog.js = `window.extension = {...};`（JSON.stringify 产物）→ 截出 JSON 解析，
+                   不用 eval（避免把远端脚本当代码执行）。 */
+                var body = txt.slice(txt.indexOf("{"), txt.lastIndexOf("}") + 1);
+                var j = null;
+                try { j = JSON.parse(body); } catch (eP) { throw new Error("更新目录解析失败"); }
+                var info = j && j["池子魔将"];
+                if (!info || !info.version) throw new Error("更新目录缺少版本信息");
+                var remoteVer = String(info.version);
+                if (!localVer) { status.textContent = "本机版本未知；远端最新为 " + remoteVer + "。"; return; }
+                if (cshVerCmp(remoteVer, localVer) <= 0) {
+                    status.textContent = "已是最新版本（当前 " + localVer + "，远端 " + remoteVer + "）。";
+                    return;
+                }
+                status.textContent = "发现新版本 " + remoteVer + "（当前 " + localVer + "）。\n是否在线更新？更新完成后游戏会自动重启。";
+                var goBtn = document.createElement("button");
+                goBtn.type = "button";
+                goBtn.className = "csh-ext-btn";
+                goBtn.textContent = "立即更新";
+                goBtn.addEventListener("click", function () {
+                    goBtn.disabled = true;
+                    closeBtn.disabled = true;
+                    startUpdate(info, remoteVer);
+                }, false);
+                row.insertBefore(goBtn, row.firstChild);
+            }).catch(function (e) {
+                status.textContent = "检查更新失败：" + ((e && e.message) || e) +
+                    "。\n（网络不可用时可稍后再试；不影响游戏正常运行）";
+            });
             return true;
         };
 

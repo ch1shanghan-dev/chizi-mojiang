@@ -73,7 +73,7 @@ const bossImportPromise = game.import("character", function () {
 		const src = (pkg.character && typeof pkg.character === "object") ? pkg.character : null;
 		if (!src || !Object.keys(src).length) return { name: NAME };
 
-		const built = buildBossEntries(src, pkg.translate, pkg.characterTitle);
+		const built = buildBossEntries(src, pkg.translate, pkg.characterTitle, (typeof lib !== "undefined" && lib.cshBossRecord && typeof lib.cshBossRecord.bountyGet === "function") ? lib.cshBossRecord.bountyGet() : "");
 		if (!built || !built.entryCount) return { name: NAME };
 
 		/* character：魔王全量 + 妖灵（纯对象格式，与 character/index.js 的条目同形态） */
@@ -140,7 +140,7 @@ export function cshBossSelfLoad() {
 		const pkg = cshCharacter || {};
 		const src = (pkg.character && typeof pkg.character === "object") ? pkg.character : null;
 		if (!src || !Object.keys(src).length) return 0;
-		const built = buildBossEntries(src, pkg.translate, pkg.characterTitle);
+		const built = buildBossEntries(src, pkg.translate, pkg.characterTitle, (typeof lib !== "undefined" && lib.cshBossRecord && typeof lib.cshBossRecord.bountyGet === "function") ? lib.cshBossRecord.bountyGet() : "");
 		if (!built || !built.entryCount) return 0;
 		cshEnsureBossPack("懒人包自愈（cshBossSelfLoad）");
 		if (!lib.character) lib.character = {};

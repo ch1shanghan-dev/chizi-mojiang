@@ -1,4 +1,4 @@
-/* 自动生成于 2026-10-16T14:08:27.741Z by tools/release.js —— 发版后 git push 即生效，勿手改 files */
+/* 自动生成于 2026-10-16T18:14:05.530Z by tools/release.js —— 发版后 git push 即生效，勿手改 files */
 window.extension = {
 	"池子魔将": {
 		"name": "池子魔将",

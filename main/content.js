@@ -33,6 +33,111 @@ import { cshBossPackHide } from "../character/boss.js";
    ② 挂 class 门控（`html.csh-egsc`）→ 设置项 `csh_eg_group_scroll` 可即时开关。
    初版教训（2026-10-16 晚）：误注入到 cshShoushaFx 的懒注入块里 —— 要等第一次击杀
    特效播放才生效，等于没装。E45 门禁已锚定"两处不得混居"。 */
+/* ★ 2026-10-17 · 势力面板「第二形态」识别（作者实机：斗地主也有势力面板，滚动条却没生效 = BUG）
+   ----------------------------------------------------------------------------
+   根因：旧选择器 `.dialog:has(.card.button)` 只认**卡牌形**势力按钮（神/魔「双势力」那种
+         带立绘的 vcard）。而另一些模式（斗地主等）的「请选择…势力」面板用的是**普通按钮**，
+         命中不到 ⇒ 面板一路溢出到屏幕外、没有滚动条。
+   修法：不再猜 DOM 形态，改为**运行时按内容判定**（三条判据任一：标题含「势力」/ 按钮 link 是
+         `group_*` / 按钮文字多数是 lib.group 的译名），命中后**直接写内联样式**并打 `.csh-egdlg`
+         ⇒ 与按钮形态、DOM 层级、模式全部无关。
+   ★ 2026-10-17 二次修正（作者：除身份模式外全失效）：观察器原本绑 `ui.arena` —— arena 元素
+     会随开局重建，绑旧元素等于挂在已摘除的节点上、永不触发。现改绑 `document.documentElement`，
+     并补「内联样式」兜底（不依赖 CSS 选择器深度 / 优先级）。
+   成本：只在新节点插入时做一次 closest('.dialog')，O(1)；没有全表轮询。 */
+var _cshEgMO = null;
+var _cshEgGroupNames = null;
+/* 势力译名集（用 lib.group + lib.translate 现算，不抄第二份名单）——用于「按按钮文字判定」 */
+function cshEgGroupNameSet() {
+    if (_cshEgGroupNames) return _cshEgGroupNames;
+    var set = {};
+    try {
+        var gs = (typeof lib !== "undefined" && lib.group) || [];
+        for (var i = 0; i < gs.length; i++) {
+            var g = gs[i];
+            set[g] = 1;
+            try { var tn = lib.translate && lib.translate[g]; if (tn) set[String(tn)] = 1; } catch (e1) {}
+        }
+    } catch (e0) {}
+    _cshEgGroupNames = set;
+    return set;
+}
+/* 是不是「选势力」面板：三条判据任一命中即可（覆盖不同内核/模式/按钮形态） */
+function cshEgIsGroupDialog(dlg) {
+    try {
+        var caps = dlg.querySelectorAll(".caption");
+        for (var c = 0; c < caps.length; c++) {
+            if ((caps[c].textContent || "").indexOf("势力") >= 0) return true;
+        }
+    } catch (eC) {}
+    var btns;
+    try { btns = dlg.querySelectorAll(".buttons .button"); } catch (eB) { return false; }
+    if (!btns || !btns.length) return false;
+    var names = cshEgGroupNameSet(), hit = 0;
+    for (var j = 0; j < btns.length; j++) {
+        var lk = btns[j].link;
+        if (lk && typeof lk[2] === "string" && lk[2].indexOf("group_") === 0) return true;
+        var tx = (btns[j].textContent || "").trim();
+        if (tx && names[tx]) hit++;
+    }
+    return hit >= 3 && hit * 2 >= btns.length;
+}
+/* ★ 直接写内联样式（不靠 CSS 选择器的 `>` / :has / 优先级）：结构怎么变都按得住 */
+function cshEgStyleGroupDialog(dlg) {
+    try {
+        dlg.style.maxHeight = "70vh";
+        dlg.style.overflow = "hidden";
+        dlg.style.overscrollBehavior = "contain";
+        var boxes = dlg.querySelectorAll(".content-container");
+        if (!boxes.length) boxes = dlg.querySelectorAll(".content");
+        for (var i = 0; i < boxes.length; i++) {
+            var c = boxes[i];
+            if (!c || !c.style) continue;
+            c.style.overflowY = "auto";
+            c.style.overflowX = "auto";
+            c.style.webkitOverflowScrolling = "touch";
+            c.style.overscrollBehavior = "contain";
+            c.style.scrollbarColor = "rgba(255,255,255,.45) rgba(0,0,0,.22)";
+        }
+    } catch (eS) {}
+}
+function cshEgTryTag(el) {
+    try {
+        if (!el || el.nodeType !== 1) return;
+        var dlg = (el.classList && el.classList.contains("dialog")) ? el
+            : (el.closest ? el.closest(".dialog") : null);
+        if (!dlg || dlg.classList.contains("csh-egdlg")) return;
+        if (!cshEgIsGroupDialog(dlg)) return;
+        dlg.classList.add("csh-egdlg");
+        cshEgStyleGroupDialog(dlg);
+        try {
+            if (lib.cshDebug && typeof lib.cshDebug.info === "function")
+                lib.cshDebug.info("eg-scroll 命中势力面板 · dialog=[" + dlg.className + "] 挂点=[" +
+                    ((dlg.parentNode && dlg.parentNode.className) || "?") + "] content-container=" +
+                    (dlg.querySelector(".content-container") ? "有" : "无") + " 按钮数=" +
+                    dlg.querySelectorAll(".buttons .button").length);
+        } catch (eD) {}
+    } catch (eT) {}
+}
+function cshEgGroupObserve(on) {
+    try {
+        if (_cshEgMO) { _cshEgMO.disconnect(); _cshEgMO = null; }
+        if (!on || typeof window === "undefined" || !window.MutationObserver) return;
+        /* ★ 监听 documentElement 而不是 ui.arena：arena 元素可能随开局被重建，
+           若绑在旧元素上，观察器等于挂在一个已摘除的节点上、永不触发
+           （这正是「身份模式生效、其他模式全失效」的最强嫌疑）。 */
+        _cshEgMO = new MutationObserver(function (muts) {
+            for (var i = 0; i < muts.length; i++) {
+                var added = muts[i].addedNodes;
+                for (var j = 0; j < added.length; j++) cshEgTryTag(added[j]);
+            }
+        });
+        _cshEgMO.observe(document.documentElement, { childList: true, subtree: true });
+        /* 首扫一次（进入本局前可能已有面板在场） */
+        var ds = document.querySelectorAll(".dialog");
+        for (var k = 0; k < ds.length; k++) cshEgTryTag(ds[k]);
+    } catch (eO) {}
+}
 function cshEgScrollApply(force) {
     try {
         var on = (force === undefined)
@@ -42,6 +147,11 @@ function cshEgScrollApply(force) {
             var st = document.createElement("style");
             st.id = "csh_eg_scroll_css";
             var dlgSel = ".csh-egsc .dialog:not(.fullheight):has(.card.button)";
+            /* 滚动阴影（local 随内容滚 + scroll 固定两层）：卡牌形与 .csh-egdlg 两套规则共用一份 */
+            var scbg = "background:linear-gradient(rgba(0,0,0,.22),rgba(0,0,0,0)) 0 0/100% 14px no-repeat local,"
+                + "linear-gradient(rgba(0,0,0,0),rgba(0,0,0,.22)) 0 100%/100% 14px no-repeat local,"
+                + "radial-gradient(farthest-side at 50% 0,rgba(0,0,0,.30),rgba(0,0,0,0)) 0 0/100% 7px no-repeat scroll,"
+                + "radial-gradient(farthest-side at 50% 100%,rgba(0,0,0,.30),rgba(0,0,0,0)) 0 100%/100% 7px no-repeat scroll";
             st.textContent = [
                 /* ④ 对话框本体封顶（内联 height 由引擎/十周年UI 写死，max-height 独立生效兜底）+
                    overflow:hidden 使其成为滚动链终点：滚轮在标题/空白处也不会把滚动冒泡给
@@ -67,10 +177,21 @@ function cshEgScrollApply(force) {
                 /* 旧内核兜底（无 :has 时放弃卡牌门控，非 fullheight 对话框同能力） */
                 "@supports not selector(:has(*)){.csh-egsc .dialog:not(.fullheight){max-height:70vh;overflow:hidden}"
                 + ".csh-egsc .dialog:not(.fullheight)>.content-container{overflow-y:auto;overflow-x:hidden}}",
+                /* ★ 2026-10-17 · 势力面板「第二形态」（普通按钮，如斗地主）：靠 JS 打上的
+                   .csh-egdlg 标记命中。用**后代**选择器（不写 `>`）以覆盖结构差异；
+                   这条与卡牌形规则互不干扰（标记是 JS 精确判定的）。 */
+                ".csh-egsc .csh-egdlg{max-height:70vh;overflow:hidden;overscroll-behavior:contain}",
+                ".csh-egsc .csh-egdlg .content-container{overflow-y:auto;overflow-x:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;"
+                + "scrollbar-color:rgba(255,255,255,.45) rgba(0,0,0,.22);" + scbg + "}",
+                ".csh-egsc .csh-egdlg .content-container::-webkit-scrollbar{width:10px;height:10px}",
+                ".csh-egsc .csh-egdlg .content-container::-webkit-scrollbar-track{background:rgba(0,0,0,.22);border-radius:5px}",
+                ".csh-egsc .csh-egdlg .content-container::-webkit-scrollbar-thumb{background:rgba(255,255,255,.45);border-radius:5px}",
+                ".csh-egsc .csh-egdlg .content-container::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.68)}",
             ].join("");
             document.head.appendChild(st);
         }
         document.documentElement.classList.toggle("csh-egsc", on);
+        cshEgGroupObserve(on);
         try { lib.__cshEgScrollApply = cshEgScrollApply; } catch (eL) {}
     } catch (e) { /* 兼容注入失败绝不阻断 content */ }
 }

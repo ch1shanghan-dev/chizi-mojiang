@@ -494,7 +494,7 @@ mode_boss 包**（v3 手工塞 = 绕过引擎 → 条目形态不一致 → opti
 | --- | --- | --- | --- |
 | ① 标题宋 | `--ff-title` | `Noto Serif SC / Source Han Serif SC / Songti SC / STSong / SimSun / serif` | 角色名 / 区块标题 / 官阶名 / 大数字 |
 | ② 正文黑 | `--ff-body` | `Noto Sans SC / PingFang SC / Microsoft YaHei / system-ui / sans-serif` | 正文 / 台词 / 说明 / 按钮 |
-| ③ 数字牌 | `--ff-num` | `ui-monospace / Cascadia Mono / Consolas / SF Mono / Menlo / monospace`（+ `tabular-nums`） | 金额 / 价格 / 计数 |
+| ③ 数字牌 | `--ff-num` | `"Times New Roman", Times, "Nimbus Roman", "Songti SC", serif` | 金额 / 价格 / 计数 |
 | ④ 书法点缀 | `--ff-callig` | **`ZMX3`（自建全覆盖子集）** + `Zhi Mang Xing / Kaiti SC / STKaiti / KaiTi` + ① | 招牌字 / 封面书名 / 卷号 / 序跋大字 |
 
 - **新制 `font/csh_fx_font_3.woff2`（1.23MB / 4058 字）**：由**开源字体 Zhi Mang Xing 完整版**

@@ -35,10 +35,10 @@
 | --- | --- | --- | --- |
 | ① 标题宋 | `--ff-title` | `"Noto Serif SC","Source Han Serif SC","Songti SC","STSong","SimSun",serif` | 页签菜单 / 区块标题 / 官阶名 / 大数字 |
 | ② 正文黑 | `--ff-body` | `"Noto Sans SC","PingFang SC","Microsoft YaHei",system-ui,sans-serif` | 正文 / 说明 / 按钮 / 普通标签 |
-| ③ 数字牌 | `--ff-num` | `ui-monospace,"Cascadia Mono",Consolas,"SF Mono",Menlo,monospace` | 余额 / 榜值 / 进度 / 计数 / 编号 |
+| ③ 数字牌 | `--ff-num` | `"Times New Roman",Times,"Nimbus Roman","Songti SC",serif` | 余额 / 榜值 / 进度 / 计数 / 编号 |
 
 **为什么是这三档**：中文界面里「宋 + 黑」的对比本身就是高级感来源 —— 标题有骨、正文稳当；
-数字单独一档是因为界面里所有数字都要**竖着对齐**（等宽 + `font-variant-numeric:tabular-nums`），
+数字单独一档是为了让界面里的数字**字形统一**（2026-10-17 作者指令：由等宽字体改为 Times 衬线数字），
 对齐这件事由字体解决，而不是逐处 `margin` 补。
 
 ### 4.2 字号标尺（单一基数派生 · 移动端优先）
