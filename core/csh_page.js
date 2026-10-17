@@ -30,6 +30,20 @@
 	function fmt(n) {
 		return String(Math.floor(Number(n) || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 	}
+
+	/* ---------- 同屏提示条数上限（2026-10-18 · 唯一真源） ----------
+	   同一个坑被四个页面**各自独立**发现过三遍，写法还都不一样（2 / 3 / 固定 3）：
+	     德州 texas：3 条在矮屏（手机横屏 ≤480px）向下生长约 120px，盖住公共牌与底池；
+	     斗地主：3 条从底部锚点上探进 .mid 出牌区，与「正在叫分…」视觉堆叠；
+	     黑杰克 / UNO：只写了固定 3，**矮屏这一档一直没跟上**；
+	     生涯 career：连上限都没有（领奖连发会一路堆到几百像素）。
+	   收敛成一个函数，页面不要再写魔数 —— 矮屏统一收一档，其它一律 3 条。
+	   （花市 goldfish 是"单条滚动替换"的另一种设计，不属于这个集合，保持原样。） */
+	function toastCap() {
+		var h = 0;
+		try { h = root.innerHeight || 0; } catch (e) {}
+		return (h && h <= 480) ? 2 : 3;
+	}
 	function lsGet(k) {
 		try { return (typeof localStorage !== "undefined" && localStorage) ? localStorage.getItem(k) : null; }
 		catch (e) { return null; }
@@ -349,5 +363,6 @@
 root.CSHPage = {
 		fmt: fmt, lsGet: lsGet, lsSet: lsSet, rnd: rnd, rndMs: rndMs, transport: transport,
 		statusOf: statusOf, say: say, sayThrottled: sayThrottled, QUIPS: QUIPS, seatAnchor: seatAnchor,
+		toastCap: toastCap,
 	};
 })(typeof window !== "undefined" ? window : this);

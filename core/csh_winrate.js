@@ -641,6 +641,67 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                 "#csh-wr-cards .wr-t2 .csh-wr-pct{font-size:12px!important;}",
                 "#csh-wr-cards .wr-m i{font-size:11px!important;margin-right:2px!important;}",
                 "}",
+                /* ============================================================
+                 * 导入 / 导出 / 清空浮层（2026-10-18）
+                 * 独立于 #csh-wr-panel：挂在遮罩上、盖住面板，所以 div/span 复位
+                 * 必须再写一份（引擎全局 div{display:inline-block;position:absolute}）。
+                 * 尺寸单位可用 vw/vh —— 本浮层挂在 documentElement 上，不参与 body 缩放。
+                 * ============================================================ */
+                "#csh-wr-io{position:absolute!important;left:0!important;top:0!important;width:100%!important;height:100%!important;z-index:9!important;",
+                "display:flex!important;align-items:center!important;justify-content:center!important;padding:14px!important;box-sizing:border-box!important;",
+                "background:rgba(4,3,2,.66)!important;-webkit-backdrop-filter:blur(2px)!important;backdrop-filter:blur(2px)!important;",
+                "animation:cshWrFade .16s ease-out!important;}",
+                "#csh-wr-io *{box-sizing:border-box!important;}",
+                "#csh-wr-io div{position:static!important;display:block!important;}",
+                "#csh-wr-io span{position:static!important;display:inline-block!important;}",
+                /* 选择器带两个 id：`#csh-wr-io div` 的 display:block!important 特异度更高，
+                   单写 #csh-wr-io-card 会被它压成 block（卡片就失去 flex 收缩能力） */
+                "#csh-wr-io #csh-wr-io-card{position:relative!important;display:flex!important;flex-direction:column!important;",
+                "width:min(94vw,620px)!important;max-height:min(88vh,780px)!important;overflow-y:auto!important;padding:16px 16px 14px!important;border-radius:16px!important;",
+                "background:linear-gradient(168deg,#1e1811 0%,#15110c 46%,#0b0a08 100%)!important;",
+                "border:1px solid rgba(216,180,106,.55)!important;box-shadow:0 30px 80px rgba(0,0,0,.82)!important;",
+                "animation:cshWrRise .2s cubic-bezier(.2,.8,.2,1)!important;}",
+                "#csh-wr-io-title{font-size:17px!important;font-weight:700!important;letter-spacing:2px!important;color:#f6e5b6!important;margin:0 0 6px!important;}",
+                "#csh-wr-io-title.danger{color:#f2b9c2!important;}",
+                "#csh-wr-io-tip{font-size:12.5px!important;line-height:1.75!important;color:#9d947e!important;margin:0 0 10px!important;}",
+                "#csh-wr-io-text,#csh-wr-io-input{width:100%!important;margin:0 0 8px!important;padding:10px 12px!important;",
+                "border-radius:10px!important;border:1px solid rgba(216,180,106,.35)!important;background:rgba(0,0,0,.46)!important;",
+                "color:#ece5d6!important;font-size:13px!important;line-height:1.6!important;-webkit-text-fill-color:#ece5d6!important;}",
+                /* 长 JSON 必须多行显示：pre-wrap + break-all，横向永不出现「一条线」 */
+                "#csh-wr-io-text{flex:1 1 auto!important;min-height:150px!important;height:34vh!important;max-height:46vh!important;resize:vertical!important;",
+                "font-family:Consolas,Menlo,monospace!important;font-size:12.5px!important;white-space:pre-wrap!important;word-break:break-all!important;",
+                "overflow:auto!important;-webkit-overflow-scrolling:touch!important;overscroll-behavior:contain!important;}",
+                "#csh-wr-io-text[disabled]{opacity:.72!important;}",
+                "#csh-wr-io-input{flex:0 0 auto!important;height:44px!important;text-align:center!important;letter-spacing:4px!important;}",
+                "#csh-wr-io-text:focus,#csh-wr-io-input:focus{outline:none!important;border-color:rgba(216,180,106,.85)!important;}",
+                "#csh-wr-io-stat{min-height:20px!important;font-size:12px!important;line-height:1.6!important;color:#8b8271!important;",
+                "margin:0 0 10px!important;word-break:break-all!important;}",
+                "#csh-wr-io-stat.ok{color:#8fe6cf!important;}",
+                "#csh-wr-io-stat.bad{color:#f0a3b0!important;}",
+                "#csh-wr-io #csh-wr-io-acts{display:flex!important;flex-wrap:wrap!important;justify-content:flex-end!important;gap:10px!important;}",
+                "#csh-wr-io .csh-wr-iobtn{display:inline-block!important;cursor:pointer!important;padding:11px 20px!important;min-height:44px!important;",
+                "border-radius:999px!important;border:1px solid rgba(216,180,106,.3)!important;color:#e3d6b2!important;font-size:13.5px!important;letter-spacing:1px!important;",
+                "background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.015))!important;",
+                "transition:border-color .16s ease,background .16s ease!important;}",
+                "#csh-wr-io .csh-wr-iobtn:hover{border-color:rgba(216,180,106,.8)!important;background:linear-gradient(180deg,rgba(216,180,106,.2),rgba(216,180,106,.05))!important;}",
+                "#csh-wr-io .csh-wr-iobtn.primary{color:#221a0c!important;font-weight:700!important;border-color:rgba(216,180,106,.85)!important;",
+                "background:linear-gradient(180deg,#f4dfa8,#cfa958)!important;}",
+                "#csh-wr-io .csh-wr-iobtn.danger{color:#f2b9c2!important;border-color:rgba(214,110,124,.5)!important;",
+                "background:linear-gradient(180deg,rgba(214,110,124,.18),rgba(214,110,124,.04))!important;}",
+                "#csh-wr-io .csh-wr-iobtn.dis{opacity:.32!important;pointer-events:none!important;}",
+                "@media (max-width:600px){",
+                "#csh-wr-io{padding:8px!important;}",
+                "#csh-wr-io #csh-wr-io-card{width:100%!important;max-height:94vh!important;padding:14px 13px 12px!important;}",
+                "#csh-wr-io-text{height:40vh!important;max-height:none!important;}",
+                "#csh-wr-io #csh-wr-io-acts{justify-content:stretch!important;}",
+                "#csh-wr-io #csh-wr-io-acts .csh-wr-iobtn{flex:1 1 auto!important;text-align:center!important;}",
+                "}",
+                /* 矮窗（手机横屏 360~470 高）：文本域再收一档，保证底部按钮不被挤出屏幕。
+                   紧凑断点用 max-height 而不是宽度 —— 915×412 比 900px 桌面断点还宽。 */
+                "@media (max-height:470px){",
+                "#csh-wr-io #csh-wr-io-text{height:30vh!important;min-height:110px!important;}",
+                "#csh-wr-io #csh-wr-io-card{max-height:96vh!important;}",
+                "}",
             ].join("");
             (document.head||document.documentElement).appendChild(st);
         }
@@ -776,80 +837,313 @@ function filterBar(){
         +'<span class="csh-wr-danger" data-act="clearall">清空全部</span>'
         +'</div>';
 }
-        // 导入 / 导出：数据 = lib.config[STAT_KEY]，导出为带版本号的 JSON 文本（复制/粘贴即可）。
-        function exportData(){
-            var d=readData();
-            var payload={__csh:"winrate",ver:1,data:d};
-            var json=JSON.stringify(payload);
-            // 复制到剪贴板
-            var ok=false;
-            try{
-                var ta=document.createElement("textarea");
-                ta.value=json;
-                ta.style.position="fixed";ta.style.left="-9999px";ta.style.top="0";
-                document.body.appendChild(ta);
-                ta.focus();ta.select();
-                ok=document.execCommand("copy");
-                document.body.removeChild(ta);
-            }catch(e){ ok=false; }
-            if(ok){
-                alert("胜负统计已复制到剪贴板（JSON 文本）。\n\n到另一台设备「导入」时，粘贴这段文本即可。");
-            }else{
-                alert("自动复制失败，请手动复制下面这段文本：\n\n"+json);
+        /* ============================================================
+           导入 / 导出（2026-10-18 重做）
+           ------------------------------------------------------------
+           旧实现用 window.prompt + window.alert：
+             · Electron 渲染进程**不支持 prompt** ⇒ 点「导入」直接抛
+               “prompt() is not supported.”（作者 PC 截图），功能完全不可用；
+             · 手机/浏览器虽支持，但 prompt 是**单行**输入框，几 KB 的 JSON
+               被压成一条线，看不见也改不了（作者手机截图）。
+           新实现 = 面板内浮层：多行 textarea + 实时校验 + 合并结果回显；
+           导出同样走浮层（可复制 / 桌面端可下载 .json），不再用 alert 塞长文本。
+           ============================================================ */
+        var ioLayer=null;
+        function closeIO(){
+            if(ioLayer){
+                try{ if(ioLayer.parentNode) ioLayer.parentNode.removeChild(ioLayer); }catch(e){}
+                ioLayer=null;
             }
         }
-        function importData(){
-            var raw=prompt("请粘贴之前导出的胜负统计 JSON 文本：","");
-            if(raw==null) return;
-            raw=(raw||"").trim();
-            if(!raw){ alert("未输入内容"); return; }
+        function ioStat(msg,tone){
+            var el=ioLayer&&ioLayer.querySelector("#csh-wr-io-stat");
+            if(!el) return;
+            el.className=tone||"";
+            el.textContent=msg||"";
+        }
+        function fmtSize(str){
+            var n=0;
+            try{ n=String(str).length; }catch(e){}
+            return n>=1024?(n/1024).toFixed(1)+" KB":n+" 字符";
+        }
+        function legacyCopy(txt){
+            var ta=null;
             try{
-                var p=JSON.parse(raw);
-                if(!p||p.__csh!=="winrate"||!p.data||typeof p.data!=="object"){
-                    alert("导入失败：这不是有效的胜负统计导出数据。");
+                ta=document.createElement("textarea");
+                ta.value=txt;
+                ta.setAttribute("readonly","readonly");
+                ta.style.cssText="position:fixed;left:-9999px;top:0;opacity:0;";
+                document.body.appendChild(ta);
+                ta.select();
+                try{ ta.setSelectionRange(0,ta.value.length); }catch(eSel){}
+                var ok=document.execCommand("copy");
+                document.body.removeChild(ta);
+                return ok;
+            }catch(e){
+                try{ if(ta&&ta.parentNode) ta.parentNode.removeChild(ta); }catch(e2){}
+                return false;
+            }
+        }
+        function copyText(txt,cb){
+            var done=false;
+            function fin(ok){ if(done) return; done=true; cb(!!ok); }
+            try{
+                if(navigator.clipboard&&typeof navigator.clipboard.writeText==="function"){
+                    navigator.clipboard.writeText(txt).then(function(){ fin(true); },function(){ fin(legacyCopy(txt)); });
                     return;
                 }
-                // 合并策略：逐模式逐角色累加，而不是覆盖（避免误操作清空现有记录）
-                var cur=readData();
-                function mergeBucket(src,dst){
-                    for(var n in src){
-                        if(!src.hasOwnProperty(n)) continue;
-                        var se=src[n];
-                        if(!se||typeof se!=="object"||Array.isArray(se)) continue;
-                        if(!dst[n]) dst[n]={games:0,win:0,lose:0,damage:0,damaged:0,gain:0,discard:0,kill:0};
-                        ["games","win","lose","damage","damaged","gain","discard","kill"].forEach(function(k){
-                            if(typeof se[k]=="number"&&isFinite(se[k])&&se[k]>0) dst[n][k]=(dst[n][k]||0)+se[k];
-                        });
+            }catch(e){}
+            fin(legacyCopy(txt));
+        }
+        function payloadSummary(p){
+            var n=0,g=0,d=(p&&p.data)||{};
+            ["identity","versus","doudizhu","guozhan"].forEach(function(mk){
+                var b=d[mk];
+                if(!b||typeof b!=="object"||Array.isArray(b)) return;
+                for(var k in b){
+                    if(!b.hasOwnProperty(k)) continue;
+                    var e=b[k];
+                    if(!e||typeof e!=="object"||Array.isArray(e)) continue;
+                    n++;
+                    g+=(typeof e.games==="number"&&isFinite(e.games)?e.games:0);
+                }
+            });
+            return {chars:n,games:g};
+        }
+        function parsePayload(raw){
+            raw=String(raw==null?"":raw).trim();
+            if(!raw) return {ok:false,error:"尚未粘贴内容。"};
+            var p;
+            try{ p=JSON.parse(raw); }
+            catch(e){ return {ok:false,error:"JSON 解析失败："+((e&&e.message)||e)}; }
+            if(!p||p.__csh!=="winrate"||!p.data||typeof p.data!=="object"||Array.isArray(p.data)){
+                return {ok:false,error:"这不是胜负统计的导出数据（缺少 __csh=\"winrate\" 标记）。"};
+            }
+            return {ok:true,payload:p};
+        }
+        /* 合并策略：逐模式逐角色累加，而不是覆盖（避免误操作清空现有记录）。
+           只接受已知数值字段，且只累加正数 —— 负数/NaN 是脏数据，不入账。 */
+        function mergePayload(p){
+            var cur=readData();
+            var touched=0,games=0;
+            function mergeBucket(src,dst,count){
+                for(var n in src){
+                    if(!src.hasOwnProperty(n)) continue;
+                    var se=src[n];
+                    if(!se||typeof se!=="object"||Array.isArray(se)) continue;
+                    if(!dst[n]) dst[n]={games:0,win:0,lose:0,damage:0,damaged:0,gain:0,discard:0,kill:0};
+                    ["games","win","lose","damage","damaged","gain","discard","kill"].forEach(function(k){
+                        if(typeof se[k]==="number"&&isFinite(se[k])&&se[k]>0) dst[n][k]=(dst[n][k]||0)+se[k];
+                    });
+                    if(count){
+                        touched++;
+                        games+=(typeof se.games==="number"&&isFinite(se.games)?se.games:0);
                     }
                 }
-                // 顶层模式桶（identity/versus/doudizhu/guozhan）
-                ["identity","versus","doudizhu","guozhan"].forEach(function(mk){
-                    if(p.data[mk]&&typeof p.data[mk]=="object") mergeBucket(p.data[mk],cur[mk]||(cur[mk]={}));
+            }
+            ["identity","versus","doudizhu","guozhan"].forEach(function(mk){
+                if(p.data[mk]&&typeof p.data[mk]==="object"&&!Array.isArray(p.data[mk])){
+                    mergeBucket(p.data[mk],cur[mk]||(cur[mk]={}),true);
+                }
+            });
+            if(p.data.camps&&typeof p.data.camps==="object"&&!Array.isArray(p.data.camps)){
+                if(!cur.camps||typeof cur.camps!=="object") cur.camps={};
+                mergeBucket(p.data.camps,cur.camps,false);
+            }
+            if(p.data.me&&typeof p.data.me==="object"){
+                if(!cur.me||typeof cur.me!=="object") cur.me={};
+                ["chars","camps"].forEach(function(k){
+                    if(p.data.me[k]&&typeof p.data.me[k]==="object"&&!Array.isArray(p.data.me[k])){
+                        if(!cur.me[k]||typeof cur.me[k]!=="object") cur.me[k]={};
+                        mergeBucket(p.data.me[k],cur.me[k],false);
+                    }
                 });
-                // camps
-                if(p.data.camps&&typeof p.data.camps=="object"){
-                    if(!cur.camps||typeof cur.camps!=="object") cur.camps={};
-                    mergeBucket(p.data.camps,cur.camps);
+            }
+            game.saveConfig(STAT_KEY,cur);
+            return {chars:touched,games:games};
+        }
+        /* 浮层骨架：html 里必须有 #csh-wr-io-text（或 #csh-wr-io-input）、#csh-wr-io-stat、
+           #csh-wr-io-acts；点击 [data-act] 交给 onAct（Close 由这里统一处理）。 */
+        function openIO(html,value,onAct){
+            closeIO();
+            var host=wr.dialog||uiHost();
+            if(!host) return null;
+            var layer=document.createElement("div");
+            layer.id="csh-wr-io";
+            layer.innerHTML='<div id="csh-wr-io-card">'+html+'</div>';
+            host.appendChild(layer);
+            ioLayer=layer;
+            var ta=layer.querySelector("#csh-wr-io-text");
+            if(ta&&value!=null) ta.value=value;
+            layer.addEventListener("click",function(e){
+                var t=e.target;
+                while(t&&t!==layer&&!(t.getAttribute&&t.getAttribute("data-act"))) t=t.parentNode;
+                if(!t||t===layer){
+                    if(e.target===layer) closeIO();
+                    return;
                 }
-                // me.chars / me.camps
-                if(p.data.me&&typeof p.data.me=="object"){
-                    if(!cur.me||typeof cur.me!=="object") cur.me={};
-                    ["chars","camps"].forEach(function(k){
-                        if(p.data.me[k]&&typeof p.data.me[k]=="object"){
-                            if(!cur.me[k]||typeof cur.me[k]!=="object") cur.me[k]={};
-                            mergeBucket(p.data.me[k],cur.me[k]);
-                        }
-                    });
+                var act=t.getAttribute("data-act");
+                if(act==="io-close"){ closeIO(); return; }
+                try{ if(onAct) onAct(act,layer,ta); }
+                catch(err){ ioStat("操作失败："+((err&&err.message)||err),"bad"); }
+            });
+            return layer;
+        }
+        function downloadJSON(json){
+            try{
+                var blob=new Blob([json],{type:"application/json;charset=utf-8"});
+                var url=URL.createObjectURL(blob);
+                var a=document.createElement("a");
+                a.href=url;
+                a.download="池子魔将-胜负统计.json";
+                a.style.display="none";
+                document.body.appendChild(a);
+                a.click();
+                setTimeout(function(){
+                    try{ if(a.parentNode) a.parentNode.removeChild(a); URL.revokeObjectURL(url); }catch(e){}
+                },1200);
+                ioStat("已发出下载请求；若没有弹出保存框，请改用「复制文本」。","ok");
+            }catch(e){
+                ioStat("下载失败："+((e&&e.message)||e)+"，请改用「复制文本」。","bad");
+            }
+        }
+        function pasteTo(ta,after){
+            if(!ta) return;
+            function fallback(msg){
+                try{ ta.focus(); }catch(e){}
+                ioStat(msg||"请长按文本框，用系统菜单粘贴。","");
+            }
+            try{
+                if(navigator.clipboard&&typeof navigator.clipboard.readText==="function"){
+                    navigator.clipboard.readText().then(function(txt){
+                        if(!txt){ fallback("剪贴板是空的，请长按文本框手动粘贴。"); return; }
+                        ta.value=txt;
+                        /* 直接回调刷新：不依赖 Event 构造器（老 WebView 可能没有） */
+                        if(typeof after==="function"){ try{ after(); }catch(eR){} }
+                        else { try{ ta.dispatchEvent(new Event("input",{bubbles:true})); }catch(eD){} }
+                        try{ ta.focus(); }catch(e2){}
+                    },function(){ fallback("系统不允许读取剪贴板，请长按文本框手动粘贴。"); });
+                    return;
                 }
-                game.saveConfig(STAT_KEY,cur);
-                alert("导入完成：数据已与现有记录合并累加。");
-                if(wr.dialog){
-                    // 重新渲染当前面板
+            }catch(e){}
+            fallback();
+        }
+        function exportData(){
+            var payload={__csh:"winrate",ver:1,data:readData()};
+            var json=JSON.stringify(payload);
+            var sum=payloadSummary(payload);
+            var desktop=false;
+            try{ desktop=!lib.config.touchscreen; }catch(e){}
+            openIO(
+                '<div id="csh-wr-io-title">导出胜负统计</div>'
+                +'<div id="csh-wr-io-tip">共 '+sum.chars+' 名武将 · '+sum.games+' 场记录 · 文本 '+fmtSize(json)
+                +'。复制后到另一台设备的「导入」里粘贴即可（导入按场次累加，不会覆盖现有记录）。</div>'
+                +'<textarea id="csh-wr-io-text" readonly spellcheck="false"></textarea>'
+                +'<div id="csh-wr-io-stat">桌面端点「复制文本」；手机端长按文本框 → 全选 → 复制。</div>'
+                +'<div id="csh-wr-io-acts">'
+                +'<span class="csh-wr-iobtn primary" data-act="io-copy">复制文本</span>'
+                +(desktop?'<span class="csh-wr-iobtn" data-act="io-download">下载 .json</span>':'')
+                +'<span class="csh-wr-iobtn" data-act="io-close">关 闭</span>'
+                +'</div>',
+                json,
+                function(act){
+                    if(act==="io-copy"){
+                        copyText(json,function(ok){
+                            ioStat(ok?"已复制到剪贴板。":"复制失败，请长按文本框手动全选复制。",ok?"ok":"bad");
+                        });
+                    }
+                    else if(act==="io-download") downloadJSON(json);
+                }
+            );
+        }
+        function importData(){
+            openIO(
+                '<div id="csh-wr-io-title">导入胜负统计</div>'
+                +'<div id="csh-wr-io-tip">把之前「导出」得到的 JSON 文本粘贴到下面。导入按场次累加，不会覆盖现有记录。</div>'
+                +'<textarea id="csh-wr-io-text" spellcheck="false" placeholder="在这里粘贴 JSON 文本…"></textarea>'
+                +'<div id="csh-wr-io-stat">尚未粘贴内容。</div>'
+                +'<div id="csh-wr-io-acts">'
+                +'<span class="csh-wr-iobtn" data-act="io-paste">从剪贴板粘贴</span>'
+                +'<span class="csh-wr-iobtn" data-act="io-cancel">取 消</span>'
+                +'<span class="csh-wr-iobtn primary dis" data-act="io-import" id="csh-wr-io-ok">导入并合并</span>'
+                +'</div>',
+                "",
+                function(act,layer,ta){
+                    if(act==="io-paste"){ pasteTo(ta,refresh); return; }
+                    if(act==="io-cancel"){ closeIO(); return; }
+                    if(act!=="io-import") return;
+                    var res=parsePayload(ta.value);
+                    if(!res.ok){ ioStat(res.error,"bad"); return; }
+                    var added=mergePayload(res.payload);
+                    wr.page=0;
                     var root=document.getElementById("csh-wr-root");
                     if(root) render(root);
+                    try{ ta.disabled=true; }catch(eD){}
+                    var acts=layer.querySelector("#csh-wr-io-acts");
+                    if(acts) acts.innerHTML='<span class="csh-wr-iobtn primary" data-act="io-close">完 成</span>';
+                    ioStat("导入完成：已合并 "+added.chars+" 名武将 · "+added.games+" 场（与现有记录累加）。","ok");
                 }
-            }catch(e){
-                alert("导入失败：JSON 格式错误。\n"+((e&&e.message)||e));
+            );
+            if(!ioLayer) return;
+            var ta=ioLayer.querySelector("#csh-wr-io-text");
+            var okBtn=ioLayer.querySelector("#csh-wr-io-ok");
+            function refresh(){
+                var raw=ta?ta.value:"";
+                if(!String(raw||"").trim()){
+                    ioStat("尚未粘贴内容。","");
+                    if(okBtn) okBtn.classList.add("dis");
+                    return;
+                }
+                var res=parsePayload(raw);
+                if(!res.ok){
+                    ioStat(res.error,"bad");
+                    if(okBtn) okBtn.classList.add("dis");
+                    return;
+                }
+                var s=payloadSummary(res.payload);
+                ioStat("已识别："+s.chars+" 名武将 · "+s.games+" 场记录。点「导入并合并」开始。","ok");
+                if(okBtn) okBtn.classList.remove("dis");
+            }
+            if(ta) ta.addEventListener("input",refresh);
+            refresh();
+            /* 桌面端直接把光标放进文本框（省一次点击）；手机端不抢焦点，避免软键盘顶掉浮层 */
+            try{
+                if(!lib.config.touchscreen) setTimeout(function(){ try{ ta.focus(); }catch(e){ } },30);
+            }catch(e){}
+        }
+        /* 清空全部：旧实现用 prompt 让人输入「确认」，Electron 下同样不可用。
+           这里换成浮层输入框，语义不变（必须打出「确认」二字才可执行）。 */
+        function openClearAll(root){
+            openIO(
+                '<div id="csh-wr-io-title" class="danger">清空全部胜负统计</div>'
+                +'<div id="csh-wr-io-tip">将清空全部武将战绩、阵营胜率与玩家操控数据（不含钱包 / AI 世界 / 成就），且无法撤销。<br>如需继续，请在下面输入「确认」二字。</div>'
+                +'<input id="csh-wr-io-input" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="输入 确认">'
+                +'<div id="csh-wr-io-stat">仅清空胜负统计。</div>'
+                +'<div id="csh-wr-io-acts">'
+                +'<span class="csh-wr-iobtn" data-act="io-close">取 消</span>'
+                +'<span class="csh-wr-iobtn danger dis" data-act="io-confirm" id="csh-wr-io-ok">清 空</span>'
+                +'</div>',
+                null,
+                function(act,layer){
+                    if(act!=="io-confirm") return;
+                    var inp=layer.querySelector("#csh-wr-io-input");
+                    if(!inp||inp.value.trim()!=="确认"){ ioStat("请输入「确认」二字后再清空。","bad"); return; }
+                    game.saveConfig(STAT_KEY,{});
+                    wr.page=0;
+                    render(root);
+                    closeIO();
+                }
+            );
+            if(!ioLayer) return;
+            var inp=ioLayer.querySelector("#csh-wr-io-input");
+            var ok=ioLayer.querySelector("#csh-wr-io-ok");
+            if(inp){
+                inp.addEventListener("input",function(){
+                    var ready=inp.value.trim()==="确认";
+                    if(ok) ok.classList.toggle("dis",!ready);
+                    ioStat(ready?"确认无误，点「清空」将删除全部战绩。":"仅清空胜负统计，输入「确认」后可继续。",ready?"bad":"");
+                });
+                setTimeout(function(){ try{ inp.focus(); }catch(e){} },30);
             }
         }
         function pageBar(pages,withReset){
@@ -1094,10 +1388,19 @@ function filterBar(){
             root.innerHTML=html.join("");
         }
         function closePanel(){
+            closeIO();
             if(wr.dialog){
                 try{ if(wr.dialog.parentNode) wr.dialog.parentNode.removeChild(wr.dialog); }catch(e){}
                 wr.dialog=null;
             }
+        }
+        /* 原生 confirm 的替身：优先走界面基座（自绘、层级/触屏/文案都可控）；
+           基座缺席时退回原生 confirm（功能不残）。 */
+        function uiConfirm(opts,cb){
+            try{
+                if(lib.cshUI&&typeof lib.cshUI.confirm==="function"){ lib.cshUI.confirm(opts,cb); return; }
+            }catch(e){}
+            try{ cb(!!confirm(String((opts&&opts.message)||""))); }catch(e2){ cb(false); }
         }
         /* D1 单条删除（联动 me.chars，避免两页数据打架）+ D4 撤销快照 */
         function delChar(name,root){
@@ -1105,15 +1408,22 @@ function filterBar(){
             var e=(d[wr.mode]||{})[name];
             if(!e) return;
             var summary="场次 "+e.games+" · 胜 "+e.win+" · 负 "+e.lose+" · 胜率 "+fmtPct(rateOf(e))+" · 场均击杀 "+fmtNum(e.games?e.kill/e.games:0);
-            if(!confirm("确定删除【"+cname(name)+"】在「"+MODE_NAMES[wr.mode]+"」的战绩吗？\n"+summary+"\n删除后不可恢复（可点「撤销」）。")) return;
-            wr._undo=JSON.parse(JSON.stringify(d));               // D4：内存级快照（不落盘）
-            delete d[wr.mode][name];
-            if(d.me&&d.me.chars){ delete d.me.chars[name]; if(!Object.keys(d.me.chars).length) delete d.me.chars; }
-            if(d.me&&!Object.keys(d.me).length) delete d.me;
-            game.saveConfig(STAT_KEY,d);
-            render(root);
-            if(wr._undoTimer) clearTimeout(wr._undoTimer);
-            wr._undoTimer=setTimeout(function(){ wr._undo=null; },8000);   // 8 秒后撤销失效
+            uiConfirm({
+                title:"删除武将战绩",
+                message:"确定删除【"+cname(name)+"】在「"+MODE_NAMES[wr.mode]+"」的战绩吗？\n"+summary+"\n删除后不可恢复（可点「撤销」）。",
+                ok:"删除",
+                danger:true,
+            },function(ok){
+                if(!ok) return;
+                wr._undo=JSON.parse(JSON.stringify(d));               // D4：内存级快照（不落盘）
+                delete d[wr.mode][name];
+                if(d.me&&d.me.chars){ delete d.me.chars[name]; if(!Object.keys(d.me.chars).length) delete d.me.chars; }
+                if(d.me&&!Object.keys(d.me).length) delete d.me;
+                game.saveConfig(STAT_KEY,d);
+                render(root);
+                if(wr._undoTimer) clearTimeout(wr._undoTimer);
+                wr._undoTimer=setTimeout(function(){ wr._undo=null; },8000);   // 8 秒后撤销失效
+            });
         }
         // Esc 关闭：全局只绑一次，面板不存在时直接放行，不干扰引擎其它快捷键
         function bindEsc(){
@@ -1124,6 +1434,8 @@ function filterBar(){
                     if(e.key!=="Escape"&&e.keyCode!==27) return;
                     if(!document.getElementById("csh-wr-overlay")) return;
                     try{ e.preventDefault(); e.stopPropagation(); }catch(_e){}
+                    /* 导入/导出/清空浮层开着时，Esc 只关浮层，不连面板一起关 */
+                    if(document.getElementById("csh-wr-io")){ closeIO(); return; }
                     closePanel();
                 },true);
             }catch(_e2){}
@@ -1162,13 +1474,19 @@ function filterBar(){
                 else if(act=="prev"){ if(wr.page>0){ wr.page--; render(root); } }
                 else if(act=="next"){ wr.page++; render(root); }
                 else if(act=="resetcamps"){
-                    if(confirm("确定清空阵营胜率数据吗？\n（含全场阵营与你自己的阵营战绩，武将排行与角色胜率排行不受影响）")){
+                    uiConfirm({
+                        title:"重置阵营数据",
+                        message:"确定清空阵营胜率数据吗？\n（含全场阵营与你自己的阵营战绩，武将排行与角色胜率排行不受影响）",
+                        ok:"重置",
+                        danger:true,
+                    },function(ok){
+                        if(!ok) return;
                         var d=readData();
                         delete d.camps;
                         if(d.me){ delete d.me.camps; if(!Object.keys(d.me).length) delete d.me; }
                         game.saveConfig(STAT_KEY,d);
                         render(root);
-                    }
+                    });
                 }
                 else if(act=="mingames"){
                     var g=parseInt(val,10);
@@ -1179,17 +1497,20 @@ function filterBar(){
                     if(wr._undo){ game.saveConfig(STAT_KEY,wr._undo); wr._undo=null; render(root); }
                 }
                 else if(act=="clearmode"){
-                    if(confirm("将清空【"+MODE_NAMES[wr.mode]+"】全部武将战绩。\n阵营胜率与玩家操控数据不受影响。")){
+                    uiConfirm({
+                        title:"清空本模式战绩",
+                        message:"将清空【"+MODE_NAMES[wr.mode]+"】全部武将战绩。\n阵营胜率与玩家操控数据不受影响。",
+                        ok:"清空",
+                        danger:true,
+                    },function(ok){
+                        if(!ok) return;
                         var d2=readData();
                         delete d2[wr.mode];
                         game.saveConfig(STAT_KEY,d2);
                         wr.page=0; render(root);
-                    }
+                    });
                 }
-                else if(act=="clearall"){
-                    var inp=prompt("此操作将清空全部胜负统计（仅胜负统计，不含钱包 / AI 世界 / 成就）。\n如需继续，请输入「确认」二字：","");
-                    if(inp==="确认"){ game.saveConfig(STAT_KEY,{}); wr.page=0; render(root); }
-                }
+                else if(act=="clearall"){ openClearAll(root); }
                 else if(act=="export"){ exportData(); }
                 else if(act=="import"){ importData(); }
                 else if(act=="close"){ closePanel(); }

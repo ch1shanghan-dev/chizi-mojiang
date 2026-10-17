@@ -4,6 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
 <title>池子魔将 · 天下榜</title>
+<!-- 2026-10-18：进页即预热 DNS/TLS，把「首包 0.8s」压到页面渲染之后、用户点开时已就绪。
+     注意只预热 https 域名 —— 安卓 origin 是 https://localhost，明文 http 会被混合内容拦。 -->
+<link rel="preconnect" href="https://chishanghan.duckdns.org" crossorigin>
+<link rel="dns-prefetch" href="//chishanghan.duckdns.org">
 <!-- 天下榜 v3（2026-10-15）：留名机制沿用 v2（一个出口网络只占一个位置；机器指纹参与身份识别），
      本轮三处体验返工：
        ① 榜单列表此前是"死"的——五十行只看得见八行。改全高 flex 布局，列表区自带滚动。
@@ -439,6 +443,15 @@ var T = {
   debounceManual:"稍候片刻再试",
   nameTaken:     "这个名字已经有人用了，换一个吧",
   offline:       "未连接（不影响游戏）",
+  /* 2026-10-18 · 网络慢时的「缓存先上屏」：不再让整页停在"正在联网…" */
+  cacheStat:     "网络较慢 · 先看{cached}的榜单",
+  cacheOffline:  "未连接 · 显示{cached}的榜单",
+  cacheAgoJust:  "刚刚",
+  cacheAgoMin:   "{n} 分钟前",
+  cacheAgoHour:  "{n} 小时前",
+  cacheAgoDay:   "{n} 天前",
+  /* 2026-10-18 · 最高值补送达：上次断网时那一笔留在本机，这次进页自动补 */
+  pendingUp:     "上次有一笔 {n} 没送出去，正在补送…",
   savedOk:       "已留名：{line}",
   savedSig:      " · {sig}",
   adoptedFp:     "认出你这台机器的留名了 · {line}",
@@ -462,7 +475,103 @@ function tierWord(key) {
 }
 
 var NET_BASE = "https://chishanghan.duckdns.org";
-var NET = { uid: "", name: "", sig: "", fp: "", kind: "cby", busing: false, rows: [], me: null, seg: "", last: null };
+var NET = { uid: "", name: "", sig: "", fp: "", kind: "cby", busing: false, rows: [], me: null, seg: "", last: null, total: 0, ver: "" };
+
+/* ---------- 上报口径：历史最高，不是当前余额（2026-10-18） ----------
+   作者问「版本不同的话，能参与天下榜吗」—— 顺着这条线发现了一个更要紧的漏洞：
+   服务端 /submit 的口径是「取历史最高，花掉也不会掉榜」（board.py 的 submit：
+   `if cby > row["cby"]: row["cby"] = cby`），但**客户端上报的是当前余额**
+   （netSnapshot 读 csh_wallet.pc）。于是只要出现下面这种顺序，最高值就永久丢了：
+        打出一笔新高 → 那一次没传上去（断网/限流） → 花掉一部分 → 再传，传的是更低的数
+   修法：本地记一份 `csh_rank_high`（历史最高，只增不减），每次上报都拿它，
+   再用 `csh_rank_submit_pending` 记住「有一笔最高值还没送达」。
+   配合服务端的 max 语义，重发一百次也不会重复计数 —— 所以这里不需要真正的"队列"，
+   只需要"最高值 + 一次待送达标记"：比排队更准，也不会因为队列里躺着一堆旧快照而互相覆盖。 */
+var HIGH_KEY = "csh_rank_high";
+var PEND_KEY = "csh_rank_submit_pending";
+function rankHighRead() {
+  try {
+    var o = JSON.parse(ls(HIGH_KEY) || "null");
+    if (o && typeof o === "object") {
+      return {
+        cby: Math.max(0, Math.floor(Number(o.cby) || 0)),
+        merit: Math.max(0, Math.floor(Number(o.merit) || 0)),
+        seg: String(o.seg || "").slice(0, 12),
+        t: Number(o.t) || 0,
+      };
+    }
+  } catch (e) {}
+  return { cby: 0, merit: 0, seg: "", t: 0 };
+}
+function rankHighMerge(v) {
+  var h = rankHighRead();
+  var changed = false;
+  if (v.cby > h.cby) { h.cby = v.cby; changed = true; }
+  if (v.merit > h.merit) { h.merit = v.merit; changed = true; }
+  if (v.seg && v.seg !== h.seg) { h.seg = String(v.seg).slice(0, 12); changed = true; }
+  if (changed) {
+    h.t = Date.now();
+    try { ls(HIGH_KEY, JSON.stringify(h)); } catch (e) {}
+  }
+  return h;
+}
+function pendRead() {
+  try {
+    var o = JSON.parse(ls(PEND_KEY) || "null");
+    return (o && typeof o.t === "number") ? o : null;
+  } catch (e) { return null; }
+}
+function pendSet(cby, merit) {
+  try { ls(PEND_KEY, JSON.stringify({ t: Date.now(), cby: cby, merit: merit })); } catch (e) {}
+}
+function pendClear() { try { ls(PEND_KEY, ""); } catch (e) {} }
+
+/* 本扩展版本（2026-10-18）：随上报一起带上，服务端只记录、不设门槛 ——
+   老版本照样能上榜，但榜单可以据此标注「这条是 v4.0.5 的旧口径」。
+   取法三兜底（宿主 lib 在 iframe 里可直达，与 csh_page.js 的 applyGameSkin 同一套访问方式）。 */
+function pageVer() {
+  try {
+    var L = (window.parent && window.parent !== window && window.parent.lib) || null;
+    if (!L) { try { L = (typeof lib !== "undefined") ? lib : null; } catch (e0) { L = null; } }
+    if (L) {
+      var v = (L.config && L.config["extension_池子魔将_version"]) || "";
+      if (!v && L.extensionPack && L.extensionPack["池子魔将"]) v = L.extensionPack["池子魔将"].version || "";
+      if (v) return String(v).slice(0, 12);
+    }
+  } catch (e) {}
+  return "";
+}
+
+/* ---------- 榜单缓存（2026-10-18） ----------
+   作者："天下榜联机因为网络原因很鸡肋"。根因不是服务端，是页面把「网络」当成了
+   唯一数据源：每次进页都先清空榜单、停在"正在联网…"，8 秒超时后只剩一句"未连接"。
+   修法与界面基座同一条思路 —— **先把上次成功的快照画出来，再后台刷新**：
+     · 进页立即用缓存渲染（标注"几分钟前"），网络结果回来再覆盖；
+     · 请求失败时保留缓存，只把状态行改成"未连接 · 显示 x 分钟前的榜单"；
+     · 只有从来没有成功过（无缓存）才显示空榜 —— 不再"一断网就白屏"。
+   缓存键 csh_rank_cache_v1 已登记 csh_migrate 的 EXCLUDED（不随行囊走）。 */
+var RANK_CACHE_KEY = "csh_rank_cache_v1";
+function cacheRead() {
+  try {
+    var o = JSON.parse(ls(RANK_CACHE_KEY) || "null");
+    if (o && typeof o === "object" && Object.prototype.toString.call(o.rows) === "[object Array]") return o;
+  } catch (e) {}
+  return null;
+}
+function cacheWrite() {
+  try {
+    ls(RANK_CACHE_KEY, JSON.stringify({
+      ts: Date.now(), kind: NET.kind, rows: NET.rows, me: NET.me, n: NET.total || 0,
+    }));
+  } catch (e) {}
+}
+function cacheAgo(ts) {
+  var d = Date.now() - (Number(ts) || 0);
+  if (!(d > 60000)) return T.cacheAgoJust;
+  if (d < 3600000) return tt("cacheAgoMin", { n: Math.round(d / 60000) });
+  if (d < 86400000) return tt("cacheAgoHour", { n: Math.round(d / 3600000) });
+  return tt("cacheAgoDay", { n: Math.round(d / 86400000) });
+}
 
 /* ---------- 桥（与 Game Shell 通信） ----------
    ★ 2026-10-15 修：**这一页此前根本没有建桥** —— 全文只有 `Bridge.call(...)` 的引用，
@@ -516,6 +625,7 @@ function netInit() {
     ls("csh_net_uid", NET.uid);
   }
   NET.fp = machineFp();
+  NET.ver = pageVer();
   NET.name = ls("csh_net_name");
   NET.sig = ls("csh_net_sig");
   /* 缠头数额（2026-10-16 晚）：进页回填上次使用的数额（缺省 1000） */
@@ -555,8 +665,11 @@ function applyStaticCopy() {
 }
 applyStaticCopy();
 
-/* 一次请求：path / method / body(对象) → cb(ok, jsonObj) */
+/* 一次请求：path / method / body(对象) → cb(ok, jsonObj)
+   ★ 2026-10-18：只保留 https 单基址 —— E38 实锤：安卓 origin 是 https://localhost，
+     明文 http 直连会被混合内容拦掉。真正的"第二通道"必须也是 https（见 docs/ui-kernel.md）。 */
 function netReq(path, method, body, cb) {
+  var base = NET_BASE;
   var done = false;
   function fin(ok, o) { if (done) return; done = true; cb(ok, o); }
   var payload = body ? JSON.stringify(body) : "";
@@ -564,10 +677,10 @@ function netReq(path, method, body, cb) {
   try { req = (typeof window !== "undefined" && window.require) ? window.require : null; } catch (e0) {}
   if (req) {
     try {
-      var http = req(/^https:/.test(NET_BASE) ? "https" : "http"), url = req("url");
-      var u = url.parse(NET_BASE + path);
+      var http = req(/^https:/.test(base) ? "https" : "http"), url = req("url");
+      var u = url.parse(base + path);
       var r = http.request({
-        hostname: u.hostname, port: u.port || (/^https:/.test(NET_BASE) ? 443 : 80), path: u.path, method: method, timeout: 8000,
+        hostname: u.hostname, port: u.port || (/^https:/.test(base) ? 443 : 80), path: u.path, method: method, timeout: 4500,
         headers: payload ? { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(payload) } : {},
       }, function (res) {
         var buf = "";
@@ -588,8 +701,8 @@ function netReq(path, method, body, cb) {
        提前 return 等于永远掐断手机端联机（作者实机：手机端一直"未连接"）。
        现在统一"试一下，失败按未连接处理"（E31 纪律：失败静默、提示中性）。 */
   try {
-    var to = setTimeout(function () { fin(false, null); }, 8000);
-    fetch(NET_BASE + path, {
+    var to = setTimeout(function () { fin(false, null); }, 4500);
+    fetch(base + path, {
       method: method, cache: "no-store",
       headers: payload ? { "Content-Type": "application/json" } : undefined, body: payload || undefined,
     }).then(function (res) {
@@ -597,6 +710,8 @@ function netReq(path, method, body, cb) {
     }).catch(function () { clearTimeout(to); fin(false, null); });
   } catch (e2) { fin(false, null); }
 }
+
+
 
 /* 本机成绩：优先问宿主（shell-stats 快照），拿不到就用本地兜底。
    ★ 兜底此前读的是 `csh_wallet_pc` —— 这个键**全扩展无人写入**（真键是 `csh_wallet`，
@@ -636,17 +751,28 @@ function netSnapshot(cb) {
 
 function netPush(manual) {
   netSnapshot(function (v) {
-    if (!manual && v.cby <= 0 && v.merit <= 0) { netStat(T.noScore); return; }
+    /* ★ 口径：上报「历史最高」而不是「当前余额」。
+       余额会花掉、会变低，一旦出现「打出新高 → 没传上去 → 花掉一部分 → 再传」，
+       最高值就永久丢了。rankHighMerge 只增不减，本机记得住曾经达到过多少。 */
+    var high = rankHighMerge(v);
+    var upCby = Math.max(high.cby, Math.floor(Number(v.cby) || 0));
+    var upMerit = Math.max(high.merit, Math.floor(Number(v.merit) || 0));
+    if (!manual && upCby <= 0 && upMerit <= 0) { netStat(T.noScore); return; }
     if (!NET.name) { netStat(T.needNameList); return; }
-    NET.seg = v.seg || NET.seg;
+    NET.seg = v.seg || high.seg || NET.seg;
     netReq("/submit", "POST", {
-      uid: NET.uid, name: NET.name, sig: NET.sig, cby: v.cby, merit: v.merit, fp: NET.fp, seg: NET.seg
+      uid: NET.uid, name: NET.name, sig: NET.sig, cby: upCby, merit: upMerit, fp: NET.fp, seg: NET.seg,
+      /* v4.0.6 起带版本：服务端只记录不设门槛（老服务端忽略未知字段，不会 400） */
+      ver: NET.ver
     }, function (ok, r) {
       if (!ok) {
         /* 服务端 400 且带原因时，只处理"名字已被占用"这一种；其余照旧给中性文案 */
         if (r && r.error === "name-taken") { netStat(T.nameTaken, true); return; }
         if (r && r.error === "name-blocked") { netStat(T.nameBlocked || "换个名字试试", true); return; }
         if (r && r.error === "rename-limited") { netStat(T.renameLimited || "今日已更名，明日再来", true); return; }
+        /* ★ 网络失败（r 为空）：把「有一笔最高值还没送达」记在本机，
+           下次进页 netPush 会自动再传一次；服务端取 max，重复提交不会刷高。 */
+        pendSet(upCby, upMerit);
         netStat(manual ? T.failManual : T.offline, true);
         return;
       }
@@ -658,8 +784,9 @@ function netPush(manual) {
       /* ★ 服务端可能把这次提交"认领"到已有记录上（同一台机器 / 同一个网络），
          并把最终归属的 uid 回给我们 —— 存下来，之后"我的那条"高亮才对得上。 */
       if (r && r.uid) { NET.uid = r.uid; ls("csh_net_uid", r.uid); }
-      NET.last = { cby: v.cby, merit: v.merit };
-      var line = fmt(v.cby) + " " + T.cbyUnit + " · " + v.merit + " " + T.meritUnit + (v.seg ? " · " + v.seg : "");
+      NET.last = { cby: upCby, merit: upMerit };
+      pendClear();
+      var line = fmt(upCby) + " " + T.cbyUnit + " · " + upMerit + " " + T.meritUnit + (NET.seg ? " · " + NET.seg : "");
       /* 留名成功后把这一句题壁也回显出来 —— 让"题壁确实落榜了"当场可见。 */
       if (NET.sig) line += tt("savedSig", { sig: NET.sig });
       if (r && r.adopted === "fp") netStat(tt("adoptedFp", { line: line }));
@@ -673,17 +800,42 @@ function netPush(manual) {
 function netLoad() {
   if (NET.busing) return;
   NET.busing = true;
-  /* 带上 uid：服务端会额外把"我"的全局名次算出来（哪怕不在前 N 名也能显示） */
+  /* ① 先上缓存：有同类型快照就立刻画出来，不把整页卡在"正在联网…" */
+  var cached = cacheRead();
+  var hasCache = !!(cached && cached.kind === NET.kind && cached.rows && cached.rows.length);
+  if (hasCache) {
+    NET.rows = cached.rows;
+    NET.me = cached.me || null;
+    NET.total = cached.n || 0;
+    netStat(tt("cacheStat", { cached: cacheAgo(cached.ts) }));
+    netRender();
+  }
+  /* ② 浏览器已明确离线：不要再等 4.5s 超时，直接吃缓存（没缓存才报未连接） */
+  var offline = false;
+  try { offline = (typeof navigator !== "undefined" && navigator.onLine === false); } catch (eOff) {}
+  if (offline) {
+    NET.busing = false;
+    if (hasCache) netStat(tt("cacheOffline", { cached: cacheAgo(cached.ts) }), true);
+    else { NET.rows = []; NET.me = null; NET.total = 0; netStat(T.offline, true); netRender(); }
+    return;
+  }
+  /* ③ 后台刷新：网络结果覆盖缓存；失败则保留缓存，只改状态行 */
   netReq("/board?type=" + NET.kind + "&limit=50&uid=" + encodeURIComponent(NET.uid), "GET", null, function (ok, r) {
     NET.busing = false;
     if (!ok || !r || !r.ok) {
-      NET.rows = []; NET.me = null;
+      if (hasCache) {
+        netStat(tt("cacheOffline", { cached: cacheAgo(cached.ts) }), true);
+        return;
+      }
+      NET.rows = []; NET.me = null; NET.total = 0;
       netStat(T.offline, true);
       netRender();
       return;
     }
     NET.rows = r.list || [];
     NET.me = r.me || null;
+    NET.total = r.n || 0;
+    cacheWrite();
     netStat(NET.rows.length
       ? tt("boardStat", { n: r.n, m: NET.rows.length })
       : T.boardEmpty);
@@ -1147,8 +1299,13 @@ function doCheer(gid, gname, amt) {
   if (vw) vw.addEventListener("click", function () { setView("wall"); netRenderGirls(); }, false);
   if (vl) vl.addEventListener("click", function () { setView("list"); netRenderGirls(); }, false);
   if (vl) vl.addEventListener("click", function () { setView("list"); netRenderGirls(); }, false);
-  /* 进页先读名册；**已有名字就自动上传一次**（作者要的"有网就自动传，不用点"） */
-  if (NET.name) netPush(false); else netStat(T.needNameAuto);
+  /* 进页先读名册；**已有名字就自动上传一次**（作者要的"有网就自动传，不用点"）。
+     上传前先看有没有「上次没送出去的最高值」—— 有就先说一声，玩家知道这一笔在补。 */
+  if (NET.name) {
+    var pdPn = pendRead();
+    if (pdPn) netStat(tt("pendingUp", { n: fmt(pdPn.cby) }));
+    netPush(false);
+  } else netStat(T.needNameAuto);
   netLoad();
 })();
 </script>

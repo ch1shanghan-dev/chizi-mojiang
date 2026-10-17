@@ -13,3 +13,7 @@ Desktop.ini
 *.log
 *.tmp
 *.bak
+
+# 探针临时产物（tools/probe_*.cjs 运行时生成，每次内容不同，不入库）
+tools/_*.html
+tools/run[0-9]*.html

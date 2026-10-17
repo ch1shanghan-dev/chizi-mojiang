@@ -2107,7 +2107,8 @@ function toast(msg) {
      出牌区（容器 bottom:146~208px，3 条高约 120px，顶端可达 y≈100px），
      与 center-note「正在叫分…」视觉堆叠。矮屏收紧到 2 条，功能不删（只少留一条历史）。
      【2026-10-03】顶部信息行已清零（战况改台面左上角标），toast 与顶部再无叠加对象。 */
-  var maxN = (window.innerHeight && window.innerHeight <= 480) ? 2 : 3;
+  /* 2026-10-18：上限改由 CSHPage.toastCap() 统一给出（唯一真源，矮屏自动收一档） */
+  var maxN = (typeof CSHPage !== "undefined" && CSHPage.toastCap) ? CSHPage.toastCap() : 3;
   while (box.children.length >= maxN) box.removeChild(box.firstChild);
   var d = document.createElement('div');
   d.className = 'toast';

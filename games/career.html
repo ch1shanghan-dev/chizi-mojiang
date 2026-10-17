@@ -679,6 +679,10 @@ function toast(msg) {
     var t = el("div", "", msg);
     t.style.cssText = "background:rgba(21,17,12,.94);border:1px solid var(--gold-line);color:#f0dfae;" +
       "padding:7px 16px;border-radius:18px;font-size:var(--fs-sm);text-align:center;max-width:100%";
+    /* 2026-10-18：补同屏上限 —— 此前无限制，连续领成就（一次接一次）会把提示
+       一路堆到几百像素、盖住大厅内容。上限与四个牌桌页共用 CSHPage.toastCap()。 */
+    var capMax = (typeof CSHPage !== "undefined" && CSHPage.toastCap) ? CSHPage.toastCap() : 3;
+    while (_toastBox.children.length >= capMax) _toastBox.removeChild(_toastBox.firstChild);
     _toastBox.appendChild(t);
     setTimeout(function () { if (t.parentNode) t.parentNode.removeChild(t); }, 2400);
   } catch (e) {}

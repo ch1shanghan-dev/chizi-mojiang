@@ -1372,7 +1372,9 @@ function toast(msg) {
   el.className = 'toast';
   el.textContent = msg;
   box.appendChild(el);
-  while (box.children.length > 3) box.removeChild(box.firstChild);
+  /* 2026-10-18：固定 3 条在矮屏会探进牌桌，改由 CSHPage.toastCap() 统一给出 */
+  var capMax = (typeof CSHPage !== "undefined" && CSHPage.toastCap) ? CSHPage.toastCap() : 3;
+  while (box.children.length > capMax) box.removeChild(box.firstChild);
   setTimeout(function () {
     el.classList.add('fade');
     setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, 450);

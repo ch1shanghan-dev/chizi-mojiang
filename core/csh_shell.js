@@ -181,6 +181,10 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 	function toast(msg) {
 		msg = String(msg == null ? "" : msg);
 		try {
+			/* 统一走界面基座（documentElement 挂载 · 不随 body 缩放 · 合并/排队/描金） */
+			if (lib.cshUI && typeof lib.cshUI.toast === "function") { lib.cshUI.toast(msg); return; }
+		} catch (e0) {}
+		try {
 			if (typeof ui !== "undefined" && ui && ui.create && typeof ui.create.toast === "function") {
 				ui.create.toast(msg); return;
 			}

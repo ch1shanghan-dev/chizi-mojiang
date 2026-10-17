@@ -251,6 +251,10 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 	function toast(msg) {
 		msg = String(msg == null ? "" : msg);
 		try {
+			/* 统一走界面基座（documentElement 挂载 · 不随 body 缩放 · 合并/排队/描金） */
+			if (lib.cshUI && typeof lib.cshUI.toast === "function") { lib.cshUI.toast(msg); return; }
+		} catch (e0) {}
+		try {
 			if (typeof ui !== "undefined" && ui && ui.create && typeof ui.create.toast === "function") {
 				ui.create.toast(msg);
 				return;
@@ -574,7 +578,15 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 		var r = settle(gameKey, opts.buyIn, opts.netWin, opts.aiStakeTotal, opts.players);
 		var credited = r.payout > 0 ? addPC(r.payout, "结算/" + gameKey) : 0;
 		r.credited = credited;
-		if (typeof credited === "number" && credited < r.payout) r.clamped = true;
+		/* ★ 2026-10-18（第二十二批审计）：原来 `r.clamped` 只被赋值、全项目无人读（死字段）。
+		   它不是和 discarded 重复 —— discarded 是"算法按封顶丢掉"，clamped 是"钱包层按
+		   单笔/总量上限丢掉"，两种丢法原因不同、排查时不能混。所以保留并补齐可诊断信息：
+		   记下被吞掉多少 + 打一条日志（上限虽然大到正常玩不到，但真触发时不至于无声无息）。 */
+		if (typeof credited === "number" && credited < r.payout) {
+			r.clamped = true;
+			r.clampShort = r.payout - credited;
+			logInfo("结算被钱包上限截断：" + r.clampShort + " CBY 未入账（" + gameKey + "）");
+		}
 		r.balance = wallet.pc;
 		return r;
 	}
@@ -1577,12 +1589,22 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 	_sig: { sign: sigOf, verify: verifySig, fnv1a: fnv1a, verifyRSA: verifyPKCS1v15, sha256: _sha256 },
 };
 
-/* 卸载兜底：标签页关闭/刷新时强制落盘最后一拍（合并写盘不会丢跨会话状态） */
+/* 卸载兜底：标签页关闭/刷新时强制落盘最后一拍（合并写盘不会丢跨会话状态）
+   ★ 2026-10-18 补 visibilitychange（第二十二批审计）：
+     pagehide / beforeunload 在**手机端不可靠** —— 安卓 WebView 把应用切到后台时两条都不一定触发，
+     而钱包写盘是 250ms 防抖（SAVE_DEBOUNCE_MS）⇒ 「刚结算完就切后台」那 ≤250ms 的钱会丢。
+     切后台是移动端最常见的"结束"，所以这里必须补上；hidden 时落盘，回来照常。
+     （不改防抖本身：热点路径每笔都同步写 localStorage 会更糟 —— 这是正确的取舍，不是补丁。） */
 try {
 	if (typeof window !== "undefined" && window && typeof window.addEventListener === "function") {
 		var _cshFlush = function () { try { flushSave(); } catch (eFlush) {} };
 		window.addEventListener("pagehide", _cshFlush, false);
 		window.addEventListener("beforeunload", _cshFlush, false);
+		document.addEventListener("visibilitychange", function () {
+			try {
+				if (document.visibilityState === "hidden" || document.hidden) _cshFlush();
+			} catch (eVis) {}
+		}, false);
 	}
 } catch (eFlushInit) {}
 

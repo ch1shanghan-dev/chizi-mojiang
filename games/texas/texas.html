@@ -2607,7 +2607,10 @@ function toast(msg, cls) {
      【2026-10-02 续修】顶部锚定的 3 条在矮屏（手机横屏，高 ≤480px）向下生长
      约 120px，正好盖住公共牌与底池（牌桌中心）。矮屏收紧到 2 条，
      且容器改底部锚定（见 #toasts 的媒体查询），让出牌桌中心。 */
-  var maxN = (window.innerHeight && window.innerHeight <= 480) ? 2 : 3;
+  /* 2026-10-18：上限改由 CSHPage.toastCap() 统一给出（矮屏 2 / 其它 3）——
+     这一档此前在德州/斗地主/黑杰克/UNO 四处各写一份，黑杰克与 UNO 一直停在固定 3、
+     矮屏没跟上。真源收在 core/csh_page.js。 */
+  var maxN = (typeof CSHPage !== "undefined" && CSHPage.toastCap) ? CSHPage.toastCap() : 3;
   while (box.children.length >= maxN) box.removeChild(box.firstChild);
   var t = document.createElement('div');
   t.className = 'toast' + (cls ? ' ' + cls : '');

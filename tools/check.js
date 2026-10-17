@@ -2360,6 +2360,7 @@ async function runBossChecks() {
 			"extension_池子魔将_csh_effect_announce": "无名杀设置项（同上）",
 			"extension_池子魔将_csh_enable_pingxing": "无名杀设置项（同上）",
 			"extension_池子魔将_csh_eg_group_scroll": "无名杀设置项（同上 · 2026-10-16 新增：选将势力面板滚动条开关，engine-compat C4）",
+			"extension_池子魔将_csh_kami_group": "无名杀设置项（同上 · 2026-10-18 新增：非身份场「神将选势力」的独立开关，作者要求能单独关掉以免与别的扩展重复）",
 			"extension_池子魔将_version": "引擎写入的扩展版本号（架构级内部键，非玩家数据、不进行囊；2026-10-17 「检查更新」读它比对远端版本）",
 		};
 		const walkDirs = ["core", "main", "games", "character", "skills"];
@@ -2481,13 +2482,18 @@ async function runBossChecks() {
 		else ok("执行级 E44：契约机制在位（oath + OATH_LINES + 三新互动 + 迁移字段 + 图鉴 UI + tableQuip）");
 	}
 
-	/* E45（2026-10-16 深夜四 · 本体兼容注入 + 懒人包自愈；深夜七 · 实机重做锚）：
+	/* E45（2026-10-16 深夜四 · 本体兼容注入 + 懒人包自愈；深夜七 · 实机重做锚；
+	   2026-10-18 · 误伤主菜单回归锚）：
 	   ① 选将势力面板滚动条必须在 content 加载时即注入（曾误挂 kill-fx 懒注入块——要等第一次
 	      击杀特效才生效，等于没装）；② 必须有设置开关（csh_eg_group_scroll → __cshEgScrollApply）；
 	   ③ 懒人包自愈补载（cshBossSelfLoad）已导出且在 bossmode 接线；
-	   ④ ★ 滚动必须交还原生 `.content-container`（对话框封顶 70vh），不得再退回「截断 .buttons」
-	      方案 —— 实机（2026-10-16 深夜七）已证：按钮盒子 54vh 比对话框 45% 还高，外层滚动
-	      范围塌缩成固定 ~120px 小段（作者「滚不动 / 范围固定」的根因）。 */
+	   ④ ★ 滚动必须交还原生 `.content-container`，不得再退回「截断 .buttons」方案
+	      —— 实机（2026-10-16 深夜七）已证：按钮盒子 54vh 比对话框 45% 还高，外层滚动
+	      范围塌缩成固定 ~120px 小段（作者「滚不动 / 范围固定」的根因）；
+	   ⑤ ★ 2026-10-18 实机：`.dialog:not(.fullheight):has(.card.button)` 会命中引擎主菜单
+	      （ui/create/menu/index.js:135 的 `.main.menu.dialog`，卡牌/武将页含 .card.button）
+	      ⇒ 选项菜单被压成 70vh 并裁掉下半截。全局 :has 规则永久废弃，封顶只走 .csh-egdlg；
+	      且封顶值必须按 body 缩放换算 px（documentZoom），不能写 vh（手机会只剩 28% 屏幕）。 */
 	{
 		const ct45 = fs.readFileSync(path.join(ROOT, "main", "content.js"), "utf8");
 		const cf45 = fs.readFileSync(path.join(ROOT, "main", "config.js"), "utf8");
@@ -2499,7 +2505,30 @@ async function runBossChecks() {
 		else if (!/cshEgScrollApply\(\);/.test(ct45)) fail("执行级 E45：cshEgScrollApply 未在 content 加载时调用");
 		else if (fx45.indexOf(":has(.card.button)") >= 0) fail("执行级 E45：选将滚动条又挂回击杀特效懒注入块（要等第一次特效才生效）");
 		else if (ct45.indexOf(".buttons:has(.card.button){max-height:54vh") >= 0) fail("执行级 E45：滚动退回 .buttons 截断（实机会塌缩成固定小段）");
-		else if (!/max-height:70vh/.test(ct45) || !/content-container/.test(ct45)) fail("执行级 E45：缺对话框封顶 / 原生滚动容器接管（深夜七实机重做）");
+		else if (/\.dialog:not\(\.fullheight\):has\(\.card\.button\)/.test(ct45)) fail("执行级 E45：全局 :has(.card.button) 封顶回归（会把主菜单/卡牌图鉴一起压扁）");
+		else if (!/cshEgIsMenuDialog/.test(ct45) || !/classList\.contains\("menu"\)/.test(ct45)) fail("执行级 E45：打标器缺主菜单排除（选项菜单会被误判成势力面板）");
+		else if (!/function cshEgCapPx\s*\(/.test(ct45) || !/documentZoom/.test(ct45)) fail("执行级 E45：封顶未按 body 缩放换算 px（手机端只剩 28% 屏幕）");
+		/* ★ 2026-10-18 第二修（作者实机录像：装了很多扩展的用户，势力 20+ 个，右侧整列出屏）
+		   根因 = .buttons 宽度跟着不受控的父容器走。headless 实测：父宽 1400 时
+		   .buttons 被撑到 1392，一行 9 个，最后一列在 x=1392 而屏幕只有 884。
+		   修法 = width:min(100%, 视口宽/缩放)。任何一条被删都会让「宽 dialog」场景重新出屏。 */
+		else if (!/function cshEgCapW\s*\(/.test(ct45)) fail("执行级 E45：缺宽度上界 cshEgCapW（势力多时会横向出屏）");
+		/* ★ 2026-10-18 第三修（作者：「每次出现这个自适应窗口会这样一下」）：
+		   宽度上界只能靠 dialog 自己的 max-width —— 那是**被动**属性，只在超屏时生效，
+		   正常面板一个像素都不动。**禁止**给 .buttons 设 width：
+		   它会覆盖引擎的 `.content > div:not(.pointerdiv){width:calc(100% - 8px)}`
+		   （layout.css:1857），等于主动把按钮墙改宽 8px；旧实现同时还给内容区加
+		   padding-right:10px（窄 10px）。两个方向一起动 ⇒ 列数压在临界值上来回跳。
+		   反向也要守：谁再把 width / padding-right 加回来，这一条立刻红。 */
+		else if (/\.csh-egsc \.csh-egdlg \.buttons\{[^}]*(?<!max-)width:/.test(ct45)) fail("执行级 E45：.buttons 又主动设 width 了（会与引擎 calc(100%-8px) 冲突、列数跳变）");
+		else if (!/\.csh-egsc \.csh-egdlg \.buttons\{max-width:100%/.test(ct45)) fail("执行级 E45：.buttons 缺 max-width:100% 兜底");
+		else if (/setProperty\("width",\s*"min\(100%,/.test(ct45)) fail("执行级 E45：内联又给 .buttons 设 width 了（同上）");
+		else if (/c\.style\.paddingRight\s*=\s*Math\.round/.test(ct45)) fail("执行级 E45：又给内容区加 padding-right（内容变窄 → 列数跳变）");
+		else if (!/dlg\.style\.maxWidth\s*=\s*capW/.test(ct45)) fail("执行级 E45：缺 dialog 自身的 maxWidth（宽度上界失去依托）");
+		else if (!/overflowX\s*=\s*"hidden"/.test(ct45)) fail("执行级 E45：横向滚动未关（会多出一条压在按钮上的横条）");
+		else if (!/maxHeight/.test(ct45) || !/content-container/.test(ct45)) fail("执行级 E45：缺对话框封顶 / 原生滚动容器接管");
+		else if (!/cshEgUnstyle/.test(ct45)) fail("执行级 E45：缺样式还原（关掉开关后 70vh 会粘在面板上）");
+		else if (!/cshEgIsGroupControl/.test(ct45) || !/cshEgStyleGroupControl/.test(ct45)) fail("执行级 E45：缺控制条形态（2v2 冷/暖方势力走 chooseControl，不处理 = 只有身份场生效）");
 		else if (!/csh_eg_group_scroll/.test(cf45) || !/__cshEgScrollApply/.test(cf45)) fail("执行级 E45：设置开关未接线（csh_eg_group_scroll → __cshEgScrollApply）");
 		/* ★ 深夜八·修「关了他又自动打开」：引擎（optionsMenu.js:305 / exetensionMenu.js:135）
 		   对**有自定义 onclick 的选项不代存**（默认保存回调只在 `if (!cfg.onclick)` 时装）——
@@ -2526,10 +2555,14 @@ async function runBossChecks() {
 		else if (!/CSH_UPDATE_SRC\s*=\s*"https:\/\/raw\.githubusercontent\.com\/ch1shanghan-dev\/chizi-mojiang\/main\/"/.test(db46))
 			e46.push("更新源未硬编码为仓库 raw 根（自动化要求不依赖引擎「获取扩展地址」设置项）");
 		else if (/lib\.config\.extension_sources?\[/.test(db46)) e46.push("更新逻辑读了 lib.config.extension_sources（应由内置源接管）");
-		else if (!/game\.multiDownload/.test(db46) || !/game\.checkFileList/.test(db46))
-			e46.push("更新未复用引擎 game.multiDownload / game.checkFileList（逐文件下载）");
-		else if (!/extension\/"\s*\+\s*String\(cur\)\.slice\(CSH_UPDATE_SRC\.length\)/.test(db46))
-			e46.push("更新 URL→本地路径 映射缺失或写法不符（文件会落错位置）");
+		else if (!/game\.checkFileList/.test(db46))
+			e46.push("更新未复用引擎 game.checkFileList（素材补缺）");
+		else if (!/function fetchBin\s*\(/.test(db46) || !/game\.download\s*\(/.test(db46))
+			e46.push("更新下载未走自建逐文件器（PC = fetch+fs 校验落盘 / 手机 = game.download 双通道）");
+		else if (!/"extension\/"\s*\+\s*EXT_DIR_NAME\s*\+\s*"\/"\s*\+\s*rel/.test(db46))
+			e46.push("手机端 更新 URL→本地路径 映射缺失或写法不符（文件会落错位置）");
+		else if (!/p\.join\(extRoot,\s*rel\)/.test(db46))
+			e46.push("PC 端落盘未按扩展根拼接（文件会落错位置）");
 		else if (!/csh_check_update/.test(cf46) || !/lib\.cshDebug\.checkUpdate/.test(cf46))
 			e46.push("扩展设置缺「检查更新」按钮接线（config.js → lib.cshDebug.checkUpdate）");
 		/* ② 框体分层 */
@@ -2595,6 +2628,158 @@ async function runBossChecks() {
 		else if (!/snapS\.bounty/.test(sh47)) e47.push("shell-stats 未下发 bounty（图鉴拿不到当前悬赏）");
 		if (e47.length) fail("执行级 E47：指定讨伐令（" + e47.slice(0, 4).join("；") + "）");
 		else ok("执行级 E47：指定讨伐令在位（pickMinions 带守卫 · 出怪入口接线 · 先校验后扣费+回滚 · 达成即清 · 键入行囊 · 图鉴挂未讨伐行）");
+	}
+
+	/* E48（2026-10-18 · 界面基座 + 网络容灾）：
+	   作者定则：不要只修尺寸，要从根上不再出现 —— 所以门禁锁「机制」而不是某一句文案：
+	     ① 界面基座必须存在、被 content 安装；所有会弹提示的模块必须优先走 lib.cshUI.toast
+	        （引擎 ui.create.toast 挂在被缩放 body 上：手机只剩四成大小、nowrap 溢出、
+	          innerHTML 注入、单条 1.5s 串行 —— 这就是「奖励提示一闪就没」的总根）；
+	     ② 全项目禁止 window.prompt（Electron 渲染进程直接抛 “prompt() is not supported.”）；
+	     ③ 检查更新必须有「超时 + 镜像 + 缓存」三件（单源无超时 = 一直停在“正在检查”）；
+	     ④ 天下榜必须「缓存先上屏 + 超时 ≤5s」（否则一断网就白屏 8 秒）；
+	     ⑤ 两个新缓存键必须登记 csh_migrate（E41 同一套账）。 */
+	{
+		const e48 = [];
+		const uk48 = path.join(ROOT, "core", "csh_uikit.js");
+		if (!fs.existsSync(uk48)) e48.push("缺 core/csh_uikit.js（界面基座）");
+		else {
+			const u48 = fs.readFileSync(uk48, "utf8");
+			if (!/export function installUIKit\s*\(/.test(u48)) e48.push("基座缺 installUIKit 导出");
+			else if (!/document\.documentElement/.test(u48)) e48.push("提示容器未挂 documentElement（会随 body 缩放）");
+			else if (!/white-space:normal/.test(u48)) e48.push("提示未允许换行（长奖励文案会溢出屏幕）");
+			else if (!/\.textContent\s*=/.test(u48)) e48.push("提示未走 textContent（innerHTML 有注入风险）");
+			else if (!/function confirmBox\s*\(/.test(u48)) e48.push("基座缺 confirmBox（原生 confirm 不可控）");
+		}
+		const ct48 = fs.readFileSync(path.join(ROOT, "main", "content.js"), "utf8");
+		if (!/installUIKit\(\)/.test(ct48)) e48.push("content 未安装界面基座");
+		const users48 = ["core/csh_shell.js", "core/csh_wallet.js", "core/csh_games.js", "core/csh_world.js", "core/csh_interact.js"];
+		for (const f of users48) {
+			const t = fs.readFileSync(path.join(ROOT, f), "utf8");
+			if (!/lib\.cshUI\.toast/.test(t)) e48.push(f + " 未接 lib.cshUI.toast（仍会被 body 缩放）");
+		}
+		const scan48 = [];
+		const walk48 = (d) => {
+			if (!fs.existsSync(d)) return;
+			for (const ent of fs.readdirSync(d, { withFileTypes: true })) {
+				const fp = path.join(d, ent.name);
+				if (ent.isDirectory()) walk48(fp);
+				else if (/\.(js|html)$/.test(ent.name)) scan48.push(fp);
+			}
+		};
+		["core", "main", "games"].forEach((d) => walk48(path.join(ROOT, d)));
+		for (const fp of scan48) {
+			const t = fs.readFileSync(fp, "utf8");
+			const rel = path.relative(ROOT, fp).replace(/\\/g, "/");
+			if (/window\.prompt\s*\(/.test(t) || /[^.\w]prompt\s*\(\s*["']/.test(t)) {
+				e48.push(rel + " 仍在用 prompt（Electron 不支持）");
+				break;
+			}
+		}
+		const db48 = fs.readFileSync(path.join(ROOT, "core", "csh_debug.js"), "utf8");
+		if (!/AbortController/.test(db48)) e48.push("检查更新缺超时（AbortController）");
+		else if (!/CSH_UPDATE_MIRRORS/.test(db48) || !/cshFetchManifest/.test(db48)) e48.push("检查更新缺镜像兜底");
+		else if (!/CSH_UPDATE_CACHE/.test(db48)) e48.push("检查更新缺离线缓存");
+		/* 小包优先：必须先拉 info.json（240B）比版本，相同就别拉 35KB 的 catalog */
+		else if (!/function cshFetchVer\s*\(/.test(db48) || !/info\.json/.test(db48)) e48.push("检查更新未走 info.json 小包优先（每次白拉 35KB 目录）");
+		else if (!/CSH_UPDATE_VER_CACHE\s*=\s*"csh_update_ver_v1"/.test(db48)) e48.push("缺版本小包缓存键");
+		else if (!/_cshUpdBase/.test(db48)) e48.push("更新下载未复用验证通过的基址");
+		/* 逐文件回退：必须有 updateBases（多源）与逐文件尝试，而不是整批塞给引擎 */
+		else if (!/function updateBases\s*\(/.test(db48)) e48.push("更新下载未做逐文件多源回退（单源挂 = 整批挂）");
+		else if (/game\.multiDownload/.test(db48)) e48.push("仍在用 game.multiDownload（onfinish 无条件触发 → 失败也会重启）");
+		else if (!/failed\.push/.test(db48) || !/finishAll/.test(db48)) e48.push("更新缺失败清单（失败必须列出并不重启）");
+		const rk48 = fs.readFileSync(path.join(ROOT, "games", "rank.html"), "utf8");
+		if (!/RANK_CACHE_KEY\s*=\s*"csh_rank_cache_v1"/.test(rk48)) e48.push("天下榜缺榜单缓存键");
+		else if (!/function cacheWrite\s*\(/.test(rk48) || !/cacheWrite\(\)/.test(rk48)) e48.push("天下榜未写缓存");
+		else if (!/timeout: 4500/.test(rk48)) e48.push("天下榜请求超时未收到 4.5s");
+		/* 上报口径（2026-10-18）：服务端取 max，客户端必须上报「历史最高」而不是当前余额，
+		   否则「打出新高 → 断网 → 花掉一部分 → 再传」会把那一笔永久抹掉。 */
+		else if (!/rankHighMerge\s*\(/.test(rk48) || !/cby:\s*upCby/.test(rk48)) e48.push("天下榜上报未取历史最高（花掉池子币会带走已打出的成绩）");
+		else if (!/pendSet\s*\(/.test(rk48) || !/pendClear\s*\(/.test(rk48)) e48.push("天下榜失败未留待送达标记（断网那一笔永远补不上）");
+		else if (!/ver:\s*NET\.ver/.test(rk48)) e48.push("天下榜上报未带版本字段（版本不同照样能上榜，但服务端认不出旧口径）");
+		const mg48 = fs.readFileSync(path.join(ROOT, "core", "csh_migrate.js"), "utf8");
+		if (!/csh_update_manifest_v1/.test(mg48) || !/csh_rank_cache_v1/.test(mg48) || !/csh_update_ver_v1/.test(mg48)) e48.push("新缓存键未登记 csh_migrate（E41 会红）");
+		/* 同屏提示上限：唯一真源在 csh_page.js，页面不得再各写一份魔数
+		   （德州/斗地主写过 2/3、黑杰克/UNO 固定 3、生涯干脆没有 —— 矮屏全在探牌桌） */
+		const pg48 = fs.readFileSync(path.join(ROOT, "core", "csh_page.js"), "utf8");
+		if (!/function toastCap\s*\(/.test(pg48) || !/toastCap:\s*toastCap/.test(pg48)) e48.push("csh_page.js 缺 toastCap（同屏提示上限的唯一真源）");
+		const capUsers = ["games/texas/texas.html", "games/doudizhu/doudizhu.html", "games/blackjack/blackjack.html", "games/uno/uno.html", "games/career.html"];
+		for (const f of capUsers) {
+			const t = fs.readFileSync(path.join(ROOT, f), "utf8");
+			if (!/CSHPage\.toastCap/.test(t)) e48.push(f + " 未接 CSHPage.toastCap（矮屏提示仍会盖住牌桌）");
+			else if (/innerHeight\s*<=\s*480\)\s*\?\s*2\s*:\s*3/.test(t)) e48.push(f + " 仍留着 2/3 魔数（应交给 toastCap）");
+		}
+		if (e48.length) fail("执行级 E48：界面基座/网络容灾（" + e48.slice(0, 4).join("；") + "）");
+		else ok("执行级 E48：界面基座在位（documentElement · 唯一 toast · 合并排队 · confirm 自绘）＋ 更新三源容灾（超时/镜像/缓存）＋ 榜单缓存先上屏（4.5s）");
+	}
+
+	/* E49（2026-10-18 · 神武将选势力 · 第四版）：
+	   四次迭代的结论要写进门禁，否则下一个人（或下一轮的我）还会走回同两条死路：
+	     死路 A：给角色补 doubleGroup，让引擎 _doublegroup_choice 认领 ——
+	       确实能弹，但选将界面会把 doubleGroup 逐个画出来
+	       （ui/create/index.js:3191-3197：double2.reduce(... <div data-nature=...>)），
+	       势力越多越乱，作者实机截图已确认。字段语义被滥用，UI 必然跟着错。
+	     死路 B：给技能补 initGroup —— 一个技能只能一个势力（groups.add 去重），
+	       表达不了"可选 5 个"；且神将技能常与普通武将共享（longdan），改一个波及一片。
+	   ⇒ 准确说不是"引擎没有入口"，而是**有零件、没有装配好的流程**：
+	     通用零件齐全（get.selectGroup / player.changeGroup），但"弹窗让玩家选"的唯一完整实现
+	     写在 mode/identity.js:2358-2372，是身份模式私有；斗地主三处是空语句；
+	     mode/brawl.js:2733 的 choose_group 只给 AI 随机赋势力。
+	     生态里的标准做法就是自写全局技（十周年UI 的 _slyh 也是这么做的，
+	     filter 是 !lib.group.includes(player.group)，与本技能的 shen 判定不重叠）。
+	     门禁锁这些条，都是前三次真实炸过的点：
+	     ① 文件存在、被 content 调用；
+	     ② 走 game.addGlobalSkill 注册全局技（与 _doublegroup_choice 同构的两个触发点）；
+	     ③ 用原生 chooseButton(vcard) + changeGroup 落地；
+	     ④ **只认 shen** —— devil 是本扩展魔王/小怪全家，碰了 BOSS 模式整桌 AI 会被弹框改势力；
+	     ⑤ 不许再用 player.isUnseen（DOM 状态，斗地主 gameStart 恒 true）；
+	     ⑥ choose_group 只认显式 false（老存档缺键时 undefined 会让引擎 && 短路）；
+	     ⑦ 必须补 _priority（finishCards 早跑完，运行时后加的技能拿不到触发档位）；
+	     ⑧ 必须有诊断通道（why(...)），弹不出来时能说出原因，而不是靠猜。 */
+	{
+		const e49 = [];
+		const rp49 = path.join(ROOT, "core", "csh_rules.js");
+		if (!fs.existsSync(rp49)) e49.push("缺 core/csh_rules.js");
+		else {
+			const r49 = fs.readFileSync(rp49, "utf8");
+			if (!/export function installKamiChoice\s*\(/.test(r49)) e49.push("缺 installKamiChoice 导出");
+			else if (!/game\.addGlobalSkill\s*\(/.test(r49)) e49.push("未走 game.addGlobalSkill");
+			else if (!/global:\s*"gameStart"/.test(r49) || !/player:\s*"enterGame"/.test(r49)) e49.push("触发点未与 _doublegroup_choice 对齐");
+			else if (!/\.chooseButton\s*\(/.test(r49) || !/"vcard"/.test(r49)) e49.push("未用原生 chooseButton(vcard)");
+			else if (!/player\.changeGroup\s*\(/.test(r49)) e49.push("未用原生 changeGroup 落地势力");
+			else if (!/group\s*!==\s*"shen"/.test(r49)) e49.push("没有「只认 shen」守卫（devil 是 BOSS 全家）");
+			/* 两条死路：不许再走 */
+			if (/info\.doubleGroup\s*=/.test(r49)) e49.push("又给角色补 doubleGroup 了（会被选将界面逐个画出来）");
+			if (/initGroup\s*=/.test(r49) && !/typeof si\.initGroup/.test(r49)) e49.push("又给技能补 initGroup 了（共享技能会波及普通武将）");
+			if (/player\.isUnseen\s*\(/.test(r49)) e49.push("又用了 player.isUnseen（DOM 状态）");
+			if (!/get\.config\("choose_group"\)\s*===\s*false/.test(r49)) e49.push("choose_group 未写成「只认显式 false」");
+			if (!/_priority/.test(r49)) e49.push("未补 _priority");
+			if (!/function why\s*\(/.test(r49)) e49.push("缺诊断通道 why()（弹不出来只能靠猜）");
+			if (/get\.selectGroup\s*=\s*[^=]/.test(r49)) e49.push("禁止覆盖 get.selectGroup");
+			if (/lib\.skill\._doublegroup_choice/.test(r49)) e49.push("禁止触碰引擎 _doublegroup_choice");
+			/* 2026-10-18 · 作者要求：非身份场选势力必须有**独立开关**（怕与别的扩展冲突）。
+			     开关只被 filter 读一次、纯 early return ⇒ 不产生 DOM、不改样式，
+			     所以它本身与美化扩展零冲突；真正防冲突的是下面那条让位守卫。 */
+			if (!/function kamiEnabled\s*\(/.test(r49)) e49.push("缺 kamiEnabled()：没有独立开关，关不掉");
+			/* 本项**默认关闭**，所以判据必须反过来：只认显式 true 才算开。
+			   若写成"只认显式 false 才关"，缺键（老存档/刚装）会被判成开 ——
+			   名义上默认关、实际默认开。 */
+			else if (!/csh_kami_group"\]\s*===\s*true/.test(r49)) e49.push("扩展开关未写成「只认显式 true 才算开」（默认关必须靠这个方向）");
+			/* 让位守卫：别的扩展（如十周年UI 的 _slyh，priority Infinity）先把势力改了，我们就放弃 */
+			if (!/player\.group\s*&&\s*player\.group\s*!==\s*"shen"/.test(r49)) e49.push("缺让位守卫（player.group 已非 shen 时会让玩家被问两次）");
+		}
+		/* 设置页必须有这一项，否则玩家无从关闭（作者原话：要能单独关掉） */
+		const cfg49 = fs.readFileSync(path.join(ROOT, "main", "config.js"), "utf8");
+		if (!/"csh_kami_group"\s*:\s*\{/.test(cfg49)) e49.push("设置页缺「神将选势力」开关");
+		else if (!/"csh_kami_group"\s*:\s*\{[^}]*"init"\s*:\s*false/.test(cfg49)) e49.push("「神将选势力」默认值不是 false（作者定案：默认关闭）");
+		else if (!/"csh_kami_group"\s*:\s*\{[^}]*saveExtensionConfig\("池子魔将",\s*"csh_kami_group"/.test(cfg49)) e49.push("开关 onclick 未落盘（引擎对自定义 onclick 不代存，会每次回落到默认值）");
+		/* 下游项的文案必须说清"它不管弹不弹" —— 作者已经因为这一点困惑过一次 */
+		else if (!/csh_eg_group_scroll[^}]*不是「弹不弹」/.test(cfg49)) e49.push("下游项（尺寸自适应）文案未说清「它不管弹不弹」（会让人以为关了就不弹）");
+		const ct49 = fs.readFileSync(path.join(ROOT, "main", "content.js"), "utf8");
+		if (!/installKamiChoice\(\)/.test(ct49)) e49.push("content 未调用 installKamiChoice");
+		else if (!/import\s*\{[^}]*installKamiChoice[^}]*\}\s*from\s*"\.\.\/core\/csh_rules\.js"/.test(ct49)) e49.push("content 未从 core/csh_rules.js 引入");
+		if (e49.length) fail("执行级 E49：神武将选势力（" + e49.slice(0, 4).join("；") + "）");
+		else ok("执行级 E49：神武将选势力在位（自写规则技 · 只认 shen · 有独立开关与让位守卫 · 不碰 doubleGroup/initGroup · 有诊断）");
 	}
 	log("");
 }

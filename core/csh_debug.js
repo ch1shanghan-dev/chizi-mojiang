@@ -647,9 +647,6 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                     if (evt.player) entry.player = playerTag(evt.player);
                     if (evt.source) entry.source = playerTag(evt.source);
                     if (evt.skill) entry.skill = String(evt.skill);
-                    if (evt.name && !entry.skill && typeof evt.name === "string" && evt.name.indexOf("_") > 0) {
-                        /* 部分 trigger 名含技能 */
-                    }
                     entry.summary = safeSerialize({
                         name: evt.name,
                         step: evt.step,
@@ -1371,6 +1368,14 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
         function toast(msg, key) {
             msg = String(msg == null ? "" : msg);            /* 自绘顶层提示：面板关掉、遮罩盖住时也仍然可见。
                 带 key 时复用同键元素（不堆叠）——彩蛋连点提示逐条累积太吵，2026-09-28 改单条刷新。 */
+            /* ★ 2026-10-18：统一走界面基座（paper 皮肤 = 调试面板浅色）。
+               基座负责挂载点/缩放/队列/层级；这里保留原实现作为基座缺席时的兜底。 */
+            try {
+                if (lib.cshUI && typeof lib.cshUI.toast === "function") {
+                    lib.cshUI.toast(msg, { key: key || "", theme: "paper", merge: false });
+                    return;
+                }
+            } catch (eUI) {}
             try {
                 ensureToastStyle();
                 var host = ensureToastHost();
@@ -6819,9 +6824,12 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                  且那一页的 intro 会把长地址与下一行标题叠在一起（源头在引擎
                  noname/library/index.js:1567-1598 的渲染缺陷，属引擎，本扩展不改）。
            做法：更新源**硬编码**在本模块，完全不读 lib.config.extension_sources；
-                 玩家只要点「检查更新」→ 拉远端 catalog.js → 比版本 →
-                 有新版则由玩家点「立即更新」→ 复用引擎 game.checkFileList / game.multiDownload
-                 逐文件下载 → 自动重启。**零手动输入、不再依赖那个引擎设置项。**
+                 玩家只要点「检查更新」→ 先拉 240B 的 info.json 比版本（2026-10-18 起）→
+                 真有新版才拉 catalog.js 取文件清单 →
+                 由玩家点「立即更新」→ 自建逐文件下载器（多源回退 + 状态码校验）落盘 → 自动重启。
+                 **零手动输入、不再依赖那个引擎设置项。**
+                 （早先用引擎的批量下载原语，因「onfinish 无条件触发」+「不校验 HTTP 状态码」
+                   会在部分文件失败时照样重启、甚至把 404 正文写进 .js，2026-10-18 已整体替换。）
            ⚠ 为什么不走引擎原生「更新扩展」：本仓库根目录＝扩展内容（见 tools/release.js 注释），
              而引擎按 `<源><扩展名>/…` 拼下载 URL，与本布局不匹配 ⇒ 这里自行拼 URL（去掉扩展名前缀）。
            文件策略：**代码全量下 + 素材只补缺失**
@@ -6875,6 +6883,155 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
             ].join("");
             (document.head || document.documentElement).appendChild(st);
         }
+        /* ---------- 更新源容灾（2026-10-18 · 作者：网络原因检查更新很鸡肋） ----------
+           旧实现：`fetch(raw.githubusercontent.com/catalog.js)` 单源、**无超时**、无缓存。
+           国内网络下 raw 经常 10s+ 才超时，界面一直「正在检查…」；一旦失败就只剩一句
+           「检查更新失败」，连"远端到底是不是新版"都答不上来。
+           新实现三层：
+             ① 官方 raw 先试 2.6s（保证版本新鲜度）；
+             ② 失败后并发两个 GitHub 公共镜像（jsDelivr / gitmirror），3.5s 首个成功即用；
+             ③ 成功结果落本地缓存（catalog 约 35KB）；全失败时用缓存回答"上次已知版本"
+                并明确告知缓存时间 —— 不再是一句死胡同。
+           镜像只做兜底，永远不抢在官方前面（jsDelivr 的 @main 有缓存延迟）。 */
+        var CSH_UPDATE_CACHE = "csh_update_manifest_v1";
+        var CSH_UPDATE_MIRRORS = [
+            "https://cdn.jsdelivr.net/gh/ch1shanghan-dev/chizi-mojiang@main/",
+            "https://fastly.jsdelivr.net/gh/ch1shanghan-dev/chizi-mojiang@main/",
+            "https://raw.gitmirror.com/ch1shanghan-dev/chizi-mojiang/main/",
+        ];
+        var _cshUpdBase = "";   /* 本次会话验证可用的基址（更新下载也用它） */
+        /* 上次成功过的基址直接优先：国内 raw 常年连不上，每次先等 2.6s 纯属浪费。
+           缓存里有 base 就从它开始（仍是 https；镜像只是兜底）。 */
+        try {
+            var _uc0 = JSON.parse(localStorage.getItem(CSH_UPDATE_CACHE) || "null");
+            if (_uc0 && typeof _uc0.base === "string" && /^https:\/\//.test(_uc0.base)) _cshUpdBase = _uc0.base;
+        } catch (eUC) {}
+        function cshAgo(ts) {
+            var d = Date.now() - (Number(ts) || 0);
+            if (!(d > 60000)) return "刚刚";
+            if (d < 3600000) return Math.round(d / 60000) + " 分钟前";
+            if (d < 86400000) return Math.round(d / 3600000) + " 小时前";
+            return Math.round(d / 86400000) + " 天前";
+        }
+        function cshFetchText(url, ms) {
+            return new Promise(function (resolve, reject) {
+                var done = false, ctrl = null, to = 0;
+                function fin(ok, v) {
+                    if (done) return;
+                    done = true;
+                    if (to) clearTimeout(to);
+                    try { if (ctrl) ctrl.abort(); } catch (e) {}
+                    ok ? resolve(v) : reject(v);
+                }
+                to = setTimeout(function () { fin(false, new Error("连接超时")); }, ms);
+                try {
+                    if (typeof AbortController === "function") ctrl = new AbortController();
+                    fetch(url, {
+                        cache: "no-store",
+                        referrerPolicy: "no-referrer",
+                        signal: ctrl ? ctrl.signal : undefined,
+                    }).then(function (r) {
+                        if (!r.ok) throw new Error("HTTP " + r.status);
+                        return r.text();
+                    }).then(function (t) { fin(true, t); })
+                      .catch(function (e) { fin(false, e); });
+                } catch (e0) { fin(false, e0); }
+            });
+        }
+        function cshFetchManifest() {
+            var first = _cshUpdBase || CSH_UPDATE_SRC;
+            return cshFetchText(first + "catalog.js", 2600).then(function (txt) {
+                return { txt: txt, base: first };
+            }).catch(function () {
+                var list = CSH_UPDATE_MIRRORS.slice();
+                if (first !== CSH_UPDATE_SRC) list.unshift(CSH_UPDATE_SRC);
+                return new Promise(function (resolve, reject) {
+                    var left = list.length, errs = [];
+                    if (!left) { reject(new Error("没有可用更新源")); return; }
+                    for (var j = 0; j < list.length; j++) {
+                        (function (base) {
+                            cshFetchText(base + "catalog.js", 3500).then(function (txt) {
+                                resolve({ txt: txt, base: base });
+                            }, function (err) {
+                                errs.push(err);
+                                if (--left === 0) reject(errs[0] || new Error("全部更新源不可用"));
+                            });
+                        })(list[j]);
+                    }
+                });
+            });
+        }
+        function cshCacheRead() {
+            try {
+                var o = JSON.parse(localStorage.getItem(CSH_UPDATE_CACHE) || "null");
+                return (o && o.txt) ? o : null;
+            } catch (e) { return null; }
+        }
+        function cshCacheWrite(txt, base) {
+            try { localStorage.setItem(CSH_UPDATE_CACHE, JSON.stringify({ ts: Date.now(), base: base || "", txt: txt })); } catch (e) {}
+        }
+
+        /* ---------- 小包优先（2026-10-18 · 作者：网络原因检查更新很鸡肋） ----------
+           旧行为：每点一次「检查更新」都拉 **35KB 的 catalog.js**（整份文件清单 + 2000 行路径），
+                   只为了回答一句"有没有新版"。国内 raw 拉 35KB 经常 8s+，于是"鸡肋"。
+           新行为：先拉 **240B 的 info.json**（引擎自己也会读它做扩展列表，字段永远是
+                   {name,intro,author,version,...}），只比 version：
+                     · 相同 / 更旧  → 当场收工，省掉 99.3% 流量；
+                     · 有新版本    → 再拉 catalog.js 取 files 清单，进入更新流程。
+           额外收益（很关键）：info.json 通了就等于**确认了这个基址真的能提供本扩展的文件**
+                   —— 这个 base 直接交给后面逐文件下载用，不用再猜哪个镜像能下载。
+           兜底：如果远端仓库里没有 info.json（很老的发布 / 仓库结构变了），
+                 这一阶段会整体失败，主流程自动退回原来的 catalog 直拉路径，行为不变。 */
+        var CSH_UPDATE_VER_CACHE = "csh_update_ver_v1";
+        function cshVerParse(txt, base) {
+            try {
+                var j = JSON.parse(txt);
+                var v = j && j.version != null ? String(j.version) : "";
+                return v ? { ver: v, base: base } : null;
+            } catch (e) {
+                return null;
+            }
+        }
+        function cshFetchVer() {
+            var first = _cshUpdBase || CSH_UPDATE_SRC;
+            return cshFetchText(first + "info.json", 2400).then(function (txt) {
+                var r = cshVerParse(txt, first);
+                if (r) return r;
+                throw new Error("info.json 无版本");
+            }).catch(function () {
+                var list = CSH_UPDATE_MIRRORS.slice();
+                if (first !== CSH_UPDATE_SRC) list.unshift(CSH_UPDATE_SRC);
+                return new Promise(function (resolve, reject) {
+                    var left = list.length, lastErr = null, done = false;
+                    if (!left) { reject(new Error("没有可用更新源")); return; }
+                    for (var j = 0; j < list.length; j++) {
+                        (function (base) {
+                            cshFetchText(base + "info.json", 3000).then(function (txt) {
+                                if (done) return;
+                                var r = cshVerParse(txt, base);
+                                if (r) { done = true; resolve(r); return; }
+                                lastErr = new Error("info.json 无版本");
+                                if (--left === 0) reject(lastErr);
+                            }, function (err) {
+                                if (done) return;
+                                lastErr = err;
+                                if (--left === 0) reject(lastErr);
+                            });
+                        })(list[j]);
+                    }
+                });
+            });
+        }
+        function cshVerCacheRead() {
+            try {
+                var o = JSON.parse(localStorage.getItem(CSH_UPDATE_VER_CACHE) || "null");
+                return o && o.ver ? o : null;
+            } catch (e) { return null; }
+        }
+        function cshVerCacheWrite(ver, base) {
+            try { localStorage.setItem(CSH_UPDATE_VER_CACHE, JSON.stringify({ ts: Date.now(), base: base || "", ver: ver })); } catch (e) {}
+        }
+
         lib.cshDebug.checkUpdate = function () {
             try { ensureUpdateStyle(); } catch (eSt) {}
             var staleBg = document.getElementById("csh-update-bg");
@@ -6932,8 +7089,75 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                     (lib.extensionPack && lib.extensionPack["池子魔将"] && lib.extensionPack["池子魔将"].version) || "";
             } catch (eV) {}
 
-            /* 逐文件更新：代码全量 + 素材补缺（复用引擎两件原语，零引擎改动） */
-            function startUpdate(info, remoteVer) {
+            /* ---------- 逐文件下载器（2026-10-18 · 取代引擎的批量下载原语） ----------
+               为什么不能用引擎那两件原语（三条都是实测/源码确认过的硬伤）：
+               ① 引擎的批量下载（noname/game/index.js:3102）把清单切三批并发，
+                  而 **onfinish 是无条件触发的**（3087 / 3112-3117）——文件失败也照样回调
+                  "完成"，旧代码于是照样 restart：重启后少文件的扩展直接坏掉；
+               ② 它只有一个 URL 前缀（我们自己拼的），单源挂 = 整批挂，没有逐文件换源；
+               ③ game.download 的 node 实现（noname/init/node.js:40-85）**不看 HTTP 状态码**，
+                  `response.pipe(file)` 直接落盘 —— 远端 404 的正文（raw 是 "404: Not Found"，
+                  jsDelivr 是整页 HTML）会被当成文件内容写进 .js，静默写坏、且下次启动才炸。
+               ⇒ 这里改成自己的下载器：
+                  · 每个文件独立在「已验证基址 → 官方 → 各镜像」之间回退，单文件超时 12s；
+                  · PC（有 lib.node）走 fetch → 校验状态码 → fs 落盘，目录不存在自动建；
+                    手机（无 lib.node）退回 game.download（那条通道没有状态码可查，只能靠换源）；
+                  · 3 路并发（与引擎同速），全部成功才重启；有失败就列清单、留按钮、允许重试。 */
+            var EXT_DIR_NAME = "池子魔将";
+            function resolveExtRoot() {
+                try {
+                    if (!lib.node || !lib.node.fs || !lib.node.path) return "";
+                    var p = lib.node.path, fs = lib.node.fs, cands = [];
+                    try { if (typeof window !== "undefined" && typeof window.__dirname === "string") cands.push(window.__dirname); } catch (e0) {}
+                    try { cands.push(p.resolve()); } catch (e1) {}
+                    try { if (typeof __dirname === "string") { cands.push(__dirname); cands.push(p.join(__dirname, "..", "..")); } } catch (e2) {}
+                    for (var i = 0; i < cands.length; i++) {
+                        var base = cands[i];
+                        if (!base) continue;
+                        var ext = p.join(base, "extension", EXT_DIR_NAME);
+                        try { if (fs.existsSync(p.join(ext, "info.json"))) return ext; } catch (eX) {}
+                    }
+                } catch (e) {}
+                return "";
+            }
+            function fetchBin(url, ms) {
+                return new Promise(function (resolve, reject) {
+                    var done = false, ctrl = null, to = 0;
+                    function fin(ok, v) {
+                        if (done) return;
+                        done = true;
+                        if (to) clearTimeout(to);
+                        try { if (ctrl) ctrl.abort(); } catch (eA) {}
+                        ok ? resolve(v) : reject(v);
+                    }
+                    to = setTimeout(function () { fin(false, new Error("连接超时")); }, ms);
+                    try {
+                        if (typeof AbortController === "function") ctrl = new AbortController();
+                        fetch(url, {
+                            cache: "no-store",
+                            referrerPolicy: "no-referrer",
+                            signal: ctrl ? ctrl.signal : undefined,
+                        }).then(function (r) {
+                            if (!r.ok) throw new Error("HTTP " + r.status);
+                            return r.arrayBuffer();
+                        }).then(function (buf) { fin(true, new Uint8Array(buf)); })
+                          .catch(function (e) { fin(false, e); });
+                    } catch (e0) { fin(false, e0); }
+                });
+            }
+            /* 基址候选：**先用本次 info.json 验证通过的那个**（它一定有本扩展的文件），
+               再官方 raw，最后各镜像。同一个文件在这里面从头试到尾才算失败。 */
+            function updateBases() {
+                var list = [];
+                var first = _cshUpdBase || CSH_UPDATE_SRC;
+                list.push(first);
+                if (first !== CSH_UPDATE_SRC) list.push(CSH_UPDATE_SRC);
+                for (var i = 0; i < CSH_UPDATE_MIRRORS.length; i++) {
+                    if (list.indexOf(CSH_UPDATE_MIRRORS[i]) < 0) list.push(CSH_UPDATE_MIRRORS[i]);
+                }
+                return list;
+            }
+            function startUpdate(info, remoteVer, goBtn, closeBtn) {
                 status.textContent = "准备更新到 " + remoteVer + " …（代码重下 + 素材补缺）";
                 var files = (info.files || []).slice();
                 if (files.indexOf("extension.js") < 0) files.push("extension.js");
@@ -6942,45 +7166,126 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                     var f = String(files[i]);
                     if (cshIsCode(f)) code.push(f); else mediaLocal.push(CSH_UPDATE_EXT + f);
                 }
-                var proceed = function () {
+                function unlock() {
+                    try { if (goBtn) goBtn.disabled = false; } catch (e1) {}
+                    try { if (closeBtn) closeBtn.disabled = false; } catch (e2) {}
+                }
+                function proceed() {
                     /* mediaLocal 已被 checkFileList 就地剪枝 → 只剩「本机缺失」的素材；转回相对路径 */
                     var missing = [];
                     for (var m = 0; m < mediaLocal.length; m++) missing.push(String(mediaLocal[m]).slice(CSH_UPDATE_EXT.length));
                     var toGet = code.concat(missing);
-                    if (!toGet.length) { status.textContent = "没有需要更新的文件。"; return; }
-                    var urls = [];
-                    for (var u = 0; u < toGet.length; u++) urls.push(CSH_UPDATE_SRC + toGet[u]);
-                    var done = 0, total = urls.length;
-                    game.multiDownload(
-                        urls,
-                        function () { done++; status.textContent = "下载中 " + done + " / " + total + " …"; },
-                        function (e) { status.textContent = "更新失败：" + ((e && e.source) || "文件下载失败") + "\n可关闭后重试。"; },
-                        function () {
-                            status.textContent = "更新完成，正在重启游戏…";
-                            setTimeout(function () { try { game.reload(); } catch (eR) { location.reload(); } }, 1200);
-                        },
-                        function (cur) { return "extension/" + String(cur).slice(CSH_UPDATE_SRC.length); }
-                    );
-                };
+                    if (!toGet.length) { status.textContent = "没有需要更新的文件。"; unlock(); return; }
+
+                    var bases = updateBases();
+                    var extRoot = resolveExtRoot();     /* 非空 = PC，可自行校验+落盘 */
+                    var total = toGet.length, cursor = 0, active = 0, doneCnt = 0;
+                    var failed = [], prefBase = 0;      /* prefBase：上次成功的源，下次从它开始试 */
+
+                    function shortName(rel) {
+                        var s = String(rel);
+                        return s.slice(s.lastIndexOf("/") + 1);
+                    }
+                    function downloadOne(rel) {
+                        return new Promise(function (resolve) {
+                            var tried = 0;
+                            function attempt() {
+                                if (tried >= bases.length) { resolve(false); return; }
+                                var idxBase = (prefBase + tried) % bases.length;
+                                var base = bases[idxBase];
+                                tried++;
+                                var tag = tried > 1 ? "（换源 " + tried + "/" + bases.length + "）" : "";
+                                status.textContent = "下载中 " + doneCnt + " / " + total + " · " + shortName(rel) + tag;
+                                var url = base + rel;
+                                var go = extRoot
+                                    ? fetchBin(url, 12000).then(function (bytes) {
+                                        if (!bytes || !bytes.length) throw new Error("空文件");
+                                        var p = lib.node.path;
+                                        var full = p.join(extRoot, rel);
+                                        var dir = p.dirname(full);
+                                        try { if (!lib.node.fs.existsSync(dir)) lib.node.fs.mkdirSync(dir, { recursive: true }); } catch (eMk) {}
+                                        /* 直接写 Uint8Array —— 不依赖 Buffer 全局（个别渲染进程上下文没有） */
+                                        lib.node.fs.writeFileSync(full, bytes);
+                                    })
+                                    : new Promise(function (res2, rej2) {
+                                        /* 手机端：只能借引擎通道（它会自己建目录），失败按异常处理 */
+                                        try {
+                                            game.download(url, "extension/" + EXT_DIR_NAME + "/" + rel,
+                                                function () { res2(); }, function () { rej2(new Error("下载失败")); });
+                                        } catch (eD) { rej2(eD); }
+                                    });
+                                go.then(function () {
+                                    prefBase = idxBase;
+                                    resolve(true);
+                                }).catch(function () {
+                                    attempt();
+                                });
+                            }
+                            attempt();
+                        });
+                    }
+                    function finishAll() {
+                        if (failed.length) {
+                            var head = "更新未完成：有 " + failed.length + " 个文件没下下来。\n";
+                            var listTxt = failed.slice(0, 6).join("\n");
+                            if (failed.length > 6) listTxt += "\n…";
+                            status.textContent = head + listTxt +
+                                "\n\n已下载的部分会保留，再点「立即更新」只补缺，不会从头再来。\n（本次没有重启，游戏仍是可用的。）";
+                            unlock();
+                            return;
+                        }
+                        status.textContent = "更新完成（" + doneCnt + " 个文件），正在重启游戏…";
+                        setTimeout(function () { try { game.reload(); } catch (eR) { location.reload(); } }, 1200);
+                    }
+                    function pump() {
+                        while (active < 3 && cursor < total) {
+                            (function (rel) {
+                                active++;
+                                downloadOne(rel).then(function (ok) {
+                                    active--;
+                                    doneCnt++;
+                                    if (!ok) failed.push(rel);
+                                    pump();
+                                });
+                            })(toGet[cursor++]);
+                        }
+                        if (active === 0 && cursor >= total) finishAll();
+                    }
+                    pump();
+                }
                 /* checkFileList 只负责"素材补缺"；代码项不进这个名单，才能每次都重下 */
                 try { game.checkFileList(mediaLocal, proceed); } catch (eC) { proceed(); }
             }
 
-            fetch(CSH_UPDATE_SRC + "catalog.js", { cache: "no-store", referrerPolicy: "no-referrer" }).then(function (r) {
-                if (!r.ok) throw new Error("HTTP " + r.status);
-                return r.text();
-            }).then(function (txt) {
+            /* 目录解析 + 结果呈现：在线 / 缓存共用一套，避免两份版本比较逻辑漂移。
+               cached 时只回答"上次已知版本 + 缓存时间"，不给「立即更新」按钮（网络不可用，点了也白点）。 */
+            function applyCatalog(txt, cached, ageText) {
                 /* catalog.js = `window.extension = {...};`（JSON.stringify 产物）→ 截出 JSON 解析，
                    不用 eval（避免把远端脚本当代码执行）。 */
                 var body = txt.slice(txt.indexOf("{"), txt.lastIndexOf("}") + 1);
                 var j = null;
-                try { j = JSON.parse(body); } catch (eP) { throw new Error("更新目录解析失败"); }
+                try { j = JSON.parse(body); } catch (eP) {
+                    status.textContent = cached ? "本地缓存的更新目录已损坏；联网后再试即可。"
+                        : "更新目录解析失败（远端文件格式异常）。";
+                    return;
+                }
                 var info = j && j["池子魔将"];
-                if (!info || !info.version) throw new Error("更新目录缺少版本信息");
+                if (!info || !info.version) { status.textContent = "更新目录缺少版本信息。"; return; }
                 var remoteVer = String(info.version);
-                if (!localVer) { status.textContent = "本机版本未知；远端最新为 " + remoteVer + "。"; return; }
+                if (!cached) cshCacheWrite(txt, _cshUpdBase);
+                var head = cached
+                    ? "当前无法连接更新源（已使用" + (ageText || "上次") + "的缓存目录，远端 " + remoteVer + "）。\n"
+                    : "";
+                if (!localVer) {
+                    status.textContent = head + "本机版本未知；远端最新为 " + remoteVer + "。";
+                    return;
+                }
                 if (cshVerCmp(remoteVer, localVer) <= 0) {
-                    status.textContent = "已是最新版本（当前 " + localVer + "，远端 " + remoteVer + "）。";
+                    status.textContent = head + "已是最新版本（当前 " + localVer + "，远端 " + remoteVer + "）。";
+                    return;
+                }
+                if (cached) {
+                    status.textContent = head + "本机 " + localVer + " 可更新，但当前网络不可用；联网后重试即可。";
                     return;
                 }
                 status.textContent = "发现新版本 " + remoteVer + "（当前 " + localVer + "）。\n是否在线更新？更新完成后游戏会自动重启。";
@@ -6991,12 +7296,53 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                 goBtn.addEventListener("click", function () {
                     goBtn.disabled = true;
                     closeBtn.disabled = true;
-                    startUpdate(info, remoteVer);
+                    startUpdate(info, remoteVer, goBtn, closeBtn);
                 }, false);
                 row.insertBefore(goBtn, row.firstChild);
-            }).catch(function (e) {
-                status.textContent = "检查更新失败：" + ((e && e.message) || e) +
-                    "。\n（网络不可用时可稍后再试；不影响游戏正常运行）";
+            }
+
+            /* 两阶段取目录：小包比版本 → 真有新版才拉 35KB catalog。
+               任何一个环节失败都往下兜（目录直拉 → 目录缓存 → 版本缓存 → 中性失败），
+               绝不把玩家留在「正在检查…」的死胡同里。 */
+            var _triedCatalog = false;
+            function loadCatalogOnce() {
+                if (_triedCatalog) return Promise.reject(new Error("已尝试过"));
+                _triedCatalog = true;
+                return cshFetchManifest().then(function (m) {
+                    _cshUpdBase = m.base || _cshUpdBase;
+                    applyCatalog(m.txt, false, "");
+                });
+            }
+            cshFetchVer().then(function (v) {
+                _cshUpdBase = v.base || _cshUpdBase;
+                cshVerCacheWrite(v.ver, _cshUpdBase);
+                if (localVer && cshVerCmp(v.ver, localVer) <= 0) {
+                    /* 最常见的一条路：版本没变，240B 收工，一次都不碰 catalog */
+                    status.textContent = "已是最新版本（当前 " + localVer + "）。";
+                    return;
+                }
+                status.textContent = "发现新版本 " + v.ver + "，正在获取文件清单…";
+                return loadCatalogOnce();
+            }).catch(function () {
+                /* ① info.json 阶段全挂（老仓库没这个文件 / 全源不通）→ 退回 catalog 直拉，行为与旧版一致 */
+                return loadCatalogOnce().catch(function () {
+                    /* ② 在线全挂 → 缓存兜底：优先整份目录（能给出按钮），其次只用版本小包如实回答 */
+                    var c = cshCacheRead();
+                    if (c) {
+                        _cshUpdBase = c.base || _cshUpdBase;
+                        applyCatalog(c.txt, true, cshAgo(c.ts));
+                        return;
+                    }
+                    var cv = cshVerCacheRead();
+                    if (cv) {
+                        status.textContent = "当前无法连接更新源。\n上次成功检查是在 " + cshAgo(cv.ts) +
+                            "，当时远端最新为 " + cv.ver +
+                            (localVer ? "（本机 " + localVer + "）。" : "。") +
+                            "\n可稍后再试；不影响游戏正常运行。";
+                        return;
+                    }
+                    status.textContent = "检查更新失败：无法连接更新源（已尝试官方源与两个镜像）。\n可稍后再试；不影响游戏正常运行。";
+                });
             });
             return true;
         };
@@ -7048,29 +7394,55 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                 {
                     var st = document.createElement("style");
                     st.id = "csh-dbg-float-css";
+                    /* 书法体：项目自带的 OFL 志莽行书子集（font/csh_fx_font_3.woff2，4058 字）。
+                       用绝对 URL 拼（相对 document.baseURI = 引擎根 index.html），
+                       这样挂在对局页/任何 iframe 里都指得对。
+                       只用于「池」这一个字 —— 它承担的是印章的视觉重量，不是正文可读性。 */
                     st.textContent = [
-                        "@keyframes cshDbgBreath{0%,100%{filter:drop-shadow(0 0 0 rgba(var(--csh-accent-rgb),0));}50%{filter:drop-shadow(0 0 9px rgba(var(--csh-accent-rgb),.45));}}",
-                        /* 悬浮球挂在 documentElement（不随 body 缩放），所以用真实像素：
-                         * 手机端 clamp 到 44px 以上才点得中；touch-action:none 阻止 WebView 抢手势 */
+                        /* ══════════════════════════════════════════════════════════
+                           悬浮球 · 第四版（2026-10-18 · 作者：「越改越差」「字体跟背景撞色」
+                           「做成圆形」「再小一点」「要有高级感」「规范里不一定正确」）
+                           ------------------------------------------------------------------
+                           前三版错在同一个地方：**把"装饰"当成了"设计"**。
+                           金边、拉丝、内框、金属渐变字、五层阴影 —— 每一样单独看都对，
+                           叠在一起就互相抢戏；更要命的是"暗金底 + 暗金字"，
+                           字和背景明度几乎一样，**看不清**。球上只有一个字，
+                           它唯一的工作是被认出来，其他都是次要的。
+
+                           这一版做减法，四条硬约束：
+                             ① **对比优先**：象牙白底 + 墨色字。深色牌桌上它是全场最亮的一点，
+                                字永远清楚；也不再和任何皮肤撞色。
+                             ② **圆形**：入口/按钮的标准形态，比方印更轻、更小、更不挡视线。
+                             ③ **小**：clamp(38px,10vmin,44px)（上一版 48~60，确实偏大）。
+                             ④ **静**：去掉呼吸动画和金色光晕。高级感来自"不动"和"克制"，
+                                不来自堆效果。悬停才抬 1px。
+                           字体换回**宋体粗**：书法体在 20 出头的小尺寸里笔画会糊在一起，
+                           而宋体有笔锋、有起收、横细竖粗 —— 清晰又不中庸，正好是"印章/纸墨"的调性。
+                           ══════════════════════════════════════════════════════════ */
                         "#csh-dbg-float-btn{position:fixed!important;z-index:999990!important;box-sizing:border-box!important;",
-                        "width:clamp(44px,12vmin,56px)!important;height:clamp(44px,12vmin,56px)!important;border-radius:16px!important;",
-                        "display:flex!important;align-items:center!important;justify-content:center!important;flex-direction:column!important;",
+                        "width:clamp(38px,10vmin,44px)!important;height:clamp(38px,10vmin,44px)!important;border-radius:50%!important;",
+                        "display:flex!important;align-items:center!important;justify-content:center!important;",
                         "padding:0!important;margin:0!important;overflow:hidden!important;",
-                        "background:var(--csh-fg)!important;",
-                        "border:1px solid rgba(var(--csh-bg-rgb),.10)!important;color:var(--csh-bg)!important;",
-                        "font-family:system-ui,-apple-system,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif!important;font-weight:600!important;line-height:1!important;",
+                        "background:linear-gradient(180deg,#fcf8ed 0%,#efe4cc 100%)!important;",
+                        "border:1px solid rgba(116,92,52,.22)!important;",
+                        "color:#241d14!important;",
                         "cursor:grab!important;user-select:none!important;pointer-events:auto!important;",
                         "touch-action:none!important;-webkit-tap-highlight-color:transparent!important;",
-                        "box-shadow:0 2px 6px rgba(var(--csh-bg-rgb),.06),0 16px 40px -16px rgba(var(--csh-bg-rgb),.28)!important;",
-                        "transition:transform .18s cubic-bezier(.22,.61,.36,1),box-shadow .24s ease,background .18s ease,border-color .18s ease!important;",
-                        "animation:cshDbgBreath 3.6s ease-in-out infinite!important;}",
-                        "#csh-dbg-float-btn:hover{transform:scale(1.08)!important;color:var(--csh-accent-ink)!important;background:var(--csh-accent)!important;border-color:var(--csh-accent)!important;box-shadow:0 6px 20px -6px rgba(var(--csh-accent-rgb),.60)!important;}",
-                        "#csh-dbg-float-btn.csh-dragging{cursor:grabbing!important;animation:none!important;transform:scale(1.04)!important;}",
-                        /* 单字「池」：字号占满圆球，居中对齐 */
+                        "box-shadow:0 6px 16px -6px rgba(0,0,0,.55),0 2px 4px -1px rgba(0,0,0,.3),",
+                        "inset 0 1px 0 rgba(255,255,255,.92)!important;",
+                        "transition:transform .18s cubic-bezier(.22,.61,.36,1),box-shadow .22s ease,opacity .35s ease!important;",
+                        "animation:none!important;}",
+                        "#csh-dbg-float-btn:hover{transform:translateY(-1px) scale(1.06)!important;",
+                        "box-shadow:0 10px 22px -8px rgba(0,0,0,.6),0 3px 6px -1px rgba(0,0,0,.34),",
+                        "inset 0 1px 0 rgba(255,255,255,.95)!important;}",
+                        "#csh-dbg-float-btn.csh-dragging{transform:scale(1.08)!important;cursor:grabbing!important;",
+                        "transition:transform .12s ease!important;}",
+                        "#csh-dbg-float-btn.csh-dbg-idle{opacity:.5!important;}",
                         "#csh-dbg-float-btn .csh-dbg-fb-main{display:block!important;position:static!important;",
-                        "font-size:clamp(22px,6.2vmin,29px)!important;line-height:1!important;",
-                        "letter-spacing:0!important;text-align:center!important;",
-                        "text-shadow:none!important;}",
+                        "font-family:'Songti SC','STSong','SimSun','Noto Serif SC',serif!important;",
+                        "font-size:clamp(18px,4.8vmin,22px)!important;font-weight:700!important;line-height:1!important;",
+                        "letter-spacing:0!important;color:#241d14!important;text-align:center!important;",
+                        "text-shadow:0 1px 0 rgba(255,255,255,.7)!important;}",
                     ].join("");
                     (document.head || document.documentElement).appendChild(st);
                 }
@@ -7171,7 +7543,29 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                     var top = parseFloat(btn.style.top);
                     ptr.id = null;
                     if (wasDrag) {
-                        if (!isNaN(left) && !isNaN(top)) saveFloatPos(left, top);
+                        /* 2026-10-18 · 贴边轻吸附：只在离边 ≤24px 时对齐（微信浮窗 / Chat Head 的通行做法）。
+                           不做全屏强制吸附 —— 玩家把球摆在牌桌侧边中间是有意的，不该被拽走。 */
+                        var w = btn.offsetWidth || 48, h = btn.offsetHeight || 48;
+                        var vw = window.innerWidth || 800, vh = window.innerHeight || 600;
+                        var SNAP = 24;
+                        if (!isNaN(left) && !isNaN(top)) {
+                            if (left <= SNAP) left = 0;
+                            else if (left + w >= vw - SNAP) left = Math.max(0, vw - w);
+                            if (top <= SNAP) top = 0;
+                            else if (top + h >= vh - SNAP) top = Math.max(0, vh - h);
+                            /* 吸附时给一段短过渡，手感才是"滑过去"而不是"跳过去" */
+                            var needSnap = (left !== parseFloat(btn.style.left)) || (top !== parseFloat(btn.style.top));
+                            if (needSnap) {
+                                var oldTr = btn.style.transition;
+                                btn.style.transition = "left .18s cubic-bezier(.22,.61,.36,1),top .18s cubic-bezier(.22,.61,.36,1)";
+                                btn.style.left = left + "px";
+                                btn.style.top = top + "px";
+                                setTimeout(function () {
+                                    try { btn.style.transition = oldTr || ""; } catch (eTr) {}
+                                }, 220);
+                            }
+                            saveFloatPos(left, top);
+                        }
                         // 拖动后浏览器仍会补一个 click，这里把它吞掉，避免拖完误触打开
                         lastToggle = Date.now();
                         try { console.log("[池子调试] 悬浮球拖动结束", left, top); } catch (e1) {}
@@ -7242,6 +7636,69 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                         saveFloatPos(cx, cy);
                     }
                 } catch (eClamp) {}
+
+                /* ---------- 闲置淡出（2026-10-18） ----------
+                   球常驻对局界面，一直亮着会抢视觉焦点（尤其牌桌暗底 + 黄铜高光）。
+                   3s 无交互降到 .45，一碰就恢复。拖动中 / 面板打开时不淡出 ——
+                   那时候球正在被用，变淡反而是负面反馈。 */
+                var idleTo = 0;
+                function wake() {
+                    try { btn.classList.remove("csh-dbg-idle"); } catch (eW) {}
+                    if (idleTo) clearTimeout(idleTo);
+                    idleTo = setTimeout(function () {
+                        idleTo = 0;
+                        if (ptr.id != null) { wake(); return; }
+                        if (document.getElementById("csh-dbg-overlay")) { wake(); return; }
+                        try { btn.classList.add("csh-dbg-idle"); } catch (eI) {}
+                    }, 3000);
+                }
+                btn.addEventListener("pointerenter", wake, true);
+                btn.addEventListener("pointerdown", wake, true);
+                btn.addEventListener("mouseenter", wake, true);
+                try { btn.addEventListener("touchstart", wake, { capture: true, passive: true }); } catch (eT) {}
+                wake();
+
+                /* ---------- 视口变化重新钳制（2026-10-18） ----------
+                   此前只在**挂载那一刻**钳一次（见上方 eClamp 块）。手机横竖屏切换、
+                   桌面改窗口大小之后，存档里的 left/top 会落到屏幕外 —— 球就此消失，
+                   玩家只能清存档才找得回来。这里补 resize / orientationchange。
+                   ★ 只处理"已经被拖过、有内联 left/top"的球：从未拖过的球是
+                      right/bottom 锚定的，让它自然跟随右下角才对，不能硬写死坐标。 */
+                function reclamp() {
+                    try {
+                        if (!btn.parentNode) return;
+                        var lx = parseFloat(btn.style.left), ly = parseFloat(btn.style.top);
+                        if (isNaN(lx) || isNaN(ly)) return;
+                        var w = btn.offsetWidth || 48, h = btn.offsetHeight || 48;
+                        var vw = window.innerWidth || 800, vh = window.innerHeight || 600;
+                        var nx = Math.max(0, Math.min(Math.max(0, vw - w), lx));
+                        var ny = Math.max(0, Math.min(Math.max(0, vh - h), ly));
+                        if (nx !== lx || ny !== ly) {
+                            btn.style.left = nx + "px";
+                            btn.style.top = ny + "px";
+                            btn.style.right = "auto";
+                            btn.style.bottom = "auto";
+                            saveFloatPos(nx, ny);
+                        }
+                    } catch (eRc) {}
+                }
+                var rzTo = 0;
+                function onViewport() {
+                    if (rzTo) clearTimeout(rzTo);
+                    /* 旋转/缩放过程会连发十几个事件；稳定下来再算一次就够了 */
+                    rzTo = setTimeout(function () { rzTo = 0; reclamp(); }, 120);
+                }
+                /* 重挂时先摘掉上一条，避免监听器随挂载次数累积 */
+                try {
+                    if (lib.__cshFloatRz) {
+                        window.removeEventListener("resize", lib.__cshFloatRz, false);
+                        window.removeEventListener("orientationchange", lib.__cshFloatRz, false);
+                    }
+                } catch (eRb) {}
+                lib.__cshFloatRz = onViewport;
+                window.addEventListener("resize", onViewport, false);
+                window.addEventListener("orientationchange", onViewport, false);
+
                 try { console.log("[池子调试] 悬浮球已挂载"); } catch (e1) {}
                 return true;
             } catch (e) {

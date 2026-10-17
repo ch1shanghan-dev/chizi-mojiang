@@ -4,6 +4,8 @@ import { cshBossModeInstall } from "./bossmode.js";
 import { installBossRecord } from "../core/csh_bossrecord.js";
 import { installMarket } from "../core/csh_market.js";
 import { installAffection } from "../core/csh_affection.js";
+import { installUIKit } from "../core/csh_uikit.js";
+import { installKamiChoice, kamiStatus } from "../core/csh_rules.js";
 import { cshBossPackHide } from "../character/boss.js";
 
 /* ============================================================
@@ -23,7 +25,8 @@ import { cshBossPackHide } from "../character/boss.js";
            内容高被截成 ~54vh → 外层滚动范围塌缩成一个**固定的 120px 小段**
            （作者所感「能滚动的范围是固定的」），且与外层双滚动条互相打架（「滚不动」）。
       重做方案（单条原生滚动条 · 一处封顶）：
-        ④ 对话框本体封顶 max-height:70vh（仅含卡牌按钮、非 fullheight 的对话框）——
+        ④ 对话框本体封顶（2026-10-18 起改为**按真实缩放换算的 px**，不再用 70vh，
+           也不用全局选择器；只作用于 JS 内容判定命中的 .csh-egdlg）——
            max-height 与内联 height 是两个属性，**无需 !important** 即可兜底；
            正常面板（十周年UI 45% / 引擎布局约 40vh）不触发，只在「内容撑满、比屏幕还高、
            尾部够不到」时兜底（手机端 75%屏高−80 超屏的场景即此类）；
@@ -44,6 +47,17 @@ import { cshBossPackHide } from "../character/boss.js";
    ★ 2026-10-17 二次修正（作者：除身份模式外全失效）：观察器原本绑 `ui.arena` —— arena 元素
      会随开局重建，绑旧元素等于挂在已摘除的节点上、永不触发。现改绑 `document.documentElement`，
      并补「内联样式」兜底（不依赖 CSS 选择器深度 / 优先级）。
+   ★ 2026-10-18 三次修正（作者实机：一开滚动条，选项→卡牌/扩展页被压成 70vh 还多一条滚动条；
+     关掉后仍残留；手机端更明显）—— 根因两条，都是「用选择器猜形态」的债：
+       ① 旧 CSS 的 `:has(.card.button)` 全局规则会命中引擎主菜单
+          （`ui/create/menu/index.js:135` 造的 `.main.menu.dialog`）：切到卡牌/武将页即含
+          `.card.button` ⇒ 整个选项菜单被 max-height 压扁、overflow:hidden 裁掉下半截。
+       ② `70vh` 是局部视口单位，而对话框活在 `body{transform:scale(documentZoom)}` 里
+          （引擎 ui/index.js:592；十周年UI overrides/ui/update.js 实测）⇒ 实际只有
+          屏幕的 70%×zoom（手机 zoom≈0.4 时只剩 28%），所以手机端更夸张。
+     修法：CSS 只认 JS 内容判定后打上的 `.csh-egdlg`（全局 `:has` 规则永久废弃）；
+          打标器显式排除 `.menu` / `.menu-container`；封顶按「真实可视像素 ÷ 实际缩放」
+          换算成局部 px；关开关或撤销标记时把内联样式一并还原。
    成本：只在新节点插入时做一次 closest('.dialog')，O(1)；没有全表轮询。 */
 var _cshEgMO = null;
 var _cshEgGroupNames = null;
@@ -62,14 +76,20 @@ function cshEgGroupNameSet() {
     _cshEgGroupNames = set;
     return set;
 }
-/* 是不是「选势力」面板：三条判据任一命中即可（覆盖不同内核/模式/按钮形态） */
-function cshEgIsGroupDialog(dlg) {
+/* 主菜单 / 图鉴：引擎 createMenu 造的是 `.main.menu.dialog`（ui/create/menu/index.js:135），
+   切到「卡牌 / 武将」页就含 `.card.button` —— 它不是「选势力」面板。
+   只靠内容判据不足以 100% 排除（图鉴里也可能出现势力名），直接按容器排除。 */
+function cshEgIsMenuDialog(dlg) {
     try {
-        var caps = dlg.querySelectorAll(".caption");
-        for (var c = 0; c < caps.length; c++) {
-            if ((caps[c].textContent || "").indexOf("势力") >= 0) return true;
-        }
-    } catch (eC) {}
+        if (!dlg) return true;
+        if (dlg.classList && dlg.classList.contains("menu")) return true;
+        if (dlg.closest && dlg.closest(".menu-container")) return true;
+    } catch (e) {}
+    return false;
+}
+/* 是不是「选势力」面板：先排除菜单/图鉴，再用内容判据（覆盖不同内核/模式/按钮形态） */
+function cshEgIsGroupDialog(dlg) {
+    if (cshEgIsMenuDialog(dlg)) return false;
     var btns;
     try { btns = dlg.querySelectorAll(".buttons .button"); } catch (eB) { return false; }
     if (!btns || !btns.length) return false;
@@ -78,32 +98,248 @@ function cshEgIsGroupDialog(dlg) {
         var lk = btns[j].link;
         if (lk && typeof lk[2] === "string" && lk[2].indexOf("group_") === 0) return true;
         var tx = (btns[j].textContent || "").trim();
-        if (tx && names[tx]) hit++;
+        if (tx && (names[tx] || (tx.length <= 3 && names[tx.replace(/国$/, "")]))) hit++;
     }
-    return hit >= 3 && hit * 2 >= btns.length;
+    /* 标题可能落在 .caption（chooseButton）也可能落在 .prompt（chooseControl / 某些模式），
+       两边都认；**只要标题提到「势力」就按势力面板处理**（菜单/图鉴已在上面排除）。
+       2026-10-18 修复「只有身份场生效」：2v2 的冷/暖方势力走 chooseControl（控制条），
+       身份场走 chooseButton（对话框）；另外部分模式只有 2 个势力按钮，旧的 hit>=3 会漏。 */
+    var capHit = false;
+    try {
+        var caps = dlg.querySelectorAll(".caption,.prompt");
+        for (var c = 0; c < caps.length; c++) {
+            if ((caps[c].textContent || "").indexOf("势力") >= 0) { capHit = true; break; }
+        }
+    } catch (eC) {}
+    if (capHit) return true;
+    return hit >= 2 && hit * 2 >= btns.length;
 }
-/* ★ 直接写内联样式（不靠 CSS 选择器的 `>` / :has / 优先级）：结构怎么变都按得住 */
+/* 控制条形态（2v2 冷/暖方势力 = chooseControl → #control 里的一条 .control）。
+   引擎的 .control 是 white-space:nowrap + overflow:hidden：按钮一多就被裁掉且无法滚。
+   判据：条内 ≥2 个按钮，且过半是势力名。 */
+function cshEgIsGroupControl(bar) {
+    try {
+        if (!bar || !bar.children) return false;
+        var names = cshEgGroupNameSet(), total = 0, hit = 0;
+        for (var i = 0; i < bar.children.length; i++) {
+            var k = bar.children[i];
+            if (!k || (k.classList && k.classList.contains("removing"))) continue;
+            var tx = (k.textContent || "").trim();
+            if (!tx) continue;
+            total++;
+            if (names[tx] || (tx.length <= 3 && names[tx.replace(/国$/, "")])) hit++;
+        }
+        return total >= 2 && hit >= 2 && hit * 2 >= total;
+    } catch (e) { return false; }
+}
+/* 对话框实际缩放系数 = 屏幕像素 ÷ 局部像素。
+   引擎把 body 整体缩放（素版 transform:scale(documentZoom) / 十周年UI style.zoom），
+   vh 是「局部视口单位」⇒ 70vh 在手机（zoom≈0.4）只剩屏幕的 28%，这正是
+   「手机端这个 BUG 更明显」的根因。取不到就退回 game.documentZoom。 */
+function cshEgViewScale(dlg) {
+    var z = 0;
+    try {
+        var oh = dlg ? dlg.offsetHeight : 0;
+        var rh = dlg ? dlg.getBoundingClientRect().height : 0;
+        if (oh > 0 && rh > 0) z = rh / oh;
+    } catch (e) {}
+    if (!(z > 0.05) || !isFinite(z)) {
+        try { z = (typeof game !== "undefined" && game.documentZoom > 0) ? game.documentZoom : 1; } catch (e2) { z = 1; }
+    }
+    if (!(z > 0.05) || !isFinite(z)) z = 1;
+    return z;
+}
+/* 封顶像素：把「屏幕还能用多少」换算回对话框的局部 px。
+   max-height 只在内容真的超出时才生效，正常尺寸的面板一个像素都不动。 */
+function cshEgCapPx(dlg) {
+    var vh = 0;
+    try { vh = window.innerHeight || document.documentElement.clientHeight || 0; } catch (e) {}
+    if (!vh) return 0;
+    var top = 0;
+    try { top = Math.max(0, Math.min(dlg.getBoundingClientRect().top || 0, vh)); } catch (e2) {}
+    var cap = Math.floor((vh - top - 8) / cshEgViewScale(dlg)); // 8px 呼吸位
+    return Math.max(200, cap);
+}
+/* ★ 宽度上界（2026-10-18 第二修 · 作者提供的实机录像）
+   ------------------------------------------------------------------
+   录像里（一位装了很多扩展的用户）：势力 20+ 个，身份场/对决的势力面板是
+   4 行 × 6 列，**最右一列被切在屏幕外**，中间还压着一条橙色横向滚动条。
+   我用引擎真实的 layout.css 在 headless Chromium 里做了一次定量对照，
+   把「父容器宽度」当自变量（376 = 引擎默认 / 849 = 十周年UI 96% / 1400 = 插件乱改）：
+
+       父宽   .buttons 宽   每行个数   总高
+       376      368          2        1260
+       849      841          5         525
+      1400     1392          9         315      ← 一行 9 个，最后一列在 x=1392，屏幕只有 884
+
+   ⇒ 根因不是"内容太多"，是 **`.buttons` 的宽度跟着一个不受本扩展控制的父容器走**。
+     引擎 `.buttons{width:100%}`（layout.css:1560），而父链上任何一环被 UI 插件
+     /其它扩展改宽，按钮墙就跟着变宽 —— 换行在"错误的宽度"上发生，于是溢出到屏幕外。
+    ⇒ 修法：**只封顶，不设宽**。宽度上界写在 dialog 自己的 `max-width`（被动属性，
+      只在超屏时才生效）；`.buttons` 只留 `max-width:100%` 兜底，**绝不设 width**。
+      ★ 为什么要强调"不设 width"（2026-10-18 第三修）：曾经写成
+        `width: min(100%, 视口宽/缩放)`，它会覆盖引擎的 `calc(100% - 8px)`（layout.css:1857），
+        等于**主动把按钮墙改宽 8px**；同一次处理里又给容器加 `padding-right:10px`（窄 10px）。
+        两个方向一起动，列数就压在临界值上来回跳 —— 作者实机的"每次出现会自动一下"。
+      纵向照旧靠 max-height + 滚动（行数变多是不可避免的，那不是 bug）。 */
+function cshEgCapW(dlg) {
+    var vw = 0;
+    try { vw = window.innerWidth || document.documentElement.clientWidth || 0; } catch (e) {}
+    if (!vw) return 0;
+    return Math.max(220, Math.floor((vw - 16) / cshEgViewScale(dlg)));
+}
+/* ★ 直接写内联样式（不靠 CSS 选择器的 `>` / :has / 优先级）：结构怎么变都按得住。
+   封顶值必须是 px（按真实缩放换算），不能写 vh —— 见 cshEgViewScale 注释。 */
 function cshEgStyleGroupDialog(dlg) {
     try {
-        dlg.style.maxHeight = "70vh";
+        var cap = cshEgCapPx(dlg);
+        var capW = cshEgCapW(dlg);
+        if (cap) dlg.style.maxHeight = cap + "px";
+        /* 对话框本身也钳宽：插件把它拉到 96% 时，靠 maxWidth + 自身的居中 transform
+           会重新回到屏幕中间（translateX(-50%) 按自身宽度算，宽度一变就自动重算）。 */
+        if (capW) dlg.style.maxWidth = capW + "px";
         dlg.style.overflow = "hidden";
         dlg.style.overscrollBehavior = "contain";
+        /* ★ 不再下发 --csh-egw（2026-10-18 第三修）：它唯一的消费者是
+           `.buttons{width:min(100%,var(--csh-egw))}`，而那条规则已经因为"主动改布局"
+           被删除。留着变量只会让下一个人以为还有东西在用它。 */
         var boxes = dlg.querySelectorAll(".content-container");
         if (!boxes.length) boxes = dlg.querySelectorAll(".content");
         for (var i = 0; i < boxes.length; i++) {
             var c = boxes[i];
             if (!c || !c.style) continue;
+            /* 横向改 hidden：宽度已经靠 min() 钳住并换行了，不需要横向滚；
+               留着 auto 只会多出一条压在按钮上的横条（录像里那条橙色线就是它）。 */
+            c.style.overflowX = "hidden";
             c.style.overflowY = "auto";
-            c.style.overflowX = "auto";
             c.style.webkitOverflowScrolling = "touch";
             c.style.overscrollBehavior = "contain";
             c.style.scrollbarColor = "rgba(255,255,255,.45) rgba(0,0,0,.22)";
+            /* ★ 不设 padding-right（2026-10-18 第三修）。
+               旧实现为了给滚动条让位加 10px 内边距 —— 但这会让内容区**变窄**，
+               与"绝不主动改布局"的纪律直接冲突（它正是列数跳变的另一半原因）。
+               滚动条改窄到 8px + 半透明（见 CSS 的 ::-webkit-scrollbar），压在按钮边缘不碍事。
+               box-sizing 保留：它不改变宽度，只是让 max-width 的算法与内边距一致。 */
+            try { c.style.boxSizing = "border-box"; } catch (eB) {}
         }
+        /* 按钮墙：**只封顶，绝不设 width**（见 cshEgScrollApply 里那条 CSS 的注释）。
+           设 width 会覆盖引擎的 `calc(100% - 8px)` ⇒ 宽 8px ⇒ 按钮列数在临界值上跳变，
+           那正是作者看到的"从图一变成图二"。压制插件用的 !important 只需要 max-width。 */
+        var bars = dlg.querySelectorAll(".buttons");
+        for (var j = 0; j < bars.length; j++) {
+            var b = bars[j];
+            if (!b || !b.style) continue;
+            try {
+                b.style.setProperty("max-width", "100%", "important");
+                b.style.setProperty("box-sizing", "border-box", "important");
+            } catch (eBs) {}
+        }
+        /* 实测纠偏：万一插件把 left 定死（不是居中），maxWidth 救不了右边界，这里再推回来。
+           只在真溢出时动一次，不动就不碰 —— 避免和插件的定位/动画打架。 */
+        try {
+            var r = dlg.getBoundingClientRect();
+            var vw = window.innerWidth || document.documentElement.clientWidth || 0;
+            var z = cshEgViewScale(dlg) || 1;
+            if (vw && r.right > vw - 4) {
+                var dx = Math.ceil((r.right - (vw - 4)) / z);
+                dlg.style.marginLeft = (-dx) + "px";
+            } else if (vw && r.left < 4) {
+                var dx2 = Math.ceil((4 - r.left) / z);
+                dlg.style.marginLeft = dx2 + "px";
+            }
+        } catch (eSh) {}
     } catch (eS) {}
+}
+/* 控制条限宽 + 横向滚动（2v2 冷/暖方势力）：不裁按钮、可左右滑。
+   注意：引擎在创建时按未限宽的 offsetWidth 设了 translateX(-w/2)，限宽后要重新居中。 */
+function cshEgStyleGroupControl(bar) {
+    try {
+        var vw = window.innerWidth || document.documentElement.clientWidth || 0;
+        if (!vw) return;
+        bar.style.maxWidth = Math.max(180, Math.floor((vw - 16) / cshEgViewScale(bar))) + "px";
+        bar.style.overflowX = "auto";
+        bar.style.overflowY = "hidden";
+        bar.style.webkitOverflowScrolling = "touch";
+        bar.style.overscrollBehavior = "contain";
+        bar.style.scrollbarWidth = "thin";
+        try { bar.style.transform = "translateX(-" + Math.round(bar.offsetWidth / 2) + "px)"; } catch (e2) {}
+    } catch (eC) {}
+}
+function cshEgUnstyleControl(bar) {
+    try {
+        if (!bar) return;
+        bar.style.maxWidth = "";
+        bar.style.overflowX = "";
+        bar.style.overflowY = "";
+        bar.style.webkitOverflowScrolling = "";
+        bar.style.overscrollBehavior = "";
+        bar.style.scrollbarWidth = "";
+        bar.classList.remove("csh-egctrl");
+        try { bar.style.transform = "translateX(-" + Math.round(bar.offsetWidth / 2) + "px)"; } catch (e2) {}
+    } catch (e) {}
+}
+/* 还原：关开关 / 面板复用 / 误标时把内联样式与标记一起撤掉（旧实现只加不减，
+   关掉开关后 70vh 与滚动条仍粘在菜单上 —— 作者实机「关闭之后」那张图的根因）。 */
+function cshEgUnstyle(dlg) {
+    try {
+        if (!dlg) return;
+        dlg.style.maxHeight = "";
+        dlg.style.maxWidth = "";
+        dlg.style.overflow = "";
+        dlg.style.overscrollBehavior = "";
+        dlg.style.marginLeft = "";
+        try { dlg.style.removeProperty("--csh-egw"); } catch (eV) {}
+        var boxes = dlg.querySelectorAll(".content-container");
+        if (!boxes.length) boxes = dlg.querySelectorAll(".content");
+        for (var i = 0; i < boxes.length; i++) {
+            var c = boxes[i];
+            if (!c || !c.style) continue;
+            c.style.overflowY = "";
+            c.style.overflowX = "";
+            c.style.webkitOverflowScrolling = "";
+            c.style.overscrollBehavior = "";
+            c.style.scrollbarColor = "";
+            c.style.paddingRight = "";
+            c.style.boxSizing = "";
+        }
+        var bars = dlg.querySelectorAll(".buttons");
+        for (var j = 0; j < bars.length; j++) {
+            var b = bars[j];
+            if (!b || !b.style) continue;
+            try {
+                b.style.removeProperty("width");
+                b.style.removeProperty("max-width");
+                b.style.removeProperty("box-sizing");
+            } catch (eB) {}
+        }
+        dlg.classList.remove("csh-egdlg");
+    } catch (eU) {}
+}
+function cshEgClearAll() {
+    try {
+        var list = document.querySelectorAll(".csh-egdlg");
+        for (var i = 0; i < list.length; i++) cshEgUnstyle(list[i]);
+        var bars = document.querySelectorAll(".csh-egctrl");
+        for (var j = 0; j < bars.length; j++) cshEgUnstyleControl(bars[j]);
+    } catch (eC) {}
 }
 function cshEgTryTag(el) {
     try {
         if (!el || el.nodeType !== 1) return;
+        /* ① 控制条形态（2v2 冷/暖方势力 = chooseControl → .control，不在 dialog 里） */
+        var bar = (el.classList && el.classList.contains("control")) ? el
+            : (el.closest ? el.closest(".control") : null);
+        if (bar && !bar.classList.contains("csh-egctrl") && !(bar.closest && bar.closest(".dialog"))) {
+            if (cshEgIsGroupControl(bar)) {
+                bar.classList.add("csh-egctrl");
+                cshEgStyleGroupControl(bar);
+                try {
+                    if (lib.cshDebug && typeof lib.cshDebug.info === "function")
+                        lib.cshDebug.info("eg-scroll 命中势力控制条 · 按钮数=" + bar.children.length);
+                } catch (eD0) {}
+            }
+        }
+        /* ② 对话框形态 */
         var dlg = (el.classList && el.classList.contains("dialog")) ? el
             : (el.closest ? el.closest(".dialog") : null);
         if (!dlg || dlg.classList.contains("csh-egdlg")) return;
@@ -122,7 +358,8 @@ function cshEgTryTag(el) {
 function cshEgGroupObserve(on) {
     try {
         if (_cshEgMO) { _cshEgMO.disconnect(); _cshEgMO = null; }
-        if (!on || typeof window === "undefined" || !window.MutationObserver) return;
+        if (!on) { cshEgClearAll(); return; }
+        if (typeof window === "undefined" || !window.MutationObserver) return;
         /* ★ 监听 documentElement 而不是 ui.arena：arena 元素可能随开局被重建，
            若绑在旧元素上，观察器等于挂在一个已摘除的节点上、永不触发
            （这正是「身份模式生效、其他模式全失效」的最强嫌疑）。 */
@@ -133,60 +370,67 @@ function cshEgGroupObserve(on) {
             }
         });
         _cshEgMO.observe(document.documentElement, { childList: true, subtree: true });
-        /* 首扫一次（进入本局前可能已有面板在场） */
+        /* 首扫一次（进入本局前可能已有面板/控制条在场） */
         var ds = document.querySelectorAll(".dialog");
         for (var k = 0; k < ds.length; k++) cshEgTryTag(ds[k]);
+        var cs = document.querySelectorAll("#control .control");
+        for (var m = 0; m < cs.length; m++) cshEgTryTag(cs[m]);
     } catch (eO) {}
 }
 function cshEgScrollApply(force) {
     try {
+        /* 2026-10-18 第二十二批：默认值改为**关闭**（作者定案）。
+           旧判断 `!== false` 在「从未设置过」（undefined）时会判定为开启 —— 那正是默认开启。
+           现在要求显式 === true 才生效：没配置过 = 关，玩家主动打开才算数。
+           同时注意：本开关只影响「本扩展额外加的滚动条与限宽限高」，
+           引擎自己的 `.content-container{overflow:scroll}` 始终在（我们关掉的是**我们在上面加的**那层样式）。 */
         var on = (force === undefined)
-            ? (lib.config["extension_池子魔将_csh_eg_group_scroll"] !== false)
+            ? (lib.config["extension_池子魔将_csh_eg_group_scroll"] === true)
             : !!force;
         if (!document.getElementById("csh_eg_scroll_css")) {
             var st = document.createElement("style");
             st.id = "csh_eg_scroll_css";
-            var dlgSel = ".csh-egsc .dialog:not(.fullheight):has(.card.button)";
-            /* 滚动阴影（local 随内容滚 + scroll 固定两层）：卡牌形与 .csh-egdlg 两套规则共用一份 */
+            /* 滚动阴影（local 随内容滚 + scroll 固定两层）：随 .content-container 走 */
             var scbg = "background:linear-gradient(rgba(0,0,0,.22),rgba(0,0,0,0)) 0 0/100% 14px no-repeat local,"
                 + "linear-gradient(rgba(0,0,0,0),rgba(0,0,0,.22)) 0 100%/100% 14px no-repeat local,"
                 + "radial-gradient(farthest-side at 50% 0,rgba(0,0,0,.30),rgba(0,0,0,0)) 0 0/100% 7px no-repeat scroll,"
                 + "radial-gradient(farthest-side at 50% 100%,rgba(0,0,0,.30),rgba(0,0,0,0)) 0 100%/100% 7px no-repeat scroll";
             st.textContent = [
-                /* ④ 对话框本体封顶（内联 height 由引擎/十周年UI 写死，max-height 独立生效兜底）+
-                   overflow:hidden 使其成为滚动链终点：滚轮在标题/空白处也不会把滚动冒泡给
-                   页面（防止「滑主界面」——主界面随滚轮整体上下动）。 */
-                dlgSel + "{max-height:70vh;overflow:hidden;overscroll-behavior:contain}",
-                /* ⑤ 原生滚动容器接管：单条纵向滚动 + 滚动阴影（上下渐隐）+ 滚动条
-                   （阴影同 2026-10-16 深夜五方案：local 随内容滚 + scroll 固定两层；
-                    深夜八强化：条宽 10px + 轨道 + 提亮 + 悬停，做到「一眼见一条」） */
-                /* ★ 注意：Chromium 里「标准滚动条属性」（scrollbar-width/color）一旦设置会屏蔽
-                   ::-webkit-scrollbar 样式，二者互斥 —— 故只设 scrollbar-color（新内核走配色、
-                   旧内核不识别则走下方 webkit 样式），滚动条宽度保持默认（最醒目）。 */
-                dlgSel + ">.content-container{overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;scrollbar-color:rgba(255,255,255,.45) rgba(0,0,0,.22);"
-                + "background:linear-gradient(rgba(0,0,0,.22),rgba(0,0,0,0)) 0 0/100% 14px no-repeat local,"
-                + "linear-gradient(rgba(0,0,0,0),rgba(0,0,0,.22)) 0 100%/100% 14px no-repeat local,"
-                + "radial-gradient(farthest-side at 50% 0,rgba(0,0,0,.30),rgba(0,0,0,0)) 0 0/100% 7px no-repeat scroll,"
-                + "radial-gradient(farthest-side at 50% 100%,rgba(0,0,0,.30),rgba(0,0,0,0)) 0 100%/100% 7px no-repeat scroll}",
-                /* 右缘防裁：卡牌按钮宽度不得超出容器（窄屏把右侧势力裁掉的根因之一） */
-                dlgSel + ">.content-container>.content>.buttons>.card{max-width:100%;box-sizing:border-box}",
-                dlgSel + ">.content-container::-webkit-scrollbar{width:10px}",
-                dlgSel + ">.content-container::-webkit-scrollbar-track{background:rgba(0,0,0,.22);border-radius:5px}",
-                dlgSel + ">.content-container::-webkit-scrollbar-thumb{background:rgba(255,255,255,.45);border-radius:5px}",
-                dlgSel + ">.content-container::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.68)}",
-                /* 旧内核兜底（无 :has 时放弃卡牌门控，非 fullheight 对话框同能力） */
-                "@supports not selector(:has(*)){.csh-egsc .dialog:not(.fullheight){max-height:70vh;overflow:hidden}"
-                + ".csh-egsc .dialog:not(.fullheight)>.content-container{overflow-y:auto;overflow-x:hidden}}",
-                /* ★ 2026-10-17 · 势力面板「第二形态」（普通按钮，如斗地主）：靠 JS 打上的
-                   .csh-egdlg 标记命中。用**后代**选择器（不写 `>`）以覆盖结构差异；
-                   这条与卡牌形规则互不干扰（标记是 JS 精确判定的）。 */
-                ".csh-egsc .csh-egdlg{max-height:70vh;overflow:hidden;overscroll-behavior:contain}",
-                ".csh-egsc .csh-egdlg .content-container{overflow-y:auto;overflow-x:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;"
+                /* ★ 唯一选择器 = JS 内容判定后打上的 .csh-egdlg。
+                   【2026-10-18 事故】旧规则用 `.dialog:not(.fullheight)` 加 `:has(.card.button)`，
+                   而引擎主菜单本身就是 `.main.menu.dialog`（ui/create/menu/index.js:135），
+                   切到「卡牌 / 武将」页即含 .card.button ⇒ 整个选项菜单被压成 70vh、
+                   overflow:hidden 裁掉下半截，还多出一条滚动条。`:has()` 区分不了
+                   「选势力」和「看图鉴」，这条全局规则永久废弃，禁止回归。
+                   max-height 由图内联写入 px（按 body 真实缩放换算），CSS 不再写 vh。 */
+                ".csh-egsc .csh-egdlg{overflow:hidden;overscroll-behavior:contain}",
+                /* 原生滚动容器接管：**只留纵向一条**。
+                   2026-10-18 第二修：横向改成 hidden —— 宽度已由下面的 min() 钳住并换行，
+                   再留 auto 只会多出一条压在按钮中间的横条（录像里那条橙色线就是它）。 */
+                ".csh-egsc .csh-egdlg .content-container{overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;box-sizing:border-box;"
                 + "scrollbar-color:rgba(255,255,255,.45) rgba(0,0,0,.22);" + scbg + "}",
-                ".csh-egsc .csh-egdlg .content-container::-webkit-scrollbar{width:10px;height:10px}",
+                /* ★ 按钮墙：**只封顶，不设宽**（2026-10-18 第三修 · 作者："每次出现会自动一下"）
+                   ------------------------------------------------------------------
+                   第二修写的是 `width: min(100%, --csh-egw)`，那是**主动参与布局**：
+                   引擎本来给 `.buttons` 的是 `.content > div:not(.pointerdiv){width:calc(100% - 8px)}`
+                   （layout.css:1857-1860），被覆盖成 `100%` ⇒ **宽了 8px**；
+                   同一次处理里又给 `.content-container` 加了 `padding-right:10px` ⇒ **窄了 10px**。
+                   两个方向同时动，按钮列数就落在临界值上来回跳（实机：4 列 → 5 列）。
+                   ⇒ 现在的纪律：**任何"会让布局变化的属性"都不许主动写**。
+                     宽度上界只靠 dialog 自己的 `max-width`（被动，只在超屏时生效），
+                     `.buttons` 只留 `max-width:100%` 兜底 —— 父宽正常时**一个像素都不动**。 */
+                ".csh-egsc .csh-egdlg .buttons{max-width:100%;box-sizing:border-box}",
+                /* 右缘防裁：卡牌按钮宽度不得超出容器（窄屏把右侧势力裁掉的根因之一） */
+                ".csh-egsc .csh-egdlg .content-container .buttons>.card{max-width:100%;box-sizing:border-box}",
+                ".csh-egsc .csh-egdlg .content-container::-webkit-scrollbar{width:8px;height:0}",
                 ".csh-egsc .csh-egdlg .content-container::-webkit-scrollbar-track{background:rgba(0,0,0,.22);border-radius:5px}",
                 ".csh-egsc .csh-egdlg .content-container::-webkit-scrollbar-thumb{background:rgba(255,255,255,.45);border-radius:5px}",
                 ".csh-egsc .csh-egdlg .content-container::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.68)}",
+                /* 控制条形态（2v2 冷/暖方势力）：限宽是内联 px（JS 按缩放算），这里只画滚动条 */
+                ".csh-egsc .csh-egctrl::-webkit-scrollbar{height:8px}",
+                ".csh-egsc .csh-egctrl::-webkit-scrollbar-track{background:rgba(0,0,0,.18);border-radius:4px}",
+                ".csh-egsc .csh-egctrl::-webkit-scrollbar-thumb{background:rgba(255,255,255,.42);border-radius:4px}",
+                ".csh-egsc .csh-egctrl::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.66)}",
             ].join("");
             document.head.appendChild(st);
         }
@@ -197,6 +441,25 @@ function cshEgScrollApply(force) {
 }
 
 export function cshContent(config, pack) { try {
+    /* ★ 界面基座（2026-10-18）：提示/确认框的唯一实现，必须在任何会弹提示的模块之前装好
+       （小游戏结算、成就、签到、讨伐奖励都在 content 之后才可能触发）。
+       非关键 UI：装不上也不能拖垮 content 的其它注入（与红线的"非关键 UI 允许兜底"一致）。 */
+    try { installUIKit(); } catch (eUI) {}
+    /* ★ 神武将选势力（2026-10-18 · 第四版）
+       前三次全部作废：补 doubleGroup 会被选将界面逐个画出来（ui/create/index.js:3191-3197），
+       补 initGroup 会污染共享技能；而引擎**没有**为非身份场提供标准入口
+       （identity.js:1505 那套是模式私有的）。所以只能自写，但这次写对了三处判定。
+       详见 core/csh_rules.js 文件头。 */
+    try {
+        var _kamiOk = installKamiChoice();
+        if (_kamiOk && lib.config && lib.config.extension_池子魔将_csh_dev_log) {
+            var _ks = kamiStatus();
+            console.log("[池子魔将] 神将选势力已装：" + (_ks.enabled ? "开关=开" : "开关=关（设置页「神将选势力」）")
+                + " · 可选 " + _ks.choices.join("/")
+                + " · _priority=" + _ks.priority
+                + (_ks.peerSlyh ? " · 检测到十周年UI 的 _slyh（接自定义势力，与 shen 不重叠）" : ""));
+        }
+    } catch (eRule) {}
     /* 讨伐记录层（2026-10-13 · 批次 4a）：常驻挂 lib.cshBossRecord（对局写入/快照聚合/
        bossbook 展示三处共用；install 幂等） */
     installBossRecord();

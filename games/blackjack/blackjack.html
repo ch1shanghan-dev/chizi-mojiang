@@ -602,6 +602,14 @@
     n = Math.round(Number(n) || 0);
     return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
   }
+  /* HTML 转义：本页有一处把「庄家名」拼进 innerHTML（庄家席是宿主下发的世界人选，
+     名字来自角色表 / 玩家可改的昵称）。按第一性原理的第 3 条 —— 外部输入没有形状保证，
+     拼进 HTML 前必须转义。与 rank.html / doudizhu 的 esc 同一实现，不另写一份规则。 */
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+      return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c];
+    });
+  }
 
   /* ==TURNER-START== 回合调度器：所有延迟行动统一派发，alive=false 后不再排下一轮 */
   var timers = [];
@@ -1264,8 +1272,11 @@ try { CRD = (typeof window !== 'undefined' && window.CSH && window.CSH.cards) ? 
     if (!box) return;
     /* 【2026-09-30 修复】补同屏条数上限。原实现只 append，而本游戏短时间内可连发多条
        （重新洗牌 / 已买保险 / 筹码不足降注 / 庄家本钱赔光…），3 条叠加就会越过 HUD
-       探进 .heat 与牌桌。UNO 早已这么修，这里对齐。 */
-    while (box.children.length >= 3) box.removeChild(box.firstChild);
+       探进 .heat 与牌桌。UNO 早已这么修，这里对齐。
+       【2026-10-18】固定 3 的写法在矮屏（手机横屏 ≤480px）仍会探进牌桌 ——
+       改由 CSHPage.toastCap() 统一给出（矮屏 2 / 其它 3），不再各页写魔数。 */
+    var capMax = (typeof CSHPage !== "undefined" && CSHPage.toastCap) ? CSHPage.toastCap() : 3;
+    while (box.children.length >= capMax) box.removeChild(box.firstChild);
     var d = document.createElement('div');
     d.className = 'toast' + (kind ? ' ' + kind : '');
     d.textContent = msg;
@@ -1347,7 +1358,7 @@ try { CRD = (typeof window !== 'undefined' && window.CSH && window.CSH.cards) ? 
       if (dealerSeat) {
         /* 廿一点的庄家按固定规则要牌（≤16 要、≥17 停），**没有决策空间**，
            所以这里不写"牌技"，只写它真有的东西：资金与真实战绩。 */
-        dEl.innerHTML = '庄家 <b>' + dealerSeat.name + '</b> · ' + (dealerSeat.tierName || '牌手') +
+        dEl.innerHTML = '庄家 <b>' + esc(dealerSeat.name) + '</b> · ' + esc(dealerSeat.tierName || '牌手') +
           ' · 台面本钱 <b>' + fmt(dealerBankInit()) + '</b>' +
           '<br><span style="opacity:.68">它自己资金 ' + fmt(dealerSeat.fund) + ' · 打过 ' +
           fmt(dealerSeat.hands || 0) + ' 手 / 赢 ' + fmt(dealerSeat.wins || 0) +

@@ -46,6 +46,10 @@ import { lib, game } from "../../../noname.js";
 	var K_FLOAT_POS = "extension_池子魔将_csh_debug_float_pos";/* 调试悬浮球坐标 */
 	var K_CHEER_DAY = "csh_rank_cheer_day";                   /* 每日首次免缠头日键 */
 	var K_MIG_FLAG = "csh_wallet_migrated";                   /* 内部迁移标记 */
+	var K_UPDATE_CACHE = "csh_update_manifest_v1";            /* 更新目录缓存（2026-10-18） */
+	var K_UPDATE_VER = "csh_update_ver_v1";                   /* 更新版本小包缓存（2026-10-18） */
+	var K_RANK_CACHE = "csh_rank_cache_v1";                   /* 天下榜榜单快照（2026-10-18） */
+	var K_RANK_PEND = "csh_rank_submit_pending";              /* 天下榜「最高值待送达」标记（2026-10-18） */
 
 	/* 白名单键（§J.2 / §J.4#3 · 2026-10-01 由 6 项扩到 19 项）
 	   6 原有：winrate/wallet/rank/world/cdkUsed/meta
@@ -57,7 +61,11 @@ import { lib, game } from "../../../noname.js";
 		"dailyTask", "achv", "texasBest", "bjBest", "sniperBest", "cdkLifetime",
 		"panelSkin", "bgmVolume", "bgmOn", "sfxVolume", "texasSet", "bjSet", "dbgPresets",
 		"affection", "bossKill", "bossAsBoss", "goldfish", "ledger",
-		"walletHist", "walletSnap", "uiSeen", "names"];
+		"walletHist", "walletSnap", "uiSeen", "names",
+		/* 2026-10-18 · 天下榜「历史最高」：这是玩家**挣到过**的成绩，
+		   花池子币不会把它抹掉，换机也必须带走（否则新机器上报的是变低后的余额）。
+		   排在最后，不动前面已发版键的下标。 */
+		"rankHigh"];
 
 	/* 故意不带（边界清单 · 页面会如实展示给玩家）：
 	     · 键名             —— 为什么 */
@@ -68,6 +76,10 @@ import { lib, game } from "../../../noname.js";
 		[K_FLOAT_POS, "调试悬浮球坐标（跟着屏幕大小走，换设备会落在奇怪的位置）"],
 		[K_CHEER_DAY, "每日首次免缠头的日键（按机器按天，跨设备带过去会白送/吞掉一次）"],
 		[K_MIG_FLAG, "内部迁移标记（本机一次性开关，与新机器无关）"],
+		[K_UPDATE_CACHE, "更新目录缓存（网络环境的产物；换机后重新拉一次才是真实的远端版本）"],
+		[K_UPDATE_VER, "更新版本小包缓存（同上 —— 它是「上次检查到哪个版本」的时效性记录，换机后必然过期）"],
+		[K_RANK_CACHE, "天下榜榜单快照（离线时撑门面的缓存，不是玩家资产；旧快照带过去只会骗自己）"],
+		[K_RANK_PEND, "天下榜「最高值待送达」标记（一次性补报意图，换机后由新机器的 csh_rank_high 重新产生）"],
 	];
 
 

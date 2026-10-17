@@ -1,12 +1,12 @@
-/* 自动生成于 2026-10-16T18:14:05.530Z by tools/release.js —— 发版后 git push 即生效，勿手改 files */
+/* 自动生成于 2026-10-17T19:34:05.312Z by tools/release.js —— 发版后 git push 即生效，勿手改 files */
 window.extension = {
 	"池子魔将": {
 		"name": "池子魔将",
 		"author": "池上寒",
-		"intro": "<font color=#c9a84c>版本</font> <font color=#00FFFF>4.0.6</font>",
-		"version": "4.0.6",
-		"date": "2026-10-16",
-		"size": "133.7MB",
+		"intro": "<font color=#c9a84c>版本</font> <font color=#00FFFF>4.0.7</font>",
+		"version": "4.0.7",
+		"date": "2026-10-17",
+		"size": "133.9MB",
 		"forum": "https://github.com/ch1shanghan-dev/chizi-mojiang",
 		"netdisk": "",
 		"files": [
@@ -325,12 +325,14 @@ window.extension = {
 			"core/csh_page.js",
 			"core/csh_pots.js",
 			"core/csh_registry.js",
+			"core/csh_rules.js",
 			"core/csh_selftest.js",
 			"core/csh_sfx.js",
 			"core/csh_shell.js",
 			"core/csh_svggen.js",
 			"core/csh_theme.js",
 			"core/csh_titles_style.js",
+			"core/csh_uikit.js",
 			"core/csh_voice.js",
 			"core/csh_wallet.js",
 			"core/csh_winrate.js",

@@ -1479,6 +1479,10 @@ import GEN_LINES from "./csh_interact_lines_gen.js";
 	function toast(msg) {
 		var text = String(msg == null ? "" : msg);
 		try {
+			/* 统一走界面基座（documentElement 挂载 · 不随 body 缩放 · 合并/排队/描金） */
+			if (lib.cshUI && typeof lib.cshUI.toast === "function") { lib.cshUI.toast(text); return; }
+		} catch (eU) {}
+		try {
 			if (typeof ui !== "undefined" && ui && ui.create && typeof ui.create.toast === "function") {
 				ui.create.toast(text);
 				return;

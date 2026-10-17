@@ -895,11 +895,19 @@ function pay(amount, reason) {
 		return true;
 	} catch (e) { return false; }
 }
+/* 落盘。★ 2026-10-18（第二十二批审计）：改为**返回布尔**。
+   原来只 console.warn 就吞掉 —— 而 trade 的买入路径是「先扣钱包 → 改持仓 → 落盘」，
+   落盘失败时钱已经扣了、持仓只在内存里，重启就变成「钱没了、股也没了」。
+   现在把失败如实上抛给调用方，由它回滚（见 trade）。 */
 function write(s) {
 	try {
 		lib.config[KEY] = s;
 		if (game && typeof game.saveConfig === "function") game.saveConfig(KEY, s);
-	} catch (eW) { console.warn("[池子魔将] 金鳞市存档写入异常", eW); }
+		return true;
+	} catch (eW) {
+		console.warn("[池子魔将] 金鳞市存档写入异常", eW);
+		return false;
+	}
 }
 
 /* ---------- 每日结算（跨日首次访问时执行 · 离线补算） ----------
@@ -1052,7 +1060,18 @@ export function trade(id, n, side) {
 			if (done !== true) return { ok: false, msg: "扣款失败" };
 			s.hold[id] = (s.hold[id] | 0) + n;
 			s.cost[id] = (s.cost[id] || 0) + total;
-			write(s);
+			/* ★ 2026-10-18：落盘失败必须回滚扣款 —— 否则「钱扣了、持仓只在内存」，
+			   重启后变成钱和股都没了（静默亏钱，玩家只会觉得"我的股不见了"）。 */
+			if (!write(s)) {
+				s.hold[id] = Math.max(0, (s.hold[id] | 0) - n);
+				s.cost[id] = Math.max(0, (s.cost[id] || 0) - total);
+				if (s.hold[id] === 0) s.cost[id] = 0;
+				try {
+					const w2 = lib.cshWallet && lib.cshWallet.wallet;
+					if (w2 && typeof w2.add === "function") w2.add(Math.round(total), "金鳞市买入回滚:" + name);
+				} catch (eRb) {}
+				return { ok: false, msg: "存档写入失败，已退回 " + Math.round(total) + " CBY" };
+			}
 			return { ok: true, msg: "买入 " + name + " ×" + n, price: Math.round(price), n: n };
 		}
 		if (side === "sell") {
@@ -1063,10 +1082,17 @@ export function trade(id, n, side) {
 			if (!pay(Math.round(gain), "金鳞市卖出:" + name)) return { ok: false, msg: "入账失败，请稍后重试" };
 			/* 成本按比例冲减（便于算盈亏） */
 			const avg = have > 0 ? (s.cost[id] || 0) / have : 0;
-			s.cost[id] = Math.max(0, (s.cost[id] || 0) - avg * n);
+			const oldCost = s.cost[id] || 0;
+			s.cost[id] = Math.max(0, oldCost - avg * n);
 			s.hold[id] = have - n;
 			if (s.hold[id] <= 0) { s.hold[id] = 0; s.cost[id] = 0; }
-			write(s);
+			/* 落盘失败：持仓还原 + 把刚打进来的钱收回（与买入同一套事务语义） */
+			if (!write(s)) {
+				s.hold[id] = have;
+				s.cost[id] = oldCost;
+				try { wallet.spend && wallet.spend(Math.round(gain), "金鳞市卖出回滚:" + name); } catch (eRb2) {}
+				return { ok: false, msg: "存档写入失败，本次卖出已撤销" };
+			}
 			return { ok: true, msg: "卖出 " + name + " ×" + n, price: Math.round(price), n: n };
 		}
 		return { ok: false, msg: "未知操作" };
