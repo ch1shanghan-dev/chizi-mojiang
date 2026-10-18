@@ -17,3 +17,9 @@ Desktop.ini
 # 探针临时产物（tools/probe_*.cjs 运行时生成，每次内容不同，不入库）
 tools/_*.html
 tools/run[0-9]*.html
+
+# 仅本地留存、不进公开仓库的资料（合规：不含第三方客户端逆向/解包内容）
+docs/client-mining.md
+docs/*-mining.md
+docs/private/
+_backup/

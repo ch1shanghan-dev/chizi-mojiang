@@ -6894,6 +6894,8 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                 并明确告知缓存时间 —— 不再是一句死胡同。
            镜像只做兜底，永远不抢在官方前面（jsDelivr 的 @main 有缓存延迟）。 */
         var CSH_UPDATE_CACHE = "csh_update_manifest_v1";
+        /* 更新互斥锁：面板可被重复点开，两次 startUpdate 并发会让进度计数互相污染（曾出现「已完成 > 总数」） */
+        var _cshUpdating = false;
         var CSH_UPDATE_MIRRORS = [
             "https://cdn.jsdelivr.net/gh/ch1shanghan-dev/chizi-mojiang@main/",
             "https://fastly.jsdelivr.net/gh/ch1shanghan-dev/chizi-mojiang@main/",
@@ -7175,12 +7177,25 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                     var missing = [];
                     for (var m = 0; m < mediaLocal.length; m++) missing.push(String(mediaLocal[m]).slice(CSH_UPDATE_EXT.length));
                     var toGet = code.concat(missing);
+
+                    /* 去重：catalog 的 files 与 extension.js 可能重叠，重复项会让进度出现「已完成 > 总数」 */
+                    var _seen = {}, _uniq = [];
+                    for (var u = 0; u < toGet.length; u++) {
+                        var _k = String(toGet[u]);
+                        if (!_seen[_k]) { _seen[_k] = 1; _uniq.push(_k); }
+                    }
+                    toGet = _uniq;
+
                     if (!toGet.length) { status.textContent = "没有需要更新的文件。"; unlock(); return; }
+                    if (_cshUpdating) { status.textContent = "更新已在进行中，请稍候…"; unlock(); return; }
+                    _cshUpdating = true;
 
                     var bases = updateBases();
                     var extRoot = resolveExtRoot();     /* 非空 = PC，可自行校验+落盘 */
                     var total = toGet.length, cursor = 0, active = 0, doneCnt = 0;
                     var failed = [], prefBase = 0;      /* prefBase：上次成功的源，下次从它开始试 */
+                    var lastTick = Date.now();          /* 看门狗：长时间无进展即判超时，避免永远停在「下载中」 */
+                    var aborted = false;
 
                     function shortName(rel) {
                         var s = String(rel);
@@ -7225,6 +7240,9 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                         });
                     }
                     function finishAll() {
+                        if (_updWd) { clearInterval(_updWd); _updWd = null; }
+                        _cshUpdating = false;
+                        if (aborted) return;    /* 看门狗已判超时并放行 —— 迟到的下载完成不再触发重启 */
                         if (failed.length) {
                             var head = "更新未完成：有 " + failed.length + " 个文件没下下来。\n";
                             var listTxt = failed.slice(0, 6).join("\n");
@@ -7243,7 +7261,8 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                                 active++;
                                 downloadOne(rel).then(function (ok) {
                                     active--;
-                                    doneCnt++;
+                                    doneCnt = Math.min(doneCnt + 1, total);
+                                    lastTick = Date.now();
                                     if (!ok) failed.push(rel);
                                     pump();
                                 });
@@ -7251,6 +7270,17 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                         }
                         if (active === 0 && cursor >= total) finishAll();
                     }
+                    /* 看门狗：25 秒没有任何文件落地 = 连接挂在半路，而不是"慢"。
+                       旧实现没有这一层，面板会永远停在「下载中 n / m」，玩家只能强退。 */
+                    var _updWd = setInterval(function () {
+                        if (Date.now() - lastTick > 25000 && active > 0) {
+                            clearInterval(_updWd);
+                            aborted = true;
+                            _cshUpdating = false;
+                            status.textContent = "更新超时：还有 " + active + " 个文件没有响应（已完成 " + doneCnt + "/" + total + "）。\n已下载的部分会保留，网络恢复后再点「立即更新」只补缺，不会从头再来。";
+                            unlock();
+                        }
+                    }, 5000);
                     pump();
                 }
                 /* checkFileList 只负责"素材补缺"；代码项不进这个名单，才能每次都重下 */

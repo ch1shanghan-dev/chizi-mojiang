@@ -1,0 +1,76 @@
+name: Release
+
+# 打 tag（v*）即自动出包并挂到 Releases，玩家可直接下载 zip。
+# 包结构：根目录放 info.json / extension.js —— 无名杀 importExtension 读的是 zip.file("info.json")。
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: 读取版本号
+        id: ver
+        run: |
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          import io, json
+          info = json.load(io.open("info.json", encoding="utf-8"))
+          print("version=" + info["version"])
+          print("name=" + info["name"])
+          PY
+
+      - name: 打包（按 package.js 的 files 清单）
+        run: |
+          python - <<'PY'
+          import io, os, re, zipfile
+          root = "."
+          pkg = io.open("package.js", encoding="utf-8").read()
+          entries = re.findall(r'"([^"]+)"', re.search(r"files\s*:\s*\[([^\]]*)\]", pkg).group(1))
+          info = __import__("json").load(io.open("info.json", encoding="utf-8"))
+          out = f"池子魔将_v{info['version']}.zip"
+          skip_dir = {".git", "node_modules"}
+          skip_file = {"catalog.js"}
+          files = []
+          for e in entries:
+              if os.path.isfile(e):
+                  files.append(e); continue
+              for dp, dns, fns in os.walk(e):
+                  dns[:] = [d for d in dns if d not in skip_dir]
+                  for fn in fns:
+                      if fn in skip_file or fn.endswith(".zip"):
+                          continue
+                      files.append(os.path.relpath(os.path.join(dp, fn), root).replace("\\", "/"))
+          files = sorted(set(files))
+          with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED, compresslevel=6) as z:
+              for f in files:
+                  z.write(f, f)
+          print(f"{out}: {len(files)} files, {os.path.getsize(out)/1024/1024:.1f} MB")
+          PY
+
+      - name: 创建 Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: v${{ steps.ver.outputs.version }}
+          tag_name: ${{ github.ref_name }}
+          body: |
+            **池子魔将 v${{ steps.ver.outputs.version }}**
+
+            安装：下载下方 zip → 在无名杀扩展目录下新建 `池子魔将` 文件夹 → 解压进去（`info.json`、`extension.js` 应在该文件夹根部）→ 重启游戏 → 「扩展」页开启。
+            也可以直接把 zip 拖进游戏窗口导入。
+
+            详细变更见 `docs/CHANGELOG.md`。
+          files: 池子魔将_v*.zip
+          fail_on_unmatched_files: true
