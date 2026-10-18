@@ -23,7 +23,7 @@
 
 **方式一：压缩包（推荐）**
 
-1. 到 Releases 页面下载最新的 `池子魔将_vX.Y.Z.zip`；
+1. 到 Releases 页面下载最新的 `chizi-mojiang_vX.Y.Z.zip`；
 2. 在无名杀的扩展目录下新建文件夹 `池子魔将`，把压缩包内容解压进去
    （`info.json`、`extension.js` 应直接位于该文件夹根部，不要再套一层）：
    - Windows：`无名杀/resources/app/extension/`

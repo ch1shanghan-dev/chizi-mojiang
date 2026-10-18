@@ -40,7 +40,9 @@ jobs:
           pkg = io.open("package.js", encoding="utf-8").read()
           entries = re.findall(r'"([^"]+)"', re.search(r"files\s*:\s*\[([^\]]*)\]", pkg).group(1))
           info = __import__("json").load(io.open("info.json", encoding="utf-8"))
-          out = f"池子魔将_v{info['version']}.zip"
+          # 文件名保持纯 ASCII：runner 上 Python 写非 ASCII 文件名会丢字符（实测 池子魔将 → 空），
+          # 且下载 URL 带中文对部分客户端不友好。
+          out = f"chizi-mojiang_v{info['version']}.zip"
           skip_dir = {".git", "node_modules"}
           skip_file = {"catalog.js"}
           files = []
@@ -72,5 +74,5 @@ jobs:
             也可以直接把 zip 拖进游戏窗口导入。
 
             详细变更见 `docs/CHANGELOG.md`。
-          files: 池子魔将_v*.zip
+          files: chizi-mojiang_v*.zip
           fail_on_unmatched_files: true
