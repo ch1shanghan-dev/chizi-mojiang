@@ -6880,6 +6880,19 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                 "background:#c9a84c!important;color:#1d1608!important;border:1px solid rgba(60,48,28,.2)!important;}",
                 "#csh-update .csh-ext-btn.ghost{background:#e8e0cc!important;color:#3a2f1c!important;}",
                 "#csh-update .csh-ext-btn:disabled{opacity:.55!important;cursor:default!important;}",
+                /* 更新源列表：并发探测结果逐行展示，可达的行可点选 */
+                "#csh-update .csh-src-box{display:block!important;margin:2px 0 10px!important;border:1px solid rgba(60,48,28,.18)!important;",
+                "border-radius:8px!important;overflow:hidden!important;background:rgba(255,255,255,.35)!important;}",
+                "#csh-update .csh-src-row{display:flex!important;align-items:center!important;gap:8px!important;padding:6px 10px!important;",
+                "font-size:12px!important;line-height:1.4!important;border-top:1px solid rgba(60,48,28,.1)!important;}",
+                "#csh-update .csh-src-row:first-child{border-top:0!important;}",
+                "#csh-update .csh-src-row.on{background:rgba(201,168,76,.22)!important;}",
+                "#csh-update .csh-src-row.dead{opacity:.5!important;}",
+                "#csh-update .csh-src-dot{flex:none!important;width:10px!important;text-align:center!important;color:#3f7a3f!important;}",
+                "#csh-update .csh-src-row.dead .csh-src-dot{color:#8a8073!important;}",
+                "#csh-update .csh-src-name{flex:none!important;font-weight:600!important;min-width:96px!important;}",
+                "#csh-update .csh-src-stat{flex:1 1 auto!important;opacity:.72!important;font-variant-numeric:tabular-nums!important;}",
+                "#csh-update .csh-src-row:not(.dead){cursor:pointer!important;}",
             ].join("");
             (document.head || document.documentElement).appendChild(st);
         }
@@ -6901,6 +6914,30 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
             "https://fastly.jsdelivr.net/gh/ch1shanghan-dev/chizi-mojiang@main/",
             "https://raw.gitmirror.com/ch1shanghan-dev/chizi-mojiang/main/",
         ];
+        /* ---------- 源清单并列展示（2026-10-19 · 作者：把所有可选源列出来，别一个个试） ----------
+           旧实现：固定顺序「官方 2.6s → 再镜像 3.5s」串行试探，谁先回用谁；国内 raw 常年不通，
+                   每次都要先白等一轮，而且玩家完全看不到还有哪些源可用、各自快慢如何。
+           新实现：面板一打开就**并发**探测全部源（各拉 240B 的 info.json，独立超时），
+                   把「名称 + 可达性 + 响应时间 + 远端版本」整列摆出来，默认取最快的可达源；
+                   玩家可手动点选，选中的基址直接交给下面的下载器（下载失败仍会自动换源兜底）。
+           加源只改这里（一行一项）；CSH_UPDATE_MIRRORS 继续作为下载阶段的兜底顺序。 */
+        var CSH_UPDATE_SOURCES = [
+            { name: "GitHub 官方", base: CSH_UPDATE_SRC },
+            { name: "jsDelivr CDN", base: CSH_UPDATE_MIRRORS[0] },
+            { name: "jsDelivr (fastly)", base: CSH_UPDATE_MIRRORS[1] },
+            { name: "GitMirror 镜像", base: CSH_UPDATE_MIRRORS[2] },
+        ];
+        function cshProbeAll(msEach) {
+            return Promise.all(CSH_UPDATE_SOURCES.map(function (s) {
+                var t0 = Date.now();
+                return cshFetchText(s.base + "info.json", msEach || 4000).then(function (txt) {
+                    var v = cshVerParse(txt, s.base);
+                    return { name: s.name, base: s.base, ok: !!v, ms: Date.now() - t0, ver: v ? v.ver : "" };
+                }, function () {
+                    return { name: s.name, base: s.base, ok: false, ms: Date.now() - t0, ver: "" };
+                });
+            }));
+        }
         var _cshUpdBase = "";   /* 本次会话验证可用的基址（更新下载也用它） */
         /* 上次成功过的基址直接优先：国内 raw 常年连不上，每次先等 2.6s 纯属浪费。
            缓存里有 base 就从它开始（仍是 https；镜像只是兜底）。 */
@@ -7069,8 +7106,12 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
             box.appendChild(t);
             var sub = document.createElement("div");
             sub.className = "csh-ext-sub";
-            sub.textContent = "更新源：github.com/ch1shanghan-dev/chizi-mojiang（已内置，无需手动填写更新地址）";
+            sub.textContent = "更新源已内置（无需手动填写地址）：共 " + CSH_UPDATE_SOURCES.length +
+                " 个，并发探测后默认取最快可用的一个，可手动切换。";
             box.appendChild(sub);
+            var srcBox = document.createElement("div");
+            srcBox.className = "csh-src-box";
+            box.appendChild(srcBox);
             var status = document.createElement("div");
             status.className = "csh-ext-loading";
             status.textContent = "正在检查…";
@@ -7090,6 +7131,48 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                 localVer = lib.config["extension_池子魔将_version"] ||
                     (lib.extensionPack && lib.extensionPack["池子魔将"] && lib.extensionPack["池子魔将"].version) || "";
             } catch (eV) {}
+
+            /* ---------- 源列表渲染：并发探测的结果一次性摆出来 ---------- */
+            var _srcProbed = null;
+            function renderSources(list) {
+                _srcProbed = list;
+                srcBox.innerHTML = "";
+                var firstOk = null;
+                for (var i = 0; i < list.length; i++) {
+                    if (list[i].ok && !firstOk) firstOk = list[i];
+                }
+                /* 没有历史优选基址时，直接采用最快的可达源（不再等官方源超时） */
+                if (!_cshUpdBase && firstOk) _cshUpdBase = firstOk.base;
+                for (var k = 0; k < list.length; k++) {
+                    var s = list[k];
+                    var line = document.createElement("div");
+                    line.className = "csh-src-row" + (s.ok ? "" : " dead") + (s.base === _cshUpdBase ? " on" : "");
+                    var dot = document.createElement("span");
+                    dot.className = "csh-src-dot";
+                    dot.textContent = s.ok ? "●" : "○";
+                    var nm = document.createElement("span");
+                    nm.className = "csh-src-name";
+                    nm.textContent = s.name;
+                    var st = document.createElement("span");
+                    st.className = "csh-src-stat";
+                    st.textContent = s.ok ? ("可达 " + s.ms + "ms" + (s.ver ? " · 远端 v" + s.ver : "")) : "不可达";
+                    line.appendChild(dot);
+                    line.appendChild(nm);
+                    line.appendChild(st);
+                    (function (item) {
+                        if (!item.ok) return;
+                        line.addEventListener("click", function () {
+                            _cshUpdBase = item.base;
+                            var c0 = cshCacheRead();
+                            if (c0) cshCacheWrite(c0.txt, item.base);   /* 记住玩家选的源，下次开机优先 */
+                            renderSources(_srcProbed);
+                            runCheck();
+                        }, false);
+                    })(s);
+                    srcBox.appendChild(line);
+                }
+            }
+            cshProbeAll(4000).then(renderSources);
 
             /* ---------- 逐文件下载器（2026-10-18 · 取代引擎的批量下载原语） ----------
                为什么不能用引擎那两件原语（三条都是实测/源码确认过的硬伤）：
@@ -7343,37 +7426,46 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                     applyCatalog(m.txt, false, "");
                 });
             }
-            cshFetchVer().then(function (v) {
-                _cshUpdBase = v.base || _cshUpdBase;
-                cshVerCacheWrite(v.ver, _cshUpdBase);
-                if (localVer && cshVerCmp(v.ver, localVer) <= 0) {
-                    /* 最常见的一条路：版本没变，240B 收工，一次都不碰 catalog */
-                    status.textContent = "已是最新版本（当前 " + localVer + "）。";
-                    return;
-                }
-                status.textContent = "发现新版本 " + v.ver + "，正在获取文件清单…";
-                return loadCatalogOnce();
-            }).catch(function () {
-                /* ① info.json 阶段全挂（老仓库没这个文件 / 全源不通）→ 退回 catalog 直拉，行为与旧版一致 */
-                return loadCatalogOnce().catch(function () {
-                    /* ② 在线全挂 → 缓存兜底：优先整份目录（能给出按钮），其次只用版本小包如实回答 */
-                    var c = cshCacheRead();
-                    if (c) {
-                        _cshUpdBase = c.base || _cshUpdBase;
-                        applyCatalog(c.txt, true, cshAgo(c.ts));
+            function runCheck() {
+                _triedCatalog = false;
+                status.textContent = "正在检查…";
+                /* 切换源会重跑一次检查 —— 先摘掉上一轮插入的「立即更新」按钮，避免重复 */
+                var oldGo = row.querySelector(".csh-ext-btn:not(.ghost)");
+                if (oldGo && oldGo.parentNode) oldGo.parentNode.removeChild(oldGo);
+                cshFetchVer().then(function (v) {
+                    _cshUpdBase = v.base || _cshUpdBase;
+                    cshVerCacheWrite(v.ver, _cshUpdBase);
+                    if (localVer && cshVerCmp(v.ver, localVer) <= 0) {
+                        /* 最常见的一条路：版本没变，240B 收工，一次都不碰 catalog */
+                        status.textContent = "已是最新版本（当前 " + localVer + "）。";
                         return;
                     }
-                    var cv = cshVerCacheRead();
-                    if (cv) {
-                        status.textContent = "当前无法连接更新源。\n上次成功检查是在 " + cshAgo(cv.ts) +
-                            "，当时远端最新为 " + cv.ver +
-                            (localVer ? "（本机 " + localVer + "）。" : "。") +
-                            "\n可稍后再试；不影响游戏正常运行。";
-                        return;
-                    }
-                    status.textContent = "检查更新失败：无法连接更新源（已尝试官方源与两个镜像）。\n可稍后再试；不影响游戏正常运行。";
+                    status.textContent = "发现新版本 " + v.ver + "，正在获取文件清单…";
+                    return loadCatalogOnce();
+                }).catch(function () {
+                    /* ① info.json 阶段全挂（老仓库没这个文件 / 全源不通）→ 退回 catalog 直拉，行为与旧版一致 */
+                    return loadCatalogOnce().catch(function () {
+                        /* ② 在线全挂 → 缓存兜底：优先整份目录（能给出按钮），其次只用版本小包如实回答 */
+                        var c = cshCacheRead();
+                        if (c) {
+                            _cshUpdBase = c.base || _cshUpdBase;
+                            applyCatalog(c.txt, true, cshAgo(c.ts));
+                            return;
+                        }
+                        var cv = cshVerCacheRead();
+                        if (cv) {
+                            status.textContent = "当前无法连接更新源。\n上次成功检查是在 " + cshAgo(cv.ts) +
+                                "，当时远端最新为 " + cv.ver +
+                                (localVer ? "（本机 " + localVer + "）。" : "。") +
+                                "\n可稍后再试；不影响游戏正常运行。";
+                            return;
+                        }
+                        status.textContent = "检查更新失败：全部 " + CSH_UPDATE_SOURCES.length +
+                            " 个更新源都连不上。\n已并发探测过，不是单个源的问题；可稍后再试，不影响游戏正常运行。";
+                    });
                 });
-            });
+            }
+            runCheck();
             return true;
         };
 
