@@ -50,7 +50,7 @@ export const cshConfig = {
                所以与美化类扩展没有可冲突的面；真正会打架的是「别的扩展也做同一件事 ⇒ 弹两次」，
                那种情况由 csh_rules.js 的让位守卫兜住（player.group 已经不是 shen 就自动放弃）。
                建议：**同步关掉引擎的「选择势力」也能达到同样效果**（本项尊重引擎那一项，任一关闭即不弹）。 */
-            "csh_kami_group":{"name":"神将选势力（斗地主 / 对决等）","intro":"默认关闭（2026-10-18 作者定案：别人已经有选势力，我们不再重复弹）。身份场弹「请选择你的势力」是引擎自己做的，本项不参与；但斗地主、对决等模式引擎留了空实现（斗地主源码里三处判断的语句体是空的），神势力武将会以「神」开局。开启本项后由本扩展补一个全局规则技，让这些模式也能选势力。只处理「神」势力武将（池子魔将里有 11 位）；魔王与小怪是 devil，不受影响，国战也不参与。本项不产生任何界面元素、不改样式，不会与美化扩展冲突；需要本扩展补这个功能时再打开；若你另装了做同一件事的扩展、出现重复弹窗，保持关闭即可。改动立即生效。","init":false,"onclick":function(bool){ try{ game.saveExtensionConfig("池子魔将","csh_kami_group",bool); }catch(e){} }},
+            "csh_kami_group":{"name":"神将补选势力","intro":"【适用模式：斗地主 / 对决等引擎留了空实现的模式】默认关闭（2026-10-18 作者定案：别人已经有选势力，我们不再重复弹）。身份场弹「请选择你的势力」是引擎自己做的，本项不参与；但斗地主、对决等模式引擎留了空实现（斗地主源码里三处判断的语句体是空的），神势力武将会以「神」开局。开启本项后由本扩展补一个全局规则技，让这些模式也能选势力。只处理「神」势力武将（池子魔将里有 11 位）；魔王与小怪是 devil，不受影响，国战也不参与。本项不产生任何界面元素、不改样式，不会与美化扩展冲突；需要本扩展补这个功能时再打开；若你另装了做同一件事的扩展、出现重复弹窗，保持关闭即可。改动立即生效。","init":false,"onclick":function(bool){ try{ game.saveExtensionConfig("池子魔将","csh_kami_group",bool); }catch(e){} }},
             /* ★ 2026-10-16 深夜四（作者：给滚动条「在扩展设置里加一个开关」）：
                本体兼容注入 C4 的开关。改动即时生效（onclick 传新状态给注入器），无需重启。
                ★ 2026-10-16 深夜八·修「关了他又自动打开」：引擎（optionsMenu.js:305 /
@@ -58,7 +58,7 @@ export const cshConfig = {
                `if (!cfg.onclick)` 时装），而本项 onclick 当时只调了注入器 —— 存值永远缺失 →
                每次重开设置页/重启都回落到默认 init:true。修法 = onclick 里自行落盘（与引擎
                默认回调同键同法：extension_池子魔将_csh_eg_group_scroll）。E45 已加断言防回退。 */
-            "csh_eg_group_scroll":{"name":"势力面板尺寸自适应（限宽 / 纵向滚动）","intro":"【这是「弹出来之后尺寸怎么管」，不是「弹不弹」】弹不弹由上面那一项「神将选势力」决定（身份场则由引擎决定）。本项只管一件事：势力很多、面板放不下时，要不要由本扩展接管尺寸（宽度锁到屏幕内 + 纵向滚动 + 滚动条让位）。默认关闭 = 完全交给引擎原画；只有装了很多加势力的扩展、面板右侧被切掉或滚不动时才需要打开。改动即时生效。","init":false,"onclick":function(bool){ try{ game.saveExtensionConfig("池子魔将","csh_eg_group_scroll",bool); }catch(e){} try{ if(typeof lib.__cshEgScrollApply==="function") lib.__cshEgScrollApply(bool); }catch(e){} }},
+            "csh_eg_group_scroll":{"name":"势力面板自适应","intro":"【这是「弹出来之后尺寸怎么管」，不是「弹不弹」】弹不弹由上面那一项「神将补选势力」决定（身份场则由引擎决定）。本项只管一件事：势力很多、面板放不下时，要不要由本扩展接管尺寸（宽度锁到屏幕内 + 纵向滚动 + 滚动条让位）。默认关闭 = 完全交给引擎原画；只有装了很多加势力的扩展、面板右侧被切掉或滚不动时才需要打开。改动即时生效。","init":false,"onclick":function(bool){ try{ game.saveExtensionConfig("池子魔将","csh_eg_group_scroll",bool); }catch(e){} try{ if(typeof lib.__cshEgScrollApply==="function") lib.__cshEgScrollApply(bool); }catch(e){} }},
             /* 【2026-10-05】「开发者日志」设置项按需求移除；precontent 会把历史开启的存档一并复位。 */
             /* 【2026-10-05】联机手气卡：仅联机（connectMode）生效；实现见 main/precontent.js 的
                _csh_swReplaceHandCards 全局规则技。本功能为最高优先级：与懒人包/云中守望同类开局

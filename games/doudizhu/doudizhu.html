@@ -220,6 +220,10 @@
   @keyframes breathe { 50% { box-shadow: 0 0 0 1px var(--gold-soft), 0 0 26px rgba(216, 180, 106, .55); } }
   .seat-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
   .seat-line { display: flex; align-items: center; gap: 5px; min-width: 0; white-space: nowrap; }
+  /* 【2026-10-19 · 同类隐患】座位行里是玩家名（联机时可能很长）+ 身份/分数，
+     旧写法只 nowrap：名字一长就把后面的分数挤出去，被 .seat 裁掉半截。
+     逐个子项给省略号，谁也不压谁。 */
+  .seat-line > * { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
   .avatar {
     flex: 0 0 auto;
     width: clamp(24px, 3.4vh, 36px); height: clamp(24px, 3.4vh, 36px); border-radius: 50%;

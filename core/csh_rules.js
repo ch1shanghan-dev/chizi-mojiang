@@ -69,7 +69,7 @@ function why(reason, player) {
     return reason;
 }
 
-/* 本扩展的独立开关（设置页「神将选势力」）。
+/* 本扩展的独立开关（设置页「神将补选势力」）。
    ★ 只认**显式 true** 才算开 —— 注意这跟「引擎 choose_group」的方向**相反**，
      因为两者的默认值不同，不能照抄：
        · 引擎 choose_group 默认开（init:true），所以"缺键按开"才是尊重引擎；

@@ -454,7 +454,7 @@ export function cshContent(config, pack) { try {
         var _kamiOk = installKamiChoice();
         if (_kamiOk && lib.config && lib.config.extension_池子魔将_csh_dev_log) {
             var _ks = kamiStatus();
-            console.log("[池子魔将] 神将选势力已装：" + (_ks.enabled ? "开关=开" : "开关=关（设置页「神将选势力」）")
+            console.log("[池子魔将] 神将补选势力已装：" + (_ks.enabled ? "开关=开" : "开关=关（设置页「神将补选势力」）")
                 + " · 可选 " + _ks.choices.join("/")
                 + " · _priority=" + _ks.priority
                 + (_ks.peerSlyh ? " · 检测到十周年UI 的 _slyh（接自定义势力，与 shen 不重叠）" : ""));

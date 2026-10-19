@@ -2789,6 +2789,38 @@ async function runBossChecks() {
 		else if (!/import\s*\{[^}]*installKamiChoice[^}]*\}\s*from\s*"\.\.\/core\/csh_rules\.js"/.test(ct49)) e49.push("content 未从 core/csh_rules.js 引入");
 		if (e49.length) fail("执行级 E49：神武将选势力（" + e49.slice(0, 4).join("；") + "）");
 		else ok("执行级 E49：神武将选势力在位（自写规则技 · 只认 shen · 有独立开关与让位守卫 · 不碰 doubleGroup/initGroup · 有诊断）");
+
+		/* ------------------------------------------------------------------ *
+		 * E50（2026-10-19 · 作者截图：设置页文字太长，压到右边的开关上）
+		 * ------------------------------------------------------------------
+		 * 问题类：**文案长度不受控，而容器宽度是引擎定死的**。
+		 * 引擎的配置行（createConfig）= 单行 line-height:25px + 右侧 60px 绝对定位开关，
+		 * 文字超宽既不换行也不省略，直接盖在开关上 —— 本次截图就是这么坏的。
+		 * 这里只锁「已经查证过的四处」，不用模糊启发式（启发式误报会让门禁失去可信度）：
+		 *   ① 设置项名长度（超了就把括号里的解释挪进 intro）；
+		 *   ② .csh-dock 必须可横向滚动（否则窄屏上超出的按钮被整颗切掉，功能直接消失）；
+		 *   ③ ④ 状态行/玩家行/顶栏的省略号兜底，防止半截字露在相邻项边上。 */
+		const e50 = [];
+		const WIDTH_BUDGET = 28;   /* 28 半角宽 = 14 个汉字 */
+		for (const line of cfg49.split(/\r?\n/)) {
+			const k = line.match(/"([A-Za-z0-9_]+)"\s*:\s*\{/);
+			const n = line.match(/"name"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+			if (!k || !n) continue;
+			const plain = n[1].replace(/<[^>]+>/g, "").replace(/\\"/g, '"');
+			let w = 0;
+			for (const ch of plain) w += ch.charCodeAt(0) > 127 ? 2 : 1;
+			if (w > WIDTH_BUDGET) e50.push("设置项 " + k[1] + " 名过长（" + w + " 半角宽 > " + WIDTH_BUDGET + "）：「" + plain + "」");
+		}
+		/* 注释里会写「旧写法只 overflow:hidden」这类说明，先剥注释再断言，否则自己误伤自己 */
+		const lay50 = fs.readFileSync(path.join(ROOT, "core", "csh_layout.css"), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+		if (/\.csh-dock\s*\{[^}]*\boverflow\s*:\s*hidden/.test(lay50)) e50.push(".csh-dock 又被写回 overflow:hidden（超出的按钮会被整颗切掉）");
+		else if (!/\.csh-dock\s*\{[^}]*overflow-x\s*:\s*auto/.test(lay50)) e50.push(".csh-dock 不可横向滚动（窄屏下尾部按钮点不到）");
+		else if (!/\.csh-dock > \.act-group[^{]*\{[^}]*flex\s*:\s*0 0 auto/.test(lay50)) e50.push(".csh-dock 的按钮组未固定宽度（会被压扁，而不是触发滚动）");
+		if (!/\.csh-player \.pl-line > \*\s*\{[^}]*text-overflow\s*:\s*ellipsis/.test(lay50)) e50.push(".pl-line 子项缺省略号兜底（长手牌名会挤掉后面的字）");
+		if (!/\.csh-hudrow \.tb-v\s*\{[^}]*text-overflow\s*:\s*ellipsis/.test(lay50)) e50.push(".csh-hudrow .tb-v 缺省略号兜底");
+		if (!/\.csh-topbar \.tb-k\s*\{[^}]*text-overflow\s*:\s*ellipsis/.test(lay50)) e50.push(".csh-topbar .tb-k 缺省略号兜底");
+		if (e50.length) fail("执行级 E50：文案不挤压控件（" + e50.slice(0, 4).join("；") + "）");
+		else ok("执行级 E50：文案不挤压控件（设置项名 ≤14 汉字 · 控制条溢出可横滚不切按钮 · 状态/玩家/顶栏省略号兜底）");
 	}
 	log("");
 }

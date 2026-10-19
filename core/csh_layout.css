@@ -124,7 +124,9 @@
   display: flex; align-items: baseline; gap: 4px;
   min-width: 0; white-space: nowrap;
 }
-.csh-topbar .tb-k { font-size: var(--fs-3); color: var(--csh-text-dim); letter-spacing: .5px; }
+.csh-topbar .tb-k { font-size: var(--fs-3); color: var(--csh-text-dim); letter-spacing: .5px;
+  /* 【2026-10-19】文字比槽位宽时给省略号，别让半截字露在相邻项边上 */
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .csh-topbar .tb-v {
   font-size: var(--fs-2); font-weight: 800; color: var(--csh-gold-hi);
   font-variant-numeric: tabular-nums;
@@ -161,8 +163,10 @@
   overflow: hidden;
 }
 .csh-hudrow .tb-item { display: flex; align-items: baseline; gap: 4px; min-width: 0; white-space: nowrap; }
-.csh-hudrow .tb-k { font-size: var(--fs-3); color: var(--csh-text-dim); }
+.csh-hudrow .tb-k { font-size: var(--fs-3); color: var(--csh-text-dim); min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .csh-hudrow .tb-v { font-size: var(--fs-2); font-weight: 700; color: var(--csh-text); font-variant-numeric: tabular-nums;
+  /* 【2026-10-19】与 topbar 对齐：数值允许省略号，绝不允许被相邻项压住半个字 */
+  min-width: 0; overflow: hidden; text-overflow: ellipsis;
   font-family: var(--ff-num, monospace); }   /* A1：状态行数值走等宽档 */
 .csh-hudrow .tb-grow { flex: 1 1 auto; }
 
@@ -193,6 +197,9 @@
   font-size: var(--fs-3); color: var(--csh-text-dim);
 }
 .csh-player .pl-line { display: flex; align-items: baseline; gap: 6px; min-width: 0; white-space: nowrap; }
+/* 【2026-10-19】行内每一项单独兜底：手牌名/座位名一长，旧写法会把后面的字挤到 .pl-brief 外面
+   （被祖先 overflow:hidden 切掉，看上去像"字被吃了一半"）。逐个子项给省略号，谁也不压谁。 */
+.csh-player .pl-line > * { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .csh-player .pl-line b { font-size: var(--fs-2); font-weight: 800; color: var(--csh-gold-hi); font-variant-numeric: tabular-nums; }
 .csh-player .pl-line .hand-name { color: var(--ok, #7fd8c4); font-weight: 700; }
 .csh-player .pl-line em { font-style: normal; color: var(--csh-text-dim); }
@@ -200,9 +207,15 @@
 /* ---------- 5. Action Dock（规范 §21）：稳定的控制台 ---------- */
 .csh-dock {
   display: flex; align-items: center; justify-content: center;
+  /* 【2026-10-19 · 同类隐患】按钮文字长度是不受控的（斗地主「叫地主 3 分」×3 + 「不叫」在
+     窄屏上就超一行）。旧写法只 overflow:hidden，超出的按钮被整颗切掉 —— 不是"不好看"，
+     是「叫不了 3 分」这种功能直接消失。改成：允许横向滚动（滚动条隐藏），
+     `safe center` 保证溢出时不会连左侧也滚不到（Chromium 旧版不认 safe 时退回普通 center）。 */
+  justify-content: safe center;
+  overflow-x: auto; overflow-y: hidden;
+  scrollbar-width: none; -ms-overflow-style: none; -webkit-overflow-scrolling: touch;
   gap: var(--gap-sm);
   padding: 0 var(--game-pad);
-  overflow: hidden;
   /* A2：分隔线改为「中间实、两端收」的渐隐金线 —— 通栏 1px 实线太像表格边框 */
   background: rgba(0, 0, 0, .18);
   background-image: linear-gradient(90deg, transparent, rgba(216, 180, 106, .34) 22%, rgba(216, 180, 106, .34) 78%, transparent);
@@ -213,7 +226,13 @@
   flex: 0 0 auto;
   min-height: clamp(38px, 10vh, 48px);
   white-space: nowrap;          /* 规范 §21：按钮不因文字长度换行 */
+  /* 【2026-10-19】按钮自身也不再被压扁；真的放不下时由 .csh-dock 横向滚动兜底 */
+  overflow-x: visible;
 }
+/* 按钮组/提示条同样不许被压缩 —— 让"放不下"表现为可滚动，而不是"按钮被切开" */
+.csh-dock > .act-group,
+.csh-dock > .dock-wait,
+.csh-dock > .dock-acts { flex: 0 0 auto; }
 .csh-dock .btn.grow { flex: 1 1 auto; }
 
 /* ---------- 6. 统一结算层（规范 §13） ----------

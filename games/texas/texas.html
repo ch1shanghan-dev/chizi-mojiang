@@ -267,6 +267,8 @@
   }
   .seat-info { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
   .seat-line { display: flex; align-items: center; gap: 4px; white-space: nowrap; min-width: 0; }
+  /* 【2026-10-19 · 同类隐患】同斗地主：名字长的时候不许把筹码/状态挤到裁切区外 */
+  .seat-line > * { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
   .seat-av {
     flex: 0 0 auto;
     width: clamp(24px, 3.2vh, 38px); height: clamp(24px, 3.2vh, 38px); border-radius: 50%;
