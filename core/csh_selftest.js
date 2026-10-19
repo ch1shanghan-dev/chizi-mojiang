@@ -101,7 +101,7 @@
 	function css(el, prop) { try { return win().getComputedStyle ? win().getComputedStyle(el)[prop] : ""; } catch (e) { return ""; } }
 	function px(v) { var n = parseFloat(v); return isFinite(n) ? n : 0; }
 	/* 根字号归一化标定：
-	   headless/嵌入式 WebView 会因视口缩放把 html{font-size:16px} 实际算成
+	   headless/嵌入式 WebView 会因视口缩放把 html 根字号 16px 实际算成
 	   12.62px 或 19.09px（rem 值随之线性缩放），但真实浏览器恒为声明的 16px。
 	   自检关心的是「设计上的字号/尺寸是否够大」，故把所有 px 值换算回
 	   「声明根字号 16px」的标尺再比阈值，消除测试环境缩放怪癖。
@@ -521,7 +521,7 @@
 		var head = "";
 		var tone = rep.ok ? (rep.warn ? "#d8b26a" : "#7fd18b") : "#e2705f";
 		head += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">'
-			+ '<b style="font-size:13px">池子魔将 · 自检 <span style="color:' + tone + '">'
+			+ '<b style="font-size:var(--csh-lfs-md,13px)">池子魔将 · 自检 <span style="color:' + tone + '">'
 			+ (rep.ok ? (rep.warn ? "通过（含警告）" : "全部通过") : "存在失败") + "</span></b>"
 			+ '<span style="opacity:.7">' + esc(rep.scope) + " · " + esc(rep.selector) + "</span>"
 			+ '<span style="margin-left:auto;opacity:.8">✓' + rep.pass + " !" + rep.warn + " ✗" + rep.fail + "</span>"

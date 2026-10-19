@@ -451,6 +451,18 @@
 	var byKey = {};
 	for (var d = 0; d < defs.length; d++) byKey[defs[d].key] = defs[d];
 
+	/* ---------- 退休层（2026-10-20 · 形态治理兼容机制） ----------
+	   治理方案见 docs/career-achv-governance.md。
+	   RETIRED 里的 key 是「退休」的凑数档位：
+	     · 已领取或已达成的玩家 —— 照常可见、可领，进度与奖励记录不蒸发；
+	     · 未达成也未领取的玩家 —— 列表里不再出现（软下线）。
+	   存档永远不动： claimed 集合里的 key 不删不改，退役只影响「展示」。
+	   执行减法批次时逐键登记（值 = 批次号，如 "R1"），禁止整族清空。 */
+	var RETIRED = {
+		/* 示例："rank_7": "R1"。本批次（4.0.8）只落地机制，不退役任何条目。 */
+	};
+	function isRetired(key) { return !!RETIRED[key]; }
+
 	function evalAll(stats) {
 		stats = stats || {};
 		var claimedMap = lsGet(), out = [];
@@ -459,10 +471,13 @@
 			try { var pr = df.prog(stats); cur = Number(pr[0]) || 0; goal = Number(pr[1]) || 1; }
 			catch (e) {}
 			var done = cur >= goal;
+			var retired = !!RETIRED[df.key];
+			/* 退休条目：未达成且未领取 → 不出现在列表（软下线） */
+			if (retired && !done && !claimedMap[df.key]) continue;
 			out.push({
 				key: df.key, cat: df.cat, ico: df.ico, label: df.label, desc: df.desc,
 				reward: df.reward, cur: Math.min(cur, goal), goal: goal,
-				done: done, claimed: !!claimedMap[df.key],
+				done: done, claimed: !!claimedMap[df.key], retired: retired,
 			});
 		}
 		return out;
@@ -489,6 +504,9 @@
 		var errs = [];
 		if (defs.length < MIN_DEFS) errs.push("定义数 " + defs.length + " < " + MIN_DEFS);
 		var seen = {};
+		for (var rk in RETIRED) {
+			if (Object.prototype.hasOwnProperty.call(RETIRED, rk) && !byKey[rk]) errs.push("RETIRED 指向不存在的 key: " + rk);
+		}
 		for (var i = 0; i < defs.length; i++) {
 			var df = defs[i];
 			if (!df.key || seen[df.key]) errs.push("key 重复或为空: " + df.key);
@@ -537,6 +555,8 @@
 		defs: defs,
 		byId: function (k) { return byKey[k] || null; },
 		byKey: function (k) { return byKey[k] || null; },
+		RETIRED: RETIRED,
+		isRetired: isRetired,
 		evalAll: evalAll,
 		test: test,
 		claimed: claimed,

@@ -138,6 +138,13 @@ import { lib, game } from "../../../noname.js";
 	/* 2026-10-20 · 池子成就（操作型成就）。与生涯成就分开存：一份是"领奖集合"，
 	   一份是"达成记录 + 次数 + 模式"，清洗规则也不一样。 */
 	var K_POOL_ACHV = "csh_pool_achv";
+	/* 2026-10-20 · 池子成就发奖台账：只增不删，页面级「重置成就进度」不清它，
+	   防清档刷奖（见 core/csh_pool_achv.js §5b）。全部重置时随钱包一起清。 */
+	var K_POOL_ACHV_PAY = "csh_pool_achv_pay";
+	/* 2026-10-20 · 其他扩展下载断点（csh_debug.js 续传清单）。
+	   跨机导入无意义（半成品 buffer 不随存档走），导入后由 resumeLoad 的
+	   name/repo/dir 三重校验自然失效；登记只为满足 E41 全键覆盖纪律。 */
+	var K_STORE_RESUME = "csh_store_resume";
 	var K_TEXAS_BEST = "csh_texas_best";
 	var K_BJ_BEST = "csh_bj_best";
 	var K_SNIPER_BEST = "csh_sniper_best";
@@ -603,6 +610,41 @@ import { lib, game } from "../../../noname.js";
 		for (var j = 0; j < sk.length; j++) out.seen[clampStr(sk[j], 48)] = 1;
 		return out;
 	}
+	/* 池子成就发奖台账：{v, paid:{id:{t,pc,merit}}}。形状校验 + 截断，与主存档同纪律。 */
+	function cleanPoolAchvPay(o) {
+		if (!o || typeof o !== "object") return null;
+		var out = { v: 1, paid: {} };
+		var src = (o.paid && typeof o.paid === "object") ? o.paid : {};
+		var keys = Object.keys(src).slice(0, 800);
+		for (var i = 0; i < keys.length; i++) {
+			var id = clampStr(keys[i], 48);
+			var rec = src[keys[i]];
+			if (!rec || typeof rec !== "object") continue;
+			out.paid[id] = {
+				t: Number(rec.t) || 0,
+				pc: Math.max(0, Math.min(99999999, Number(rec.pc) || 0)),
+				merit: Math.max(0, Math.min(999999, Number(rec.merit) || 0)),
+			};
+		}
+		return out;
+	}
+	/* 其他扩展下载断点：{name, repo, dir, branch, done:[rel], t}。
+	   done 数组截断到 5000（大合集上限）；name/repo/dir 不匹配的脏记录直接丢。 */
+	function cleanStoreResume(o) {
+		if (!o || typeof o !== "object" || typeof o.name !== "string" || !o.name.trim()) return null;
+		if (typeof o.repo !== "string" || !/^[\w.-]+\/[\w.-]+$/.test(o.repo)) return null;
+		var out = {
+			name: clampStr(o.name, 60),
+			repo: o.repo,
+			dir: typeof o.dir === "string" ? clampStr(o.dir, 120) : "",
+			branch: clampStr(String(o.branch || "main"), 40),
+			done: [],
+			t: Number(o.t) || 0,
+		};
+		var d = Array.isArray(o.done) ? o.done.slice(0, 5000) : [];
+		for (var i = 0; i < d.length; i++) out.done.push(clampStr(String(d[i] || ""), 200));
+		return out;
+	}
 	/* bgmOn 是「一主键 + N 后缀键」通配族（csh_bgm.js onKey()），导出合并为对象 */	function collectBgmOn() {
 		var out = {};
 		try {
@@ -849,6 +891,8 @@ import { lib, game } from "../../../noname.js";
 		["dailyTask", K_DAILY_TASK, cleanDailyTask, 0],
 		["achv", K_ACHV, cleanAchv, 0],
 		["poolAchv", K_POOL_ACHV, cleanPoolAchv, 0],
+		["poolAchvPay", K_POOL_ACHV_PAY, cleanPoolAchvPay, 0],
+		["storeResume", K_STORE_RESUME, cleanStoreResume, 0],
 		["texasBest", K_TEXAS_BEST, cleanObj, 0],
 		["bjBest", K_BJ_BEST, cleanObj, 0],
 		["sniperBest", K_SNIPER_BEST, cleanObj, 0],
@@ -968,7 +1012,7 @@ import { lib, game } from "../../../noname.js";
 	var RESET_KEYS = [
 		K_WALLET, K_WALLET_SNAP, K_WALLET_HIST, K_CDK_LIFETIME,
 		K_RANK, K_WORLD, K_CDK, "csh_cdk_used_n", K_DEVICE_ID, K_DEV_BIND,
-		K_DAILY_TASK, K_ACHV, K_POOL_ACHV,
+		K_DAILY_TASK, K_ACHV, K_POOL_ACHV, K_POOL_ACHV_PAY, K_STORE_RESUME,
 		K_TEXAS_BEST, K_SNIPER_BEST, K_BJ_BEST,
 		"csh_texas_bank", "csh_texas_bank_legacy", K_MIG_FLAG,
 		K_WINRATE,

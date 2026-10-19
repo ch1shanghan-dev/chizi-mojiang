@@ -32,20 +32,39 @@
   --ink:#efe6cf; --ink-dim:rgba(239,230,207,.62); --ink-faint:rgba(239,230,207,.36);
   --gold:#d8bd7a; --gold-2:#b08d3e; --line:rgba(216,189,122,.28); --line-2:rgba(216,189,122,.14);
   --up:#ff6b57; --down:#57c78a;                       /* A 股口径：红涨绿跌 */
+
+  /* 字号收编档（2026-10-20）：同值 token 替换裸字号，渲染不变；同档多值待实机测量后并档 */
+  --pfs-micro: 10.5px;
+  --pfs-cap: 11px;
+  --pfs-cap2: 11.5px;
+  --pfs-sm: 12px;
+  --pfs-sm2: 12.5px;
+  --pfs-md: 13px;
+  --pfs-md2: 13.5px;
+  --pfs-lg: 14px;
+  --pfs-lg2: 15px;
+  --pfs-xl: 16px;
+  --pfs-xl2: 17px;
+  --pfs-xl3: 19px;
+  --pfs-2xl: 22px;
+  --pfs-2xl2: 23px;
+  --pfs-2xl3: 24px;
+  --pfs-3xl: 28px;
+  --pfs-4xl: 34px;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;height:100%;overflow:hidden}
 body{background:
   radial-gradient(120% 80% at 50% 0%,rgba(216,189,122,.06),transparent 55%),
   linear-gradient(170deg,var(--bg2),var(--bg));
-  color:var(--ink);font-family:var(--ff-body);font-size:14px}
+  color:var(--ink);font-family:var(--ff-body);font-size:var(--pfs-lg)}
 #app{display:flex;flex-direction:column;height:100%;padding:8px 12px 6px 30px}
 
 /* ---------- 顶部资产条 ---------- */
 .topbar{flex:0 0 auto;display:flex;align-items:center;gap:10px;min-height:42px;padding-right:200px}
-.brand{font-family:var(--ff-callig);font-size:24px;letter-spacing:.2em;color:var(--gold)}
-.brand small{font-size:12px;letter-spacing:.1em;color:var(--ink-faint);margin-left:8px;font-family:var(--ff-body)}
-.stats{margin-left:auto;display:flex;gap:8px;font-family:var(--ff-num);font-size:14px;font-variant-numeric:tabular-nums}
+.brand{font-family:var(--ff-callig);font-size:var(--pfs-2xl3);letter-spacing:.2em;color:var(--gold)}
+.brand small{font-size:var(--pfs-sm);letter-spacing:.1em;color:var(--ink-faint);margin-left:8px;font-family:var(--ff-body)}
+.stats{margin-left:auto;display:flex;gap:8px;font-family:var(--ff-num);font-size:var(--pfs-lg);font-variant-numeric:tabular-nums}
 .stat{background:rgba(216,189,122,.10);border:1px solid var(--line-2);border-radius:999px;padding:4px 12px;white-space:nowrap}
 .stat b{color:var(--gold);font-weight:600}
 .stat .up{color:var(--up)} .stat .down{color:var(--down)}
@@ -54,14 +73,14 @@ body{background:
 /* v6.3「她的消息」：亲近(B)及以上持仓，每交易日一条涨跌倾向（好感回报之一） */
 .tips{flex:0 0 auto;display:none;gap:6px;overflow-x:auto;padding:0 0 6px;scrollbar-width:none}
 .tips.on{display:flex}
-.tipchip{flex:0 0 auto;display:flex;align-items:center;gap:5px;font-size:11px;
+.tipchip{flex:0 0 auto;display:flex;align-items:center;gap:5px;font-size:var(--pfs-cap);
   border:1px solid rgba(240,112,156,.30);background:rgba(240,112,156,.08);color:#f7c9d9;
   border-radius:999px;padding:3px 9px;white-space:nowrap}
 .tipchip b{font-family:var(--ff-title);letter-spacing:.04em;color:#fff}
 .tipchip i{font-style:normal;font-family:var(--ff-num)}
 .tipchip.up{color:#ffb3b3;border-color:rgba(255,120,120,.34);background:rgba(255,120,120,.08)}
 .tipchip.down{color:#9fd8b0;border-color:rgba(120,200,150,.32);background:rgba(120,200,150,.07)}
-.tipchip .dir{font-size:12px}
+.tipchip .dir{font-size:var(--pfs-sm)}
 .gridwrap{flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:8px 2px 10px}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px}
 .card{position:relative;border:1px solid var(--line-2);border-radius:12px;overflow:hidden;
@@ -73,20 +92,20 @@ body{background:
 .face img{width:100%;height:100%;object-fit:cover;object-position:50% 12%;display:block}
 /* 人像/主立绘都缺失时的名字占位（对齐 codex 的 .gph 范式，避免破图图标） */
 .gf-noimg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
-  font-family:var(--ff-title);font-size:34px;letter-spacing:.1em;color:rgba(239,230,207,.30)}
+  font-family:var(--ff-title);font-size:var(--pfs-4xl);letter-spacing:.1em;color:rgba(239,230,207,.30)}
 .face::after{content:"";position:absolute;inset:auto 0 0 0;height:64px;
   background:linear-gradient(180deg,transparent,rgba(25,21,18,.94))}
-.hold-tag{position:absolute;left:7px;top:7px;font-family:var(--ff-num);font-size:12px;
+.hold-tag{position:absolute;left:7px;top:7px;font-family:var(--ff-num);font-size:var(--pfs-sm);
   background:rgba(25,21,18,.80);border:1px solid var(--line);color:var(--gold);border-radius:999px;padding:2px 8px}
-.heat-tag{position:absolute;right:7px;top:7px;font-size:12px;color:#ffd98a;
+.heat-tag{position:absolute;right:7px;top:7px;font-size:var(--pfs-sm);color:#ffd98a;
   background:rgba(25,21,18,.80);border:1px solid var(--line-2);border-radius:999px;padding:2px 8px}
 .cinfo{position:absolute;left:0;right:0;bottom:0;padding:7px 10px;display:flex;align-items:baseline;gap:8px}
-.cname{font-family:var(--ff-title);font-size:19px;font-weight:600;letter-spacing:.06em;
+.cname{font-family:var(--ff-title);font-size:var(--pfs-xl3);font-weight:600;letter-spacing:.06em;
   text-shadow:0 1px 3px rgba(0,0,0,.85);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.cprice{margin-left:auto;font-family:var(--ff-num);font-size:15px;color:var(--gold);
+.cprice{margin-left:auto;font-family:var(--ff-num);font-size:var(--pfs-lg2);color:var(--gold);
   text-shadow:0 1px 3px rgba(0,0,0,.85)}
-.csub{position:relative;display:flex;align-items:center;gap:8px;padding:6px 10px;font-size:13px;color:var(--ink-dim)}
-.cdev{font-family:var(--ff-num);font-size:13px;font-variant-numeric:tabular-nums}
+.csub{position:relative;display:flex;align-items:center;gap:8px;padding:6px 10px;font-size:var(--pfs-md);color:var(--ink-dim)}
+.cdev{font-family:var(--ff-num);font-size:var(--pfs-md);font-variant-numeric:tabular-nums}
 .cdev.up{color:var(--up)} .cdev.down{color:var(--down)}
 .cdev.flat{color:var(--ink-faint)}
 
@@ -97,7 +116,7 @@ body{background:
   display:flex;gap:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;
   background:linear-gradient(150deg,var(--panel2),var(--bg2));box-shadow:0 20px 60px rgba(0,0,0,.6)}
 .pclose{position:absolute;right:8px;top:8px;z-index:3;width:36px;height:36px;border-radius:999px;
-  border:1px solid var(--line);background:rgba(25,21,18,.7);color:var(--gold);font-size:17px;cursor:pointer}
+  border:1px solid var(--line);background:rgba(25,21,18,.7);color:var(--gold);font-size:var(--pfs-xl2);cursor:pointer}
 /* 左：立绘 */
 .pstage{flex:0 0 44%;position:relative;background:#141110;overflow:hidden}
 .pstage img{width:100%;height:100%;object-fit:cover;object-position:50% 8%;display:block;animation:fin .5s ease}
@@ -105,56 +124,56 @@ body{background:
 .pstage::after{content:"";position:absolute;inset:0;box-shadow:inset -40px 0 60px -30px rgba(25,21,18,.95)}
 /* 右：信息与操作 */
 .pinfo{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;padding:14px 16px 12px;gap:8px;overflow-y:auto}
-.pname{font-family:var(--ff-title);font-size:28px;letter-spacing:.12em;color:var(--ink)}
-.ptag{font-size:13.5px;color:var(--gold);letter-spacing:.14em}
-.pbio{font-size:14px;line-height:1.8;color:var(--ink-dim);border-left:2px solid var(--line);padding-left:9px}
+.pname{font-family:var(--ff-title);font-size:var(--pfs-3xl);letter-spacing:.12em;color:var(--ink)}
+.ptag{font-size:var(--pfs-md2);color:var(--gold);letter-spacing:.14em}
+.pbio{font-size:var(--pfs-lg);line-height:1.8;color:var(--ink-dim);border-left:2px solid var(--line);padding-left:9px}
 /* 台词气泡（galgame 核心） */
 .say{position:relative;margin-top:2px;background:rgba(216,189,122,.08);border:1px solid var(--line-2);
-  border-radius:10px;padding:11px 13px;font-size:15px;line-height:1.75;min-height:60px;
+  border-radius:10px;padding:11px 13px;font-size:var(--pfs-lg2);line-height:1.75;min-height:60px;
   animation:sayIn .28s ease}
 @keyframes sayIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 .say::before{content:"";position:absolute;left:16px;top:-6px;width:10px;height:10px;transform:rotate(45deg);
   background:rgba(216,189,122,.08);border-left:1px solid var(--line-2);border-top:1px solid var(--line-2)}
-.say .who{display:block;font-size:12px;color:var(--gold);letter-spacing:.14em;margin-bottom:3px}
+.say .who{display:block;font-size:var(--pfs-sm);color:var(--gold);letter-spacing:.14em;margin-bottom:3px}
 /* 数据格 */
 .facts{flex:0 0 auto;display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:2px}
 .fact{background:rgba(255,255,255,.03);border:1px solid var(--line-2);border-radius:9px;padding:7px 9px}
-.fact .k{font-size:12px;color:var(--ink-faint);letter-spacing:.06em}
-.fact .v{font-family:var(--ff-num);font-size:16px;color:var(--ink)}
+.fact .k{font-size:var(--pfs-sm);color:var(--ink-faint);letter-spacing:.06em}
+.fact .v{font-family:var(--ff-num);font-size:var(--pfs-xl);color:var(--ink)}
 .fact .v.up{color:var(--up)} .fact .v.down{color:var(--down)}
 /* 操作区 */
 .ops{margin-top:auto;display:flex;flex-direction:column;gap:8px}
 .qty{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .qbtn{border:1px solid var(--line-2);background:transparent;color:var(--ink-dim);border-radius:8px;
-  font-family:var(--ff-num);font-size:13.5px;padding:5px 11px;cursor:pointer}
+  font-family:var(--ff-num);font-size:var(--pfs-md2);padding:5px 11px;cursor:pointer}
 .qbtn.on{color:#fff;background:var(--gold-2);border-color:var(--gold-2)}
 .act{display:flex;gap:8px}
-.act button{flex:1;height:42px;border-radius:10px;font-size:15px;letter-spacing:.1em;cursor:pointer;border:1px solid transparent}
+.act button{flex:1;height:42px;border-radius:10px;font-size:var(--pfs-lg2);letter-spacing:.1em;cursor:pointer;border:1px solid transparent}
 .buy{background:linear-gradient(180deg,#e2c078,#c39a45);color:#241d12;font-weight:700}
 .sell{background:transparent;border-color:var(--line);color:var(--gold)}
 .act button:disabled{opacity:.38;cursor:not-allowed}
-.cost-hint{font-family:var(--ff-num);font-size:13.5px;color:var(--ink-dim);text-align:right}
+.cost-hint{font-family:var(--ff-num);font-size:var(--pfs-md2);color:var(--ink-dim);text-align:right}
 
 /* ---------- 提示 & 底部 ---------- */
 #toast{position:fixed;left:50%;bottom:52px;transform:translateX(-50%);z-index:60;pointer-events:none;
   background:rgba(42,35,28,.96);border:1px solid var(--line);color:var(--ink);border-radius:999px;
-  padding:8px 18px;font-size:14px;opacity:0;transition:opacity .2s ease;max-width:92%;text-align:center}
+  padding:8px 18px;font-size:var(--pfs-lg);opacity:0;transition:opacity .2s ease;max-width:92%;text-align:center}
 #toast.on{opacity:1}
-.foot{flex:0 0 auto;font-size:12.5px;color:var(--ink-faint);letter-spacing:.06em;padding:5px 2px 2px;display:flex;gap:10px}
+.foot{flex:0 0 auto;font-size:var(--pfs-sm2);color:var(--ink-faint);letter-spacing:.06em;padding:5px 2px 2px;display:flex;gap:10px}
 .foot .dot{color:var(--gold-2)}
 @media (max-width:720px){
   .pwrap{flex-direction:column;height:min(96%,660px)}
   .pstage{flex:0 0 40%}
   .pstage::after{box-shadow:inset 0 -40px 60px -30px rgba(25,21,18,.95)}
   .pinfo{padding:10px 12px 10px}
-  .pname{font-size:23px}
+  .pname{font-size:var(--pfs-2xl2)}
   .grid{grid-template-columns:repeat(auto-fill,minmax(148px,1fr))}
   .topbar{padding-right:190px}
 }
 
 /* ---------- 好感度（v6.2）—— 卡面角标 + 面板整条 ---------- */
 .affbadge{position:absolute;right:7px;bottom:30px;display:flex;align-items:center;gap:3px;
-  font-family:var(--ff-num);font-size:11.5px;padding:1px 7px 1px 5px;border-radius:999px;
+  font-family:var(--ff-num);font-size:var(--pfs-cap2);padding:1px 7px 1px 5px;border-radius:999px;
   background:rgba(25,21,18,.82);border:1px solid rgba(240,112,156,.34);color:#ffb9d2;
   text-shadow:0 0 8px rgba(240,112,156,.55)}
 .affbadge svg{width:13px;height:12px;display:block;overflow:visible}
@@ -178,7 +197,7 @@ body{background:
    **只渲染出一部分**（作者实机：「亲密有一部分文字不可见」）。改为
    ① 兜底色（不支持 clip 时也是亮粉色，永远看得见）
    ② 只在支持 background-clip:text 时才切渐变（并且不再用 filter，改 glow 光晕） */
-.afftitle{font-family:var(--ff-callig);font-size:17px;letter-spacing:.16em;line-height:1.55;
+.afftitle{font-family:var(--ff-callig);font-size:var(--pfs-xl2);letter-spacing:.16em;line-height:1.55;
   color:#ff9dbe;text-shadow:0 0 10px rgba(240,112,156,.55),0 1px 2px rgba(0,0,0,.55);
   padding:1px 0}
 @supports ((-webkit-background-clip:text) or (background-clip:text)){
@@ -187,8 +206,8 @@ body{background:
     -webkit-text-fill-color:transparent;color:transparent;text-shadow:none;
     padding:1px 0 2px}
 }
-.afflv{margin-left:auto;font-family:var(--ff-title);font-size:13.5px;letter-spacing:.1em;color:#f0709c}
-.affval{font-family:var(--ff-num);font-size:13px;color:var(--ink-dim);font-variant-numeric:tabular-nums}
+.afflv{margin-left:auto;font-family:var(--ff-title);font-size:var(--pfs-md2);letter-spacing:.1em;color:#f0709c}
+.affval{font-family:var(--ff-num);font-size:var(--pfs-md);color:var(--ink-dim);font-variant-numeric:tabular-nums}
 .affhearts{position:relative;display:flex;align-items:center;gap:5px;margin:8px 0 7px;z-index:2}
 .affheart{width:30px;height:28px;display:block;flex:0 0 auto;overflow:visible}
 .affheart.on .b{filter:drop-shadow(0 0 3px rgba(240,112,156,.95)) drop-shadow(0 0 7px rgba(240,112,156,.45))}
@@ -207,41 +226,41 @@ body{background:
   background:linear-gradient(100deg,transparent 20%,rgba(255,255,255,.42) 50%,transparent 80%);
   transform:translateX(-120%);animation:affSheen 2.8s ease-in-out infinite}
 @keyframes affSheen{0%{transform:translateX(-120%)}55%,100%{transform:translateX(120%)}}
-.affmeta{position:relative;display:flex;gap:8px;margin-top:6px;z-index:2;font-size:11.5px;color:var(--ink-dim)}
+.affmeta{position:relative;display:flex;gap:8px;margin-top:6px;z-index:2;font-size:var(--pfs-cap2);color:var(--ink-dim)}
 .affops{position:relative;display:flex;gap:6px;margin-top:8px;z-index:2;flex-wrap:wrap}
 .affbtn{border:1px solid rgba(240,112,156,.36);background:linear-gradient(180deg,rgba(240,112,156,.18),rgba(240,112,156,.06));
-  color:#ffd9e6;border-radius:8px;font-size:12px;padding:5px 10px;cursor:pointer;transition:box-shadow .2s ease,transform .14s ease}
+  color:#ffd9e6;border-radius:8px;font-size:var(--pfs-sm);padding:5px 10px;cursor:pointer;transition:box-shadow .2s ease,transform .14s ease}
 .affbtn:hover{box-shadow:0 0 14px rgba(240,112,156,.5);transform:translateY(-1px)}
 .affbtn[disabled]{opacity:.34;cursor:not-allowed;box-shadow:none;transform:none}
 .affbtn.gold{border-color:var(--line);background:linear-gradient(180deg,rgba(216,189,122,.18),rgba(216,189,122,.05));color:var(--gold)}
 /* v6.5 折叠式好感回报（减少啰嗦） */
 .pkbox{position:relative;z-index:2;margin-top:10px;border-top:1px dashed rgba(216,189,122,.22);padding-top:8px}
-.pkbox>summary{list-style:none;cursor:pointer;font-size:12.5px;color:var(--gold);letter-spacing:.04em}
+.pkbox>summary{list-style:none;cursor:pointer;font-size:var(--pfs-sm2);color:var(--gold);letter-spacing:.04em}
 .pkbox>summary::-webkit-details-marker{display:none}
 .pkbox>summary::before{content:"\25B8 ";color:var(--gold-2)}
 .pkbox[open]>summary::before{content:"\25BE "}
 .pkbox .affperk{margin-top:3px}
 /* v6.3 互动动作 / 礼物 / 好感回报 */
-.affnote{position:relative;z-index:2;margin-top:6px;font-size:12px;color:var(--ink-faint);letter-spacing:.03em}
+.affnote{position:relative;z-index:2;margin-top:6px;font-size:var(--pfs-sm);color:var(--ink-faint);letter-spacing:.03em}
 .affgifts{position:relative;display:flex;gap:6px;margin-top:7px;z-index:2;flex-wrap:wrap}
 .affgifts .affbtn{display:flex;align-items:baseline;gap:5px}
-.affgifts .affbtn .cost{font-family:var(--ff-num);font-size:10.5px;color:rgba(255,240,200,.62);font-style:normal}
+.affgifts .affbtn .cost{font-family:var(--ff-num);font-size:var(--pfs-sm2);font-weight:600;color:rgba(255,240,200,.9);font-style:normal}
 .affperks{position:relative;margin-top:10px;z-index:2;border-top:1px dashed rgba(216,189,122,.22);padding-top:8px}
-.affperks .pktitle{font-size:12px;color:var(--gold);letter-spacing:.12em;margin-bottom:5px}
-.affperk{display:flex;align-items:baseline;gap:6px;font-size:13px;padding:3px 0;opacity:.55}
+.affperks .pktitle{font-size:var(--pfs-sm);color:var(--gold);letter-spacing:.12em;margin-bottom:5px}
+.affperk{display:flex;align-items:baseline;gap:6px;font-size:var(--pfs-md);padding:3px 0;opacity:.55}
 .affperk.on{opacity:1}
-.affperk .tk{flex:0 0 auto;font-size:11px;color:#1a130a;background:var(--ink-faint);border-radius:4px;padding:0 5px}
+.affperk .tk{flex:0 0 auto;font-size:var(--pfs-cap);color:#1a130a;background:var(--ink-faint);border-radius:4px;padding:0 5px}
 .affperk.on .tk{background:var(--gold-line)}
 .affperk .tn{flex:0 0 auto;color:var(--ink);letter-spacing:.04em}
-.affperk .td{flex:1 1 auto;color:var(--ink-dim);font-size:11.5px;min-width:0}
-.affperk .ts{flex:0 0 auto;font-size:11.5px;color:var(--ink-faint)}
+.affperk .td{flex:1 1 auto;color:var(--ink-dim);font-size:var(--pfs-cap2);min-width:0}
+.affperk .ts{flex:0 0 auto;font-size:var(--pfs-cap2);color:var(--ink-faint)}
 .affperk.on .ts{color:var(--ok)}
-.affheat{margin-top:6px;font-size:12.5px;color:#ffd98a}
+.affheat{margin-top:6px;font-size:var(--pfs-sm2);color:#ffd98a}
 /* v6.4：相处全部收归图鉴，这里只留一句引导（不可点：跨页跳转要过门票，反而添乱） */
-.affjump{margin-top:9px;font-size:12.5px;color:var(--gold);letter-spacing:.04em;
+.affjump{margin-top:9px;font-size:var(--pfs-sm2);color:var(--gold);letter-spacing:.04em;
   border-top:1px dashed rgba(216,189,122,.22);padding-top:7px;line-height:1.6}
 .affbtn.soft{border-color:rgba(147,166,187,.45);background:linear-gradient(180deg,rgba(147,166,187,.16),rgba(147,166,187,.05));color:#d8e4f0}
-.affhint{position:relative;z-index:2;margin-top:6px;font-size:11.5px;color:#f7c9d9;min-height:15px}
+.affhint{position:relative;z-index:2;margin-top:6px;font-size:var(--pfs-cap2);color:#f7c9d9;min-height:15px}
 .affhint.good{color:var(--up)} .affhint.bad{color:var(--ink-dim)}
 </style>
 </head>
@@ -407,9 +426,9 @@ function renderGrid() {
     var box = el("div", "gf-empty");
     box.style.cssText = "grid-column:1/-1;text-align:center;padding:48px 12px;color:var(--ink-dim)";
     var t1 = el("div", "", "金鳞市 · 静候开市");
-    t1.style.cssText = "font-family:var(--ff-title);font-size:22px;letter-spacing:.3em;color:var(--gold)";
+    t1.style.cssText = "font-family:var(--ff-title);font-size:var(--pfs-2xl);letter-spacing:.3em;color:var(--gold)";
     var t2 = el("div", "", "五十位妖灵在此挂牌——请从「池子休闲」进入，或确认扩展已加载");
-    t2.style.cssText = "margin-top:10px;font-size:12px;letter-spacing:.06em";
+    t2.style.cssText = "margin-top:10px;font-size:var(--pfs-sm);letter-spacing:.06em";
     box.appendChild(t1); box.appendChild(t2);
     g.appendChild(box);
     return;

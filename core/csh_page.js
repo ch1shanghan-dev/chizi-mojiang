@@ -284,7 +284,7 @@
 			st.textContent =
 				".csh-quip{position:fixed;z-index:var(--csh-z-tip,2147482000);max-width:16em;padding:7px 10px;border-radius:10px;" +
 				"background:rgba(22,18,13,.95);border:1px solid rgba(201,168,106,.45);color:#f0e6cf;" +
-				"font-size:13px;line-height:1.45;pointer-events:none;transform:translateY(-100%);" +
+				"font-size:var(--csh-lfs-md,13px);line-height:1.45;pointer-events:none;transform:translateY(-100%);" +
 				"box-shadow:0 6px 18px rgba(0,0,0,.45);animation:cshQuipIn .18s ease-out;}" +
 			".csh-quip::after{content:'';position:absolute;left:18px;bottom:-6px;width:10px;height:10px;" +
 			"background:inherit;border-right:1px solid rgba(201,168,106,.45);border-bottom:1px solid rgba(201,168,106,.45);" +

@@ -242,6 +242,42 @@ console.log("\n== 11. 两个已修的计数口径 ==");
 	ok("获胜手牌以 over.hand 为准（0 张）", hit.includes("op_empty_win"), hit.join(","));
 }
 
+console.log("\n== 12. 发奖对账（防重复领取 · 2026-10-20） ==");
+{
+	store.clear();
+	const name = PA.RULES.find((r) => r.id === "op_one_slash").name;
+	PA.unlock("op_one_slash", "identity");
+	ok("未领取时 isPaid=false", PA.isPaid("op_one_slash") === false);
+	PA.recordPaid("op_one_slash", 500, 5);
+	ok("recordPaid 后 isPaid=true", PA.isPaid("op_one_slash") === true);
+	ok("recordPaid 顺手补 seen", PA.load().seen["op_one_slash"] === 1);
+	/* 台账幂等：再记一次金额不翻倍 */
+	const before = store.get(PA.PAY_KEY);
+	PA.recordPaid("op_one_slash", 500, 5);
+	ok("recordPaid 幂等（台账不重复写）", store.get(PA.PAY_KEY) === before);
+
+	/* 场景①：成就页「重置成就进度」只清主存档，台账还在 → 重新达成也领不到第二次 */
+	PA.save({ v: PA.VER, got: {}, seen: {}, chars: {} });
+	PA.unlock("op_one_slash", "identity");
+	ok("页面级重置后重新达成，台账兜底 isPaid=true", PA.isPaid("op_one_slash") === true);
+	const n1 = PA.reconcile();
+	ok("reconcile 补回 seen（≥1 条）", n1 >= 1 && PA.load().seen["op_one_slash"] === 1, "补回 " + n1);
+}
+{
+	/* 场景②：主存档 + 台账都被清（极端），钱包流水里还有「池子成就/<名>」→ 兜底 */
+	const sb2 = makeSandbox();
+	const PA2 = sb2.PA;
+	const name2 = PA2.RULES.find((r) => r.id === "op_thunder").name;
+	sb2.fakeWin.CSH = { wallet: { ledger: () => [{ t: 1, d: 1500, r: "池子成就/" + name2, c: "成就", b: 1500 }] } };
+	PA2.unlock("op_thunder", "identity");
+	ok("台账已清，钱包流水兜底 isPaid=true", PA2.isPaid("op_thunder") === true);
+	const n2 = PA2.reconcile();
+	ok("reconcile 用流水补回 seen", n2 === 1 && PA2.load().seen["op_thunder"] === 1, "补回 " + n2);
+	/* 反例：流水里没有的成就不该被误标 */
+	PA2.unlock("op_one_slash", "identity");
+	ok("流水里没有的成就不误标（反例）", PA2.isPaid("op_one_slash") === false);
+}
+
 console.log("\n----------------------------------------");
 console.log(fail ? "结论：未通过（PASS " + pass + " / FAIL " + fail + "）" : "结论：通过（PASS " + pass + " / FAIL " + fail + "）");
 process.exit(fail ? 1 : 0);

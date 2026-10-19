@@ -118,7 +118,7 @@ export function cshPrecontent() {
                     'linear-gradient(180deg,#5d4a22 0%,#3b3014 50%,#231b0b 100%)!important;',
                     'box-shadow:inset 0 0 0 1px rgba(255,226,160,.16),inset 0 1px 0 rgba(255,244,214,.3),',
                     'inset 0 -1px 0 rgba(0,0,0,.55),0 2px 7px rgba(0,0,0,.6),0 0 0 1px rgba(0,0,0,.5)!important;',
-                    'color:#ffeec2!important;font-size:16px!important;font-weight:bold!important;',
+                    'color:#ffeec2!important;font-size:var(--csh-lfs-xl,16px)!important;font-weight:bold!important;',
                     'letter-spacing:2px!important;text-indent:2px!important;line-height:1.25!important;',
                     'text-align:center!important;',
                     'text-shadow:0 1px 2px rgba(0,0,0,.9),0 0 9px rgba(255,203,110,.4)!important;',
@@ -139,7 +139,7 @@ export function cshPrecontent() {
                     '.config.pointerspan:active .csh-cfg-btn{transform:translateY(1px)!important;',
                     'box-shadow:inset 0 0 0 1px rgba(255,226,160,.16),0 1px 3px rgba(0,0,0,.6)!important;}',
                     '.csh-cfg-sep{display:block!important;height:22px!important;line-height:22px!important;text-align:center!important;',
-                    'color:#e9b949!important;font-size:12.5px!important;font-weight:700!important;letter-spacing:3px!important;',
+                    'color:#e9b949!important;font-size:var(--csh-lfs-sm2,12.5px)!important;font-weight:700!important;letter-spacing:3px!important;',
                     'text-shadow:0 0 10px rgba(233,185,73,.4)!important;}',
                     // 引擎的 nopointer 只去掉鼠标手型，仍会给 clear 项挂 clickToggle（menu/index.js:207、:292）。
                     // 分隔条本身不该有点击态，这里直接断掉指针事件；不支持 :has() 的宿主会忽略该条，行为退回原样。
@@ -150,7 +150,7 @@ export function cshPrecontent() {
                     '.config:has(>span>.csh-cfg-sep)~.config:last-child>span{display:block!important;box-sizing:border-box!important;',
                     'width:min(74%,260px)!important;margin:6px auto 12px!important;padding:8px 0!important;text-align:center!important;',
                     'border-radius:9px!important;border:1px solid rgba(216,106,120,.45)!important;background:rgba(216,106,120,.10)!important;',
-                    'color:#f2a9b4!important;font-size:12.5px!important;font-weight:600!important;letter-spacing:2px!important;',
+                    'color:#f2a9b4!important;font-size:var(--csh-lfs-sm2,12.5px)!important;font-weight:600!important;letter-spacing:2px!important;',
                     'transition:background .16s ease,color .16s ease,border-color .16s ease!important;}',
                     '.config:has(>span>.csh-cfg-sep)~.config:last-child:hover>span{background:rgba(216,106,120,.24)!important;',
                     'color:#ffd9df!important;border-color:rgba(230,120,140,.85)!important;}',

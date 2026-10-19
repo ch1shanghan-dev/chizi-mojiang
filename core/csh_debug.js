@@ -1635,7 +1635,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                 "pointer-events:none!important;width:max-content!important;max-width:86%!important;",
                 "font-family:system-ui,-apple-system,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif!important;}",
                 "#" + TOAST_HOST_ID + " .csh-dbg-toast{position:static!important;display:block!important;box-sizing:border-box!important;",
-                "padding:11px 20px!important;border-radius:12px!important;font-size:13.5px!important;font-weight:500!important;letter-spacing:.01em!important;",
+                "padding:11px 20px!important;border-radius:12px!important;font-size:var(--csh-lfs-md2,13.5px)!important;font-weight:500!important;letter-spacing:.01em!important;",
                 "color:var(--csh-bg)!important;text-align:center!important;white-space:normal!important;word-break:break-word!important;",
                 "background:var(--csh-fg)!important;",
                 "border:1px solid rgba(var(--csh-bg-rgb),.10)!important;",
@@ -1711,7 +1711,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                 "position:relative!important;z-index:3!important;}",
                 "#csh-dbg-head .csh-dbg-head-main{flex:1 1 auto!important;min-width:0!important;display:block!important;}",
                 /* ---------- 标题：字重 600 + 轻微负字距（现代紧凑，不用宽字距复古排印） ---------- */
-                "#csh-dbg-title{font-family:'Noto Serif SC','Source Han Serif SC','Songti SC','STSong','SimSun',serif!important;display:flex!important;align-items:center!important;gap:9px!important;text-align:left!important;font-size:16px!important;font-weight:600!important;letter-spacing:-.01em!important;",
+                "#csh-dbg-title{font-family:'Noto Serif SC','Source Han Serif SC','Songti SC','STSong','SimSun',serif!important;display:flex!important;align-items:center!important;gap:9px!important;text-align:left!important;font-size:var(--csh-lfs-xl,16px)!important;font-weight:600!important;letter-spacing:-.01em!important;",
                 "line-height:1.3!important;margin:0!important;padding:0!important;",
                 "font-family:system-ui,-apple-system,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif!important;",
                 "color:var(--csh-bg)!important;-webkit-text-fill-color:var(--csh-bg)!important;background:none!important;",
@@ -1724,7 +1724,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                 /* ---------- 状态行：单行省略，避免撑高头部 ---------- */
                 /* 左缩进 = 品牌标宽 20 + 间距 9：状态行必须与标题**文字**对齐，
                    否则标题被标推右、状态行贴边，左缘参差（放大 6 倍才看得出的低级错位）。 */
-                "#csh-dbg-sub{display:block!important;position:static!important;text-align:left!important;font-size:12px!important;color:var(--csh-gray)!important;",
+                "#csh-dbg-sub{display:block!important;position:static!important;text-align:left!important;font-size:var(--csh-lfs-sm,12px)!important;color:var(--csh-gray)!important;",
                 "letter-spacing:.01em!important;margin:3px 0 0!important;padding:0 0 0 29px!important;",
                 "overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important;}",
                 "#csh-dbg-sub::after{content:none!important;}",
@@ -1739,7 +1739,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                    （flex-wrap + position:static，无系统弹层、无绝对定位风险），点 chip 直接生效；
                    按钮只显示当前皮肤的短名 + ▾，宽度收窄到 96px，远离误触。 */
                 "#csh-dbg-skin{flex:0 0 auto!important;height:44px!important;max-width:120px!important;padding:0 10px!important;",
-                "border-radius:10px!important;font-size:12px!important;font-family:inherit!important;cursor:pointer!important;",
+                "border-radius:10px!important;font-size:var(--csh-lfs-sm,12px)!important;font-family:inherit!important;cursor:pointer!important;",
                 "white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;",
                 "color:var(--csh-bg)!important;background:var(--csh-fg)!important;",
                 "border:1px solid rgba(var(--csh-bg-rgb),.18)!important;",
@@ -1756,7 +1756,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                 "color:var(--csh-bg)!important;background:var(--csh-fg)!important;",
                 "border:1px solid rgba(var(--csh-bg-rgb),.12)!important;box-shadow:0 1px 1px rgba(var(--csh-bg-rgb),.03)!important;",
                 "transition:border-color .16s ease,background .16s ease,color .16s ease,transform .16s ease!important;}",
-                "#csh-dbg-close::before{content:'\\2715'!important;font-size:15px!important;line-height:1!important;letter-spacing:0!important;}",
+                "#csh-dbg-close::before{content:'\\2715'!important;font-size:var(--csh-lfs-lg2,15px)!important;line-height:1!important;letter-spacing:0!important;}",
                 "#csh-dbg-close:hover{border-color:rgba(var(--csh-bg-rgb),.22)!important;background:var(--csh-paper2)!important;color:var(--csh-bg)!important;transform:rotate(90deg)!important;}",
                 /* ---------- 主区：两栏（桌面） / 单栏（手机） ---------- */
                 "#csh-dbg-main{display:flex!important;flex-direction:column!important;flex:1 1 auto!important;min-height:0!important;position:static!important;}",
@@ -1785,7 +1785,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                 "max-height:none!important;overflow:visible!important;}",
                 ".csh-dbg-tab{display:flex!important;align-items:center!important;justify-content:center!important;cursor:pointer!important;",
                 "min-width:0!important;width:100%!important;",
-                "min-height:40px!important;padding:6px 4px!important;border-radius:999px!important;font-size:13px!important;white-space:nowrap!important;",
+                "min-height:40px!important;padding:6px 4px!important;border-radius:999px!important;font-size:var(--csh-lfs-md,13px)!important;white-space:nowrap!important;",
                 "letter-spacing:.5px!important;color:var(--csh-bg)!important;background:transparent!important;border:1px solid transparent!important;user-select:none!important;",
                 "transition:color .18s ease,background .18s ease,border-color .18s ease!important;}",
                 ".csh-dbg-tab:hover{color:var(--csh-bg)!important;background:rgba(var(--csh-bg-rgb),.055)!important;}",
@@ -1833,7 +1833,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                 /* 超宽（>1440px）：内容区居中留白加大，不做三栏（§E.1） */
                 "@media (min-width:1441px){#csh-dbg-body{padding:34px 56px 56px!important;}}",
                 /* 手机：页签 5 列仍放得下（都是 2 字），只收紧字距与内边距 */
-                "@media (max-width:430px){.csh-dbg-tab{font-size:12px!important;letter-spacing:0!important;padding:7px 2px!important;}}",
+                "@media (max-width:430px){.csh-dbg-tab{font-size:var(--csh-lfs-sm,12px)!important;letter-spacing:0!important;padding:7px 2px!important;}}",
                 /* ---------- 池子休闲：等大按钮网格（2026-10-03 重做） ----------
                    旧版是「一行一款」的卡片列表：名字在左、「开始」按钮在右，中间一片空白。
                    手机上一屏放不下（6 项 ≈ 600px+，要上下滑），桌面上也显得空。
@@ -1851,36 +1851,36 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                 /* 生涯大厅非游戏（2026-10-07 · 作者反馈「与小游戏同按钮大小很奇怪」）：
                    独占整行 + 横排 + 金染底 —— 总览入口与游戏入口在视觉层级上分开。 */
                 "button.csh-dbg-gamebtn.gb-career{background:linear-gradient(160deg,rgba(var(--csh-accent-rgb),.12),rgba(var(--csh-accent-rgb),.03) 60%)!important;border-color:rgba(var(--csh-accent-rgb),.42)!important;}",
-                "button.csh-dbg-gamebtn.gb-career .gb-name{font-size:16px!important;letter-spacing:.06em!important;}",
-                "button.csh-dbg-gamebtn.gb-career .gb-mid{font-size:12px!important;color:var(--csh-accent)!important;letter-spacing:.03em!important;opacity:.85!important;}",
+                "button.csh-dbg-gamebtn.gb-career .gb-name{font-size:var(--csh-lfs-xl,16px)!important;letter-spacing:.06em!important;}",
+                "button.csh-dbg-gamebtn.gb-career .gb-mid{font-size:var(--csh-lfs-sm,12px)!important;color:var(--csh-accent)!important;letter-spacing:.03em!important;opacity:.85!important;}",
                 "button.csh-dbg-gamebtn.gb-career .gb-desc{margin:0!important;text-align:left!important;opacity:.8!important;}",
                 "button.csh-dbg-gamebtn.gb-career .gb-top{margin-bottom:2px!important;}",
                 "button.csh-dbg-gamebtn.gb-career{position:relative!important;overflow:hidden!important;}",
                 "button.csh-dbg-gamebtn.gb-career::before{content:''!important;position:absolute!important;left:-4px!important;top:-6px!important;bottom:-6px!important;width:5px!important;background:linear-gradient(180deg,var(--csh-accent),rgba(var(--csh-accent-rgb),.12))!important;transform:skewY(-10deg)!important;}",
                 /* 讨伐录卡（2026-10-13 · 批次 4a）：朱砂印意象（与生涯大厅的金染区分）+ 未阅红点 */
                 "button.csh-dbg-gamebtn.gb-bossbook{background:linear-gradient(160deg,rgba(155,34,52,.14),rgba(155,34,52,.03) 60%)!important;border-color:rgba(155,34,52,.42)!important;position:relative!important;overflow:hidden!important;}",
-                "button.csh-dbg-gamebtn.gb-bossbook .gb-name{font-size:16px!important;letter-spacing:.06em!important;}",
-                "button.csh-dbg-gamebtn.gb-bossbook .gb-mid{font-size:12px!important;color:#d06a6a!important;letter-spacing:.03em!important;opacity:.9!important;}",
+                "button.csh-dbg-gamebtn.gb-bossbook .gb-name{font-size:var(--csh-lfs-xl,16px)!important;letter-spacing:.06em!important;}",
+                "button.csh-dbg-gamebtn.gb-bossbook .gb-mid{font-size:var(--csh-lfs-sm,12px)!important;color:#d06a6a!important;letter-spacing:.03em!important;opacity:.9!important;}",
                 "button.csh-dbg-gamebtn.gb-bossbook::before{content:''!important;position:absolute!important;left:-4px!important;top:-6px!important;bottom:-6px!important;width:5px!important;background:linear-gradient(180deg,#9b2234,rgba(155,34,52,.12))!important;transform:skewY(-10deg)!important;}",
                 "button.csh-dbg-gamebtn.gb-bossbook.gb-unread::after{content:''!important;position:absolute!important;right:10px!important;top:10px!important;width:8px!important;height:8px!important;border-radius:50%!important;background:#e24b4a!important;}",
                 /* 天下榜（v6.9）：青蓝斜杠，与讨伐录的朱砂斜杠区分开 */
                 "button.csh-dbg-gamebtn.gb-rank{background:linear-gradient(160deg,rgba(64,120,176,.14),rgba(64,120,176,.03) 60%)!important;border-color:rgba(64,120,176,.42)!important;position:relative!important;overflow:hidden!important;}",
-                "button.csh-dbg-gamebtn.gb-rank .gb-name{font-size:16px!important;letter-spacing:.06em!important;}",
+                "button.csh-dbg-gamebtn.gb-rank .gb-name{font-size:var(--csh-lfs-xl,16px)!important;letter-spacing:.06em!important;}",
                 "button.csh-dbg-gamebtn.gb-rank::before{content:''!important;position:absolute!important;left:-4px!important;top:-6px!important;bottom:-6px!important;width:5px!important;background:linear-gradient(180deg,#4078b0,rgba(64,120,176,.12))!important;transform:skewY(-10deg)!important;}",
                 /* 天下榜中部行（2026-10-15 · 下一轮交接打磨）：与讨伐录 gb-mid 同规格，
                    色相取青蓝系的浅色调（base #4078b0），与朱砂 #d06a6a 区分 */
-                "button.csh-dbg-gamebtn.gb-rank .gb-mid{font-size:12px!important;color:#6f9fd0!important;letter-spacing:.03em!important;opacity:.9!important;}",
+                "button.csh-dbg-gamebtn.gb-rank .gb-mid{font-size:var(--csh-lfs-sm,12px)!important;color:#6f9fd0!important;letter-spacing:.03em!important;opacity:.9!important;}",
                 /* 池子成就（2026-10-20）：金——与生涯(浅蓝)/讨伐录(朱砂)/天下榜(青蓝)/行囊(墨绿)区隔 */
                 "button.csh-dbg-gamebtn.gb-achv{background:linear-gradient(160deg,rgba(201,168,76,.16),rgba(201,168,76,.03) 60%)!important;border-color:rgba(201,168,76,.46)!important;position:relative!important;overflow:hidden!important;}",
-                "button.csh-dbg-gamebtn.gb-achv .gb-name{font-size:16px!important;letter-spacing:.06em!important;}",
-                "button.csh-dbg-gamebtn.gb-achv .gb-mid{font-size:12px!important;color:#c9a84c!important;letter-spacing:.03em!important;opacity:.95!important;}",
+                "button.csh-dbg-gamebtn.gb-achv .gb-name{font-size:var(--csh-lfs-xl,16px)!important;letter-spacing:.06em!important;}",
+                "button.csh-dbg-gamebtn.gb-achv .gb-mid{font-size:var(--csh-lfs-sm,12px)!important;color:#c9a84c!important;letter-spacing:.03em!important;opacity:.95!important;}",
                 "button.csh-dbg-gamebtn.gb-achv::before{content:''!important;position:absolute!important;left:-4px!important;top:-6px!important;bottom:-6px!important;width:5px!important;background:linear-gradient(180deg,#c9a84c,rgba(201,168,76,.12))!important;transform:skewY(-10deg)!important;}",
                 /* 行囊（v6.10 · 2026-10-15）：墨绿斜杠 —— 与生涯大厅的金、讨伐录的朱砂、
                    天下榜的青蓝各走一路；"行囊"是装东西的，取沉着不抢眼的色。 */
                 "button.csh-dbg-gamebtn.gb-save{background:linear-gradient(160deg,rgba(88,128,102,.15),rgba(88,128,102,.03) 60%)!important;border-color:rgba(88,128,102,.44)!important;position:relative!important;overflow:hidden!important;}",
-                "button.csh-dbg-gamebtn.gb-save .gb-name{font-size:16px!important;letter-spacing:.06em!important;}",
+                "button.csh-dbg-gamebtn.gb-save .gb-name{font-size:var(--csh-lfs-xl,16px)!important;letter-spacing:.06em!important;}",
                 "button.csh-dbg-gamebtn.gb-save::before{content:''!important;position:absolute!important;left:-4px!important;top:-6px!important;bottom:-6px!important;width:5px!important;background:linear-gradient(180deg,#588066,rgba(88,128,102,.12))!important;transform:skewY(-10deg)!important;}",
-                "button.csh-dbg-gamebtn.gb-save .gb-mid{font-size:12px!important;color:#88ac93!important;letter-spacing:.03em!important;opacity:.9!important;}",
+                "button.csh-dbg-gamebtn.gb-save .gb-mid{font-size:var(--csh-lfs-sm,12px)!important;color:#88ac93!important;letter-spacing:.03em!important;opacity:.9!important;}",
                 /* ---------- 框体分层（2026-10-17 · 作者：「德州斗地主 UNO 廿一点就统一，其他的各具特色」） ----------
                    ① gb-table：四款牌桌**共用**一套材质 —— 青碧毡面 + 左斜条 + 右下角 ♠♥♦♣ 暗纹。
                       四张卡只靠右上角 tag（牌桌/纸牌）与文案区分，不再各自造样式（这就是"统一"）。
@@ -1889,28 +1889,28 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                    色相与既有四张（金 / 朱砂 / 青蓝 / 墨绿）各区一路；写法沿用 gb-* 的
                    「::before 左斜条 + 渐变底 + .gb-mid 配色」范式，零结构变化。 */
                 "button.csh-dbg-gamebtn.gb-table{background:linear-gradient(160deg,rgba(31,122,107,.18),rgba(31,122,107,.04) 60%)!important;border-color:rgba(31,122,107,.46)!important;position:relative!important;overflow:hidden!important;}",
-                "button.csh-dbg-gamebtn.gb-table .gb-name{font-size:16px!important;letter-spacing:.06em!important;}",
-                "button.csh-dbg-gamebtn.gb-table .gb-mid{font-size:12px!important;color:#6fc9b4!important;letter-spacing:.03em!important;opacity:.9!important;}",
+                "button.csh-dbg-gamebtn.gb-table .gb-name{font-size:var(--csh-lfs-xl,16px)!important;letter-spacing:.06em!important;}",
+                "button.csh-dbg-gamebtn.gb-table .gb-mid{font-size:var(--csh-lfs-sm,12px)!important;color:#6fc9b4!important;letter-spacing:.03em!important;opacity:.9!important;}",
                 "button.csh-dbg-gamebtn.gb-table::before{content:''!important;position:absolute!important;left:-4px!important;top:-6px!important;bottom:-6px!important;width:5px!important;background:linear-gradient(180deg,#1f7a6b,rgba(31,122,107,.12))!important;transform:skewY(-10deg)!important;}",
-                "button.csh-dbg-gamebtn.gb-table::after{content:'♠♥♦♣'!important;position:absolute!important;right:10px!important;bottom:-8px!important;font-size:28px!important;line-height:1!important;letter-spacing:-3px!important;color:#1f7a6b!important;opacity:.13!important;pointer-events:none!important;}",
+                "button.csh-dbg-gamebtn.gb-table::after{content:'♠♥♦♣'!important;position:absolute!important;right:10px!important;bottom:-8px!important;font-size:var(--csh-lfs-3xl,28px)!important;line-height:1!important;letter-spacing:-3px!important;color:#1f7a6b!important;opacity:.13!important;pointer-events:none!important;}",
                 "button.csh-dbg-gamebtn.gb-goldfish{background:linear-gradient(160deg,rgba(196,122,30,.18),rgba(196,122,30,.04) 60%)!important;border-color:rgba(196,122,30,.46)!important;position:relative!important;overflow:hidden!important;}",
-                "button.csh-dbg-gamebtn.gb-goldfish .gb-name{font-size:16px!important;letter-spacing:.06em!important;}",
-                "button.csh-dbg-gamebtn.gb-goldfish .gb-mid{font-size:12px!important;color:#d9a24f!important;letter-spacing:.03em!important;opacity:.9!important;}",
+                "button.csh-dbg-gamebtn.gb-goldfish .gb-name{font-size:var(--csh-lfs-xl,16px)!important;letter-spacing:.06em!important;}",
+                "button.csh-dbg-gamebtn.gb-goldfish .gb-mid{font-size:var(--csh-lfs-sm,12px)!important;color:#d9a24f!important;letter-spacing:.03em!important;opacity:.9!important;}",
                 "button.csh-dbg-gamebtn.gb-goldfish::before{content:''!important;position:absolute!important;left:-4px!important;top:-6px!important;bottom:-6px!important;width:5px!important;background:linear-gradient(180deg,#c47a1e,rgba(196,122,30,.12))!important;transform:skewY(-10deg)!important;}",
-                "button.csh-dbg-gamebtn.gb-goldfish::after{content:'¤'!important;position:absolute!important;right:12px!important;bottom:-10px!important;font-size:34px!important;line-height:1!important;color:#c47a1e!important;opacity:.15!important;pointer-events:none!important;}",
+                "button.csh-dbg-gamebtn.gb-goldfish::after{content:'¤'!important;position:absolute!important;right:12px!important;bottom:-10px!important;font-size:var(--csh-lfs-4xl,34px)!important;line-height:1!important;color:#c47a1e!important;opacity:.15!important;pointer-events:none!important;}",
                 "button.csh-dbg-gamebtn.gb-codex{background:linear-gradient(160deg,rgba(106,74,138,.18),rgba(106,74,138,.04) 60%)!important;border-color:rgba(106,74,138,.46)!important;position:relative!important;overflow:hidden!important;}",
-                "button.csh-dbg-gamebtn.gb-codex .gb-name{font-size:16px!important;letter-spacing:.06em!important;}",
-                "button.csh-dbg-gamebtn.gb-codex .gb-mid{font-size:12px!important;color:#b79cd6!important;letter-spacing:.03em!important;opacity:.9!important;}",
+                "button.csh-dbg-gamebtn.gb-codex .gb-name{font-size:var(--csh-lfs-xl,16px)!important;letter-spacing:.06em!important;}",
+                "button.csh-dbg-gamebtn.gb-codex .gb-mid{font-size:var(--csh-lfs-sm,12px)!important;color:#b79cd6!important;letter-spacing:.03em!important;opacity:.9!important;}",
                 "button.csh-dbg-gamebtn.gb-codex::before{content:''!important;position:absolute!important;left:-4px!important;top:-6px!important;bottom:-6px!important;width:5px!important;background:linear-gradient(180deg,#6a4a8a,rgba(106,74,138,.12))!important;transform:skewY(-10deg)!important;}",
-                "button.csh-dbg-gamebtn.gb-codex::after{content:'❖'!important;position:absolute!important;right:12px!important;bottom:-10px!important;font-size:30px!important;line-height:1!important;color:#6a4a8a!important;opacity:.15!important;pointer-events:none!important;}",
+                "button.csh-dbg-gamebtn.gb-codex::after{content:'❖'!important;position:absolute!important;right:12px!important;bottom:-10px!important;font-size:var(--csh-lfs-3xl2,30px)!important;line-height:1!important;color:#6a4a8a!important;opacity:.15!important;pointer-events:none!important;}",
                 "button.csh-dbg-gamebtn:active{transform:translateY(0)!important;}",
                 "button.csh-dbg-gamebtn .gb-top{display:flex!important;align-items:center!important;gap:8px!important;width:100%!important;}",
-                "button.csh-dbg-gamebtn .gb-name{flex:0 1 auto!important;font-size:15px!important;font-weight:600!important;color:var(--csh-bg)!important;line-height:1.3!important;",
+                "button.csh-dbg-gamebtn .gb-name{flex:0 1 auto!important;font-size:var(--csh-lfs-lg2,15px)!important;font-weight:600!important;color:var(--csh-bg)!important;line-height:1.3!important;",
                 "white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;}",
-                "button.csh-dbg-gamebtn .gb-tag{flex:0 0 auto!important;font-style:normal!important;font-size:10.5px!important;font-weight:600!important;letter-spacing:.06em!important;",
+                "button.csh-dbg-gamebtn .gb-tag{flex:0 0 auto!important;font-style:normal!important;font-size:var(--csh-lfs-micro2,10.5px)!important;font-weight:600!important;letter-spacing:.06em!important;",
                 "color:var(--csh-blue)!important;padding:1px 9px!important;border-radius:999px!important;background:rgba(var(--csh-blue-rgb),.10)!important;}",
                 "button.csh-dbg-gamebtn .gb-desc{display:-webkit-box!important;-webkit-line-clamp:2!important;-webkit-box-orient:vertical!important;",
-                "font-size:12px!important;line-height:1.55!important;color:var(--csh-gray)!important;overflow:hidden!important;}",
+                "font-size:var(--csh-lfs-sm,12px)!important;line-height:1.55!important;color:var(--csh-gray)!important;overflow:hidden!important;}",
                 /* 筹备中：虚线边 + 降透明度，与可玩按钮一眼区分 */
                 "button.csh-dbg-gamebtn.locked{opacity:.5!important;border-style:dashed!important;background:var(--csh-light)!important;box-shadow:none!important;cursor:default!important;}",
                 "button.csh-dbg-gamebtn.locked:hover{border-color:rgba(var(--csh-bg-rgb),.14)!important;transform:none!important;",
@@ -1936,7 +1936,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                 "animation:cshRdmIn .22s ease-out!important;}",
                 "@keyframes cshRdmIn{0%{opacity:0;transform:translate(-50%,-46%) scale(.96);}100%{opacity:1;transform:translate(-50%,-50%) scale(1);}}",
                 "#csh-redeem *{position:static!important;box-sizing:border-box!important;}",
-                "#csh-redeem .csh-rdm-title{display:block!important;text-align:center!important;font-size:15px!important;",
+                "#csh-redeem .csh-rdm-title{display:block!important;text-align:center!important;font-size:var(--csh-lfs-lg2,15px)!important;",
                 "font-weight:600!important;letter-spacing:.01em!important;color:var(--csh-bg)!important;margin-bottom:16px!important;}",
                 "#csh-redeem .csh-rdm-inputwrap{display:block!important;position:relative!important;width:100%!important;}",
                 "#csh-redeem .csh-rdm-mirror{position:absolute!important;left:0!important;top:0!important;right:0!important;bottom:0!important;",
@@ -1944,37 +1944,37 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                 "background:var(--csh-light)!important;border:1px solid rgba(var(--csh-bg-rgb),.14)!important;",
                 "transition:border-color .16s ease,box-shadow .16s ease,background .16s ease!important;}",
                 "#csh-redeem .csh-rdm-mirror-in{padding:13px 12px!important;font-family:ui-monospace,'Cascadia Mono','SF Mono',Consolas,monospace!important;",
-                "font-size:15px!important;letter-spacing:.09em!important;color:var(--csh-bg)!important;white-space:nowrap!important;",
+                "font-size:var(--csh-lfs-lg2,15px)!important;letter-spacing:.09em!important;color:var(--csh-bg)!important;white-space:nowrap!important;",
                 "overflow:hidden!important;line-height:1.2!important;}",
                 "#csh-redeem .csh-rdm-mirror-in i.bad{font-style:normal!important;color:var(--csh-red)!important;background:rgba(var(--csh-red-rgb),.12)!important;}",
                 "#csh-redeem .csh-rdm-inp{display:block!important;width:100%!important;padding:13px 12px!important;border-radius:10px!important;",
-                "font-family:ui-monospace,'Cascadia Mono','SF Mono',Consolas,monospace!important;font-size:15px!important;letter-spacing:.09em!important;",
+                "font-family:ui-monospace,'Cascadia Mono','SF Mono',Consolas,monospace!important;font-size:var(--csh-lfs-lg2,15px)!important;letter-spacing:.09em!important;",
                 "background:transparent!important;color:transparent!important;caret-color:var(--csh-bg)!important;",
                 "border:1px solid transparent!important;outline:none!important;text-align:center!important;}",
                 "#csh-redeem .csh-rdm-inp::placeholder{color:transparent!important;}",
                 "#csh-redeem .csh-rdm-inputwrap:focus-within .csh-rdm-mirror{border-color:var(--csh-blue)!important;background:var(--csh-fg)!important;box-shadow:0 0 0 3px rgba(var(--csh-blue-rgb),.14)!important;}",
                 "#csh-redeem .csh-rdm-msg{display:block!important;min-height:18px!important;margin-top:8px!important;",
-                "font-size:12.5px!important;text-align:center!important;color:var(--csh-gray)!important;line-height:1.45!important;}",
+                "font-size:var(--csh-lfs-sm2,12.5px)!important;text-align:center!important;color:var(--csh-gray)!important;line-height:1.45!important;}",
                 "#csh-redeem .csh-rdm-msg.ok{color:var(--csh-green)!important;}",
                 "#csh-redeem .csh-rdm-msg.err{color:var(--csh-red)!important;}",
                 /* 余额行（§4.5.7）：等宽数字，兑换后 300ms 滚动不跳动 */
                 "#csh-redeem .csh-rdm-bal{display:block!important;margin-top:8px!important;text-align:center!important;",
-                "font-size:13px!important;color:var(--csh-bg)!important;font-variant-numeric:tabular-nums!important;",
+                "font-size:var(--csh-lfs-md,13px)!important;color:var(--csh-bg)!important;font-variant-numeric:tabular-nums!important;",
                 "font-family:ui-monospace,'Cascadia Mono','SF Mono',Consolas,monospace!important;letter-spacing:.5px!important;}",
                 "#csh-redeem .csh-rdm-row{display:flex!important;gap:10px!important;margin-top:12px!important;}",
                 "#csh-redeem .csh-rdm-row .csh-dbg-btn{flex:1 1 0!important;min-height:44px!important;}",
                 "#csh-redeem .csh-rdm-hist{display:block!important;margin-top:12px!important;}",
-                "#csh-redeem .csh-rdm-sub{display:block!important;font-size:10.5px!important;color:var(--csh-gray-soft)!important;",
+                "#csh-redeem .csh-rdm-sub{display:block!important;font-size:var(--csh-lfs-micro2,10.5px)!important;color:var(--csh-gray-soft)!important;",
                 "font-weight:600!important;letter-spacing:.09em!important;margin-bottom:7px!important;}",
-                "#csh-redeem .csh-rdm-histrow{display:block!important;font-size:12px!important;color:var(--csh-gray)!important;",
+                "#csh-redeem .csh-rdm-histrow{display:block!important;font-size:var(--csh-lfs-sm,12px)!important;color:var(--csh-gray)!important;",
                 "font-variant-numeric:tabular-nums!important;padding:6px 0!important;border-bottom:1px solid rgba(var(--csh-bg-rgb),.06)!important;}",
                 "#csh-redeem .csh-rdm-histrow:last-child{border-bottom:none!important;}",
                 /* 手机短视口/窄屏：兑换框紧凑化 + 收窄码字字号——
                    30+ 字符长码在 15px 宽字距下超出输入框宽度，尾部永远看不见（2026-09-30 手机反馈） */
                 "@media (max-width:480px),(max-height:600px){",
                 "#csh-redeem{padding:16px 16px 14px!important;}",
-                "#csh-redeem .csh-rdm-title{margin-bottom:10px!important;font-size:14px!important;}",
-                "#csh-redeem .csh-rdm-mirror-in,#csh-redeem .csh-rdm-inp{font-size:12px!important;letter-spacing:.03em!important;}",
+                "#csh-redeem .csh-rdm-title{margin-bottom:10px!important;font-size:var(--csh-lfs-lg,14px)!important;}",
+                "#csh-redeem .csh-rdm-mirror-in,#csh-redeem .csh-rdm-inp{font-size:var(--csh-lfs-sm,12px)!important;letter-spacing:.03em!important;}",
                 "}",
                 /* ---------- 其他扩展安装面板的规则已迁出主 CSS ----------
                    （2026-10-06）主 CSS（本函数）只在打开调试面板时注入，且其内容随代码版本——
@@ -2003,7 +2003,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                    游戏卡开始键(1801) / 兑换行按钮(1855) / 壳各按钮(csh_shell 257·293·353)。
                    唯独 .csh-dbg-btn 是 padding:9px ⇒ 实测高 36px（<44），横跨 8 个页签共 60+ 个按钮。
                    padding 9→13px 使其达到 44px，与其同目录邻居保持一致。 */
-                "button.csh-dbg-btn{display:inline-block!important;cursor:pointer!important;padding:13px 14px!important;min-height:44px!important;border-radius:10px!important;font-size:13px!important;letter-spacing:.02em!important;",
+                "button.csh-dbg-btn{display:inline-block!important;cursor:pointer!important;padding:13px 14px!important;min-height:44px!important;border-radius:10px!important;font-size:var(--csh-lfs-md,13px)!important;letter-spacing:.02em!important;",
                 "color:var(--csh-bg)!important;background:linear-gradient(180deg,rgba(var(--csh-accent-rgb),.07),rgba(0,0,0,0) 62%),var(--csh-fg)!important;font-weight:500!important;",
                 "border:1px solid rgba(var(--csh-accent-rgb),.26)!important;white-space:nowrap!important;font-family:inherit!important;line-height:1.25!important;margin:0!important;",
                 "box-shadow:0 1px 1px rgba(var(--csh-bg-rgb),.03)!important;",
@@ -2026,7 +2026,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                 /* ---------- 说明条：统一一种样式，避免重复提示 ----------
                    【2026-10-03 精炼】原先每页都挂一条带金色粗左条的白底块，七页下来非常吵。
                    现在只保一根细左条（金 55%）+ 近透明底：**是提示，不是警报**。 */
-                ".csh-dbg-hint{display:block!important;margin-top:12px!important;padding:9px 12px!important;font-size:11.5px!important;line-height:1.6!important;",
+                ".csh-dbg-hint{display:block!important;margin-top:12px!important;padding:9px 12px!important;font-size:var(--csh-lfs-cap2,11.5px)!important;line-height:1.6!important;",
                 "color:var(--csh-gray)!important;background:rgba(var(--csh-bg-rgb),.025)!important;border-radius:8px!important;",
                 "border:1px solid rgba(var(--csh-bg-rgb),.05)!important;border-left:2px solid rgba(var(--csh-accent-rgb),.55)!important;}",
                 /* ---------- 输入 ---------- */
@@ -2037,18 +2037,18 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                    ⇒ 工具行被迫换行，右侧留 118px 横向空洞并多占 51px 高度。
                    收紧到 150 / 170 后单行放下（329px），更窄的屏幕仍会正常换行。 */
                 ".csh-dbg-tool select{flex:1 1 150px!important;min-width:0!important;display:block!important;padding:10px 12px!important;border-radius:8px!important;",
-                "border:1px solid rgba(var(--csh-bg-rgb),.12)!important;background:var(--csh-fg)!important;color:var(--csh-bg)!important;font-size:13px!important;",
+                "border:1px solid rgba(var(--csh-bg-rgb),.12)!important;background:var(--csh-fg)!important;color:var(--csh-bg)!important;font-size:var(--csh-lfs-md,13px)!important;",
                 "font-family:inherit!important;position:static!important;outline:none!important;transition:border-color .16s ease,box-shadow .16s ease!important;}",
                 ".csh-dbg-tool input{flex:1 1 170px!important;min-width:0!important;display:block!important;padding:13px 12px!important;min-height:44px!important;border-radius:8px!important;",
-                "border:1px solid rgba(var(--csh-bg-rgb),.12)!important;background:var(--csh-fg)!important;color:var(--csh-bg)!important;font-size:13px!important;",
+                "border:1px solid rgba(var(--csh-bg-rgb),.12)!important;background:var(--csh-fg)!important;color:var(--csh-bg)!important;font-size:var(--csh-lfs-md,13px)!important;",
                 "font-family:inherit!important;position:static!important;outline:none!important;transition:border-color .16s ease,box-shadow .16s ease!important;}",
                 ".csh-dbg-tool input::placeholder{color:var(--csh-gray-soft)!important;}",
                 ".csh-dbg-tool input:focus,.csh-dbg-tool select:focus{border-color:var(--csh-blue)!important;box-shadow:0 0 0 3px rgba(var(--csh-blue-rgb),.14)!important;}",
                 /* 计数条：与输入区上下分离，避免与占位文字视觉重叠 */
-                ".csh-dbg-count{display:block!important;width:100%!important;margin:0 0 8px!important;padding:0 2px!important;font-size:11.5px!important;",
+                ".csh-dbg-count{display:block!important;width:100%!important;margin:0 0 8px!important;padding:0 2px!important;font-size:var(--csh-lfs-cap2,11.5px)!important;",
                 "line-height:1.6!important;color:var(--csh-gray-soft)!important;letter-spacing:.01em!important;font-variant-numeric:tabular-nums!important;}",
                 ".csh-dbg-row input,.csh-dbg-row select{display:block!important;width:100%!important;padding:10px 12px!important;border-radius:8px!important;",
-                "border:1px solid rgba(var(--csh-bg-rgb),.12)!important;background:var(--csh-fg)!important;color:var(--csh-bg)!important;font-size:13px!important;",
+                "border:1px solid rgba(var(--csh-bg-rgb),.12)!important;background:var(--csh-fg)!important;color:var(--csh-bg)!important;font-size:var(--csh-lfs-md,13px)!important;",
                 "font-family:inherit!important;position:static!important;outline:none!important;transition:border-color .16s ease,box-shadow .16s ease!important;}",
                 ".csh-dbg-row input::placeholder{color:var(--csh-gray-soft)!important;}",
                 ".csh-dbg-row input:focus,.csh-dbg-row select:focus{border-color:var(--csh-blue)!important;box-shadow:0 0 0 3px rgba(var(--csh-blue-rgb),.14)!important;}",
@@ -2071,20 +2071,20 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                 ".csh-dbg-sk:hover{background:rgba(var(--csh-bg-rgb),.035)!important;}",
                 ".csh-dbg-sk:focus-visible{outline:2px solid var(--csh-blue)!important;outline-offset:-2px!important;}",
                 ".csh-dbg-sk .csh-dbg-sk-info{display:table-cell!important;vertical-align:middle!important;padding:10px 12px!important;width:auto!important;position:static!important;}",
-                ".csh-dbg-sk .csh-dbg-sk-info .n{display:block!important;font-size:13.5px!important;color:var(--csh-bg)!important;font-weight:600!important;position:static!important;letter-spacing:-.005em!important;",
+                ".csh-dbg-sk .csh-dbg-sk-info .n{display:block!important;font-size:var(--csh-lfs-md2,13.5px)!important;color:var(--csh-bg)!important;font-weight:600!important;position:static!important;letter-spacing:-.005em!important;",
                 "overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important;}",
-                ".csh-dbg-sk .csh-dbg-sk-info .id{display:block!important;margin-top:2px!important;font-size:11px!important;color:var(--csh-gray)!important;position:static!important;",
+                ".csh-dbg-sk .csh-dbg-sk-info .id{display:block!important;margin-top:2px!important;font-size:var(--csh-lfs-cap,11px)!important;color:var(--csh-gray)!important;position:static!important;",
                 "font-family:ui-monospace,'Cascadia Mono','SF Mono',Consolas,monospace!important;letter-spacing:.2px!important;",
                 "overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important;}",
                 /* 来源包 + 势力：同名技能消歧（§4.6.2），单行省略 */
-                ".csh-dbg-sk .csh-dbg-sk-info .src{display:block!important;margin-top:3px!important;font-size:11px!important;color:var(--csh-gray)!important;",
+                ".csh-dbg-sk .csh-dbg-sk-info .src{display:block!important;margin-top:3px!important;font-size:var(--csh-lfs-cap,11px)!important;color:var(--csh-gray)!important;",
                 "position:static!important;overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important;}",
                 ".csh-dbg-sk .csh-dbg-sk-info .src b{display:inline!important;position:static!important;font-weight:600!important;color:var(--csh-blue)!important;}",
                 ".csh-dbg-sk .csh-dbg-sk-info .src i{display:inline!important;position:static!important;font-style:normal!important;color:var(--csh-gray)!important;}",
                 ".csh-dbg-sk .csh-dbg-sk-acts{display:table-cell!important;vertical-align:middle!important;width:auto!important;text-align:right!important;",
                 "padding:10px 12px!important;white-space:nowrap!important;position:static!important;}",
                 ".csh-dbg-sk .csh-dbg-sk-acts button{display:inline-block!important;cursor:pointer!important;padding:6px 13px!important;margin-left:6px!important;",
-                "border-radius:8px!important;font-size:12px!important;font-weight:500!important;border:1px solid transparent!important;color:var(--csh-fg)!important;font-family:inherit!important;",
+                "border-radius:8px!important;font-size:var(--csh-lfs-sm,12px)!important;font-weight:500!important;border:1px solid transparent!important;color:var(--csh-fg)!important;font-family:inherit!important;",
                 "position:static!important;box-shadow:0 1px 2px rgba(var(--csh-bg-rgb),.10)!important;",
                 "transition:filter .16s ease,transform .16s ease,box-shadow .16s ease!important;}",
                 ".csh-dbg-sk .csh-dbg-sk-acts button:hover{filter:brightness(1.06)!important;transform:translateY(-1px)!important;box-shadow:0 4px 10px -4px rgba(var(--csh-bg-rgb),.28)!important;}",
@@ -2092,24 +2092,24 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                 ".csh-dbg-sk .csh-dbg-sk-acts button.rm{color:var(--csh-color-ink)!important;background:var(--csh-red)!important;border-color:var(--csh-red)!important;}",
                 /* 窄屏：操作列按钮更紧凑（宽度已自适应，内容为准） */
                 "@media (max-width:520px){.csh-dbg-sk .csh-dbg-sk-acts{padding:10px 8px!important;}",
-                ".csh-dbg-sk .csh-dbg-sk-acts button{padding:6px 9px!important;margin-left:4px!important;font-size:11.5px!important;}}",
+                ".csh-dbg-sk .csh-dbg-sk-acts button{padding:6px 9px!important;margin-left:4px!important;font-size:var(--csh-lfs-cap2,11.5px)!important;}}",
                 /* ---------- 技能详情层（§4.6.2）：同层替换，不弹窗套弹窗 ---------- */
                 ".csh-dbg-detail{display:block!important;width:100%!important;padding:2px 2px 6px!important;position:static!important;}",
                 ".csh-dbg-detail .csh-dbg-dt-back{display:inline-flex!important;align-items:center!important;gap:6px!important;cursor:pointer!important;",
                 "min-height:40px!important;padding:6px 14px!important;margin:0 0 16px!important;border-radius:999px!important;",
-                "font-size:12.5px!important;font-weight:500!important;color:var(--csh-bg)!important;background:var(--csh-fg)!important;",
+                "font-size:var(--csh-lfs-sm2,12.5px)!important;font-weight:500!important;color:var(--csh-bg)!important;background:var(--csh-fg)!important;",
                 "border:1px solid rgba(var(--csh-bg-rgb),.12)!important;font-family:inherit!important;position:static!important;",
                 "box-shadow:0 1px 1px rgba(var(--csh-bg-rgb),.03)!important;",
                 "transition:border-color .16s ease,background .16s ease,box-shadow .16s ease,transform .16s ease!important;}",
                 ".csh-dbg-detail .csh-dbg-dt-back:hover{border-color:rgba(var(--csh-bg-rgb),.22)!important;color:var(--csh-bg)!important;background:var(--csh-paper2)!important;transform:translateY(-1px)!important;}",
                 /* ① 技能名（§4.6.2） */
-                ".csh-dbg-detail .csh-dbg-dt-name{display:block!important;font-size:17px!important;font-weight:600!important;line-height:1.4!important;",
+                ".csh-dbg-detail .csh-dbg-dt-name{display:block!important;font-size:var(--csh-lfs-xl2,17px)!important;font-weight:600!important;line-height:1.4!important;",
                 "color:var(--csh-bg)!important;position:static!important;letter-spacing:-.01em!important;}",
                 /* ② 标签行：ID / 来源包 / 势力 */
                 ".csh-dbg-detail .csh-dbg-dt-tags{display:flex!important;flex-wrap:wrap!important;gap:6px 8px!important;margin:10px 0 0!important;",
                 "position:static!important;}",
                 ".csh-dbg-detail .csh-dbg-dt-tag{display:inline-block!important;flex:0 0 auto!important;padding:3px 10px!important;border-radius:999px!important;",
-                "font-size:11.5px!important;font-weight:500!important;line-height:1.5!important;color:var(--csh-gray)!important;position:static!important;",
+                "font-size:var(--csh-lfs-cap2,11.5px)!important;font-weight:500!important;line-height:1.5!important;color:var(--csh-gray)!important;position:static!important;",
                 "background:rgba(var(--csh-bg-rgb),.045)!important;border:1px solid transparent!important;",
                 "max-width:100%!important;overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important;}",
                 ".csh-dbg-detail .csh-dbg-dt-tag.mono{font-family:ui-monospace,'Cascadia Mono','SF Mono',Consolas,monospace!important;letter-spacing:.02em!important;}",
@@ -2119,22 +2119,22 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                 ".csh-dbg-detail .csh-dbg-dt-body{display:block!important;margin:16px 0 0!important;padding:15px 17px!important;",
                 "border-radius:10px!important;background:var(--csh-light)!important;border:1px solid rgba(var(--csh-bg-rgb),.06)!important;",
                 "border-left:3px solid var(--csh-accent)!important;",
-                "font-size:13.5px!important;line-height:1.75!important;color:var(--csh-bg)!important;position:static!important;",
+                "font-size:var(--csh-lfs-md2,13.5px)!important;line-height:1.75!important;color:var(--csh-bg)!important;position:static!important;",
                 "max-width:64ch!important;white-space:pre-wrap!important;word-break:break-word!important;}",
                 ".csh-dbg-detail .csh-dbg-dt-body.none{color:var(--csh-gray-soft)!important;font-style:normal!important;border-left-color:rgba(var(--csh-bg-rgb),.14)!important;}",
-                ".csh-dbg-detail .csh-dbg-dt-h{display:block!important;margin:20px 0 9px!important;font-size:11.5px!important;font-weight:600!important;",
+                ".csh-dbg-detail .csh-dbg-dt-h{display:block!important;margin:20px 0 9px!important;font-size:var(--csh-lfs-cap2,11.5px)!important;font-weight:600!important;",
                 "color:var(--csh-gray-soft)!important;letter-spacing:.09em!important;position:static!important;}",
                 /* 相关词条 */
                 ".csh-dbg-detail .csh-dbg-dt-entries{display:flex!important;flex-wrap:wrap!important;gap:6px!important;position:static!important;}",
                 ".csh-dbg-detail .csh-dbg-dt-entry{display:inline-block!important;flex:0 0 auto!important;padding:5px 11px!important;border-radius:999px!important;",
-                "font-size:11.5px!important;font-weight:500!important;line-height:1.5!important;color:var(--csh-gray)!important;position:static!important;cursor:default!important;",
+                "font-size:var(--csh-lfs-cap2,11.5px)!important;font-weight:500!important;line-height:1.5!important;color:var(--csh-gray)!important;position:static!important;cursor:default!important;",
                 "background:var(--csh-light)!important;border:1px solid rgba(var(--csh-bg-rgb),.08)!important;}",
                 ".csh-dbg-detail .csh-dbg-dt-entry b{display:inline!important;position:static!important;font-weight:600!important;color:var(--csh-bg)!important;}",
                 /* 列表内的空态/占位（脚本里用内联样式创建，这里统一收敛） */
-                ".csh-dbg-empty{padding:8px 4px!important;text-align:left!important;color:var(--csh-gray)!important;font-size:12px!important;line-height:1.7!important;}",
+                ".csh-dbg-empty{padding:8px 4px!important;text-align:left!important;color:var(--csh-gray)!important;font-size:var(--csh-lfs-sm,12px)!important;line-height:1.7!important;}",
                 /* ---------- D1：搜索结果的「武将」分组条 / 武将行 ---------- */
                 ".csh-dbg-grp{display:block!important;margin:14px 0 6px!important;padding:0 4px!important;position:static!important;",
-                "font-size:11px!important;font-weight:600!important;letter-spacing:.09em!important;color:var(--csh-gray-soft)!important;}",
+                "font-size:var(--csh-lfs-cap,11px)!important;font-weight:600!important;letter-spacing:.09em!important;color:var(--csh-gray-soft)!important;}",
                 ".csh-dbg-grp:first-child{margin-top:2px!important;}",
                 ".csh-dbg-sk.csh-dbg-ch{border-left:3px solid var(--csh-accent)!important;}",
                 ".csh-dbg-sk.csh-dbg-ch .csh-dbg-sk-info .n{color:var(--csh-bg)!important;}",
@@ -2151,9 +2151,9 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                 "transition:border-color .18s ease,box-shadow .18s ease!important;}",
                 ".csh-dbg-preset:hover{border-color:rgba(var(--csh-bg-rgb),.22)!important;box-shadow:0 4px 14px -6px rgba(var(--csh-bg-rgb),.18)!important;}",
                 ".csh-dbg-preset .ps-main{flex:1 1 auto!important;min-width:0!important;display:block!important;position:static!important;}",
-                ".csh-dbg-preset .ps-name{display:block!important;font-size:15px!important;font-weight:600!important;color:var(--csh-bg)!important;",
+                ".csh-dbg-preset .ps-name{display:block!important;font-size:var(--csh-lfs-lg2,15px)!important;font-weight:600!important;color:var(--csh-bg)!important;",
                 "line-height:1.3!important;position:static!important;overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important;}",
-                ".csh-dbg-preset .ps-meta{display:block!important;margin-top:5px!important;font-size:12px!important;color:var(--csh-gray)!important;",
+                ".csh-dbg-preset .ps-meta{display:block!important;margin-top:5px!important;font-size:var(--csh-lfs-sm,12px)!important;color:var(--csh-gray)!important;",
                 "line-height:1.55!important;position:static!important;font-variant-numeric:tabular-nums!important;}",
                 ".csh-dbg-preset .ps-acts{flex:0 0 auto!important;display:flex!important;flex-wrap:wrap!important;gap:6px!important;",
                 "justify-content:flex-end!important;max-width:52%!important;position:static!important;}",
@@ -2162,7 +2162,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                 ".csh-dbg-preset .ps-acts{max-width:none!important;justify-content:flex-start!important;}}",
                 /* 加载反馈三态（§4.6.3）：加载中 / 成功 / 部分失败 */
                 ".csh-dbg-psfb{display:block!important;margin:12px 0 0!important;padding:12px 14px!important;border-radius:10px!important;",
-                "font-size:12.5px!important;line-height:1.65!important;position:static!important;",
+                "font-size:var(--csh-lfs-sm2,12.5px)!important;line-height:1.65!important;position:static!important;",
                 "background:var(--csh-light)!important;border:1px solid rgba(var(--csh-bg-rgb),.06)!important;border-left:3px solid rgba(var(--csh-bg-rgb),.14)!important;}",
                 ".csh-dbg-psfb.loading{color:var(--csh-bg)!important;border-left-color:var(--csh-blue)!important;}",
                 ".csh-dbg-psfb.ok{color:var(--csh-green)!important;border-left-color:var(--csh-green)!important;background:rgba(var(--csh-green-rgb),.06)!important;}",
@@ -2170,13 +2170,13 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                 ".csh-dbg-psfb .fb-toggle{display:inline-block!important;margin-left:8px!important;cursor:pointer!important;",
                 "color:var(--csh-green)!important;font-weight:500!important;text-decoration:underline!important;position:static!important;user-select:none!important;}",
                 ".csh-dbg-psfb .fb-list{display:block!important;margin:10px 0 0!important;padding:10px 12px!important;border-radius:8px!important;",
-                "background:var(--csh-fg)!important;border:1px solid rgba(var(--csh-bg-rgb),.06)!important;font-family:ui-monospace,'Cascadia Mono','SF Mono',Consolas,monospace!important;font-size:11.5px!important;",
+                "background:var(--csh-fg)!important;border:1px solid rgba(var(--csh-bg-rgb),.06)!important;font-family:ui-monospace,'Cascadia Mono','SF Mono',Consolas,monospace!important;font-size:var(--csh-lfs-cap2,11.5px)!important;",
                 "line-height:1.7!important;color:var(--csh-bg)!important;position:static!important;max-height:190px!important;overflow-y:auto!important;",
                 "white-space:pre-wrap!important;word-break:break-all!important;}",
                 /* 导入导出：一行紧凑 JSON（§4.6.3） */
                 ".csh-dbg-json{display:block!important;width:100%!important;margin:10px 0 0!important;padding:11px 13px!important;",
                 "border-radius:10px!important;background:var(--csh-light)!important;border:1px solid rgba(var(--csh-bg-rgb),.06)!important;",
-                "color:var(--csh-bg)!important;font-family:ui-monospace,'Cascadia Mono','SF Mono',Consolas,monospace!important;font-size:11.5px!important;",
+                "color:var(--csh-bg)!important;font-family:ui-monospace,'Cascadia Mono','SF Mono',Consolas,monospace!important;font-size:var(--csh-lfs-cap2,11.5px)!important;",
                 "line-height:1.6!important;position:static!important;outline:none!important;resize:vertical!important;",
                 "min-height:52px!important;box-sizing:border-box!important;}",
                 ".csh-dbg-json:focus{border-color:var(--csh-accent)!important;box-shadow:0 0 0 3px rgba(var(--csh-blue-rgb),.16)!important;}",
@@ -2186,14 +2186,14 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                 /* 分组小标题：只做「小型大写标签」。分隔交给下面的白卡去表达，
                    不必再画一条贯通全宽的横线——横线＋卡片＝双重分隔，是廉价的表格感。 */
                 ".csh-dbg-sec{display:block!important;position:static!important;width:100%!important;margin:20px 0 10px!important;padding:0 2px!important;",
-                "font-size:11.5px!important;font-weight:600!important;color:var(--csh-gray-soft)!important;letter-spacing:.09em!important;text-align:left!important;}",
+                "font-size:var(--csh-lfs-cap2,11.5px)!important;font-weight:600!important;color:var(--csh-gray-soft)!important;letter-spacing:.09em!important;text-align:left!important;}",
                 "#csh-dbg-body .csh-dbg-page>.csh-dbg-sec:first-child{margin-top:0!important;}",
-                ".csh-dbg-sec .cnt{display:inline-block!important;position:static!important;margin-left:8px!important;font-size:11px!important;font-weight:500!important;",
+                ".csh-dbg-sec .cnt{display:inline-block!important;position:static!important;margin-left:8px!important;font-size:var(--csh-lfs-cap,11px)!important;font-weight:500!important;",
                 "color:var(--csh-gray-soft)!important;letter-spacing:.02em!important;}",
                 /* ---------- 分类 chips ---------- */
                 ".csh-dbg-chips{display:flex!important;position:static!important;flex-wrap:wrap!important;gap:6px!important;width:100%!important;margin:0 0 9px!important;}",
                 ".csh-dbg-chip{display:inline-block!important;position:static!important;cursor:pointer!important;padding:5px 13px!important;border-radius:8px!important;",
-                "font-size:12px!important;color:var(--csh-bg)!important;background:var(--csh-fg)!important;border:1px solid rgba(var(--csh-bg-rgb),.12)!important;",
+                "font-size:var(--csh-lfs-sm,12px)!important;color:var(--csh-bg)!important;background:var(--csh-fg)!important;border:1px solid rgba(var(--csh-bg-rgb),.12)!important;",
                 "user-select:none!important;transition:color .16s ease,background .16s ease,border-color .16s ease!important;}",
                 ".csh-dbg-chip:hover{color:var(--csh-bg)!important;background:rgba(var(--csh-bg-rgb),.055)!important;}",
                 ".csh-dbg-chip.on{color:var(--csh-accent-ink)!important;font-weight:600!important;border-color:transparent!important;background:var(--csh-accent)!important;}",
@@ -2211,17 +2211,17 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                    的弹窗（对比 #csh-redeem 用的是 overflow-y:auto）。 */
                 "overflow-y:auto!important;overflow-x:hidden!important;-webkit-overflow-scrolling:touch!important;}",
                 "#csh-pick-panel div,#csh-pick-panel span,#csh-pick-panel input{position:static!important;}",
-                "#csh-pick-title{display:block!important;text-align:center!important;font-size:14px!important;font-weight:600!important;color:var(--csh-bg)!important;",
+                "#csh-pick-title{display:block!important;text-align:center!important;font-size:var(--csh-lfs-lg,14px)!important;font-weight:600!important;color:var(--csh-bg)!important;",
                 "letter-spacing:.01em!important;margin:0 0 14px!important;}",
                 "#csh-pick-bar{display:flex!important;flex-wrap:wrap!important;gap:8px!important;align-items:center!important;width:100%!important;margin:0 0 9px!important;}",
                 "#csh-pick-bar input{flex:1 1 200px!important;min-width:130px!important;display:block!important;padding:9px 12px!important;border-radius:8px!important;",
-                "border:1px solid rgba(var(--csh-bg-rgb),.12)!important;background:var(--csh-fg)!important;color:var(--csh-bg)!important;font-size:13px!important;",
+                "border:1px solid rgba(var(--csh-bg-rgb),.12)!important;background:var(--csh-fg)!important;color:var(--csh-bg)!important;font-size:var(--csh-lfs-md,13px)!important;",
                 "font-family:inherit!important;outline:none!important;}",
                 "#csh-pick-bar input::placeholder{color:var(--csh-gray-soft)!important;}",
                 "#csh-pick-bar input:focus{border-color:var(--csh-blue)!important;box-shadow:0 0 0 3px rgba(var(--csh-blue-rgb),.14)!important;}",
-                "#csh-pick-count{display:flex!important;align-items:center!important;gap:6px!important;font-size:12px!important;color:var(--csh-gray)!important;white-space:nowrap!important;}",
+                "#csh-pick-count{display:flex!important;align-items:center!important;gap:6px!important;font-size:var(--csh-lfs-sm,12px)!important;color:var(--csh-gray)!important;white-space:nowrap!important;}",
                 "#csh-pick-count input{flex:0 0 auto!important;width:64px!important;display:block!important;padding:8px!important;border-radius:8px!important;text-align:center!important;",
-                "border:1px solid rgba(var(--csh-bg-rgb),.12)!important;background:var(--csh-fg)!important;color:var(--csh-bg)!important;font-size:13px!important;",
+                "border:1px solid rgba(var(--csh-bg-rgb),.12)!important;background:var(--csh-fg)!important;color:var(--csh-bg)!important;font-size:var(--csh-lfs-md,13px)!important;",
                 "font-family:inherit!important;outline:none!important;}",
                 "#csh-pick-list{display:block!important;flex:1 1 auto!important;min-height:170px!important;max-height:48vh!important;overflow-y:auto!important;",
                 "overflow-x:hidden!important;width:100%!important;border:1px solid rgba(var(--csh-bg-rgb),.12)!important;border-radius:10px!important;",
@@ -2239,13 +2239,13 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                 "background:var(--csh-fg)!important;border:1px solid rgba(var(--csh-bg-rgb),.12)!important;",
                 "transition:border-color .15s ease,background .15s ease,transform .15s ease,box-shadow .15s ease!important;}",
                 ".csh-pick-card:hover{border-color:rgba(var(--csh-accent-rgb),.55)!important;background:rgba(var(--csh-accent-rgb),.10)!important;transform:translateY(-1px)!important;box-shadow:0 4px 12px -6px rgba(var(--csh-accent-rgb),.45)!important;}",
-                ".csh-pick-card .n{display:block!important;font-size:13px!important;font-weight:600!important;color:var(--csh-bg)!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;}",
-                ".csh-pick-card .t{display:block!important;margin-top:3px!important;font-size:10.5px!important;color:var(--csh-gray)!important;}",
-                ".csh-pick-card .i{display:block!important;margin-top:1px!important;font-size:10px!important;color:var(--csh-gray)!important;font-family:ui-monospace,'Cascadia Mono','SF Mono',Consolas,monospace!important;overflow:hidden!important;text-overflow:ellipsis!important;}",
+                ".csh-pick-card .n{display:block!important;font-size:var(--csh-lfs-md,13px)!important;font-weight:600!important;color:var(--csh-bg)!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;}",
+                ".csh-pick-card .t{display:block!important;margin-top:3px!important;font-size:var(--csh-lfs-micro2,10.5px)!important;color:var(--csh-gray)!important;}",
+                ".csh-pick-card .i{display:block!important;margin-top:1px!important;font-size:var(--csh-lfs-micro,10px)!important;color:var(--csh-gray)!important;font-family:ui-monospace,'Cascadia Mono','SF Mono',Consolas,monospace!important;overflow:hidden!important;text-overflow:ellipsis!important;}",
                 /* 【2026-09-30 修复】补 flex:0 0 auto —— foot 是列的最后一个子元素，
                    原先可被压缩，容器吃紧时第一个被牺牲（配合上面的 overflow 修复双重保障）。 */
                 "#csh-pick-foot{display:flex!important;flex:0 0 auto!important;align-items:center!important;justify-content:space-between!important;gap:10px!important;width:100%!important;margin-top:10px!important;}",
-                "#csh-pick-tip{font-size:11.5px!important;color:var(--csh-gray)!important;line-height:1.5!important;text-align:left!important;}",
+                "#csh-pick-tip{font-size:var(--csh-lfs-cap2,11.5px)!important;color:var(--csh-gray)!important;line-height:1.5!important;text-align:left!important;}",
                 /* ---------- 输入 / 选择弹窗 ----------
                  * 关键：引擎全局 div{position:absolute;display:inline-block} 会让标签脱离文档流，
                  * 直接压在输入框上（历史 bug）。这里逐层显式复位，并统一用类名接管排版。 */
@@ -2262,10 +2262,10 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                 "box-shadow:0 2px 6px rgba(var(--csh-bg-rgb),.06),0 24px 56px -20px rgba(var(--csh-bg-rgb),.30)!important;color:var(--csh-bg)!important;}",
                 "#csh-dbg-ask div,#csh-dbg-ask span,#csh-dbg-ask input,#csh-dbg-ask button{position:static!important;}",
                 "#csh-dbg-ask .csh-ask-lab{display:block!important;width:100%!important;margin:0 0 10px!important;padding:0!important;",
-                "font-size:13px!important;line-height:1.6!important;color:var(--csh-bg)!important;letter-spacing:.01em!important;word-break:break-all!important;}",
+                "font-size:var(--csh-lfs-md,13px)!important;line-height:1.6!important;color:var(--csh-bg)!important;letter-spacing:.01em!important;word-break:break-all!important;}",
                 "#csh-dbg-ask .csh-ask-inp{display:block!important;width:100%!important;box-sizing:border-box!important;padding:10px 12px!important;",
                 "border-radius:8px!important;border:1px solid rgba(var(--csh-bg-rgb),.12)!important;background:var(--csh-fg)!important;",
-                "color:var(--csh-bg)!important;font-size:14px!important;outline:none!important;font-family:inherit!important;line-height:1.4!important;}",
+                "color:var(--csh-bg)!important;font-size:var(--csh-lfs-lg,14px)!important;outline:none!important;font-family:inherit!important;line-height:1.4!important;}",
                 "#csh-dbg-ask .csh-ask-inp:focus{border-color:var(--csh-blue)!important;box-shadow:0 0 0 3px rgba(var(--csh-blue-rgb),.14)!important;}",
                 "#csh-dbg-ask .csh-ask-row{display:flex!important;width:100%!important;margin:12px 0 0!important;padding:0!important;",
                 "gap:8px!important;justify-content:flex-end!important;align-items:center!important;}",
@@ -4059,17 +4059,17 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
             st.id = "csh-skc-style";
             st.textContent = [
                 "#csh-skillcode .csh-skc-btn,#csh-cardinfo .csh-skc-btn{padding:5px 12px;border-radius:8px;border:1px solid rgba(var(--csh-bg-rgb),.12);",
-                "background:var(--csh-fg);color:var(--csh-bg);font-size:12.5px;font-weight:500;cursor:pointer;line-height:1.4;font-family:inherit;",
+                "background:var(--csh-fg);color:var(--csh-bg);font-size:var(--csh-lfs-sm2,12.5px);font-weight:500;cursor:pointer;line-height:1.4;font-family:inherit;",
                 "box-shadow:0 1px 1px rgba(var(--csh-bg-rgb),.03);",
                 "transition:background .16s ease,color .16s ease,border-color .16s ease,box-shadow .16s ease;}",
                 "#csh-skillcode .csh-skc-btn:hover,#csh-cardinfo .csh-skc-btn:hover{background:var(--csh-accent);color:var(--csh-accent-ink);border-color:var(--csh-accent);}",
                 "#csh-cardinfo .csh-ci-row{display:flex!important;gap:8px!important;align-items:flex-start!important;margin:6px 0!important;",
-                "font-size:12.5px!important;line-height:1.6!important;position:static!important;}",
+                "font-size:var(--csh-lfs-sm2,12.5px)!important;line-height:1.6!important;position:static!important;}",
                 "#csh-cardinfo .csh-ci-k{flex:0 0 62px!important;color:var(--csh-gray)!important;position:static!important;}",
                 "#csh-cardinfo .csh-ci-v{flex:1 1 auto!important;min-width:0!important;color:var(--csh-bg)!important;position:static!important;word-break:break-word!important;}",
                 "#csh-cardinfo .csh-ci-desc{display:block!important;margin:12px 0 0!important;padding:13px 15px!important;border-radius:10px!important;",
                 "background:var(--csh-light)!important;border:1px solid rgba(var(--csh-bg-rgb),.08)!important;border-left:3px solid var(--csh-accent)!important;",
-                "color:var(--csh-bg)!important;font-size:13px!important;line-height:1.7!important;white-space:pre-wrap!important;position:static!important;}",
+                "color:var(--csh-bg)!important;font-size:var(--csh-lfs-md,13px)!important;line-height:1.7!important;white-space:pre-wrap!important;position:static!important;}",
                 "#csh-cardinfo .csh-ci-img{display:block!important;margin:0 auto 14px!important;max-width:100%!important;border-radius:10px!important;",
                 "border:1px solid rgba(var(--csh-bg-rgb),.12)!important;position:static!important;}",
                 /* ---------- 浮层骨架：单一真值来源 ----------
@@ -4091,8 +4091,8 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                 "#csh-skillcode>div>div>b,#csh-cardinfo>div>div>b{color:var(--csh-accent)!important;background:var(--csh-ink-plate)!important;border:1px solid var(--csh-ink-plate)!important;",
                 "border-radius:8px!important;font-weight:600!important;line-height:1.4!important;overflow:hidden!important;",
                 "text-overflow:ellipsis!important;white-space:nowrap!important;box-sizing:border-box!important;flex:0 0 auto!important;}",
-                "#csh-skillcode>div>div>b{font-size:12px!important;padding:5px 11px!important;max-width:190px!important;}",
-                "#csh-cardinfo>div>div>b{font-size:14px!important;padding:7px 11px!important;flex:0 0 auto!important;max-width:58%!important;}",
+                "#csh-skillcode>div>div>b{font-size:var(--csh-lfs-sm,12px)!important;padding:5px 11px!important;max-width:190px!important;}",
+                "#csh-cardinfo>div>div>b{font-size:var(--csh-lfs-lg,14px)!important;padding:7px 11px!important;flex:0 0 auto!important;max-width:58%!important;}",
                 "#csh-skillcode>div>div{position:absolute!important;right:10px!important;top:10px!important;z-index:2!important;",
                 "display:flex!important;align-items:center!important;gap:8px!important;}",
                 "#csh-cardinfo>div>div{position:static!important;display:flex!important;align-items:center!important;gap:10px!important;margin:0 0 16px!important;}",
@@ -4101,7 +4101,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                 "#csh-skillcode>div>pre{flex:1 1 auto!important;overflow:auto!important;margin:0!important;padding:46px 18px 16px!important;",
                 "background:var(--csh-light)!important;color:var(--csh-bg)!important;font-variant-numeric:tabular-nums!important;",
                 "font-family:ui-monospace,'Cascadia Mono','SF Mono',Consolas,monospace!important;",
-                "font-size:12px!important;line-height:1.55!important;white-space:pre!important;text-align:left!important;}",
+                "font-size:var(--csh-lfs-sm,12px)!important;line-height:1.55!important;white-space:pre!important;text-align:left!important;}",
             ].join("");
             (document.head || document.documentElement).appendChild(st);
         }
@@ -4130,7 +4130,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
             var head = document.createElement("div");
             head.style.cssText = "position:absolute;right:10px;top:10px;z-index:2;display:flex;align-items:center;gap:8px;";
             var title = document.createElement("b");
-            title.style.cssText = "color:var(--csh-accent);font-size:12px;font-weight:600;line-height:1.4;padding:5px 11px;border-radius:8px;" +
+            title.style.cssText = "color:var(--csh-accent);font-size:var(--csh-lfs-sm,12px);font-weight:600;line-height:1.4;padding:5px 11px;border-radius:8px;" +
                 "background:var(--csh-ink-plate);border:1px solid var(--csh-ink-plate);max-width:190px;" +
                 "overflow:hidden;text-overflow:ellipsis;white-space:nowrap;";
             title.textContent = "技能代码 · " + id;
@@ -4146,7 +4146,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 
             var pre = document.createElement("pre");
             pre.style.cssText = "flex:1 1 auto;overflow:auto;margin:0;padding:46px 18px 16px;background:var(--csh-light);color:var(--csh-bg);font-variant-numeric:tabular-nums;" +
-                "font-family:ui-monospace,'Cascadia Mono','SF Mono',Consolas,monospace;font-size:12px;line-height:1.55;white-space:pre;text-align:left;";
+                "font-family:ui-monospace,'Cascadia Mono','SF Mono',Consolas,monospace;font-size:var(--csh-lfs-sm,12px);line-height:1.55;white-space:pre;text-align:left;";
             pre.textContent = skillCodeText(id);
 
             inner.appendChild(head); inner.appendChild(pre);
@@ -4262,7 +4262,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
             var title = document.createElement("b");
             /* 标题墨底黄字 chip：与技能代码查看器同款（黄字在纸白上仅 1.6:1，必须给深底）。
                宽度随内容自适应（绝不用 flex:1 拉成长条——单字卡名会撑成黑杠，重心失衡）。 */
-            title.style.cssText = "color:var(--csh-accent);font-size:14px;font-weight:600;flex:0 0 auto;max-width:58%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" +
+            title.style.cssText = "color:var(--csh-accent);font-size:var(--csh-lfs-lg,14px);font-weight:600;flex:0 0 auto;max-width:58%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" +
                 "background:var(--csh-ink-plate);border:1px solid var(--csh-ink-plate);border-radius:8px;padding:7px 11px;box-sizing:border-box;";
             title.textContent = name;
             headRow.appendChild(title);
@@ -5933,7 +5933,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                 hint(body, "群体锦囊以自己为使用者。仅影响单机对局。");
             } else if (tab === "state") {
                 var pre = document.createElement("pre");
-                pre.style.cssText = "display:block!important;position:static!important;max-height:360px!important;overflow:auto!important;font-size:11px!important;line-height:1.4!important;background:var(--csh-paper)!important;padding:10px!important;border-radius:8px!important;color:var(--csh-bg)!important;white-space:pre-wrap!important;word-break:break-all!important;width:100%!important;";
+                pre.style.cssText = "display:block!important;position:static!important;max-height:360px!important;overflow:auto!important;font-size:var(--csh-lfs-cap,11px)!important;line-height:1.4!important;background:var(--csh-paper)!important;padding:10px!important;border-radius:8px!important;color:var(--csh-bg)!important;white-space:pre-wrap!important;word-break:break-all!important;width:100%!important;";
                 function refreshState() {
                     var p = needMe();
                     if (!p) {
@@ -5969,7 +5969,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                 hint(body, "只读快照。");
             } else if (tab === "track") {
                 var pre2 = document.createElement("pre");
-                pre2.style.cssText = "display:block!important;position:static!important;max-height:280px!important;overflow:auto!important;font-size:11px!important;line-height:1.35!important;background:var(--csh-paper)!important;padding:10px!important;border-radius:8px!important;color:var(--csh-bg)!important;white-space:pre-wrap!important;word-break:break-all!important;width:100%!important;";
+                pre2.style.cssText = "display:block!important;position:static!important;max-height:280px!important;overflow:auto!important;font-size:var(--csh-lfs-cap,11px)!important;line-height:1.35!important;background:var(--csh-paper)!important;padding:10px!important;border-radius:8px!important;color:var(--csh-bg)!important;white-space:pre-wrap!important;word-break:break-all!important;width:100%!important;";
                 function refreshTrack() {
                     if (!lib.cshDebug) {
                         pre2.textContent = "无 Core";
@@ -6425,9 +6425,9 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                 try {
                     var bgmSt = document.createElement("style");
                     bgmSt.textContent = "#csh-dbg-bgm{display:inline-flex!important;align-items:center!important;gap:8px!important;margin-right:6px!important;}" +
-                        "#csh-dbg-bgm label{font-size:11.5px!important;color:var(--csh-gray-soft)!important;letter-spacing:.08em!important;}" +
+                        "#csh-dbg-bgm label{font-size:var(--csh-lfs-cap2,11.5px)!important;color:var(--csh-gray-soft)!important;letter-spacing:.08em!important;}" +
                         "#csh-dbg-bgm input[type=range]{width:96px!important;accent-color:var(--csh-accent)!important;height:22px!important;cursor:pointer!important;}" +
-                        "#csh-dbg-bgm b{font-size:11px!important;color:var(--csh-gray-soft)!important;min-width:34px!important;text-align:right!important;font-variant-numeric:tabular-nums!important;}";
+                        "#csh-dbg-bgm b{font-size:var(--csh-lfs-cap,11px)!important;color:var(--csh-gray-soft)!important;min-width:34px!important;text-align:right!important;font-variant-numeric:tabular-nums!important;}";
                     (document.head || document.documentElement).appendChild(bgmSt);
                 } catch (eB2) {}
                 head.appendChild(skinBtn);
@@ -6693,17 +6693,22 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                    与 #csh-redeem * 同一范式（2026-09-30 / 10-06 两次同坑）：
                    position 可通配复位；display 必须逐类给（通配会把按钮也变块级）。 */
                 "#csh-extstore *{position:static!important;box-sizing:border-box!important;}",
-                "#csh-extstore .csh-ext-title{display:block!important;font-weight:700!important;font-size:15px!important;letter-spacing:.06em!important;margin-bottom:4px!important;}",
-                "#csh-extstore .csh-ext-sub{display:block!important;font-size:11px!important;opacity:.62!important;margin-bottom:10px!important;}",
-                "#csh-extstore .csh-ext-loading{display:block!important;font-size:12px!important;opacity:.6!important;padding:10px 2px!important;}",
+                "#csh-extstore .csh-ext-title{display:block!important;font-weight:700!important;font-size:var(--csh-lfs-lg2,15px)!important;letter-spacing:.06em!important;margin-bottom:4px!important;}",
+                "#csh-extstore .csh-ext-sub{display:block!important;font-size:var(--csh-lfs-cap,11px)!important;opacity:.62!important;margin-bottom:10px!important;}",
+                "#csh-extstore .csh-ext-loading{display:block!important;font-size:var(--csh-lfs-sm,12px)!important;opacity:.6!important;padding:10px 2px!important;}",
                 "#csh-extstore .csh-ext-row{display:flex!important;align-items:center!important;gap:10px!important;padding:9px 4px!important;border-bottom:1px dashed rgba(60,48,28,.25)!important;}",
                 "#csh-extstore .csh-ext-row:last-child{border-bottom:none!important;}",
                 "#csh-extstore .csh-ext-info{display:block!important;flex:1!important;min-width:0!important;}",
-                "#csh-extstore .csh-ext-name{display:block!important;font-weight:700!important;font-size:13px!important;}",
-                "#csh-extstore .csh-ext-desc{display:block!important;font-size:11px!important;opacity:.72!important;line-height:1.5!important;}",
+                "#csh-extstore .csh-ext-name{display:block!important;font-weight:700!important;font-size:var(--csh-lfs-md,13px)!important;}",
+                "#csh-extstore .csh-ext-desc{display:block!important;font-size:var(--csh-lfs-cap,11px)!important;opacity:.72!important;line-height:1.5!important;}",
                 "#csh-extstore .csh-ext-btn{flex:none!important;padding:7px 16px!important;cursor:pointer!important;border-radius:5px!important;",
                 "background:#c9a84c!important;color:#1d1608!important;font-weight:700!important;border:1px solid rgba(60,48,28,.2)!important;}",
                 "#csh-extstore .csh-ext-btn:disabled{opacity:.55!important;cursor:default!important;}",
+                /* 有新版可更新（2026-10-20 其他扩展 2.0）：金底→亮金渐变 + 呼吸光点，一眼看到 */
+                "#csh-extstore .csh-ext-btn.upd{background:linear-gradient(160deg,#e8c96a,#c9a84c 55%,#a8842e)!important;color:#1d1608!important;",
+                "box-shadow:0 0 0 1px rgba(201,168,76,.5),0 2px 10px rgba(201,168,76,.35)!important;position:relative!important;}",
+                "#csh-extstore .csh-ext-btn.upd::after{content:''!important;position:absolute!important;right:6px!important;top:6px!important;",
+                "width:6px!important;height:6px!important;border-radius:50%!important;background:#8b1e1e!important;box-shadow:0 0 6px rgba(180,40,40,.8)!important;}",
             ].join("");
             (document.head || document.documentElement).appendChild(st);
         }
@@ -6801,6 +6806,64 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                 try { return String(lib.config["extension_" + name + "_version"] || ""); } catch (e2) { return ""; }
             }
 
+            /* ---------- 其他扩展 2.0（2026-10-20）----------
+               ① 远端版本对比：拉扩展根 info.json（240B）与已装版本比，有新版就高亮「更新」。
+                  缓存的是 Promise（不是值）：并发点击/重复渲染只发一次请求，失败也缓存，
+                  避免面板开着时每次渲染都把 GitHub API 打一遍。
+               ② 断点续传：下载进度按「已完成文件清单」落盘（csh_store_resume）。
+                  网络抽风/误取消后重开面板接着下，不用从 0 开始（276MB 的大包体感救星）。 */
+            var remoteVerCache = {};
+            function remoteVer(entry) {
+                var ck = entry.repo + "|" + (entry.dir || "");
+                if (remoteVerCache[ck]) return remoteVerCache[ck];
+                var dirPrefix = entry.dir ? String(entry.dir).replace(/\/+$/, "") + "/" : "";
+                var p = (async function () {
+                    var branch = entry.branch || "main";
+                    var tryFetch = function (b) {
+                        return fetch("https://raw.githubusercontent.com/" + entry.repo + "/" + b + "/" + dirPrefix + "info.json", { cache: "no-store" })
+                            .then(function (r) { return r.ok ? r.json() : null; });
+                    };
+                    var j = await tryFetch(branch);
+                    if (!j) {
+                        var ri = await (await fetch("https://api.github.com/repos/" + entry.repo)).json();
+                        branch = ri.default_branch || "master";
+                        j = await tryFetch(branch);
+                    }
+                    return j ? String(j.version || "") : "";
+                })();
+                remoteVerCache[ck] = p;
+                return p;
+            }
+            var RESUME_KEY = "csh_store_resume";
+            /* 内存半成品：已下完的文件 buffer。续传（同会话内网络抽风/误取消）靠它，
+               刷新页面后它没了——所以磁盘 resume 清单只用于「展示上次进度」，
+               真正决定跳不跳过某个文件，看它还在不在这张表里。 */
+            var storePartial = {};
+            function resumeLoad() {
+                try {
+                    if (typeof localStorage === "undefined") return null;
+                    var o = JSON.parse(localStorage.getItem(RESUME_KEY) || "null");
+                    return (o && typeof o === "object") ? o : null;
+                } catch (e) { return null; }
+            }
+            function resumeSave(o) {
+                try {
+                    if (typeof localStorage === "undefined") return;
+                    o ? localStorage.setItem(RESUME_KEY, JSON.stringify(o)) : localStorage.removeItem(RESUME_KEY);
+                } catch (e) {}
+            }
+            /* 单文件完成的记账：合并落盘（工具函数内 500ms 去抖），
+               下载几千个小文件时不能每个都全量 stringify。 */
+            function resumeMark(name, rel) {
+                var o = resumeLoad();
+                if (!o || o.name !== name) return;
+                if ((o.done || []).indexOf(rel) >= 0) return;
+                o.done = (o.done || []).concat([rel]);
+                o.t = Date.now();
+                if (resumeMark._t) { clearTimeout(resumeMark._t); }
+                resumeMark._t = setTimeout(function () { resumeMark._t = 0; resumeSave(o); }, 500);
+            }
+
             /* 取清单：默认分支 → 递归文件树 → 目录过滤 → 体积合计 + 「根目录是不是扩展」校验 */
             function loadManifest(entry) {
                 return (async function () {
@@ -6832,7 +6895,17 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                单文件失败先退避重试，重试用尽才报错 —— 国内直连 raw 偶发 502 是常态。 */
             function downloadAll(entry, man, onTick, ctrl) {
                 var signal = ctrl ? ctrl.signal : undefined;
-                var data = {}, cursor = 0, done = 0, loaded = 0, total = man.blobs.length, dead = null;
+                /* 断点续传：同会话内已下完的文件（storePartial[entry.name]）跳过不重下。
+                   buffer 也来自那张表——importExtension 只在全部完成时触发一次，
+                   半成品只在内存里凑得齐。 */
+                var part = storePartial[entry.name] || {};
+                var queue = [];
+                for (var q = 0; q < man.blobs.length; q++) {
+                    var rel0 = man.prefix ? man.blobs[q].path.slice(man.prefix.length) : man.blobs[q].path;
+                    if (!part[rel0]) queue.push(man.blobs[q]);
+                }
+                var data = {}, cursor = 0, done = 0, loaded = 0, total = queue.length, dead = null;
+                for (var k in part) { if (Object.prototype.hasOwnProperty.call(part, k)) data[k] = part[k]; }
                 function one(f) {
                     var rel = man.prefix ? f.path.slice(man.prefix.length) : f.path;
                     var url = "https://raw.githubusercontent.com/" + entry.repo + "/" + man.branch + "/" + encodeURI(f.path);
@@ -6844,7 +6917,9 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                             return r.arrayBuffer();
                         }).then(function (buf) {
                             data[rel] = buf;
+                            (storePartial[entry.name] = storePartial[entry.name] || {})[rel] = buf;
                             done++; loaded += buf.byteLength;
+                            resumeMark(entry.name, rel);
                             onTick(done, total, rel);
                         }).catch(function (e) {
                             if (signal && signal.aborted) throw e;
@@ -6856,7 +6931,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                 }
                 function worker() {
                     if (dead || cursor >= total) return Promise.resolve();
-                    var f = man.blobs[cursor++];
+                    var f = queue[cursor++];
                     return one(f).then(worker, function (e) { dead = dead || e; throw e; });
                 }
                 var ws = [];
@@ -6878,6 +6953,8 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 
                 var finish = function () {
                     storeTask = null;
+                    delete storePartial[entry.name];
+                    resumeSave(null);
                     btn.textContent = "已安装";
                     prog.textContent = "安装完成，正在重启…";
                     toast("「" + entry.name + "」安装成功，即将重启");
@@ -6887,13 +6964,23 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                     storeTask = null;
                     prog.style.display = "none";
                     btn.disabled = false;
-                    btn.textContent = "重试";
-                    toast("「" + entry.name + "」安装失败：" + msg);
+                    /* 续传保留半成品：重开面板/重点安装会从断点继续，不清 storePartial 与磁盘清单 */
+                    var part = storePartial[entry.name];
+                    btn.textContent = (part && Object.keys(part).length) ? "继续下载" : "重试";
+                    toast("「" + entry.name + "」安装失败：" + msg + "（已下载的部分保留，重点可续传）");
                 };
 
                 loadManifest(entry).then(function (man) {
                     storeTask.total = man.blobs.length;
-                    prog.textContent = man.blobs.length + " 个文件 · 约 " + fmtMB(man.total) + "，准备下载…";
+                    /* 断点续传（2.0）：登记/沿用本次扩展的下载清单，跨面板、跨重试沿用 */
+                    var rs = resumeLoad();
+                    if (!rs || rs.name !== entry.name || rs.repo !== entry.repo || (rs.dir || "") !== (entry.dir || "")) {
+                        resumeSave({ name: entry.name, repo: entry.repo, dir: entry.dir || "", branch: man.branch, done: [], t: Date.now() });
+                    }
+                    var part0 = storePartial[entry.name] || {};
+                    var done0 = Object.keys(part0).length;
+                    if (done0 > 0) prog.textContent = "检测到未完成的下载（已完成 " + done0 + " 个文件），继续…";
+                    else prog.textContent = man.blobs.length + " 个文件 · 约 " + fmtMB(man.total) + "，准备下载…";
                     if (man.total > STORE_MAX_BYTES) throw new Error("体积 " + fmtMB(man.total) + " 超过单次上限 " + fmtMB(STORE_MAX_BYTES));
                     /* 大包先说清楚要等多久，别让玩家以为卡死；确认框走自绘 UI，不弹原生 */
                     if (man.total > 80 * 1048576 && lib.cshUI && typeof lib.cshUI.confirm === "function") {
@@ -6909,6 +6996,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                 }).then(function (man) {
                     return downloadAll(entry, man, function (done, total, rel) {
                         storeTask.done = done;
+                        storeTask.total = total;
                         prog.textContent = "下载中 " + done + " / " + total + " · " + rel;
                     }, ctrl).then(function (data) {
                         prog.textContent = "正在写入扩展目录…（共 " + man.blobs.length + " 个文件）";
@@ -6936,7 +7024,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                 var note = document.createElement("div");
                 note.className = "csh-ext-sub";
                 note.style.marginBottom = "8px";
-                note.textContent = "下载可以放到后台：中途关掉这个面板不会中断，装完会自动重启。点进度文字可取消。";
+                note.textContent = "下载可以放到后台：中途关掉这个面板不会中断，装完会自动重启。点进度文字可取消。已装的扩展有新版会亮「更新」，没下完的再点一次会接着下。";
                 listBox.appendChild(note);
                 list.forEach(function (entry) {
                     var row = document.createElement("div");
@@ -6973,6 +7061,25 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                             storeTask.cancelled = true;
                             try { storeTask.ctrl && storeTask.ctrl.abort(); } catch (eA) {}
                         };
+                    }
+                    /* 2.0 ① 远端版本对比：异步拉 info.json，不阻塞面板打开；
+                       有新版 → 按钮变「更新」+ 高亮（红点 = 一眼看到） */
+                    remoteVer(entry).then(function (rv) {
+                        if (!rv) return;
+                        var upd = have && typeof cshVerCmp === "function" && cshVerCmp(rv, have) > 0;
+                        dsc.textContent = (entry.intro || "") +
+                            (have ? "　（已装 v" + have + (upd ? " → 可更新 v" + rv : "") + "）" : "") +
+                            (!have ? "　远端 v" + rv : "");
+                        if (upd) { btn.textContent = "更新"; btn.classList.add("upd"); }
+                    }).catch(function () {});
+                    /* 2.0 ② 断点续传状态：上次没下完的，提示接着下而不是从 0 开始 */
+                    var part2 = storePartial[entry.name];
+                    if (part2 && !(storeTask && storeTask.running && storeTask.name === entry.name)) {
+                        var n2 = Object.keys(part2).length;
+                        if (n2 > 0) {
+                            prog.style.display = "block";
+                            prog.textContent = "上次下载未完成（已下 " + n2 + " 个文件），点「" + btn.textContent + "」接着下";
+                        }
                     }
                 });
             }
@@ -7015,7 +7122,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
         var CSH_UPDATE_SRC = "https://raw.githubusercontent.com/ch1shanghan-dev/chizi-mojiang/main/";
         var CSH_UPDATE_EXT = "extension/池子魔将/";
         function cshVerArr(v) {
-            var out = [], s = String(v == null ? "" : v).split(/[.\-+_]/);
+            var out = [], s = String(v == null ? "" : v).replace(/^v/i, "").split(/[.\-+_]/);
             for (var i = 0; i < s.length; i++) out.push(parseInt(s[i], 10) || 0);
             return out;
         }
@@ -7047,9 +7154,9 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                 "font-family:system-ui,-apple-system,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif!important;}",
                 /* 引擎全局给所有 div 设了 position:absolute;display:inline-block —— 面板内子元素必须复位 */
                 "#csh-update *{position:static!important;box-sizing:border-box!important;}",
-                "#csh-update .csh-ext-title{display:block!important;font-weight:700!important;font-size:15px!important;letter-spacing:.06em!important;margin-bottom:4px!important;}",
-                "#csh-update .csh-ext-sub{display:block!important;font-size:11px!important;opacity:.62!important;margin-bottom:10px!important;word-break:break-all!important;}",
-                "#csh-update .csh-ext-loading{display:block!important;font-size:12.5px!important;opacity:.78!important;padding:8px 2px!important;line-height:1.75!important;white-space:pre-wrap!important;}",
+                "#csh-update .csh-ext-title{display:block!important;font-weight:700!important;font-size:var(--csh-lfs-lg2,15px)!important;letter-spacing:.06em!important;margin-bottom:4px!important;}",
+                "#csh-update .csh-ext-sub{display:block!important;font-size:var(--csh-lfs-cap,11px)!important;opacity:.62!important;margin-bottom:10px!important;word-break:break-all!important;}",
+                "#csh-update .csh-ext-loading{display:block!important;font-size:var(--csh-lfs-sm2,12.5px)!important;opacity:.78!important;padding:8px 2px!important;line-height:1.75!important;white-space:pre-wrap!important;}",
                 "#csh-update .csh-ext-row{display:flex!important;align-items:center!important;justify-content:flex-end!important;gap:10px!important;margin-top:12px!important;}",
                 "#csh-update .csh-ext-btn{flex:none!important;padding:8px 18px!important;cursor:pointer!important;border-radius:5px!important;font-weight:700!important;",
                 "background:#c9a84c!important;color:#1d1608!important;border:1px solid rgba(60,48,28,.2)!important;}",
@@ -7059,7 +7166,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                 "#csh-update .csh-src-box{display:block!important;margin:2px 0 10px!important;border:1px solid rgba(60,48,28,.18)!important;",
                 "border-radius:8px!important;overflow:hidden!important;background:rgba(255,255,255,.35)!important;}",
                 "#csh-update .csh-src-row{display:flex!important;align-items:center!important;gap:8px!important;padding:6px 10px!important;",
-                "font-size:12px!important;line-height:1.4!important;border-top:1px solid rgba(60,48,28,.1)!important;}",
+                "font-size:var(--csh-lfs-sm,12px)!important;line-height:1.4!important;border-top:1px solid rgba(60,48,28,.1)!important;}",
                 "#csh-update .csh-src-row:first-child{border-top:0!important;}",
                 "#csh-update .csh-src-row.on{background:rgba(201,168,76,.22)!important;}",
                 "#csh-update .csh-src-row.dead{opacity:.5!important;}",

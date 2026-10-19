@@ -515,6 +515,101 @@
 		return { got: got, total: RULES.length, seen: seen, byRare: byRare, unread: got - seen };
 	}
 
+	/* ------------------------------------------------------------
+	   5b. 发奖对账（2026-10-20 · 防重复领取）
+	   ------------------------------------------------------------
+	   漏洞：成就页「重新开始」或单清 csh_pool_achv 会把 seen 抹掉，
+	   已领过的奖励就能再领一遍（CBY/功勋无限刷）。
+	   三层防线，任一命中即视为「已付」——只补 seen，不发钱：
+	     ① 主存档 seen（原逻辑）；
+	     ② 独立发奖台账 csh_pool_achv_pay：只增不删，页面级重置不清它。
+	        （save.html 的「全部重置」会连同钱包/流水一起清——
+	         那种情况经济已归零，重领不算刷，语义一致）；
+	     ③ 钱包流水反推：扫 CSH.wallet.ledger 里 reason="池子成就/<名>"
+	        的入账记录——台账也被误删时的兜底。
+	   ------------------------------------------------------------ */
+	var K_PAY = "csh_pool_achv_pay";
+	var memPay = null;
+	function loadPay() {
+		try {
+			if (typeof localStorage === "undefined") return memPay || (memPay = { v: 1, paid: {} });
+			var raw = localStorage.getItem(K_PAY);
+			if (!raw) return { v: 1, paid: {} };
+			var o = JSON.parse(raw);
+			if (!o || typeof o !== "object" || !o.paid || typeof o.paid !== "object") return { v: 1, paid: {} };
+			return o;
+		} catch (e) { return { v: 1, paid: {} }; }
+	}
+	function savePay(o) {
+		memPay = o;
+		try {
+			if (typeof localStorage !== "undefined") localStorage.setItem(K_PAY, JSON.stringify(o));
+		} catch (e) {}
+	}
+	var _ruleNameMap = null;
+	function ruleName(id) {
+		if (!_ruleNameMap) {
+			_ruleNameMap = {};
+			for (var i = 0; i < RULES.length; i++) _ruleNameMap[RULES[i].id] = RULES[i].name;
+		}
+		return _ruleNameMap[id] || "";
+	}
+	/* 钱包流水里的「池子成就/<名>」入账 → 已付名单（结果缓存，recordPaid 后失效重扫） */
+	var _walletPaidCache = null;
+	function walletPaidNames() {
+		if (_walletPaidCache) return _walletPaidCache;
+		var names = {};
+		try {
+			var W = root.CSH && root.CSH.wallet;
+			if (W && typeof W.ledger === "function") {
+				var list = W.ledger({ kind: "in" });
+				for (var i = 0; i < list.length; i++) {
+					var r = String(list[i].r || "");
+					if (r.indexOf("池子成就/") === 0) names[r.slice(5)] = 1;
+				}
+			}
+		} catch (e) {}
+		_walletPaidCache = names;
+		return names;
+	}
+	/* 领取闸门：true=已付过（调用方补 seen、不发钱）；false=可以发钱 */
+	function isPaid(id) {
+		var o = load();
+		if (o.seen[id]) return true;
+		var p = loadPay();
+		if (p.paid[id]) return true;
+		var nm = ruleName(id);
+		if (nm && walletPaidNames()[nm]) return true;
+		return false;
+	}
+	/* 发钱成功后记账：写台账 + 补 seen + 流水缓存失效（下次重扫） */
+	function recordPaid(id, pc, merit) {
+		var p = loadPay();
+		if (!p.paid[id]) {
+			p.paid[id] = { t: Date.now(), pc: Math.floor(Number(pc) || 0), merit: Math.floor(Number(merit) || 0) };
+			savePay(p);
+		}
+		var o = load();
+		if (o.got[id] && !o.seen[id]) { o.seen[id] = 1; save(o); }
+		_walletPaidCache = null;
+	}
+	/* 对账自愈：台账/流水显示已付、但 seen 丢了的，补回 seen（不发钱）。
+	   成就页加载时跑一次。返回补回条数。 */
+	function reconcile() {
+		var o = load(), p = loadPay(), wn = null, n = 0;
+		for (var i = 0; i < RULES.length; i++) {
+			var id = RULES[i].id;
+			if (!o.got[id] || o.seen[id]) continue;
+			if (!p.paid[id]) {
+				if (wn === null) wn = walletPaidNames();
+				if (!wn[ruleName(id)]) continue;
+			}
+			o.seen[id] = 1; n++;
+		}
+		if (n) save(o);
+		return n;
+	}
+
 	/* ============================================================
 	   6. 引擎适配层（唯一耦合点）
 	   ------------------------------------------------------------
@@ -732,6 +827,7 @@
 		RULES: RULES, INDEX: INDEX,
 		newRun: newRun, feed: feed, judge: judge, install: install,
 		load: load, save: save, unlock: unlock, claimState: claimState,
+		PAY_KEY: K_PAY, isPaid: isPaid, recordPaid: recordPaid, reconcile: reconcile,
 		selfTest: selfTest,
 	};
 })(typeof window !== "undefined" ? window : globalThis);

@@ -58,7 +58,14 @@
     --fs-lg: clamp(18px, 2.4vh, 32px);
     --fs-xl: clamp(26px, 4.2vh, 60px);
     --radius: 12px;
-  }
+  
+  /* 字号收编档（2026-10-20）：同值 token 替换裸字号，渲染不变；同档多值待实机测量后并档 */
+  --pfs-micro: 10px;
+  --pfs-micro2: 10.5px;
+  --pfs-cap: 11px;
+  --pfs-cap2: 11.5px;
+  --pfs-sm: 12px;
+}
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
   html, body { height: 100%; }
   body {
@@ -407,16 +414,16 @@
       width: min(940px, 98%); gap: 5px; padding: 9px 14px; border-radius: 14px; margin: 0 auto;
     }
     .sc-title { font-size: clamp(17px, 4.4vh, 23px); letter-spacing: 3px; }
-    .sc-sub { font-size: 11px; line-height: 1.4; margin-top: 0; }
+    .sc-sub { font-size:var(--pfs-cap); line-height: 1.4; margin-top: 0; }
     /* 关键：原来 .sc-sec 是 flex-wrap:wrap + space-between，横屏窄高时
        「标签 + 控件」会被挤成两行，每节白吃一行高度。横屏宽度够，禁止换行。 */
     .sc-sec { gap: 8px; flex-wrap: nowrap; }
-    .sc-k { font-size: 10.5px; min-width: 3.6em; letter-spacing: 1px; }
+    .sc-k { font-size:var(--pfs-micro2); min-width: 3.6em; letter-spacing: 1px; }
     /* 触摸目标：入座前的所有选择控件一律 44px */
     .chip-btn { min-height: 44px; min-width: 52px; font-size: clamp(13px, 3.4vh, 17px); }
-    .seg-btn { min-height: 44px; padding: 6px 12px; font-size: 12px; min-width: 44px; }
-    .sc-best { font-size: 11.5px; padding: 5px 8px; }
-    .sc-note { font-size: 10px; letter-spacing: .5px; }
+    .seg-btn { min-height: 44px; padding: 6px 12px; font-size:var(--pfs-sm); min-width: 44px; }
+    .sc-best { font-size:var(--pfs-cap2); padding: 5px 8px; }
+    .sc-note { font-size:var(--pfs-micro); letter-spacing: .5px; }
     /* 「开始」主操作与「玩法」次操作：45px 高命中区 */
     #btn-start-game { min-height: 44px; }
     #btn-rules { min-height: 44px; }

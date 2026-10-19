@@ -29,7 +29,7 @@ export const CSH_TITLES_CSS = `/* ==============================================
     /* 兜底：CSS 未注入时也不至于裸字 */
     font-family: "FZKai-Z03S", KaiTi, STKaiti, SimKai, "楷体", "Songti SC", serif;
     font-weight: 600;
-    font-size: 17px;
+    font-size:var(--csh-lfs-xl2,17px);
     line-height: 1.35;
     letter-spacing: 3px;
     white-space: nowrap;
@@ -52,8 +52,8 @@ export const CSH_TITLES_CSS = `/* ==============================================
 .ct > i + i { margin-left: .42em; }
 
 /* ---------- 字号档（按字数恒定视觉重量） ---------- */
-.ct.z-l { font-size: 19px; letter-spacing: 4px; }   /* ≤4 字 */
-.ct.z-s { font-size: 14px; letter-spacing: 2.2px; } /* ≥10 字 */
+.ct.z-l { font-size:var(--csh-lfs-xl4,19px); letter-spacing: 4px; }   /* ≤4 字 */
+.ct.z-s { font-size:var(--csh-lfs-lg,14px); letter-spacing: 2.2px; } /* ≥10 字 */
 
 /* ---------- 分隔符（4 种，全部降到细标级别） ---------- */
 .ct.s1 > i + i::before {

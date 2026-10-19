@@ -60,7 +60,14 @@
     --fs-lg: clamp(20px, 2.6vh, 34px);
     --fs-xl: clamp(26px, 4.2vh, 60px);
     --radius: 12px;
-  }
+  
+  /* 字号收编档（2026-10-20）：同值 token 替换裸字号，渲染不变；同档多值待实机测量后并档 */
+  --pfs-micro: 9.5px;
+  --pfs-micro2: 10px;
+  --pfs-micro3: 10.5px;
+  --pfs-cap: 11.5px;
+  --pfs-sm: 12px;
+}
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
   html, body { height: 100%; }
   body {
@@ -331,7 +338,7 @@
   .seat.dealer { z-index: 5; }
   .seat.dealer .seat-box::before {
     content: "D"; position: absolute; top: -7px; right: -7px;
-    width: 16px; height: 16px; border-radius: 50%; font-size: 10px; font-weight: 900;
+    width: 16px; height: 16px; border-radius: 50%; font-size:var(--pfs-micro2); font-weight: 900;
     display: flex; align-items: center; justify-content: center;
     background: #f2ecd8; color: #241c10;
   }
@@ -380,7 +387,7 @@
   #view-game .csh-player { min-height: calc(var(--cw) * 1.4 + 10px); }
   /* 玩家区第二行里的胜率片段（由 renderMyArea 填充） */
   .csh-player .pl-line i.dealer-dot {
-    font-style: normal; font-size: 10px; font-weight: 900; line-height: 14px;
+    font-style: normal; font-size:var(--pfs-micro2); font-weight: 900; line-height: 14px;
     width: 14px; height: 14px; text-align: center; border-radius: 50%;
     background: #f2ecd8; color: #241c10; display: inline-block; vertical-align: middle;
   }
@@ -427,7 +434,7 @@
      于是**手机上摊牌时也看不到任何人的牌** —— 这正是"翻牌看不出谁是什么牌"的直接原因。
      这里用两类选择器（优先级高于单类）在摊牌态强制放牌，并把牌放大到 sm 档。 */
   .seat-hand {
-    font-size: 10px; font-weight: 700; color: var(--gold-hi);
+    font-size:var(--pfs-micro2); font-weight: 700; color: var(--gold-hi);
     background: rgba(0, 0, 0, .6); border: 1px solid var(--gold-line); border-radius: 6px;
     padding: 0 5px; white-space: nowrap; max-width: 10em; overflow: hidden; text-overflow: ellipsis;
   }
@@ -580,30 +587,30 @@
     body.vp-landscape .start-side { display: flex; }
     /* 2) 纵向节奏整体收紧（横屏寸土寸金） */
     .start-card > .title { font-size: clamp(17px, 4.4vh, 24px); letter-spacing: 2px; }
-    .start-card > .subtitle { font-size: 11.5px; margin-top: 0; }
+    .start-card > .subtitle { font-size:var(--pfs-cap); margin-top: 0; }
     .life { padding: 6px 10px; gap: 4px 10px; }
     .life-bank { gap: 3px; }
     .life-bank-top .v { font-size: clamp(18px, 4.6vh, 26px); }
-    .life-bank-top .k, .life-quota, .life-cell .k { font-size: 10.5px; }
+    .life-bank-top .k, .life-quota, .life-cell .k { font-size:var(--pfs-micro3); }
     .life-cell .v { font-size: clamp(12px, 2.8vh, 15px); }
     /* 配额说明可能很长（「距豪赌桌 198,000」），窄列里不设省略会顶到旁边 */
     .life-quota { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
     .field { gap: 3px; }
-    .field .lab .t, .field .lab .h { font-size: 10.5px; }
+    .field .lab .t, .field .lab .h { font-size:var(--pfs-micro3); }
     /* 3) 触摸目标：实测这批选项按钮只有 36px，全部抬到 44px 红线 */
     .seg-btn { min-height: 44px; padding: 2px 4px; }
-    .seg-btn small { font-size: 10px; }
+    .seg-btn small { font-size:var(--pfs-micro2); }
     /* 4) 每日任务：项目横排（宽度足够），高度由 207px 降到一行 */
     #task-field .tasks { flex-direction: row; gap: 8px; }
     .task { flex: 1 1 0; min-width: 0; min-height: 52px; padding: 5px 8px; gap: 7px; }
-    .task .tk-lab { font-size: 11.5px; }
-    .task .tk-num, .task .tk-rw { font-size: 10.5px; }
+    .task .tk-lab { font-size:var(--pfs-cap); }
+    .task .tk-num, .task .tk-rw { font-size:var(--pfs-micro3); }
     .task .tk-bar { height: 5px; }
     /* 5) 主操作与尾部说明 */
     #btn-start-game { min-height: 44px; }
     .medals { gap: 4px; }
-    .medal { font-size: 10px; padding: 2px 7px; }
-    #start-tip.tip, .tip { font-size: 10.5px; line-height: 1.5; }
+    .medal { font-size:var(--pfs-micro2); padding: 2px 7px; }
+    #start-tip.tip, .tip { font-size:var(--pfs-micro3); line-height: 1.5; }
   }
 
   /* ---------- 极矮横屏（≤400px 高：640×360 / 740×360 这类机型） ----------
@@ -616,18 +623,18 @@
     .life-bank { grid-column: auto; gap: 2px; }
     .life-bank-top { gap: 8px; }
     .life-bank-top .v { font-size: clamp(16px, 4.2vh, 21px); }
-    .life-bank-top .k, .life-quota, .life-cell .k { font-size: 10px; }
+    .life-bank-top .k, .life-quota, .life-cell .k { font-size:var(--pfs-micro2); }
     .life-cell { gap: 1px; }
-    .life-cell .v { font-size: 12px; }
+    .life-cell .v { font-size:var(--pfs-sm); }
     /* 第二栏放「连签 / 战绩」两小块 */
     .life > .life-cell { min-height: 0; }
     .start-card { padding: 8px 12px; row-gap: 4px; }
     .start-card > .title { font-size: clamp(15px, 4.2vh, 20px); }
-    .start-card > .subtitle { font-size: 10.5px; }
+    .start-card > .subtitle { font-size:var(--pfs-micro3); }
     .field { gap: 2px; }
     .seg-btn { min-height: 44px; }
-    #start-tip.tip, .tip { font-size: 10px; line-height: 1.4; }
-    .medal { font-size: 9.5px; padding: 1px 6px; }
+    #start-tip.tip, .tip { font-size:var(--pfs-micro2); line-height: 1.4; }
+    .medal { font-size:var(--pfs-micro); padding: 1px 6px; }
   }
 </style>
 </head>

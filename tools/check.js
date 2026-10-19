@@ -2582,10 +2582,22 @@ async function runBossChecks() {
 			e46.push("势力面板打标器未接线（无 MutationObserver 则打不上标记、样式命不中）");
 		else if (!/cshEgGroupObserve\(on\)/.test(ct46)) e46.push("cshEgScrollApply 未随开关启用/停用打标器");
 		else if (!/group_"\s*\)\s*===\s*0|indexOf\("group_"\)/.test(ct46)) e46.push("打标器缺 link=group_* 兜底判据（标题措辞一变就漏）");
-		/* ④ 礼物价格字号（作者：价格数字字太小了） */
-		const cx46 = fs.readFileSync(path.join(ROOT, "games", "codex.html"), "utf8");
-		const cost46 = (cx46.match(/\.affgifts \.affbtn \.cost\{[^}]*font-size:([\d.]+)px/) || [])[1];
-		if (!cost46 || parseFloat(cost46) < 12.5) e46.push("礼物价格 .cost 字号过小（现 " + (cost46 || "缺") + "px，应 ≥12.5px）");
+		/* ④ 礼物价格字号（作者：价格数字字太小了）
+		   2026-10-20 字号收编后：字面量变成了 var(--pfs-*)，断言改为「解析出实际数值」——
+		   先抓 font-size 声明（字面 px 或 var 引用），var 引用回页内 :root 定义求真值。
+		   同组件同规则：codex 与 goldfish 两处礼物价格都要 ≥12.5px。 */
+		function resolveFs46(src, sel) {
+			const m = src.match(new RegExp(sel.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\{[^}]*font-size:\\s*(?:var\\((--[a-z0-9-]+)\\)|([\\d.]+)px)"));
+			if (!m) return null;
+			if (m[2]) return parseFloat(m[2]);
+			const def = src.match(new RegExp(m[1].replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\s*:\\s*([\\d.]+)px\\s*;"));
+			return def ? parseFloat(def[1]) : null;
+		}
+		for (const f46 of ["games/codex.html", "games/goldfish.html"]) {
+			const cx46 = fs.readFileSync(path.join(ROOT, f46), "utf8");
+			const cost46 = resolveFs46(cx46, ".affgifts .affbtn .cost");
+			if (cost46 == null || cost46 < 12.5) e46.push(f46 + " 礼物价格 .cost 字号过小（现 " + (cost46 == null ? "无法解析" : cost46 + "px") + "，应 ≥12.5px）");
+		}
 		if (e46.length) fail("执行级 E46：在线更新自动化 + 框体分层 + 势力面板第二形态 + 价格字号（" + e46.slice(0, 4).join("；") + "）");
 		else ok("执行级 E46：更新已自动化（内置源 · 检查→确认→逐文件下载→重启）＋ 框体分层在位（牌桌四款统一 gb-table · 金鳞市/妖灵图鉴各具特色）＋ 势力面板两形态全覆盖（.csh-egdlg 打标器）＋ 礼物价格字号达标");
 	}
@@ -2924,6 +2936,13 @@ async function runBossChecks() {
 		if (!/STORE_PARALLEL/.test(dbg51)) e51.push("安装器没有并发下载（几百个文件会一个接一个排队）");
 		if (!/AbortController/.test(dbg51) || !/ctrl\.abort\(\)/.test(dbg51)) e51.push("安装器不可取消");
 		if (!/installedVer\s*\(/.test(dbg51)) e51.push("面板不显示已装版本（装过的还会显示「安装」）");
+		/* 其他扩展 2.0（2026-10-20）：版本对比 + 断点续传 */
+		if (!/function remoteVer\(/.test(dbg51)) e51.push("缺远端版本探测（有新版玩家看不到「更新」）");
+		if (!/cshVerCmp/.test(dbg51)) e51.push("版本对比没走 cshVerCmp（字符串比大小会把 v9 判成比 v10 新）");
+		if (!/RESUME_KEY/.test(dbg51) || !/resumeSave\(/.test(dbg51) || !/resumeLoad\(/.test(dbg51)) e51.push("缺断点续传三件套（RESUME_KEY/resumeSave/resumeLoad）");
+		if (!/storePartial/.test(dbg51)) e51.push("缺内存半成品表 storePartial（续传会把没下载完的包写坏）");
+		if (!/\.upd/.test(dbg51)) e51.push("缺「更新」高亮样式（.upd）");
+		if (!/接着下/.test(dbg51)) e51.push("面板没提示续传（玩家不知道没下完的能接着下）");
 		if (e51.length) fail("执行级 E51：其他扩展货单/安装器（" + e51.slice(0, 4).join("；") + "）");
 		else ok("执行级 E51：其他扩展（货单 " + names51.length + " 条 · 两份清单同名 · 字段完整 · 支持 dir 子目录 / 并发 / 取消 / 已装识别）");
 
@@ -2953,6 +2972,14 @@ async function runBossChecks() {
 			if (!/addGlobalSkill/.test(pa52)) e52.push("未走 addGlobalSkill 注册");
 			const mg52 = fs.readFileSync(path.join(ROOT, "core", "csh_migrate.js"), "utf8");
 			if (!/csh_pool_achv/.test(mg52)) e52.push("存档键 csh_pool_achv 未登记 csh_migrate（E41 会连带报）");
+			/* 发奖对账（2026-10-20）：清档刷奖的漏洞三层防线，一层都不能少 */
+			if (!/csh_pool_achv_pay/.test(pa52)) e52.push("缺独立发奖台账 csh_pool_achv_pay（清主存档就能重领奖励）");
+			if (!/function isPaid\(/.test(pa52) || !/function recordPaid\(/.test(pa52) || !/function reconcile\(/.test(pa52)) e52.push("发奖对账三件套（isPaid/recordPaid/reconcile）不齐");
+			if (!/池子成就\//.test(pa52) || !/ledger/.test(pa52)) e52.push("缺钱包流水反推兜底（台账被清时最后一道防线）");
+			if (!/K_POOL_ACHV_PAY/.test(mg52)) e52.push("台账键 csh_pool_achv_pay 未登记 csh_migrate（导出/导入会丢台账）");
+			const ah52 = fs.existsSync(path.join(ROOT, "games", "achv.html")) ? fs.readFileSync(path.join(ROOT, "games", "achv.html"), "utf8") : "";
+			if (ah52 && !/PA\.isPaid/.test(ah52)) e52.push("成就页领取前没过 isPaid 闸门（清档刷奖漏洞还在）");
+			if (ah52 && !/PA\.recordPaid/.test(ah52)) e52.push("成就页发奖后没写台账 recordPaid");
 			if (!fs.existsSync(path.join(ROOT, "tools", "probe_pool_achv.mjs"))) e52.push("缺 tools/probe_pool_achv.mjs（判定层没有探针就等于没有验证）");
 			const dbgA = fs.readFileSync(path.join(ROOT, "core", "csh_debug.js"), "utf8");
 			/* 2026-10-20 真实事故：成就卡建好了却忘了 appendChild ⇒ 池子世界里那张卡直接不存在，
@@ -2973,6 +3000,124 @@ async function runBossChecks() {
 		}
 		if (e52.length) fail("执行级 E52：池子成就（" + e52.slice(0, 4).join("；") + "）");
 		else ok("执行级 E52：池子成就引擎（" + ids52.length + " 条规则 · id 唯一 · 事件白名单 8 个 · 联机守卫 · 存档已登记 · 探针在位）");
+
+		/* ------------------------------------------------------------------ *
+		 * E53（2026-10-20 · 发版命脉：catalog.js ↔ package.js ↔ 磁盘 三方对账）
+		 * ------------------------------------------------------------------
+		 * 在线更新是按 catalog.js 的 files 清单逐文件下载的。清单漏了新文件，
+		 * 玩家更新完就是残缺版（4.0.7 工作版曾漏了成就引擎两个文件，差点发出去）。
+		 * 这里锁死三件事：
+		 *   ① 三处版本号一致（info.json / package.js / catalog.js）；
+		 *   ② package.js 的 files 条目在磁盘上都存在；
+		 *   ③ catalog.js 的 files 与磁盘实扫结果一一对应（不多不少）。 */
+		const e53 = [];
+		const info53 = JSON.parse(fs.readFileSync(path.join(ROOT, "info.json"), "utf8"));
+		const pkg53 = fs.readFileSync(path.join(ROOT, "package.js"), "utf8");
+		const catPath53 = path.join(ROOT, "catalog.js");
+		const pv53 = (pkg53.match(/version\s*:\s*"([^"]+)"/) || [])[1];
+		if (!pv53) e53.push("package.js 里找不到 version");
+		else if (pv53 !== info53.version) e53.push("版本号不一致：info.json=" + info53.version + "，package.js=" + pv53);
+		const fm53 = pkg53.match(/files\s*:\s*\[([^\]]*)\]/);
+		if (!fm53) e53.push("package.js 里找不到 files 清单");
+		let expect53 = [];
+		if (fm53) {
+			const entries53 = fm53[1].match(/"([^"]+)"/g).map((s) => s.slice(1, -1));
+			const walk53 = (rel) => {
+				const abs = path.join(ROOT, rel);
+				if (!fs.existsSync(abs)) { e53.push("package.js 声明的 " + rel + " 在磁盘上不存在"); return; }
+				const st = fs.statSync(abs);
+				if (st.isFile()) { expect53.push(rel.split(path.sep).join("/")); return; }
+				for (const name of fs.readdirSync(abs).sort()) {
+					if (name === ".git" || name === "catalog.js" || name.endsWith(".zip")) continue;
+					walk53(path.join(rel, name));
+				}
+			};
+			for (const e of entries53) walk53(e);
+			expect53.sort();
+		}
+		if (!fs.existsSync(catPath53)) e53.push("缺 catalog.js（在线更新的入口，必须随包存在）");
+		else {
+			const catRaw53 = fs.readFileSync(catPath53, "utf8");
+			const catJson53 = catRaw53.substring(catRaw53.indexOf("{"), catRaw53.lastIndexOf("}") + 1);
+			let cat53 = null;
+			try { cat53 = JSON.parse(catJson53)["池子魔将"]; } catch (err) { e53.push("catalog.js 解析失败：" + err.message); }
+			if (cat53) {
+				if (cat53.version !== info53.version) e53.push("catalog.js 版本 " + cat53.version + " ≠ info.json " + info53.version + "（发版前必须重跑 tools/release.js）");
+				const catFiles53 = (cat53.files || []).slice().sort();
+				const miss53 = expect53.filter((f) => !catFiles53.includes(f));
+				const extra53 = catFiles53.filter((f) => !expect53.includes(f));
+				if (miss53.length) e53.push("catalog 漏收 " + miss53.length + " 个文件（" + miss53.slice(0, 3).join("、") + (miss53.length > 3 ? " …" : "") + "）——在线更新会丢文件");
+				if (extra53.length) e53.push("catalog 多列 " + extra53.length + " 个文件（" + extra53.slice(0, 3).join("、") + (extra53.length > 3 ? " …" : "") + "）——玩家会下到 404");
+				const nonAscii53 = catFiles53.filter((f) => /[^A-Za-z0-9._\-/]/.test(f));
+				if (nonAscii53.length) e53.push("catalog 里有非 ASCII 文件名 " + nonAscii53.length + " 个（" + nonAscii53.slice(0, 2).join("、") + " …），raw 拼接下载有风险");
+			}
+		}
+		if (e53.length) fail("执行级 E53：发版对账（" + e53.slice(0, 4).join("；") + "）");
+		else ok("执行级 E53：发版对账（版本 " + info53.version + " 三处一致 · catalog " + expect53.length + " 文件与磁盘一一对应）");
+
+		/* ------------------------------------------------------------------ *
+		 * E54（2026-10-20 · 字号标尺：禁止新增裸 font-size:px）
+		 * ------------------------------------------------------------------
+		 * 收编后的格局：
+		 *   宿主文档 UI → var(--csh-lfs-*)（csh_theme.js 统一定义，同值兜底）
+		 *   游戏页     → var(--pfs-*)（页内 :root，与宿主互不污染）
+		 *   内容层     → 技能名艺术字/台词是「内容」不是 UI 标尺，白名单锁存量
+		 * 规则：白名单外的文件出现一个裸 font-size:Npx 就失败；
+		 *       白名单内的文件计数变了也失败（逼你有意识地更新白名单）。 */
+		const e54 = [];
+		const FS_WHITELIST = {
+			"character/index.js": 31, /* 技能名艺术字/称号铭牌——内容层 */
+			"skills/index.js": 7,     /* 技能台词/演出文案——内容层 */
+		};
+		const fsScanDirs = ["core", "games", "main", "hooks", "card", "effect", "mobilefx", "character", "skills"];
+		const fsRe = /font-size\s*:\s*[0-9.]+px/g;
+		const fsSeen = {};
+		for (const d of fsScanDirs) {
+			const dAbs = path.join(ROOT, d);
+			if (!fs.existsSync(dAbs)) continue;
+			const walk54 = (dir) => {
+				for (const name of fs.readdirSync(dir)) {
+					const abs = path.join(dir, name);
+					const st = fs.statSync(abs);
+					if (st.isDirectory()) { walk54(abs); continue; }
+					if (!/\.(js|css|html)$/.test(name)) continue;
+					const rel = path.relative(ROOT, abs).split(path.sep).join("/");
+					const cnt = (fs.readFileSync(abs, "utf8").match(fsRe) || []).length;
+					if (cnt) fsSeen[rel] = cnt;
+				}
+			};
+			walk54(dAbs);
+		}
+		for (const rel in fsSeen) {
+			if (!(rel in FS_WHITELIST)) e54.push(rel + " 出现 " + fsSeen[rel] + " 处裸字号（用 var(--csh-lfs-*) / var(--pfs-*) 收编）");
+			else if (fsSeen[rel] !== FS_WHITELIST[rel]) e54.push(rel + " 裸字号计数 " + fsSeen[rel] + " ≠ 白名单 " + FS_WHITELIST[rel] + "（有增删就更新 E54 白名单并写清理由）");
+		}
+		for (const rel in FS_WHITELIST) {
+			if (!(rel in fsSeen)) e54.push("白名单条目已失效：" + rel + "（裸字号已清零，把这条从 E54 删掉）");
+		}
+		if (e54.length) fail("执行级 E54：字号标尺（" + e54.slice(0, 4).join("；") + "）");
+		else ok("执行级 E54：字号标尺（运行目录零新增裸字号 · 内容层白名单 2 文件 35 处锁定）");
+
+		/* ------------------------------------------------------------------ *
+		 * E55（2026-10-20 · 生涯成就退休层：形态治理的兼容机制）
+		 * ------------------------------------------------------------------
+		 * 治理方案见 docs/career-achv-governance.md。锁三件事：
+		 *   ① RETIRED 机制在位（软下线，不动存档）；
+		 *   ② evalAll 的过滤规则没被改掉（未达成未领取才隐藏）；
+		 *   ③ selfTest 校验 RETIRED 幽灵 key（防笔误退役不存在的条目）。 */
+		const e55 = [];
+		const ach55 = fs.readFileSync(path.join(ROOT, "core", "csh_achv.js"), "utf8");
+		if (!/var RETIRED = \{/.test(ach55)) e55.push("缺 RETIRED 退休表（形态治理没有兼容层）");
+		if (!/retired && !done && !claimedMap\[df\.key\]/.test(ach55)) e55.push("evalAll 退休过滤规则缺失（退休条目不隐藏，减法等于没做）");
+		if (!/RETIRED 指向不存在的 key/.test(ach55)) e55.push("selfTest 没校验 RETIRED 幽灵 key（笔误会静默退役空气）");
+		if (!/function isRetired\(/.test(ach55) || !/isRetired: isRetired/.test(ach55)) e55.push("isRetired 未导出（调用方无法查询退休状态）");
+		/* C 形态（彩蛋/全破/速通）永不退休：这些 key 不允许进 RETIRED */
+		const ret55 = ach55.match(/var RETIRED = \{([\s\S]*?)\n\s*\};/);
+		if (ret55 && /"(?:egg_|boss_series|boss_speed|boss_all|boss_ult|boss_lord|boss_egg)/.test(ret55[1])) e55.push("RETIRED 里有 C 形态条目（彩蛋/全破/速通永不退休，见治理方案 §2.5）");
+		const car55 = fs.readFileSync(path.join(ROOT, "games", "career.html"), "utf8");
+		if (car55 && !/r\.retired/.test(car55)) e55.push("生涯页没有「绝版」标记（玩家看不出退休与普通条目的区别）");
+		if (e55.length) fail("执行级 E55：生涯成就退休层（" + e55.slice(0, 4).join("；") + "）");
+		else ok("执行级 E55：生涯成就退休层（软下线机制在位 · 过滤规则锁死 · 幽灵 key 有校验 · C 形态禁入）");
 	}
 	log("");
 }

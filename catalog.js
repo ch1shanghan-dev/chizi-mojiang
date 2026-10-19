@@ -1,10 +1,10 @@
-/* 自动生成于 2026-10-19T19:13:03.666Z by tools/release.js —— 发版后 git push 即生效，勿手改 files */
+/* 自动生成于 2026-10-19T23:31:14.077Z by tools/release.js —— 发版后 git push 即生效，勿手改 files */
 window.extension = {
 	"池子魔将": {
 		"name": "池子魔将",
 		"author": "池上寒",
-		"intro": "<font color=#c9a84c>版本</font> <font color=#00FFFF>4.0.7</font>",
-		"version": "4.0.7",
+		"intro": "<font color=#c9a84c>版本</font> <font color=#00FFFF>4.0.8</font>",
+		"version": "4.0.8",
 		"date": "2026-10-19",
 		"size": "134.0MB",
 		"forum": "https://github.com/ch1shanghan-dev/chizi-mojiang",

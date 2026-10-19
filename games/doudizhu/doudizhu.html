@@ -51,7 +51,12 @@
     --fs-md: clamp(14px, 1.75vh, 20px);
     --fs-lg: clamp(18px, 2.4vh, 32px);
     --radius: 12px;
-  }
+  
+  /* 字号收编档（2026-10-20）：同值 token 替换裸字号，渲染不变；同档多值待实机测量后并档 */
+  --pfs-micro: 10px;
+  --pfs-micro2: 10.5px;
+  --pfs-cap: 11.5px;
+}
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
   html, body { height: 100%; }
   body {
@@ -418,16 +423,16 @@
     #view-start { padding: 6px 14px; }
     .start-card { gap: 8px; padding: 10px 14px; border-radius: 14px; }
     .start-card > .title { font-size: clamp(16px, 4.4vh, 22px); letter-spacing: 2px; }
-    .start-card > .subtitle { font-size: 10.5px; margin-top: 0; }
+    .start-card > .subtitle { font-size:var(--pfs-micro2); margin-top: 0; }
     .field { gap: 3px; }
-    .field label { font-size: 10.5px; }
+    .field label { font-size:var(--pfs-micro2); }
     .field input { padding: 6px 10px; min-height: 40px; }
     .switch-row { padding: 6px 10px; gap: 8px; }
-    .switch-text b { font-size: 11.5px; }
-    .switch-text em { font-size: 10px; line-height: 1.35; }
+    .switch-text b { font-size:var(--pfs-cap); }
+    .switch-text em { font-size:var(--pfs-micro); line-height: 1.35; }
     .switch-box { width: 38px; height: 21px; }
     #btn-start-game { min-height: 44px; }
-    .start-card > .tip { font-size: 10px; line-height: 1.4; }
+    .start-card > .tip { font-size:var(--pfs-micro); line-height: 1.4; }
   }
 </style>
 </head>

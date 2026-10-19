@@ -38,6 +38,18 @@
   --gold:#d8bd7a; --gold-2:#b08d3e; --line:rgba(216,189,122,.28); --line-2:rgba(216,189,122,.14);
   --warn:#e0863f; --danger:#c1554a; --ok:#8fbf7a;
   --fs:14px; --fs-cap:12px;
+
+  /* 字号收编档（2026-10-20）：同值 token 替换裸字号，渲染不变；同档多值待实机测量后并档 */
+  --pfs-micro: 10.5px;
+  --pfs-cap: 11px;
+  --pfs-cap2: 11.5px;
+  --pfs-sm: 12.5px;
+  --pfs-md: 13px;
+  --pfs-lg: 14px;
+  --pfs-lg2: 15px;
+  --pfs-xl: 18px;
+  --pfs-2xl: 20px;
+  --pfs-2xl2: 24px;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;height:100%;overflow:hidden}
@@ -50,20 +62,20 @@ body{background:
 
 /* ---------- 顶栏 ---------- */
 .topbar{display:flex;align-items:center;gap:10px;min-height:42px;padding-right:200px}
-.brand{font-family:var(--ff-callig);font-size:24px;letter-spacing:.2em;color:var(--gold)}
+.brand{font-family:var(--ff-callig);font-size:var(--pfs-2xl2);letter-spacing:.2em;color:var(--gold)}
 .brand small{font-size:var(--fs-cap);letter-spacing:.1em;color:var(--ink-faint);margin-left:8px;font-family:var(--ff-body)}
-.assets{margin-left:auto;display:flex;gap:8px;font-family:var(--ff-num);font-size:13px;font-variant-numeric:tabular-nums}
+.assets{margin-left:auto;display:flex;gap:8px;font-family:var(--ff-num);font-size:var(--pfs-md);font-variant-numeric:tabular-nums}
 .asset{background:rgba(216,189,122,.10);border:1px solid var(--line-2);border-radius:999px;padding:4px 12px;white-space:nowrap}
 .asset b{color:var(--gold);font-weight:600}
-.asset i{font-style:normal;color:var(--ink-faint);margin-left:4px;font-size:11px}
+.asset i{font-style:normal;color:var(--ink-faint);margin-left:4px;font-size:var(--pfs-cap)}
 
 /* ---------- 唯一滚动区 ---------- */
 /* 铁律：可滚动容器必须显式限高 + overflow。此处 #board 从 flex 列吸收剩余高度。 */
 #board{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;
   overscroll-behavior:contain;padding:2px 2px 4px}
 .card{background:var(--panel);border:1px solid var(--line-2);border-radius:12px;padding:11px 13px;margin:0 0 10px}
-.card h3{margin:0 0 9px;font-size:15px;font-weight:600;letter-spacing:.06em;color:var(--gold);font-family:var(--ff-title)}
-.card h3 span{font-family:var(--ff-body);font-size:11.5px;font-weight:400;color:var(--ink-faint);letter-spacing:.02em;margin-left:8px}
+.card h3{margin:0 0 9px;font-size:var(--pfs-lg2);font-weight:600;letter-spacing:.06em;color:var(--gold);font-family:var(--ff-title)}
+.card h3 span{font-family:var(--ff-body);font-size:var(--pfs-cap2);font-weight:400;color:var(--ink-faint);letter-spacing:.02em;margin-left:8px}
 .card.danger{border-color:rgba(193,85,74,.35)}
 .card.danger h3{color:#e08a80}
 
@@ -71,22 +83,22 @@ body{background:
 .inv{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:4px 14px}
 .iv{display:flex;align-items:baseline;gap:8px;padding:3px 0;border-bottom:1px dashed rgba(216,189,122,.10);min-width:0}
 .iv:last-child{border-bottom:0}
-.iv-k{flex:0 0 74px;font-size:12.5px;color:var(--ink-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.iv-v{flex:0 0 auto;font-family:var(--ff-num);font-variant-numeric:tabular-nums;font-size:13px;color:var(--ink)}
-.iv-x{flex:1 1 auto;min-width:0;font-size:11px;color:var(--ink-faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.iv-k{flex:0 0 74px;font-size:var(--pfs-sm);color:var(--ink-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.iv-v{flex:0 0 auto;font-family:var(--ff-num);font-variant-numeric:tabular-nums;font-size:var(--pfs-md);color:var(--ink)}
+.iv-x{flex:1 1 auto;min-width:0;font-size:var(--pfs-cap);color:var(--ink-faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .iv[data-has="0"] .iv-k{color:var(--ink-faint)}
 .iv[data-has="0"] .iv-v{color:var(--ink-faint)}
-.note{font-size:11.5px;color:var(--ink-faint);margin-top:8px;line-height:1.6}
+.note{font-size:var(--pfs-cap2);color:var(--ink-faint);margin-top:8px;line-height:1.6}
 
 /* ---------- 码区 ---------- */
 textarea{width:100%;min-height:76px;resize:vertical;background:rgba(0,0,0,.28);color:var(--ink);
-  border:1px solid var(--line-2);border-radius:9px;padding:9px 10px;font-family:var(--ff-num);font-size:11.5px;
+  border:1px solid var(--line-2);border-radius:9px;padding:9px 10px;font-family:var(--ff-num);font-size:var(--pfs-cap2);
   line-height:1.5;word-break:break-all}
 textarea::placeholder{color:var(--ink-faint)}
 textarea:focus{outline:none;border-color:var(--line)}
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:34px;padding:0 14px;
   border-radius:9px;border:1px solid var(--line);background:rgba(216,189,122,.10);color:var(--gold);
-  font-family:var(--ff-body);font-size:13px;cursor:pointer;white-space:nowrap}
+  font-family:var(--ff-body);font-size:var(--pfs-md);cursor:pointer;white-space:nowrap}
 .btn:hover{background:rgba(216,189,122,.18)}
 .btn:active{transform:translateY(1px)}
 .btn.ghost{background:transparent;border-color:var(--line-2);color:var(--ink-dim)}
@@ -98,11 +110,11 @@ textarea:focus{outline:none;border-color:var(--line)}
 .rowbtn:first-child{margin-top:0}
 
 /* ---------- 提示 / 差异 ---------- */
-.msg{font-size:12.5px;line-height:1.6;margin-top:9px;color:var(--ink-dim);min-height:1.2em}
+.msg{font-size:var(--pfs-sm);line-height:1.6;margin-top:9px;color:var(--ink-dim);min-height:1.2em}
 .msg.ok{color:var(--ok)} .msg.bad{color:#e59a90} .msg.warn{color:var(--warn)}
 .diff{margin-top:9px;border:1px solid var(--line-2);border-radius:9px;overflow:hidden;display:none}
 .diff.on{display:block}
-.diffrow{display:flex;align-items:baseline;gap:8px;padding:5px 10px;font-size:12.5px;
+.diffrow{display:flex;align-items:baseline;gap:8px;padding:5px 10px;font-size:var(--pfs-sm);
   border-bottom:1px solid rgba(216,189,122,.08)}
 .diffrow:last-child{border-bottom:0}
 .diffrow .dk{flex:0 0 92px;color:var(--ink-dim)}
@@ -112,35 +124,35 @@ textarea:focus{outline:none;border-color:var(--line)}
 .diffrow .arw{color:var(--ink-faint);margin:0 2px}
 .bkrow{display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px dashed rgba(216,189,122,.10)}
 .bkrow:last-child{border-bottom:0}
-.bkrow .bt{flex:0 0 auto;font-size:12.5px;color:var(--ink-dim);font-family:var(--ff-num)}
-.bkrow .bv{flex:1 1 auto;font-size:12.5px;font-family:var(--ff-num);color:var(--gold)}
-.excl{margin-top:9px;font-size:11.5px;color:var(--ink-faint);line-height:1.7}
+.bkrow .bt{flex:0 0 auto;font-size:var(--pfs-sm);color:var(--ink-dim);font-family:var(--ff-num)}
+.bkrow .bv{flex:1 1 auto;font-size:var(--pfs-sm);font-family:var(--ff-num);color:var(--gold)}
+.excl{margin-top:9px;font-size:var(--pfs-cap2);color:var(--ink-faint);line-height:1.7}
 .excl b{color:var(--ink-dim);font-weight:600}
-.foot{font-size:11.5px;color:var(--ink-faint);line-height:1.7;padding:0 2px 2px}
+.foot{font-size:var(--pfs-cap2);color:var(--ink-faint);line-height:1.7;padding:0 2px 2px}
 
 /* ---------- 紧凑档（实机 915×412）----------
    纪律：只按 max-height 判定、只压字号与间距，不藏关键信息。 */
 @media (max-height:640px){
   #app{padding:6px 10px 4px 24px}
-  .brand{font-size:20px}
+  .brand{font-size:var(--pfs-2xl)}
   #board{padding:0}
   .card{padding:9px 11px;margin:0 0 8px}
-  .card h3{font-size:14px;margin:0 0 7px}
+  .card h3{font-size:var(--pfs-lg);margin:0 0 7px}
 }
 @media (max-height:520px){
   .topbar{min-height:34px}
-  .brand{font-size:18px;letter-spacing:.16em}
-  .brand small{font-size:11px;margin-left:6px}
-  .asset{padding:3px 9px;font-size:12px}
+  .brand{font-size:var(--pfs-xl);letter-spacing:.16em}
+  .brand small{font-size:var(--pfs-cap);margin-left:6px}
+  .asset{padding:3px 9px;font-size:var(fs-cap)}
   #app{padding:4px 9px 3px 22px}
   .card{padding:7px 10px;margin:0 0 6px}
-  .card h3{font-size:13px;margin:0 0 6px}
-  .iv{padding:2px 0} .iv-k{flex-basis:66px;font-size:11.5px} .iv-v{font-size:12px} .iv-x{font-size:10.5px}
-  textarea{min-height:56px;font-size:11px;padding:7px 8px}
-  .btn{min-height:30px;font-size:12.5px;padding:0 11px}
-  .msg{font-size:11.5px;margin-top:7px}
-  .diffrow{padding:4px 9px;font-size:11.5px} .diffrow .dk{flex-basis:80px}
-  .foot{margin-top:4px;font-size:11px}
+  .card h3{font-size:var(--pfs-md);margin:0 0 6px}
+  .iv{padding:2px 0} .iv-k{flex-basis:66px;font-size:var(--pfs-cap2)} .iv-v{font-size:var(fs-cap)} .iv-x{font-size:var(--pfs-micro)}
+  textarea{min-height:56px;font-size:var(--pfs-cap);padding:7px 8px}
+  .btn{min-height:30px;font-size:var(--pfs-sm);padding:0 11px}
+  .msg{font-size:var(--pfs-cap2);margin-top:7px}
+  .diffrow{padding:4px 9px;font-size:var(--pfs-cap2)} .diffrow .dk{flex-basis:80px}
+  .foot{margin-top:4px;font-size:var(--pfs-cap)}
 }
 </style>
 </head>

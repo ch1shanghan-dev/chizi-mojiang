@@ -44,6 +44,7 @@
   --fs-menu:calc(var(--fs-base) * 1.44);    /* 18px：菜单（页签） */
   --fs-title:calc(var(--fs-base) * 2.08);   /* 26px：标题（官阶名、面板标题） */
   --fs-display:calc(var(--fs-base) * 2.32); /* 29px：数字牌（全页唯一主角） */
+  --fs-icon:calc(var(--fs-base) * 1.76);    /* 22px：成就图标（收编档，2026-10-20） */
   --fs-xs:var(--fs-cap);--fs-sm:var(--fs-body);--fs-md:var(--fs-lead);--fs-xl:var(--fs-title);
   --st:env(safe-area-inset-top,0px);
   --sb:env(safe-area-inset-bottom,0px);
@@ -281,7 +282,7 @@ html,body{width:100%;height:100%;background:var(--ink-0);color:var(--text);-webk
 .ach{background:var(--ink-1);border:1px solid var(--line);border-radius:var(--r-sm);
   padding:10px 6px;text-align:center;cursor:pointer}
 .ach.on{border-color:var(--gold-line);background:var(--gold-fill)}
-.ach .ico{font-size:22px;line-height:1;margin-bottom:6px;filter:grayscale(1) opacity(.45)}
+.ach .ico{font-size:var(--fs-icon);line-height:1;margin-bottom:6px;filter:grayscale(1) opacity(.45)}
 .ach.on .ico{filter:none}
 .ach span{font-size:var(--fs-cap);color:var(--text-dim)}
 .ach.on span{color:var(--text)}
@@ -1195,7 +1196,7 @@ function renderAch() {
         var bar = el("div", "abar"); var fill = el("i");
         fill.style.width = Math.min(100, Math.round((r.cur / r.goal) * 100)) + "%";
         bar.appendChild(fill); c.appendChild(bar);
-        c.appendChild(el("div", "alab", r.done ? ("已完成 +" + fmt(r.reward)) : (fmt(r.cur) + " / " + fmt(r.goal))));
+        c.appendChild(el("div", "alab", (r.done ? ("已完成 +" + fmt(r.reward)) : (fmt(r.cur) + " / " + fmt(r.goal))) + (r.retired ? " · 绝版" : "")));
         if (r.done) {
           var btn = el("button", "aclaim" + (r.claimed ? " got" : ""), r.claimed ? "已领取" : "领取 +" + fmt(r.reward));
           btn.type = "button";
@@ -1216,7 +1217,7 @@ function renderAch() {
           c.appendChild(btn);
         }
         c.addEventListener("click", function () {
-          $("#ach-note").innerHTML = "<b>" + r.label + "</b>（" + r.cat + "）：" + r.desc +
+          $("#ach-note").innerHTML = "<b>" + r.label + "</b>（" + r.cat + (r.retired ? " · 绝版" : "") + "）：" + r.desc +
             " · 奖励 +" + fmt(r.reward) + " CBY · " +
             (r.claimed ? "已领取" : (r.done ? "可领取" : "进度 " + fmt(r.cur) + " / " + fmt(r.goal)));
         }, false);
