@@ -2917,7 +2917,16 @@ async function runBossChecks() {
 			   这里锁死：gb-achv 卡在 document.createElement 之后、紧随的位置必须 appendChild 到列表。 */
 			if (!/gb-achv/.test(dbgA)) e52.push("csh_debug 里没有池子成就入口卡（gb-achv）");
 			else if (!/classList\.add\("gb-achv"\)[\s\S]{0,400}?list\.appendChild\(ac1\)/.test(dbgA)) e52.push("池子成就卡建了但没 appendChild 到列表（成就页会「消失」——2026-10-20 真实踩过）");
-			if (!fs.existsSync(path.join(ROOT, "games", "achv.html"))) e52.push("缺 games/achv.html 成就页");
+			const achvPath = path.join(ROOT, "games", "achv.html");
+			if (!fs.existsSync(achvPath)) e52.push("缺 games/achv.html 成就页");
+			else {
+				/* 2026-10-20 真实事故：整页划不动。游戏 iframe 里 body 自然滚动会被裁掉，
+				   必须 body 定高 + overflow:hidden，列表自己做唯一滚动容器。 */
+				const ah = fs.readFileSync(achvPath, "utf8");
+				if (!/height:\s*100dvh/.test(ah) || !/overflow:\s*hidden/.test(ah)) e52.push("成就页 body 未定高/未裁切（在 iframe 里会划不动）");
+				if (!/\.list\s*\{[^}]*overflow-y:\s*auto/.test(ah)) e52.push("成就页列表不是滚动容器（.list 缺 overflow-y:auto）");
+				if (!/min-height:\s*0/.test(ah)) e52.push("成就页滚动容器缺 min-height:0（flex 子项不会收缩，滚不动）");
+			}
 		}
 		if (e52.length) fail("执行级 E52：池子成就（" + e52.slice(0, 4).join("；") + "）");
 		else ok("执行级 E52：池子成就引擎（" + ids52.length + " 条规则 · id 唯一 · 事件白名单 8 个 · 联机守卫 · 存档已登记 · 探针在位）");
