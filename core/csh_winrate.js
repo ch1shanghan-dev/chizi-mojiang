@@ -1538,14 +1538,14 @@ function filterBar(){
             try{
                 // 联机禁用入口（与 debug/emote 一致；记录本身也已在联机跳过）
                 if ((typeof _status !== "undefined" && _status.connectMode) || (typeof game !== "undefined" && game.online)) {
-                    alert("胜负统计仅单机可用（联机已禁用）");
+                    noticeWR("胜负统计仅单机可用（联机已禁用）");
                     return;
                 }
                 closePanel();
                 wr.page=0;
                 wr.dialog=makeOverlay(render);
             }catch(e){
-                alert("胜负统计面板打开失败："+((e&&e.message)||e));
+                noticeWR("胜负统计面板打开失败，请重启游戏后再试"); try{console.error(e);}catch(e3){}
             }
         };
         lib.csh_winrate=wr;

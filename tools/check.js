@@ -2830,6 +2830,12 @@ async function runBossChecks() {
 		if (!/\.csh-player \.pl-line > \*\s*\{[^}]*text-overflow\s*:\s*ellipsis/.test(lay50)) e50.push(".pl-line 子项缺省略号兜底（长手牌名会挤掉后面的字）");
 		if (!/\.csh-hudrow \.tb-v\s*\{[^}]*text-overflow\s*:\s*ellipsis/.test(lay50)) e50.push(".csh-hudrow .tb-v 缺省略号兜底");
 		if (!/\.csh-topbar \.tb-k\s*\{[^}]*text-overflow\s*:\s*ellipsis/.test(lay50)) e50.push(".csh-topbar .tb-k 缺省略号兜底");
+		/* 【2026-10-20 三轮自查】设置页/统计页不许弹原生 alert：系统级弹窗会压住整个游戏窗口，
+		   与本扩展的视觉完全脱节（E48 的自绘精神）。兜底只允许显式 `window.alert(`。 */
+		for (const f of ["main/config.js", "core/csh_winrate.js"]) {
+			const src = fs.readFileSync(path.join(ROOT, f), "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
+			if (/(?<![\w.])alert\s*\(/.test(src)) e50.push(f + " 里还有裸 alert（应走自绘 toast）");
+		}
 		if (e50.length) fail("执行级 E50：文案不挤压控件（" + e50.slice(0, 4).join("；") + "）");
 		else ok("执行级 E50：文案不挤压控件（设置项名 ≤14 汉字 · 说明 ≤60 汉字 · 控制条溢出可横滚不切按钮 · 状态/玩家/顶栏省略号兜底）");
 

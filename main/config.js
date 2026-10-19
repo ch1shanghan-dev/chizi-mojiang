@@ -5,6 +5,17 @@
    同一条红线：本文件用到的 noname 绑定必须在本文件 import。 */
 import { lib, game } from "../../../noname.js";
 
+
+/* 【2026-10-20】玩家可见提示统一走自绘 toast（E48 禁原生弹窗）。
+   设置页里弹系统级 alert 会压住整个游戏窗口，且与本扩展的视觉完全脱节。
+   toast 不可用时才回退原生 —— 兜底用 window.alert 明确写死，避免下面的全局替换回头命中自己。 */
+function notice(msg) {
+    try {
+        if (lib.cshUI && typeof lib.cshUI.toast === "function") { lib.cshUI.toast(msg, { skin: "paper" }); return; }
+    } catch (eT) {}
+    try { window.alert(msg); } catch (eA) {}
+}
+
 export const cshConfig = {
             /* ===== 顶部：仅次于版本号的两个面板入口 ===== 
              * 顺序即渲染顺序。两项都是 clear:true 的纯按钮，不占配置值。
@@ -16,10 +27,10 @@ export const cshConfig = {
                    主菜单点按钮时若尚未加载，这里现场拉起再打开；失败才回落到提示。 */
                 if(lib.csh_winrate && typeof lib.csh_winrate.open==="function"){ lib.csh_winrate.open(); return false; }
                 if(typeof lib.__cshLoadWinrate==="function"){
-                    lib.__cshLoadWinrate().then(function(){ try{ lib.csh_winrate.open(); }catch(e){ console.error(e); alert("胜负统计打开失败，请重启游戏后再试"); } }).catch(function(e){ console.error(e); alert("胜负统计没能打开，请重启游戏后再试"); });
+                    lib.__cshLoadWinrate().then(function(){ try{ lib.csh_winrate.open(); }catch(e){ console.error(e); notice("胜负统计打开失败，请重启游戏后再试"); } }).catch(function(e){ console.error(e); notice("胜负统计没能打开，请重启游戏后再试"); });
                     return false;
                 }
-                alert("胜负统计没能打开，请重启游戏后再试"); return false;
+                notice("胜负统计没能打开，请重启游戏后再试"); return false;
             }},
             /* 【2026-10-02】玩家侧休闲入口。此前 5 个小游戏**只能**从调试面板的
                「池子休闲」页签进入，而那是开发者工具、入口又在横滚页签条第 11 枚，
@@ -30,12 +41,12 @@ export const cshConfig = {
                    注意先查 openLobby（懒加载桩阶段 lib.cshDebug 只有诊断转发桩）。 */
                 if(lib.cshDebug && typeof lib.cshDebug.openLobby==="function"){ lib.cshDebug.openLobby(); return false; }
                 if(typeof lib.__cshLoadDebug==="function"){
-                    lib.__cshLoadDebug().then(function(){ try{ lib.cshDebug.openLobby(); }catch(e){ console.error(e); alert("池子世界打开失败，请重启游戏后再试"); } }).catch(function(e){ console.error(e); alert("池子世界没能打开，请重启游戏后再试"); });
+                    lib.__cshLoadDebug().then(function(){ try{ lib.cshDebug.openLobby(); }catch(e){ console.error(e); notice("池子世界打开失败，请重启游戏后再试"); } }).catch(function(e){ console.error(e); notice("池子世界没能打开，请重启游戏后再试"); });
                     return false;
                 }
-                alert("池子世界没能打开，请重启游戏后再试"); return false;
+                notice("池子世界没能打开，请重启游戏后再试"); return false;
             }},
-            "csh_interact_panel":{"name":"<span class=\"csh-cfg-btn\">局内互动</span>","intro":"设置局内互动：总开关、互动频率、附带台词。联机不可用。","clear":true,"onclick":function(){ if(!lib.cshInteract||typeof lib.cshInteract.openPanel!=="function"){ alert("局内互动没能打开，请重启游戏后再试"); return false; } lib.cshInteract.openPanel(); return false; }},
+            "csh_interact_panel":{"name":"<span class=\"csh-cfg-btn\">局内互动</span>","intro":"设置局内互动：总开关、互动频率、附带台词。联机不可用。","clear":true,"onclick":function(){ if(!lib.cshInteract||typeof lib.cshInteract.openPanel!=="function"){ notice("局内互动没能打开，请重启游戏后再试"); return false; } lib.cshInteract.openPanel(); return false; }},
             /* ===== 功能开关 ===== */
             "csh_effect_announce":{"name":"伤害/击杀/回复播报","intro":"开启后播放伤害、连杀、回复的播报与音效。与其他特效扩展冲突时关掉。","init":false},
             /* 【2026-10-05】默认关闭化：调试悬浮球默认不再开启（老玩家已保存的选择不受影响）。 */
@@ -79,17 +90,17 @@ export const cshConfig = {
             "csh_check_update":{"name":"<span class=\"csh-cfg-btn\">检查更新</span>","intro":"检查并在线更新到最新版，完成后自动重启。","clear":true,"onclick":function(){
                 if(lib.cshDebug && typeof lib.cshDebug.checkUpdate==="function"){ lib.cshDebug.checkUpdate(); return false; }
                 if(typeof lib.__cshLoadDebug==="function"){
-                    lib.__cshLoadDebug().then(function(){ try{ lib.cshDebug.checkUpdate(); }catch(e){ console.error(e); alert("检查更新打开失败，请重启游戏后再试"); } }).catch(function(e){ console.error(e); alert("检查更新没能打开，请重启游戏后再试"); });
+                    lib.__cshLoadDebug().then(function(){ try{ lib.cshDebug.checkUpdate(); }catch(e){ console.error(e); notice("检查更新打开失败，请重启游戏后再试"); } }).catch(function(e){ console.error(e); notice("检查更新没能打开，请重启游戏后再试"); });
                     return false;
                 }
-                alert("检查更新没能打开，请重启游戏后再试"); return false;
+                notice("检查更新没能打开，请重启游戏后再试"); return false;
             }},
             "csh_extstore":{"name":"<span class=\"csh-cfg-btn\">其他扩展</span>","intro":"安装精选的其他扩展（武将包 / 功能扩展）。","clear":true,"onclick":function(){
                 if(lib.cshDebug && typeof lib.cshDebug.openExtStore==="function"){ lib.cshDebug.openExtStore(); return false; }
                 if(typeof lib.__cshLoadDebug==="function"){
-                    lib.__cshLoadDebug().then(function(){ try{ lib.cshDebug.openExtStore(); }catch(e){ console.error(e); alert("其他扩展打开失败，请重启游戏后再试"); } }).catch(function(e){ console.error(e); alert("其他扩展没能打开，请重启游戏后再试"); });
+                    lib.__cshLoadDebug().then(function(){ try{ lib.cshDebug.openExtStore(); }catch(e){ console.error(e); notice("其他扩展打开失败，请重启游戏后再试"); } }).catch(function(e){ console.error(e); notice("其他扩展没能打开，请重启游戏后再试"); });
                     return false;
                 }
-                alert("其他扩展没能打开，请重启游戏后再试"); return false;
+                notice("其他扩展没能打开，请重启游戏后再试"); return false;
             }}
         };
