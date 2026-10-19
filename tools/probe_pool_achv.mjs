@@ -51,7 +51,7 @@ function run(mode, opt) {
 console.log("== 1. 规则表自检 ==");
 const st = PA.selfTest();
 ok("selfTest 通过", st.ok, st.errors.join("; "));
-ok("规则 60 条", st.total === 60, "实际 " + st.total);
+ok("规则 80 条", st.total === 80, "实际 " + st.total);
 ok("事件白名单 8 个", Object.keys(PA.EVENTS).length === 8);
 
 console.log("\n== 2. 单条判定（正例 / 反例） ==");
@@ -191,7 +191,7 @@ console.log("\n== 9. 存档 ==");
 	PA.unlock("op_one_slash", "identity");
 	ok("再次达成累加次数", PA.load().got["op_one_slash"].n === 2);
 	const cs = PA.claimState();
-	ok("claimState 计数", cs.got === 1 && cs.total === 60, JSON.stringify(cs));
+	ok("claimState 计数", cs.got === 1 && cs.total === 80, JSON.stringify(cs));
 	ok("未读计数", cs.unread === 1);
 }
 
@@ -225,6 +225,21 @@ console.log("\n== 10. 跨局累计与技能成就 ==");
 	const a = run("identity", { meChars: ["x"] });
 	const hit = pump(a, { t: "over", win: false, turns: 5, survivors: 3, ident: { 0: "zhu", 1: "fan" } });
 	ok("输了不判本命（反例）", !hit.includes("gen_main"), hit.join(","));
+}
+
+console.log("\n== 11. 两个已修的计数口径 ==");
+{
+	const a = run("identity");
+	pump(a, { t: "turn", seat: 0 });
+	pump(a, { t: "turn", seat: 1 });
+	pump(a, { t: "turn", seat: 2 });
+	ok("回合数按全场推进（3 人各 1 回合 = 3）", a.turn === 3, "实际 " + a.turn);
+}
+{
+	const a = run("identity");
+	pump(a, { t: "useCard", seat: 0, name: "杀", targets: 1, handAfter: 5, before: 1 });
+	const hit = pump(a, { t: "over", win: true, turns: 4, survivors: 3, hand: 0, ident: { 0: "zhu", 1: "fan" } });
+	ok("获胜手牌以 over.hand 为准（0 张）", hit.includes("op_empty_win"), hit.join(","));
 }
 
 console.log("\n----------------------------------------");

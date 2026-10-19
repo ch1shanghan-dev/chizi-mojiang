@@ -223,6 +223,64 @@
 			test: function (c, a) { return a.emptyHandTurnsMax >= 2; } },
 		{ id: "md_butcher", name: "屠戮", cat: "操作", rare: 3, modes: [], on: ["over"],
 			desc: "单局击破 4 名角色", test: function (c, a) { return a.kills >= 4; } },
+
+		/* ---------- 扩展第二批 20 条（2026-10-20 · 作者：成就再尽可能多做点） ---------- */
+		{ id: "op_hit5", name: "一击定音", cat: "操作", rare: 2, modes: [], on: ["damage"],
+			desc: "单次造成 5 点或以上伤害", test: function (c) { return c.num >= 5; } },
+		{ id: "op_cards4", name: "连珠", cat: "操作", rare: 1, modes: [], on: ["over"],
+			desc: "单回合使用 4 张或更多牌", test: function (c, a) { return a.cardsTurnMax >= 4; } },
+		{ id: "op_cards50", name: "千锤百炼", cat: "操作", rare: 2, modes: [], on: ["over"],
+			desc: "单局累计使用 50 张牌", test: function (c, a) { return (a.cardsTotal || 0) >= 50; } },
+		{ id: "op_judge8", name: "判官", cat: "操作", rare: 3, modes: [], on: ["over"],
+			desc: "单局判定 8 次以上", test: function (c, a) { return a.judgeTotal >= 8; } },
+		{ id: "op_veteran", name: "老练", cat: "操作", rare: 1, modes: [], on: ["over"],
+			desc: "单局打到第 15 个回合", test: function (c, a) { return a.turn >= 15; } },
+		{ id: "cb_kill1", name: "杀伐果断", cat: "连击", rare: 1, modes: [], on: ["die"],
+			desc: "完成一次击破", test: function (c, a) { return a.kills >= 1; } },
+		{ id: "cb_kill5", name: "五连斩", cat: "连击", rare: 3, modes: [], on: ["over"],
+			desc: "单局击破 5 名角色", test: function (c, a) { return a.kills >= 5; } },
+		{ id: "cb_dmg6", name: "四进四出", cat: "连击", rare: 3, modes: [], on: ["over"],
+			desc: "连续 6 个回合造成伤害", test: function (c, a) { return a.dmgTurnsInRowMax >= 6; } },
+		{ id: "cb_kinds4", name: "三技同辉", cat: "连击", rare: 3, modes: [], on: ["over"],
+			desc: "单局发动 4 个不同技能",
+			test: function (c, a) { return Object.keys(a.skillUseCount || {}).length >= 4; } },
+		{ id: "ad_bloody", name: "血染战袍", cat: "逆境", rare: 2, modes: [], on: ["over"],
+			desc: "整局累计受伤 10 点以上仍获胜",
+			test: function (c, a) { return c.win && a.hurt >= 10; } },
+		{ id: "ad_endure", name: "苟活", cat: "逆境", rare: 2, modes: [], on: ["over"],
+			desc: "体力降到过 2 以下，仍打满 20 个回合",
+			test: function (c, a) { return a.hpMin <= 2 && a.turn >= 20; } },
+		{ id: "md_landlord_win", name: "地主威武", cat: "模式", rare: 1, modes: ["doudizhu"], on: ["over"],
+			desc: "以地主身份获胜",
+			test: function (c, a) { return c.win && a.isLandlord === true; } },
+		{ id: "md_farmer_win", name: "农民起义", cat: "模式", rare: 1, modes: ["doudizhu"], on: ["over"],
+			desc: "以农民身份获胜",
+			test: function (c, a) { return c.win && a.isLandlord === false; } },
+		{ id: "md_fan_slayer", name: "反贼克星", cat: "模式", rare: 1, modes: ["identity"], on: ["die"],
+			desc: "击破一名反贼",
+			test: function (c, a) { return (a.killByRole.fan || 0) >= 1; } },
+		{ id: "md_spy_win", name: "内奸之谋", cat: "模式", rare: 2, modes: ["identity"], on: ["over"],
+			desc: "以內奸身份获胜",
+			test: function (c, a) { return c.win && a.meIdentity === "nei"; } },
+		{ id: "md_versus_king", name: "对决之王", cat: "模式", rare: 2, modes: ["versus"], on: ["over"],
+			desc: "对决模式获胜并击破 2 人",
+			test: function (c, a) { return c.win && a.kills >= 2; } },
+		{ id: "gen_hundred_win", name: "百战", cat: "武将", rare: 3, modes: [], on: ["over"],
+			desc: "同一名武将累计获胜 50 次",
+			test: function (c, a) { return c.win && a.charWins >= 50; } },
+		{ id: "gen_twenty_chars", name: "二十将", cat: "武将", rare: 2, modes: [], on: ["over"],
+			desc: "用 20 名不同武将各赢过至少 1 局",
+			test: function (c, a) { return c.win && a.distinctWins >= 20; } },
+		{ id: "op_skill_master", name: "炉火纯青", cat: "武将", rare: 3, modes: [], on: ["over"],
+			desc: "同一个技能单局发动 4 次",
+			test: function (c, a) {
+				var m = 0, k;
+				for (k in (a.skillUseCount || {})) if (a.skillUseCount[k] > m) m = a.skillUseCount[k];
+				return m >= 4;
+			} },
+		{ id: "ad_clutch", name: "险胜", cat: "逆境", rare: 3, modes: [], on: ["over"],
+			desc: "获胜时只剩 1 名对手存活",
+			test: function (c, a) { return c.win && c.survivors === 2; } },
 	];
 
 	/* 索引：事件 → 规则（只跑相关规则，别让每次事件都扫全表） */
@@ -250,7 +308,7 @@
 			seatCount: meta.seatCount || 0,
 			/* 回合与出牌 */
 			turn: 0, cardsTurn: 0, cardsTurnMax: 0, cardsTotal: 0,
-			handAtWin: -1, handMin: 99,
+			handAtWin: -1, handMin: 99, lastHandPrev: null,
 			emptyHandTurns: 0, emptyHandTurnsMax: 0,
 			handUp: 0, handUpMax: 0, lastHandEnd: -1,
 			/* 伤害与击破 */
@@ -313,7 +371,9 @@
 		if (!a || !ev) return;
 		switch (ev.t) {
 			case "turn":
-				if (ev.seat === a.meSeat) bumpTurn(a);
+				/* 【2026-10-20 修】原来只在"我的回合"才推进 ⇒ a.turn 实际是"我行动过几次"，
+				   一局通常 5~10 次，「打满 20 回合」永远达不成。回合是全场节拍，谁开始都算。 */
+				bumpTurn(a);
 				break;
 			case "useCard":
 				if (ev.seat === a.meSeat) {
@@ -399,7 +459,8 @@
 	/* 结算前把派生量算出来（都是纯算术，无副作用） */
 	function finalize(a, ev) {
 		a.survivors = ev.survivors == null ? 0 : ev.survivors;
-		a.handAtWin = a.lastHandEnd;
+		/* 优先用引擎给的真实手牌数；拿不到才回落到"最后一次出牌后"的记录 */
+		a.handAtWin = (ev.hand != null) ? ev.hand : a.lastHandEnd;
 		if (ev.ident) {
 			var landlord = ev.landlordSeat;
 			a.isLandlord = (landlord == null) ? null : (landlord === a.meSeat);
@@ -621,6 +682,7 @@
 						t: "over", win: win, turns: run.turn,
 						survivors: (game.players || []).filter(function (p) { try { return p.isAlive(); } catch (e) { return false; } }).length,
 						ident: ident, landlordSeat: landlord,
+						hand: (function () { try { return me.countCards("h"); } catch (eH) { return null; } })(),
 					});
 					/* 落盘跨局累计（只记胜场；赢了才 +1） */
 					try {

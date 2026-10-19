@@ -186,7 +186,7 @@
   var CATS = ["操作", "连击", "逆境", "模式", "武将"];
   var CAT_ICO = { "操作": "⚔", "连击": "🔥", "逆境": "🛡", "模式": "🎴", "武将": "🧝" };
   var RARE_NAME = { 1: "普通", 2: "稀有", 3: "史诗" };
-  var RARE_REWARD = { 1: { pc: 200, merit: 1 }, 2: { pc: 800, merit: 3 }, 3: { pc: 3000, merit: 8 } };
+  var RARE_REWARD = { 1: { pc: 500, merit: 5 }, 2: { pc: 1500, merit: 15 }, 3: { pc: 5000, merit: 40 } };
 
   var state = { cat: "全部", only: "全部" };   /* 全部 / 已解锁 / 未解锁 */
   var store = PA.load();
@@ -367,17 +367,27 @@
     store = PA.load();
     if (store.seen[r.id]) return;
     var rw = RARE_REWARD[r.rare];
-    var paid = false;
+    var paid = false, meritPaid = false;
     try {
       var W = (window.CSH && window.CSH.wallet) || null;
       if (W && typeof W.addPC === "function") { W.addPC(rw.pc, "池子成就/" + r.name); paid = true; }
-      var R = (window.CSH && window.CSH.rank) || null;
-      if (R && typeof R.addMerit === "function") R.addMerit(rw.merit, "池子成就/" + r.name);
     } catch (e) {}
+    try {
+      var R = (window.CSH && window.CSH.rank) || null;
+      if (R && typeof R.addMerit === "function") { R.addMerit(rw.merit, "池子成就/" + r.name); meritPaid = true; }
+    } catch (e2) {}
+    /* 【2026-10-20 修】以前不管发没发出去都写 seen —— 钱包不可用时奖励就永久丢了。
+       现在：只有池子币真的入账才标记已领；否则保留可领状态并提示（宁可重复点，不可吞奖励）。 */
+    if (!paid) {
+      var b0 = document.getElementById("dClaim");
+      b0.textContent = "钱包未就绪，请回主界面再领";
+      return;
+    }
     store.seen[r.id] = 1;
     PA.save(store);
-    document.getElementById("dClaim").disabled = true;
-    document.getElementById("dClaim").textContent = paid ? "已领取" : "已记录";
+    var b1 = document.getElementById("dClaim");
+    b1.disabled = true;
+    b1.textContent = meritPaid ? "已领取" : "已领取（功勋未记账）";
     paintHead();
   });
 
@@ -390,11 +400,24 @@
   document.getElementById("back").addEventListener("click", function () {
     try { history.back(); } catch (e) {}
   });
-  document.getElementById("reset").addEventListener("click", function () {
-    if (!confirm("确定要清空池子成就的全部进度吗？这个操作不可撤销。")) return;
-    PA.save({ v: PA.VER, got: {}, seen: {} });
+  function doReset() {
+    PA.save({ v: PA.VER, got: {}, seen: {}, chars: {} });
     store = PA.load();
     paintHead(); paintList();
+  }
+  document.getElementById("reset").addEventListener("click", function () {
+    /* 项目规范：不许用原生 confirm（E48）。宿主有自绘 UI 就用它，没有才回退。 */
+    var host = null;
+    try { host = (window.parent && window.parent.lib && window.parent.lib.cshUI) || null; } catch (e) {}
+    if (host && typeof host.confirm === "function") {
+      host.confirm({
+        title: "重置池子成就",
+        message: "会清空全部解锁记录与武将胜场累计，不可撤销。",
+        ok: "清空", cancel: "算了", danger: true
+      }, function (ok) { if (ok) doReset(); });
+      return;
+    }
+    if (confirm("确定要清空池子成就的全部进度吗？这个操作不可撤销。")) doReset();
   });
   document.addEventListener("keydown", function (e) {
     if (e.key === "Escape") closeSheet();
