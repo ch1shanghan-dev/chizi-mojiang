@@ -2688,6 +2688,15 @@ async function runBossChecks() {
 		else if (!/function updateBases\s*\(/.test(db48)) e48.push("更新下载未做逐文件多源回退（单源挂 = 整批挂）");
 		else if (/game\.multiDownload/.test(db48)) e48.push("仍在用 game.multiDownload（onfinish 无条件触发 → 失败也会重启）");
 		else if (!/failed\.push/.test(db48) || !/finishAll/.test(db48)) e48.push("更新缺失败清单（失败必须列出并不重启）");
+		/* 2026-10-19 三个回归点（都是玩家端真实踩到的）：
+		   ① 源必须「并列摆出来」而不是串行试探（作者：所有可选源都列出来）；
+		   ② 本机版本必须以包内/info.json 为准 —— `extension_<名>_version` 只在「从网址安装」时写一次，
+		      排在第一位会让已更新的机器永远显示旧版本、反复全量重下；
+		   ③ 更新成功后必须把版本号写回，否则下一次检查又报「有新版本」。 */
+		else if (!/CSH_UPDATE_SOURCES/.test(db48) || !/function cshProbeAll\s*\(/.test(db48) || !/function renderSources\s*\(/.test(db48)) e48.push("更新源未并列展示（并发探测 + 可点选）");
+		else if (!/var diskVer\s*=/.test(db48) || !/localVer = diskVer \|\|/.test(db48)) e48.push("本机版本仍以 lib.config 记录为准（已手动更新的机器会永远显示旧版本）");
+		else if (!/_version", remoteVer\)|_version", remoteVer/.test(db48)) e48.push("更新成功后未写回版本号（下次检查仍报有新版本）");
+		else if (/"https:\/\/raw\.gitmirror\.com/.test(db48)) e48.push("更新源仍含已停止解析的 raw.gitmirror.com");
 		const rk48 = fs.readFileSync(path.join(ROOT, "games", "rank.html"), "utf8");
 		if (!/RANK_CACHE_KEY\s*=\s*"csh_rank_cache_v1"/.test(rk48)) e48.push("天下榜缺榜单缓存键");
 		else if (!/function cacheWrite\s*\(/.test(rk48) || !/cacheWrite\(\)/.test(rk48)) e48.push("天下榜未写缓存");
@@ -2710,7 +2719,7 @@ async function runBossChecks() {
 			else if (/innerHeight\s*<=\s*480\)\s*\?\s*2\s*:\s*3/.test(t)) e48.push(f + " 仍留着 2/3 魔数（应交给 toastCap）");
 		}
 		if (e48.length) fail("执行级 E48：界面基座/网络容灾（" + e48.slice(0, 4).join("；") + "）");
-		else ok("执行级 E48：界面基座在位（documentElement · 唯一 toast · 合并排队 · confirm 自绘）＋ 更新三源容灾（超时/镜像/缓存）＋ 榜单缓存先上屏（4.5s）");
+		else ok("执行级 E48：界面基座在位（documentElement · 唯一 toast · 合并排队 · confirm 自绘）＋ 更新多源并列容灾（并发探测/逐文件换源/版本写回/离线缓存）＋ 榜单缓存先上屏（4.5s）");
 	}
 
 	/* E49（2026-10-18 · 神武将选势力 · 第四版）：

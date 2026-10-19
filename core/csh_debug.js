@@ -6912,7 +6912,11 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
         var CSH_UPDATE_MIRRORS = [
             "https://cdn.jsdelivr.net/gh/ch1shanghan-dev/chizi-mojiang@main/",
             "https://fastly.jsdelivr.net/gh/ch1shanghan-dev/chizi-mojiang@main/",
-            "https://raw.gitmirror.com/ch1shanghan-dev/chizi-mojiang/main/",
+            /* 2026-10-19 实测替换：原第三源 raw.gitmirror.com 已停止解析（curl 000，连 DNS 都不通），
+               换成本次逐个测过的两个 raw 反向代理（同一文件 480304 字节逐字节一致）。
+               它们的形态是「前缀 + 完整 raw URL」，所以 base 里带两段 http。 */
+            "https://ghproxy.net/https://raw.githubusercontent.com/ch1shanghan-dev/chizi-mojiang/main/",
+            "https://gh-proxy.com/https://raw.githubusercontent.com/ch1shanghan-dev/chizi-mojiang/main/",
         ];
         /* ---------- 源清单并列展示（2026-10-19 · 作者：把所有可选源列出来，别一个个试） ----------
            旧实现：固定顺序「官方 2.6s → 再镜像 3.5s」串行试探，谁先回用谁；国内 raw 常年不通，
@@ -6925,7 +6929,8 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
             { name: "GitHub 官方", base: CSH_UPDATE_SRC },
             { name: "jsDelivr CDN", base: CSH_UPDATE_MIRRORS[0] },
             { name: "jsDelivr (fastly)", base: CSH_UPDATE_MIRRORS[1] },
-            { name: "GitMirror 镜像", base: CSH_UPDATE_MIRRORS[2] },
+            { name: "ghproxy 代理", base: CSH_UPDATE_MIRRORS[2] },
+            { name: "gh-proxy 代理", base: CSH_UPDATE_MIRRORS[3] },
         ];
         function cshProbeAll(msEach) {
             return Promise.all(CSH_UPDATE_SOURCES.map(function (s) {
@@ -7126,10 +7131,29 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
             closeBtn.addEventListener("click", kill, false);
             row.appendChild(closeBtn);
 
+            /* ---------- 本机版本：以「磁盘上的 info.json/package.js」为准 ----------
+               `extension_<名>_version` 这个键**只由引擎的「从网址安装扩展」写一次**
+               （exetensionMenu.js:2436），玩家手动替换文件夹、或本扩展自己在线更新完，
+               它都不会刷新。旧实现把它排在第一位，于是手机端出现「明明已经 4.0.7 了，
+               面板仍显示当前 4.0.6、每次都提示有新版、每次都把代码全量重下一遍」。
+               现在改成：包内版本（lib.extensionPack，随 info.json 走）优先，config 只兜底。 */
             var localVer = "";
             try {
-                localVer = lib.config["extension_池子魔将_version"] ||
-                    (lib.extensionPack && lib.extensionPack["池子魔将"] && lib.extensionPack["池子魔将"].version) || "";
+                var diskVer = "";
+                if (lib.extensionPack && lib.extensionPack["池子魔将"] && lib.extensionPack["池子魔将"].version) {
+                    diskVer = String(lib.extensionPack["池子魔将"].version);
+                }
+                /* 打包环境里能摸到 fs 就再校一次 info.json，防止 extensionPack 被缓存成旧值 */
+                try {
+                    if (lib.node && lib.node.fs && lib.node.path) {
+                        var _root = resolveExtRoot();
+                        if (_root) {
+                            var _ij = JSON.parse(String(lib.node.fs.readFileSync(lib.node.path.join(_root, "info.json"), "utf-8")));
+                            if (_ij && _ij.version) diskVer = String(_ij.version);
+                        }
+                    }
+                } catch (eFs) {}
+                localVer = diskVer || lib.config["extension_池子魔将_version"] || "";
             } catch (eV) {}
 
             /* ---------- 源列表渲染：并发探测的结果一次性摆出来 ---------- */
@@ -7336,6 +7360,21 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                             return;
                         }
                         status.textContent = "更新完成（" + doneCnt + " 个文件），正在重启游戏…";
+                        /* 版本号写回：引擎那只在「从网址安装」时写一次，本扩展更新完必须自己补。
+                           不补的后果是下一次检查仍报「有新版本」，玩家被反复要求更新、
+                           代码文件被全量重下一遍（面板里的 4.0.6 就是这么来的）。 */
+                        try {
+                            if (typeof game !== "undefined" && typeof game.saveConfig === "function" && remoteVer) {
+                                game.saveConfig("extension_" + EXT_DIR_NAME + "_version", remoteVer);
+                            }
+                        } catch (eSV) {
+                            try { if (lib.config) lib.config["extension_" + EXT_DIR_NAME + "_version"] = remoteVer; } catch (eSV2) {}
+                        }
+                        try {
+                            if (lib.extensionPack && lib.extensionPack[EXT_DIR_NAME]) {
+                                lib.extensionPack[EXT_DIR_NAME].version = remoteVer;
+                            }
+                        } catch (eEP) {}
                         setTimeout(function () { try { game.reload(); } catch (eR) { location.reload(); } }, 1200);
                     }
                     function pump() {
