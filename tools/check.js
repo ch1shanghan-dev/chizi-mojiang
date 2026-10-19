@@ -2782,8 +2782,10 @@ async function runBossChecks() {
 		if (!/"csh_kami_group"\s*:\s*\{/.test(cfg49)) e49.push("设置页缺「神将选势力」开关");
 		else if (!/"csh_kami_group"\s*:\s*\{[^}]*"init"\s*:\s*false/.test(cfg49)) e49.push("「神将选势力」默认值不是 false（作者定案：默认关闭）");
 		else if (!/"csh_kami_group"\s*:\s*\{[^}]*saveExtensionConfig\("池子魔将",\s*"csh_kami_group"/.test(cfg49)) e49.push("开关 onclick 未落盘（引擎对自定义 onclick 不代存，会每次回落到默认值）");
-		/* 下游项的文案必须说清"它不管弹不弹" —— 作者已经因为这一点困惑过一次 */
-		else if (!/csh_eg_group_scroll[^}]*不是「弹不弹」/.test(cfg49)) e49.push("下游项（尺寸自适应）文案未说清「它不管弹不弹」（会让人以为关了就不弹）");
+		/* 下游项的文案必须让人看出「它只管尺寸、不管弹不弹」。
+		   2026-10-19 起不再要求字面写「不是弹不弹」—— 作者要求玩家说明文案精简，
+		   改判「有没有尺寸语义」（放不下 / 滚动 / 宽度），语义对了就够了。 */
+		else if (!/csh_eg_group_scroll[^}]*放不下/.test(cfg49) || !/csh_eg_group_scroll[^}]*滚动/.test(cfg49)) e49.push("下游项（尺寸自适应）文案未体现「只管放得下 / 滚得动」（会让人以为关了就不弹）");
 		const ct49 = fs.readFileSync(path.join(ROOT, "main", "content.js"), "utf8");
 		if (!/installKamiChoice\(\)/.test(ct49)) e49.push("content 未调用 installKamiChoice");
 		else if (!/import\s*\{[^}]*installKamiChoice[^}]*\}\s*from\s*"\.\.\/core\/csh_rules\.js"/.test(ct49)) e49.push("content 未从 core/csh_rules.js 引入");
@@ -2802,6 +2804,7 @@ async function runBossChecks() {
 		 *   ③ ④ 状态行/玩家行/顶栏的省略号兜底，防止半截字露在相邻项边上。 */
 		const e50 = [];
 		const WIDTH_BUDGET = 28;   /* 28 半角宽 = 14 个汉字 */
+		const INTRO_BUDGET = 120;  /* 120 半角宽 = 60 汉字：提示框只有 170px 宽，再长就成一条竖着的长条 */
 		for (const line of cfg49.split(/\r?\n/)) {
 			const k = line.match(/"([A-Za-z0-9_]+)"\s*:\s*\{/);
 			const n = line.match(/"name"\s*:\s*"((?:[^"\\]|\\.)*)"/);
@@ -2810,6 +2813,14 @@ async function runBossChecks() {
 			let w = 0;
 			for (const ch of plain) w += ch.charCodeAt(0) > 127 ? 2 : 1;
 			if (w > WIDTH_BUDGET) e50.push("设置项 " + k[1] + " 名过长（" + w + " 半角宽 > " + WIDTH_BUDGET + "）：「" + plain + "」");
+			/* 说明文字：玩家在提示框里读，只留「做什么 / 何时开」，不写实现与来龙去脉 */
+			const it = line.match(/"intro"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+			if (it) {
+				const ip = it[1].replace(/<[^>]+>/g, "").replace(/\\"/g, '"');
+				let iw = 0;
+				for (const ch of ip) iw += ch.charCodeAt(0) > 127 ? 2 : 1;
+				if (iw > INTRO_BUDGET) e50.push("设置项 " + k[1] + " 说明过长（" + iw + " 半角宽 > " + INTRO_BUDGET + "，提示框里要拖很久）");
+			}
 		}
 		/* 注释里会写「旧写法只 overflow:hidden」这类说明，先剥注释再断言，否则自己误伤自己 */
 		const lay50 = fs.readFileSync(path.join(ROOT, "core", "csh_layout.css"), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
@@ -2820,7 +2831,7 @@ async function runBossChecks() {
 		if (!/\.csh-hudrow \.tb-v\s*\{[^}]*text-overflow\s*:\s*ellipsis/.test(lay50)) e50.push(".csh-hudrow .tb-v 缺省略号兜底");
 		if (!/\.csh-topbar \.tb-k\s*\{[^}]*text-overflow\s*:\s*ellipsis/.test(lay50)) e50.push(".csh-topbar .tb-k 缺省略号兜底");
 		if (e50.length) fail("执行级 E50：文案不挤压控件（" + e50.slice(0, 4).join("；") + "）");
-		else ok("执行级 E50：文案不挤压控件（设置项名 ≤14 汉字 · 控制条溢出可横滚不切按钮 · 状态/玩家/顶栏省略号兜底）");
+		else ok("执行级 E50：文案不挤压控件（设置项名 ≤14 汉字 · 说明 ≤60 汉字 · 控制条溢出可横滚不切按钮 · 状态/玩家/顶栏省略号兜底）");
 	}
 	log("");
 }
