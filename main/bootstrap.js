@@ -34,6 +34,9 @@ import "../core/csh_games.js";
 /* 成就引擎（2026-09-28）：零 import 双载——主文档这份供壳层 shell-ach-claim 领奖复核，
    career.html 用经典 <script> 引同一份源码渲染成就墙。 */
 import "../core/csh_achv.js";
+/* 池子成就（2026-10-20）：操作型成就引擎，零 import 双载——
+   主文档这份负责局内事件采集（install 由 content.js 调），成就页用经典 <script> 引同一份源码渲染。 */
+import "../core/csh_pool_achv.js";
 /* 音效总线（§4.7.1）：core/csh_sfx.js 零 import，只把总线挂到 window.CSH_SFX。
    主页面里由这里转挂到 lib.cshSfx —— 这样 csh_sfx.js 自身不必依赖 noname 的 lib，
    才能被 games/ 下的 iframe 用经典 <script> 直接加载（同一份实现，两个文档各挂各的）。 */

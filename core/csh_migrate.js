@@ -135,6 +135,9 @@ import { lib, game } from "../../../noname.js";
 	/* 新增键（2026-10-01 导出范围 6→19） */
 	var K_DAILY_TASK = walletKey("task", "csh_daily_task");
 	var K_ACHV = "csh_career_achv";
+	/* 2026-10-20 · 池子成就（操作型成就）。与生涯成就分开存：一份是"领奖集合"，
+	   一份是"达成记录 + 次数 + 模式"，清洗规则也不一样。 */
+	var K_POOL_ACHV = "csh_pool_achv";
 	var K_TEXAS_BEST = "csh_texas_best";
 	var K_BJ_BEST = "csh_bj_best";
 	var K_SNIPER_BEST = "csh_sniper_best";
@@ -577,8 +580,30 @@ import { lib, game } from "../../../noname.js";
 		for (var i = 0; i < keys.length; i++) out[clampStr(keys[i], 60)] = 1;
 		return out;
 	}
-	/* bgmOn 是「一主键 + N 后缀键」通配族（csh_bgm.js onKey()），导出合并为对象 */
-	function collectBgmOn() {
+	/* 池子成就存档：{v, got:{id:{t,m,n}}, seen:{id:1}}。
+	   只做形状校验与截断 —— 不因为某条 id 不认识就整体丢弃（旧存档遇到新版本规则表时，
+	   认不出的 id 留着无副作用，丢掉反而会把玩家进度吃回去）。 */
+	function cleanPoolAchv(o) {
+		if (!o || typeof o !== "object") return null;
+		var out = { v: 1, got: {}, seen: {} };
+		var src = (o.got && typeof o.got === "object") ? o.got : {};
+		var keys = Object.keys(src).slice(0, 800);
+		for (var i = 0; i < keys.length; i++) {
+			var id = clampStr(keys[i], 48);
+			var rec = src[keys[i]];
+			if (!rec || typeof rec !== "object") continue;
+			out.got[id] = {
+				t: Number(rec.t) || 0,
+				m: clampStr(String(rec.m || ""), 16),
+				n: Math.max(1, Math.min(999999, Number(rec.n) || 1)),
+			};
+		}
+		var seen = (o.seen && typeof o.seen === "object") ? o.seen : {};
+		var sk = Object.keys(seen).slice(0, 800);
+		for (var j = 0; j < sk.length; j++) out.seen[clampStr(sk[j], 48)] = 1;
+		return out;
+	}
+	/* bgmOn 是「一主键 + N 后缀键」通配族（csh_bgm.js onKey()），导出合并为对象 */	function collectBgmOn() {
 		var out = {};
 		try {
 			for (var i = 0; i < localStorage.length; i++) {
@@ -823,6 +848,7 @@ import { lib, game } from "../../../noname.js";
 		["cdkUsed", K_CDK, cleanCdk, 0],
 		["dailyTask", K_DAILY_TASK, cleanDailyTask, 0],
 		["achv", K_ACHV, cleanAchv, 0],
+		["poolAchv", K_POOL_ACHV, cleanPoolAchv, 0],
 		["texasBest", K_TEXAS_BEST, cleanObj, 0],
 		["bjBest", K_BJ_BEST, cleanObj, 0],
 		["sniperBest", K_SNIPER_BEST, cleanObj, 0],
@@ -942,7 +968,7 @@ import { lib, game } from "../../../noname.js";
 	var RESET_KEYS = [
 		K_WALLET, K_WALLET_SNAP, K_WALLET_HIST, K_CDK_LIFETIME,
 		K_RANK, K_WORLD, K_CDK, "csh_cdk_used_n", K_DEVICE_ID, K_DEV_BIND,
-		K_DAILY_TASK, K_ACHV,
+		K_DAILY_TASK, K_ACHV, K_POOL_ACHV,
 		K_TEXAS_BEST, K_SNIPER_BEST, K_BJ_BEST,
 		"csh_texas_bank", "csh_texas_bank_legacy", K_MIG_FLAG,
 		K_WINRATE,

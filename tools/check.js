@@ -2883,6 +2883,37 @@ async function runBossChecks() {
 		if (!/installedVer\s*\(/.test(dbg51)) e51.push("面板不显示已装版本（装过的还会显示「安装」）");
 		if (e51.length) fail("执行级 E51：其他扩展货单/安装器（" + e51.slice(0, 4).join("；") + "）");
 		else ok("执行级 E51：其他扩展（货单 " + names51.length + " 条 · 两份清单同名 · 字段完整 · 支持 dir 子目录 / 并发 / 取消 / 已装识别）");
+
+		/* ------------------------------------------------------------------ *
+		 * E52（2026-10-20 · 池子成就：操作型成就引擎）
+		 * ------------------------------------------------------------------
+		 * 这套东西最容易烂的三个地方：
+		 *   ① 规则表悄悄膨胀成"数值阶梯"（生涯成就 434 条的教训）——锁条数与 id 唯一；
+		 *   ② 悄悄接了新事件（万能 Hook 的开端）——锁事件白名单恰好 8 个；
+		 *   ③ 联机/旁观把成就刷爆——锁 connectMode 守卫与 silent。
+		 * 判定逻辑本身由 tools/probe_pool_achv.mjs 跑（29 条断言），门禁只锁结构。 */
+		const e52 = [];
+		let ids52 = [];
+		const paPath = path.join(ROOT, "core", "csh_pool_achv.js");
+		if (!fs.existsSync(paPath)) e52.push("缺 core/csh_pool_achv.js");
+		else {
+			const pa52 = fs.readFileSync(paPath, "utf8");
+			ids52 = Array.from(pa52.matchAll(/\{\s*id:\s*"([a-z0-9_]+)"/g)).map((m) => m[1]);
+			if (ids52.length < 40) e52.push("规则不足 40 条（当前 " + ids52.length + "）");
+			const dup52 = ids52.filter((x, i) => ids52.indexOf(x) !== i);
+			if (dup52.length) e52.push("规则 id 重复：" + Array.from(new Set(dup52)).join("、"));
+			const ev52 = pa52.match(/var _EVENTS = \{([^}]*)\}/);
+			if (!ev52) e52.push("找不到事件白名单 _EVENTS");
+			else if ((ev52[1].match(/([a-zA-Z]+)\s*:/g) || []).length !== 8) e52.push("事件白名单不是 8 个（改了要同步本断言与设计文档）");
+			if (!/connectMode/.test(pa52)) e52.push("缺联机守卫（联机会把成就刷爆）");
+			if (!/silent:\s*true/.test(pa52)) e52.push("全局技未设 silent（会打断牌局）");
+			if (!/addGlobalSkill/.test(pa52)) e52.push("未走 addGlobalSkill 注册");
+			const mg52 = fs.readFileSync(path.join(ROOT, "core", "csh_migrate.js"), "utf8");
+			if (!/csh_pool_achv/.test(mg52)) e52.push("存档键 csh_pool_achv 未登记 csh_migrate（E41 会连带报）");
+			if (!fs.existsSync(path.join(ROOT, "tools", "probe_pool_achv.mjs"))) e52.push("缺 tools/probe_pool_achv.mjs（判定层没有探针就等于没有验证）");
+		}
+		if (e52.length) fail("执行级 E52：池子成就（" + e52.slice(0, 4).join("；") + "）");
+		else ok("执行级 E52：池子成就引擎（" + ids52.length + " 条规则 · id 唯一 · 事件白名单 8 个 · 联机守卫 · 存档已登记 · 探针在位）");
 	}
 	log("");
 }

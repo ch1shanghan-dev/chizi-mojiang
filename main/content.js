@@ -469,6 +469,28 @@ export function cshContent(config, pack) { try {
     /* 妖灵好感度层（v6.2）：常驻挂 lib.cshAffection（讨伐/持股/聊天/送礼 四来源 + 五档台词；
        与金鳞市同源同一份 50 位；install 幂等）。 */
     installAffection();
+    /* 池子成就（2026-10-20 · 操作型成就）：挂局内事件采集器（幂等）。
+       只统计 身份/斗地主/对决、非联机；解锁只写存档，这里给一次轻提示（页面见下一步）。
+       任何异常都必须咽掉 —— 成就绝不能影响牌局。 */
+    try {
+        if (window.CSH_POOL_ACHV && typeof window.CSH_POOL_ACHV.install === "function") {
+            window.CSH_POOL_ACHV.install({
+                game: game,
+                lib: lib,
+                log: function (m) { try { console.warn("[池子成就] " + m); } catch (e) {} },
+                onUnlock: function (hit) {
+                    try {
+                        var names = hit.map(function (r) { return "「" + r.name + "」"; }).join(" ");
+                        if (lib.cshUI && typeof lib.cshUI.toast === "function") {
+                            lib.cshUI.toast("解锁成就 " + names, { skin: "paper", merge: false });
+                        }
+                    } catch (eT) {}
+                },
+            });
+        }
+    } catch (ePoolAchv) {
+        try { console.warn("[池子成就] install 失败", ePoolAchv); } catch (e2) {}
+    }
     /* 魔王包级隐藏（v4）：引擎 loadCharacter（init/index.js:465）已在 content（521）之前
        跑完——此刻把"池子魔将_boss"包从 lib.characterPack 移除，武将设置页不再出现该包节点；
        魔王本体已在 lib.character（get.character 首选），一切读取不受影响。 */
