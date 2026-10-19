@@ -51,7 +51,7 @@ function run(mode, opt) {
 console.log("== 1. 规则表自检 ==");
 const st = PA.selfTest();
 ok("selfTest 通过", st.ok, st.errors.join("; "));
-ok("规则 40 条", st.total === 40, "实际 " + st.total);
+ok("规则 60 条", st.total === 60, "实际 " + st.total);
 ok("事件白名单 8 个", Object.keys(PA.EVENTS).length === 8);
 
 console.log("\n== 2. 单条判定（正例 / 反例） ==");
@@ -63,8 +63,8 @@ console.log("\n== 2. 单条判定（正例 / 反例） ==");
 }
 {
 	const a = run("identity");
-	const hit = pump(a, { t: "damage", seat: 0, victimSeat: 1, num: 3 });
-	ok("伤害 3 → 不解锁（反例）", hit.length === 0, hit.join(","));
+	const hit = pump(a, { t: "damage", seat: 0, victimSeat: 1, num: 2 });
+	ok("伤害 2 → 不解锁（反例）", hit.length === 0, hit.join(","));
 }
 {
 	const a = run("identity");
@@ -191,7 +191,7 @@ console.log("\n== 9. 存档 ==");
 	PA.unlock("op_one_slash", "identity");
 	ok("再次达成累加次数", PA.load().got["op_one_slash"].n === 2);
 	const cs = PA.claimState();
-	ok("claimState 计数", cs.got === 1 && cs.total === 40, JSON.stringify(cs));
+	ok("claimState 计数", cs.got === 1 && cs.total === 60, JSON.stringify(cs));
 	ok("未读计数", cs.unread === 1);
 }
 

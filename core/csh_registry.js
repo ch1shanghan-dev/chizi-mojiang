@@ -116,6 +116,15 @@
 			lobby: true,
 			landscape: false, settle: "none", needBuyIn: false, ticket: 0, decay: 0,
 		},
+		/* 池子成就（2026-10-20）：操作型成就墙——与生涯大厅/讨伐录/天下榜同级的非游戏页
+		   （lobby:true 免收费屏直开）。数据读 core/csh_pool_achv.js 的 RULES 与 localStorage，
+		   **不进 ORDER**（keys() 保持纯游戏卡，入口卡在 csh_debug 手写、金色意象）。 */
+		achv: {
+			key: "achv", title: "池子成就", dir: "", file: "achv.html",
+			tag: "成就", desc: "你在对局里打出过的操作",
+			lobby: true,
+			landscape: false, settle: "none", needBuyIn: false, ticket: 0, decay: 0,
+		},
 		codex: {
 			key: "codex", title: "妖灵图鉴", dir: "", file: "codex.html",
 			tag: "档案", desc: "五十位妖灵的大图档案",
@@ -139,7 +148,7 @@
 		return (key && Object.prototype.hasOwnProperty.call(CATALOG, key)) ? CATALOG[key] : null;
 	}
 	function all() {
-		return ORDER.concat([LOBBY, "bossbook", "rank", "save"]).filter(function (k) { return !!CATALOG[k]; });
+		return ORDER.concat([LOBBY, "bossbook", "rank", "achv", "save"]).filter(function (k) { return !!CATALOG[k]; });
 	}
 	function keys() { return ORDER.slice(); }
 	function has(key) { return !!get(key); }

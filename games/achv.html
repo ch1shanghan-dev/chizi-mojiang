@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
+<title>池子魔将 · 池子成就</title>
+<!-- 池子成就（2026-10-20 · 步骤 2/7）
+     零外部资源 / 零网络请求。数据源 = core/csh_pool_achv.js（RULES 规则表 + localStorage 存档）。
+     唯一写入 = 存档（解锁/已读），没有其它副作用。
+     视觉纪律照 docs/art-direction.md：三档字族、单一基数字号标尺、紧凑断点 (max-height:640px)。 -->
+<script src="../core/csh_pool_achv.js"></script>
+<style>
+  :root{
+    --bg:#0f0d0b; --panel:#17130f; --panel-2:#1e1813;
+    --line:rgba(216,189,122,.18); --line-2:rgba(216,189,122,.30);
+    --ink:#efe6d4; --ink-dim:#a89b84; --gold:#d8bd7a; --gold-hi:#f4dfa8;
+    --ok:#7fd8c4; --bad:#e08a86;
+    --r1:#8a8a8a; --r2:#c9a84c; --r3:#9b59d0;
+    --ff-title:"Noto Serif SC","Songti SC","STSong","SimSun",serif;
+    --ff-body:-apple-system,"PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{
+    background:
+      radial-gradient(1200px 600px at 50% -10%, rgba(216,189,122,.10), transparent 60%),
+      var(--bg);
+    color:var(--ink); font-family:var(--ff-body); font-size:13px;
+    padding:14px 14px 22px; -webkit-font-smoothing:antialiased;
+  }
+  /* ---------- 页眉 ---------- */
+  .hd{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+  .hd .back{
+    flex:0 0 auto;height:30px;padding:0 12px;border-radius:999px;cursor:pointer;
+    background:rgba(216,189,122,.10);border:1px solid var(--line-2);color:var(--gold);
+    font-family:var(--ff-body);font-size:12px;
+  }
+  .hd .back:hover{background:rgba(216,189,122,.18)}
+  .hd h1{
+    flex:1 1 auto;min-width:0;margin:0;font-family:var(--ff-title);font-weight:700;
+    font-size:19px;letter-spacing:.08em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+  .ring{flex:0 0 auto;position:relative;width:52px;height:52px}
+  .ring svg{display:block;transform:rotate(-90deg)}
+  .ring .pct{
+    position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    font-family:var(--ff-body);font-size:12px;font-weight:800;color:var(--gold-hi);
+    font-variant-numeric:tabular-nums;
+  }
+  /* ---------- 稀有度概览 ---------- */
+  .rare-bar{display:flex;gap:8px;margin:0 0 10px;flex-wrap:wrap}
+  .rare-bar .rb{
+    flex:1 1 0;min-width:0;display:flex;align-items:baseline;gap:6px;
+    padding:7px 10px;border-radius:10px;background:var(--panel);border:1px solid var(--line);
+  }
+  .rare-bar .rb i{width:7px;height:7px;border-radius:50%;flex:0 0 auto}
+  .rare-bar .rb b{font-family:var(--ff-body);font-size:13px;font-variant-numeric:tabular-nums}
+  .rare-bar .rb span{font-size:11px;color:var(--ink-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  /* ---------- 筛选 ---------- */
+  .chips{display:flex;gap:6px;margin-bottom:10px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
+  .chips::-webkit-scrollbar{display:none}
+  .chip{
+    flex:0 0 auto;height:28px;padding:0 12px;border-radius:999px;cursor:pointer;
+    background:var(--panel);border:1px solid var(--line);color:var(--ink-dim);
+    font-family:var(--ff-body);font-size:12px;white-space:nowrap;
+  }
+  .chip.on{background:rgba(216,189,122,.16);border-color:var(--line-2);color:var(--gold-hi);font-weight:700}
+  .chip .n{color:var(--ink-dim);font-variant-numeric:tabular-nums}
+  /* ---------- 列表 ---------- */
+  .list{display:flex;flex-direction:column;gap:8px}
+  .row{
+    position:relative;display:flex;align-items:center;gap:11px;
+    padding:10px 12px 10px 14px;border-radius:11px;
+    background:var(--panel);border:1px solid var(--line);cursor:pointer;
+    transition:background .15s,border-color .15s,transform .1s;
+  }
+  .row:hover{background:var(--panel-2);border-color:var(--line-2)}
+  .row:active{transform:scale(.995)}
+  .row::before{content:'';position:absolute;left:0;top:8px;bottom:8px;width:3px;border-radius:3px}
+  .row.r1::before{background:var(--r1)}
+  .row.r2::before{background:var(--r2)}
+  .row.r3::before{background:var(--r3)}
+  .row .ico{flex:0 0 auto;width:30px;height:30px;display:flex;align-items:center;justify-content:center;
+    border-radius:9px;background:rgba(216,189,122,.08);font-size:15px}
+  .row .mid{flex:1 1 auto;min-width:0}
+  .row .nm{font-family:var(--ff-title);font-size:14px;font-weight:700;letter-spacing:.02em;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .row .ds{font-size:11.5px;color:var(--ink-dim);margin-top:2px;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .row .st{flex:0 0 auto;text-align:right}
+  .row .st .tag{display:inline-block;font-size:11px;padding:2px 8px;border-radius:999px;
+    border:1px solid var(--line-2);color:var(--ink-dim);white-space:nowrap}
+  .row.done .st .tag{color:#0f0d0b;background:linear-gradient(180deg,var(--gold-hi),var(--gold));border-color:transparent;font-weight:800}
+  .row .st .cnt{display:block;font-size:10.5px;color:var(--ink-dim);margin-top:3px;font-variant-numeric:tabular-nums}
+  /* ---------- 空态 ---------- */
+  .empty{padding:44px 18px;text-align:center;color:var(--ink-dim);line-height:1.9}
+  .empty b{display:block;color:var(--gold);font-family:var(--ff-title);font-size:15px;margin-bottom:6px}
+  .empty .go{margin-top:14px}
+  /* ---------- 详情层 ---------- */
+  .mask{position:fixed;inset:0;background:rgba(6,5,4,.62);backdrop-filter:blur(6px);
+    display:none;align-items:center;justify-content:center;padding:18px;z-index:20}
+  .mask.on{display:flex}
+  .sheet{
+    width:min(430px,100%);max-height:calc(100dvh - 36px);overflow:auto;
+    background:var(--panel-2);border:1px solid var(--line-2);border-radius:16px;
+    padding:18px 18px 14px;position:relative;
+  }
+  .sheet .close{position:absolute;right:10px;top:10px;width:28px;height:28px;border-radius:8px;
+    border:1px solid var(--line);background:transparent;color:var(--ink-dim);cursor:pointer;font-size:15px}
+  .sheet .big{width:46px;height:46px;border-radius:13px;display:flex;align-items:center;justify-content:center;
+    background:rgba(216,189,122,.10);font-size:23px;margin-bottom:10px}
+  .sheet h2{margin:0 0 4px;font-family:var(--ff-title);font-size:18px;letter-spacing:.04em}
+  .sheet .meta{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+  .sheet .badge{font-size:11px;padding:2px 9px;border-radius:999px;border:1px solid var(--line-2);color:var(--ink-dim)}
+  .sheet .badge.r2{color:var(--r2);border-color:rgba(201,168,76,.5)}
+  .sheet .badge.r3{color:#c79bea;border-color:rgba(155,89,208,.5)}
+  .sheet .sec{margin:0 0 10px}
+  .sheet .k{font-size:11px;color:var(--ink-dim);letter-spacing:.06em;margin-bottom:3px}
+  .sheet .v{font-size:13px;line-height:1.75}
+  .sheet .hint{color:#b9a888;font-size:12px;line-height:1.7}
+  .sheet .rec{display:flex;gap:16px;flex-wrap:wrap;font-variant-numeric:tabular-nums}
+  .sheet .rec .it{min-width:70px}
+  .sheet .rec b{display:block;font-size:15px;color:var(--gold-hi)}
+  .sheet .act{display:flex;gap:8px;margin-top:14px}
+  .btn{flex:1 1 auto;height:36px;border-radius:10px;cursor:pointer;font-family:var(--ff-body);font-size:13px;
+    border:1px solid var(--line-2);background:rgba(216,189,122,.12);color:var(--gold-hi);font-weight:700}
+  .btn:hover{background:rgba(216,189,122,.20)}
+  .btn:disabled{opacity:.42;cursor:default;background:transparent;color:var(--ink-dim);font-weight:400}
+  .btn.ghost{background:transparent;color:var(--ink-dim);font-weight:400}
+  /* ---------- 页脚 ---------- */
+  .ft{display:flex;justify-content:center;margin-top:18px}
+  .ft .reset{background:transparent;border:1px solid var(--line);color:var(--ink-dim);
+    height:30px;padding:0 14px;border-radius:999px;cursor:pointer;font-size:11.5px}
+  .ft .reset:hover{border-color:#7a3a38;color:var(--bad)}
+  @media (max-height:640px){
+    body{padding:10px 10px 16px;font-size:12.5px}
+    .hd h1{font-size:17px}
+    .ring{width:46px;height:46px}
+    .row{padding:9px 11px 9px 13px}
+  }
+</style>
+</head>
+<body>
+  <div class="hd">
+    <button class="back" id="back" type="button">返回</button>
+    <h1>池子成就</h1>
+    <div class="ring">
+      <svg width="52" height="52" viewBox="0 0 52 52" aria-hidden="true">
+        <circle cx="26" cy="26" r="22" fill="none" stroke="rgba(216,189,122,.16)" stroke-width="5"></circle>
+        <circle id="ringArc" cx="26" cy="26" r="22" fill="none" stroke="#d8bd7a" stroke-width="5"
+                stroke-linecap="round" stroke-dasharray="138.2" stroke-dashoffset="138.2"></circle>
+      </svg>
+      <div class="pct" id="pct">0%</div>
+    </div>
+  </div>
+
+  <div class="rare-bar" id="rareBar"></div>
+  <div class="chips" id="catChips"></div>
+  <div class="list" id="list"></div>
+  <div class="ft"><button class="reset" id="reset" type="button">重置成就进度</button></div>
+
+  <div class="mask" id="mask">
+    <div class="sheet" id="sheet">
+      <button class="close" id="close" type="button">×</button>
+      <div class="big" id="dIco">🏅</div>
+      <h2 id="dName">—</h2>
+      <div class="meta" id="dMeta"></div>
+      <div class="sec"><div class="k">条件</div><div class="v" id="dDesc">—</div></div>
+      <div class="sec" id="dHintWrap" style="display:none"><div class="k">提示</div><div class="hint" id="dHint"></div></div>
+      <div class="sec"><div class="k">你的记录</div><div class="rec" id="dRec"></div></div>
+      <div class="act">
+        <button class="btn" id="dClaim" type="button">领取奖励</button>
+        <button class="btn ghost" id="dClose2" type="button">关闭</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+(function () {
+  var PA = window.CSH_POOL_ACHV;
+  if (!PA) {
+    document.getElementById("list").innerHTML =
+      '<div class="empty"><b>成就引擎没有加载</b>扩展文件缺失，请重装扩展。</div>';
+    return;
+  }
+  var CATS = ["操作", "连击", "逆境", "模式", "武将"];
+  var CAT_ICO = { "操作": "⚔", "连击": "🔥", "逆境": "🛡", "模式": "🎴", "武将": "🧝" };
+  var RARE_NAME = { 1: "普通", 2: "稀有", 3: "史诗" };
+  var RARE_REWARD = { 1: { pc: 200, merit: 1 }, 2: { pc: 800, merit: 3 }, 3: { pc: 3000, merit: 8 } };
+
+  var state = { cat: "全部", only: "全部" };   /* 全部 / 已解锁 / 未解锁 */
+  var store = PA.load();
+
+  function got(id) { return store.got && store.got[id]; }
+
+  /* ---------- 页眉 ---------- */
+  function paintHead() {
+    var cs = PA.claimState();
+    var pct = cs.total ? Math.round(cs.got / cs.total * 100) : 0;
+    var arc = document.getElementById("ringArc");
+    var C = 2 * Math.PI * 22;
+    arc.setAttribute("stroke-dasharray", C.toFixed(1));
+    arc.setAttribute("stroke-dashoffset", (C * (1 - cs.got / Math.max(1, cs.total))).toFixed(1));
+    document.getElementById("pct").textContent = pct + "%";
+    var bar = document.getElementById("rareBar");
+    bar.textContent = "";
+    [1, 2, 3].forEach(function (r) {
+      var total = 0, have = 0;
+      PA.RULES.forEach(function (x) { if (x.rare === r) { total++; if (got(x.id)) have++; } });
+      var d = document.createElement("div");
+      d.className = "rb";
+      var i = document.createElement("i");
+      i.style.background = r === 1 ? "var(--r1)" : (r === 2 ? "var(--r2)" : "var(--r3)");
+      var b = document.createElement("b");
+      b.textContent = have + "/" + total;
+      var s = document.createElement("span");
+      s.textContent = RARE_NAME[r];
+      d.appendChild(i); d.appendChild(s); d.appendChild(b);
+      bar.appendChild(d);
+    });
+  }
+
+  /* ---------- 筛选 ---------- */
+  function paintChips() {
+    var box = document.getElementById("catChips");
+    box.textContent = "";
+    var cats = ["全部"].concat(CATS);
+    cats.forEach(function (c) {
+      var n = c === "全部" ? PA.RULES.length : PA.RULES.filter(function (x) { return x.cat === c; }).length;
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "chip" + (state.cat === c ? " on" : "");
+      b.innerHTML = "";
+      b.appendChild(document.createTextNode(c + " "));
+      var sp = document.createElement("span");
+      sp.className = "n";
+      sp.textContent = n;
+      b.appendChild(sp);
+      b.addEventListener("click", function () { state.cat = c; paintChips(); paintList(); });
+      box.appendChild(b);
+    });
+    [["全部", "全部"], ["已解锁", "已解锁"], ["未解锁", "未解锁"]].forEach(function (p) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "chip" + (state.only === p[1] ? " on" : "");
+      b.textContent = p[0];
+      b.addEventListener("click", function () { state.only = p[1]; paintChips(); paintList(); });
+      box.appendChild(b);
+    });
+  }
+
+  /* ---------- 列表 ---------- */
+  function paintList() {
+    var box = document.getElementById("list");
+    box.textContent = "";
+    var rows = PA.RULES.filter(function (r) {
+      if (state.cat !== "全部" && r.cat !== state.cat) return false;
+      var d = !!got(r.id);
+      if (state.only === "已解锁") return d;
+      if (state.only === "未解锁") return !d;
+      return true;
+    });
+    if (!rows.length) {
+      var e = document.createElement("div");
+      e.className = "empty";
+      if (state.only === "已解锁") {
+        e.innerHTML = '<b>还没有解锁任何成就</b>去打一局身份、斗地主或对决 —— 操作会被记下来。';
+      } else if (state.only === "未解锁") {
+        e.innerHTML = '<b>这个分类已经全部点亮</b>换一个分类看看。';
+      } else {
+        e.innerHTML = '<b>这里还没有内容</b>换一个筛选条件。';
+      }
+      box.appendChild(e);
+      return;
+    }
+    rows.forEach(function (r) {
+      var d = got(r.id);
+      var row = document.createElement("div");
+      row.className = "row r" + r.rare + (d ? " done" : "");
+      var ico = document.createElement("div");
+      ico.className = "ico";
+      ico.textContent = CAT_ICO[r.cat] || "🏅";
+      var mid = document.createElement("div");
+      mid.className = "mid";
+      var nm = document.createElement("div");
+      nm.className = "nm";
+      nm.textContent = r.name;
+      var ds = document.createElement("div");
+      ds.className = "ds";
+      ds.textContent = r.desc;
+      mid.appendChild(nm); mid.appendChild(ds);
+      var st = document.createElement("div");
+      st.className = "st";
+      var tag = document.createElement("span");
+      tag.className = "tag";
+      tag.textContent = d ? "已解锁" : RARE_NAME[r.rare];
+      st.appendChild(tag);
+      if (d && d.n > 1) {
+        var c = document.createElement("span");
+        c.className = "cnt";
+        c.textContent = d.n + " 次";
+        st.appendChild(c);
+      }
+      row.appendChild(ico); row.appendChild(mid); row.appendChild(st);
+      row.addEventListener("click", function () { openSheet(r); });
+      box.appendChild(row);
+    });
+  }
+
+  /* ---------- 详情 ---------- */
+  var curRule = null;
+  function openSheet(r) {
+    curRule = r;
+    var d = got(r.id);
+    document.getElementById("dIco").textContent = CAT_ICO[r.cat] || "🏅";
+    document.getElementById("dName").textContent = r.name;
+    var meta = document.getElementById("dMeta");
+    meta.textContent = "";
+    [RARE_NAME[r.rare], r.cat].concat(r.modes && r.modes.length ? [r.modes.map(function (m) {
+      return m === "identity" ? "身份" : (m === "doudizhu" ? "斗地主" : (m === "versus" ? "对决" : m));
+    }).join(" / ")] : ["全模式"]).forEach(function (t) {
+      var b = document.createElement("span");
+      b.className = "badge" + (t === "稀有" ? " r2" : (t === "史诗" ? " r3" : ""));
+      b.textContent = t;
+      meta.appendChild(b);
+    });
+    document.getElementById("dDesc").textContent = r.desc;
+    var hw = document.getElementById("dHintWrap");
+    if (r.hint) { hw.style.display = ""; document.getElementById("dHint").textContent = r.hint; }
+    else hw.style.display = "none";
+    var rec = document.getElementById("dRec");
+    rec.textContent = "";
+    var items = d
+      ? [["达成次数", d.n + " 次"], ["首次达成", fmtDate(d.t)], ["模式", modeName(d.m)]]
+      : [["状态", "未解锁"], ["奖励", RARE_REWARD[r.rare].pc + " CBY"]];
+    items.forEach(function (it) {
+      var w = document.createElement("div");
+      w.className = "it";
+      var k = document.createElement("div");
+      k.className = "k";
+      k.textContent = it[0];
+      var v = document.createElement("b");
+      v.textContent = it[1];
+      w.appendChild(k); w.appendChild(v);
+      rec.appendChild(w);
+    });
+    var claim = document.getElementById("dClaim");
+    claim.disabled = !d || !!store.seen[r.id];
+    claim.textContent = !d ? "未达成" : (store.seen[r.id] ? "已领取" : "领取 " + RARE_REWARD[r.rare].pc + " CBY");
+    document.getElementById("mask").classList.add("on");
+  }
+  function closeSheet() { document.getElementById("mask").classList.remove("on"); curRule = null; }
+
+  function modeName(m) {
+    return m === "identity" ? "身份场" : (m === "doudizhu" ? "斗地主" : (m === "versus" ? "对决" : "—"));
+  }
+  function fmtDate(t) {
+    if (!t) return "—";
+    var d = new Date(t), p = function (n) { return n < 10 ? "0" + n : "" + n; };
+    return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()) + " " + p(d.getHours()) + ":" + p(d.getMinutes());
+  }
+
+  /* ---------- 领奖：只发一次；钱包不在就当"记录已读" ---------- */
+  document.getElementById("dClaim").addEventListener("click", function () {
+    if (!curRule || !got(curRule.id)) return;
+    var r = curRule;
+    store = PA.load();
+    if (store.seen[r.id]) return;
+    var rw = RARE_REWARD[r.rare];
+    var paid = false;
+    try {
+      var W = (window.CSH && window.CSH.wallet) || null;
+      if (W && typeof W.addPC === "function") { W.addPC(rw.pc, "池子成就/" + r.name); paid = true; }
+      var R = (window.CSH && window.CSH.rank) || null;
+      if (R && typeof R.addMerit === "function") R.addMerit(rw.merit, "池子成就/" + r.name);
+    } catch (e) {}
+    store.seen[r.id] = 1;
+    PA.save(store);
+    document.getElementById("dClaim").disabled = true;
+    document.getElementById("dClaim").textContent = paid ? "已领取" : "已记录";
+    paintHead();
+  });
+
+  /* ---------- 其它 ---------- */
+  document.getElementById("close").addEventListener("click", closeSheet);
+  document.getElementById("dClose2").addEventListener("click", closeSheet);
+  document.getElementById("mask").addEventListener("click", function (e) {
+    if (e.target === this) closeSheet();
+  });
+  document.getElementById("back").addEventListener("click", function () {
+    try { history.back(); } catch (e) {}
+  });
+  document.getElementById("reset").addEventListener("click", function () {
+    if (!confirm("确定要清空池子成就的全部进度吗？这个操作不可撤销。")) return;
+    PA.save({ v: PA.VER, got: {}, seen: {} });
+    store = PA.load();
+    paintHead(); paintList();
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") closeSheet();
+  });
+
+  paintHead(); paintChips(); paintList();
+})();
+</script>
+</body>
+</html>

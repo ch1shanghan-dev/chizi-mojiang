@@ -168,6 +168,55 @@
 		{ id: "gen_niliu", name: "逆流", cat: "武将", rare: 3, modes: [], on: ["over"],
 			desc: "单局把「逆流」类技能触发 3 次以上",
 			test: function (c, a) { return (a.skillUseCount["niliu"] || 0) >= 3; } },
+
+		/* ---------- 扩展 20 条（2026-10-20 · 作者「还可以更加丰富」） ----------
+		   全部只读已有聚合量，不新增采集点 —— 加内容不加成本。 */
+		{ id: "op_hit3", name: "重手", cat: "操作", rare: 1, modes: [], on: ["damage"],
+			desc: "单次造成 3 点或以上伤害", test: function (c) { return c.num >= 3; } },
+		{ id: "op_cards6", name: "牌海", cat: "操作", rare: 2, modes: [], on: ["over"],
+			desc: "单回合使用 6 张或更多牌", test: function (c, a) { return a.cardsTurnMax >= 6; } },
+		{ id: "op_cards_total", name: "用牌如流水", cat: "操作", rare: 1, modes: [], on: ["over"],
+			desc: "单局累计使用 30 张牌", test: function (c, a) { return (a.cardsTotal || 0) >= 30; } },
+		{ id: "op_judge_all", name: "全凭天意", cat: "操作", rare: 2, modes: [], on: ["over"],
+			desc: "单局判定 5 次以上", test: function (c, a) { return a.judgeTotal >= 5; } },
+		{ id: "op_empty_hand", name: "空空如也", cat: "操作", rare: 1, modes: [], on: ["over"],
+			desc: "单局中途把手牌打到过 0 张", test: function (c, a) { return a.handMin === 0; } },
+		{ id: "op_full_win", name: "全身而退", cat: "操作", rare: 2, modes: [], on: ["over"],
+			desc: "以满体力获胜", test: function (c, a) { return c.win && a.hpNow >= a.hpMax && a.hpMax > 0; } },
+		{ id: "op_fast", name: "速战速决", cat: "操作", rare: 2, modes: [], on: ["over"],
+			desc: "5 个回合内获胜", test: function (c, a) { return c.win && a.turn <= 5; } },
+		{ id: "op_marathon", name: "持久战", cat: "操作", rare: 2, modes: [], on: ["over"],
+			desc: "单局打满 25 个回合", test: function (c, a) { return a.turn >= 25; } },
+		{ id: "cb_skill2", name: "技近乎道", cat: "连击", rare: 1, modes: [], on: ["over"],
+			desc: "单回合发动 2 个技能", test: function (c, a) { return a.skillTurnMax >= 2; } },
+		{ id: "cb_kinds3", name: "多面手", cat: "连击", rare: 2, modes: [], on: ["over"],
+			desc: "单局发动 3 个不同技能",
+			test: function (c, a) { return Object.keys(a.skillUseCount || {}).length >= 3; } },
+		{ id: "cb_dodge2", name: "轻身", cat: "连击", rare: 1, modes: [], on: ["over"],
+			desc: "单局连续闪避 2 次", test: function (c, a) { return a.dodgeStreakMax >= 2; } },
+		{ id: "cb_judge2", name: "连判", cat: "连击", rare: 1, modes: [], on: ["over"],
+			desc: "单局判定命中 2 次", test: function (c, a) { return a.judgeHit >= 2; } },
+		{ id: "cb_kill_turn3", name: "一回合三杀", cat: "连击", rare: 3, modes: [], on: ["die"],
+			desc: "同一回合内击破 3 名角色",
+			test: function (c, a) { return a.killsTurn >= 3; } },
+		{ id: "ad_near_death", name: "九死一生", cat: "逆境", rare: 2, modes: [], on: ["over"],
+			desc: "单局经历过一次濒死", test: function (c, a) { return a.nearDeath >= 1; } },
+		{ id: "ad_one_vs_many", name: "一骑当千", cat: "逆境", rare: 3, modes: [], on: ["over"],
+			desc: "体力降到过 2 以下，仍击破 3 人",
+			test: function (c, a) { return a.hpMin <= 2 && a.kills >= 3; } },
+		{ id: "ad_no_hurt_kill", name: "毫发无伤", cat: "逆境", rare: 3, modes: [], on: ["over"],
+			desc: "未受到任何伤害并击破 2 人",
+			test: function (c, a) { return a.hurt === 0 && a.kills >= 2; } },
+		{ id: "ad_double_kill", name: "双杀时刻", cat: "逆境", rare: 1, modes: [], on: ["over"],
+			desc: "单局击破 2 名角色", test: function (c, a) { return a.kills >= 2; } },
+		{ id: "ad_low_double", name: "残血双杀", cat: "逆境", rare: 3, modes: [], on: ["over"],
+			desc: "体力降到过 1 点，仍击破 2 人",
+			test: function (c, a) { return a.hpMin <= 1 && a.kills >= 2; } },
+		{ id: "md_empty_three", name: "空手三巡", cat: "逆境", rare: 2, modes: [], on: ["over"],
+			desc: "连续 2 个回合结束时没有手牌",
+			test: function (c, a) { return a.emptyHandTurnsMax >= 2; } },
+		{ id: "md_butcher", name: "屠戮", cat: "操作", rare: 3, modes: [], on: ["over"],
+			desc: "单局击破 4 名角色", test: function (c, a) { return a.kills >= 4; } },
 	];
 
 	/* 索引：事件 → 规则（只跑相关规则，别让每次事件都扫全表） */
@@ -194,7 +243,7 @@
 			meChars: meta.meChars || [],
 			seatCount: meta.seatCount || 0,
 			/* 回合与出牌 */
-			turn: 0, cardsTurn: 0, cardsTurnMax: 0,
+			turn: 0, cardsTurn: 0, cardsTurnMax: 0, cardsTotal: 0,
 			handAtWin: -1, handMin: 99,
 			emptyHandTurns: 0, emptyHandTurnsMax: 0,
 			handUp: 0, handUpMax: 0, lastHandEnd: -1,
@@ -263,6 +312,7 @@
 			case "useCard":
 				if (ev.seat === a.meSeat) {
 					a.cardsTurn++;
+					a.cardsTotal = (a.cardsTotal || 0) + 1;
 					a.played[ev.name] = 1;
 					if (typeof ev.handAfter === "number") {
 						a.lastHandEnd = ev.handAfter;

@@ -47,6 +47,20 @@ import { lib, game, ui } from "../../../noname.js";
 				} catch (e) { return ""; }
 			},
 		},
+		/* 池子成就（2026-10-20）：与生涯/讨伐录/天下榜同级的非游戏页。
+		   卡上直接给"解锁了几条"——比"有没有成就系统"更像玩家自己的进度。 */
+		achv: {
+			tag: "成就",
+			desc: "你在对局里打出过的操作",
+			statFn: function () {
+				try {
+					var PA = (typeof window !== "undefined" && window.CSH_POOL_ACHV) || null;
+					if (!PA || typeof PA.claimState !== "function") return "";
+					var cs = PA.claimState();
+					return "已解锁 " + cs.got + " / " + cs.total + (cs.unread ? (" · 新 " + cs.unread) : "");
+				} catch (e) { return ""; }
+			},
+		},
 		/* 天下榜（v6.9）：与生涯大厅/讨伐录同级的非游戏页 */
 		rank: {
 			tag: "联机",

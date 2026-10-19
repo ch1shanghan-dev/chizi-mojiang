@@ -1870,6 +1870,11 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                 /* 天下榜中部行（2026-10-15 · 下一轮交接打磨）：与讨伐录 gb-mid 同规格，
                    色相取青蓝系的浅色调（base #4078b0），与朱砂 #d06a6a 区分 */
                 "button.csh-dbg-gamebtn.gb-rank .gb-mid{font-size:12px!important;color:#6f9fd0!important;letter-spacing:.03em!important;opacity:.9!important;}",
+                /* 池子成就（2026-10-20）：金——与生涯(浅蓝)/讨伐录(朱砂)/天下榜(青蓝)/行囊(墨绿)区隔 */
+                "button.csh-dbg-gamebtn.gb-achv{background:linear-gradient(160deg,rgba(201,168,76,.16),rgba(201,168,76,.03) 60%)!important;border-color:rgba(201,168,76,.46)!important;position:relative!important;overflow:hidden!important;}",
+                "button.csh-dbg-gamebtn.gb-achv .gb-name{font-size:16px!important;letter-spacing:.06em!important;}",
+                "button.csh-dbg-gamebtn.gb-achv .gb-mid{font-size:12px!important;color:#c9a84c!important;letter-spacing:.03em!important;opacity:.95!important;}",
+                "button.csh-dbg-gamebtn.gb-achv::before{content:''!important;position:absolute!important;left:-4px!important;top:-6px!important;bottom:-6px!important;width:5px!important;background:linear-gradient(180deg,#c9a84c,rgba(201,168,76,.12))!important;transform:skewY(-10deg)!important;}",
                 /* 行囊（v6.10 · 2026-10-15）：墨绿斜杠 —— 与生涯大厅的金、讨伐录的朱砂、
                    天下榜的青蓝各走一路；"行囊"是装东西的，取沉着不抢眼的色。 */
                 "button.csh-dbg-gamebtn.gb-save{background:linear-gradient(160deg,rgba(88,128,102,.15),rgba(88,128,102,.03) 60%)!important;border-color:rgba(88,128,102,.44)!important;position:relative!important;overflow:hidden!important;}",
@@ -3563,6 +3568,42 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                         }
                     }
                     list.appendChild(sv1);
+                })();
+
+                /* ★ 池子成就卡（2026-10-20）：与生涯/讨伐录/天下榜/行囊同级的手写入口卡。
+                   数据读 window.CSH_POOL_ACHV（零 import 双载），不另立一份账。 */
+                (function () {
+                    var acDesc = "你在对局里打出过的操作";
+                    try {
+                        var rgA = (typeof window !== "undefined" && window.CSH && window.CSH.registry) || null;
+                        var a0 = rgA && typeof rgA.get === "function" ? rgA.get("achv") : null;
+                        if (a0 && a0.desc) acDesc = String(a0.desc);
+                    } catch (eAD) {}
+                    var acMid = "";
+                    try {
+                        var PA = window.CSH_POOL_ACHV;
+                        if (PA && typeof PA.claimState === "function") {
+                            var csA = PA.claimState();
+                            acMid = "已解锁 " + csA.got + " / " + csA.total + (csA.unread ? (" · 新 " + csA.unread) : "");
+                        }
+                    } catch (eAM) {}
+                    var ac1 = gameButton("池子成就", acDesc, "成就", function () {
+                        try {
+                            if (lib.cshGames && typeof lib.cshGames.open === "function") { lib.cshGames.open("achv", {}); return; }
+                        } catch (eOA) {}
+                        toast("池子成就未就绪（shell 未加载？）");
+                    }, false);
+                    ac1.classList.add("gb-achv");
+                    if (acMid) {
+                        var midA = document.createElement("span");
+                        midA.className = "gb-mid";
+                        midA.textContent = acMid;
+                        var descA = ac1.querySelector(".gb-desc");
+                        if (descA && descA.parentNode === ac1) {
+                            ac1.insertBefore(midA, descA);
+                            descA.classList.add("gb-sub");
+                        }
+                    }
                 })();
 
             games.forEach(function (g) {
