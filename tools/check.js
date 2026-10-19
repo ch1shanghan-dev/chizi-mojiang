@@ -2859,6 +2859,20 @@ async function runBossChecks() {
 			const bad = src.match(/z-index:[^0-9]*2147[0-9]{6}/g);
 			if (bad && bad.some((b) => !b.includes("var(--csh-z-"))) e50.push(f + " 有裸的浮层魔数 z-index（应走 --csh-z-*）");
 		}
+		/* 【2026-10-20】行囊页三处破坏性操作（回滚/解包/重置）必须走自绘确认。
+		   代码层面锁两件事：有 ask() 统一入口、裸 window.confirm 只剩它内部那一处兜底。
+		   行为（取消是否真的不执行）由 tools/probe_save_guards.mjs 跑 12 条断言。 */
+		{
+			const svPath = path.join(ROOT, "games", "save.html");
+			if (!fs.existsSync(svPath)) e50.push("缺 games/save.html");
+			else {
+				const sv = fs.readFileSync(svPath, "utf8");
+				if (!/function ask\(msg, onOk\)/.test(sv)) e50.push("save.html 缺 ask() 统一确认入口");
+				const rawConf = (sv.match(/window\.confirm\(/g) || []).length;
+				if (rawConf > 1) e50.push("save.html 仍有 " + rawConf + " 处裸 window.confirm（破坏性操作必须走 ask）");
+				if (!fs.existsSync(path.join(ROOT, "tools", "probe_save_guards.mjs"))) e50.push("缺 tools/probe_save_guards.mjs（确认回调行为没有验证）");
+			}
+		}
 		if (e50.length) fail("执行级 E50：文案不挤压控件（" + e50.slice(0, 4).join("；") + "）");
 		else ok("执行级 E50：文案不挤压控件（设置项名 ≤14 汉字 · 说明 ≤60 汉字 · 控制条溢出可横滚不切按钮 · 状态/玩家/顶栏省略号兜底）");
 

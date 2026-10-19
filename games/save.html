@@ -462,10 +462,11 @@ function renderBackups(list) {
     (function (x) {
       x.addEventListener("click", function () {
         var st = x.getAttribute("data-roll");
-        if (!window.confirm(T.msgRolled.split("{t}")[0] + stampText(st) + "？")) return;
-        call("shell-mig-rollback", { stamp: st }, function (ok) {
-          if (ok) { setMsg(tt("msgRolled", { t: stampText(st) }), "ok"); loadAll(); }
-          else setMsg(T.msgRollFail, "bad");
+        ask(T.msgRolled.split("{t}")[0] + stampText(st) + "？", function () {
+          call("shell-mig-rollback", { stamp: st }, function (ok) {
+            if (ok) { setMsg(tt("msgRolled", { t: stampText(st) }), "ok"); loadAll(); }
+            else setMsg(T.msgRollFail, "bad");
+          });
         });
       }, false);
     })(bs[k]);
@@ -528,31 +529,49 @@ function doCheck(hint) {
 }
 /* 倒进来：**未验证不许下手**（防"看着是新的、装的是旧的"）。
    框里内容一变，STATE.pending 就作废（input 监听）⇒ 这里比对的是**同一份串**。 */
+/* 【2026-10-20】破坏性操作的统一确认口。三条铁律：
+   ① 优先宿主自绘弹窗（lib.cshUI.confirm），项目规范禁原生 confirm；
+   ② **回调只在"确认"时执行** —— 取消一定不动作；
+   ③ 宿主不可用时才回退原生，绝不静默执行（静默执行 = 误删玩家存档）。 */
+function ask(msg, onOk) {
+  var host = null;
+  try { host = (window.parent && window.parent.lib && window.parent.lib.cshUI) || null; } catch (e) {}
+  if (host && typeof host.confirm === "function") {
+    host.confirm({ title: "请确认", message: msg, ok: "确定", cancel: "取消", danger: true },
+      function (ok) { if (ok) onOk(); });
+    return;
+  }
+  try { if (window.confirm(msg)) onOk(); } catch (e2) {}
+}
 function doUnpack() {
   var ta = el("code");
   var code = ta ? String(ta.value || "").trim() : "";
   if (!code) { setMsg(T.msgEmpty, "warn"); return; }
   if (STATE.pending !== code) { doCheck(T.msgCheckAgain); return; }
-  if (!window.confirm(T.diffTitle + "。\n\n" + T.bUnpack + "？")) return;
-  call("shell-mig-import", { code: code }, function (ok, r) {
-    if (!ok || !r || !r.ok) { setMsg(tt("msgUnpackFail", { err: (r && r.err) || "?" }), "bad"); return; }
-    STATE.pending = null;
-    setMsg(tt("msgUnpacked", { stamp: (r && r.backup) || "—" }), "ok");
-    hideDiff();
-    loadAll();
+  ask(T.diffTitle + "。\n\n" + T.bUnpack + "？", function () {
+    call("shell-mig-import", { code: code }, function (ok, r) {
+      if (!ok || !r || !r.ok) { setMsg(tt("msgUnpackFail", { err: (r && r.err) || "?" }), "bad"); return; }
+      STATE.pending = null;
+      setMsg(tt("msgUnpacked", { stamp: (r && r.backup) || "—" }), "ok");
+      hideDiff();
+      loadAll();
+    });
   });
 }
 function doReset() {
-  if (!window.confirm(T.resetConfirm1)) return;
-  if (!window.confirm(T.resetConfirm2)) return;
-  call("shell-mig-reset", null, function (ok, r) {
-    if (ok && r && r.ok) {
-      setMsg(T.msgReset, "ok");
-      setTimeout(function () {
-        try { window.parent.location.reload(); }
-        catch (e) { try { location.reload(); } catch (e2) {} }
-      }, 600);
-    } else setMsg(tt("msgResetFail", { err: (r && r.err) || "?" }), "bad");
+  /* 双层确认是刻意的（防误触清空全部家当），改成嵌套 ask 保留这层保护。 */
+  ask(T.resetConfirm1, function () {
+    ask(T.resetConfirm2, function () {
+      call("shell-mig-reset", null, function (ok, r) {
+        if (ok && r && r.ok) {
+          setMsg(T.msgReset, "ok");
+          setTimeout(function () {
+            try { window.parent.location.reload(); }
+            catch (e) { try { location.reload(); } catch (e2) {} }
+          }, 600);
+        } else setMsg(tt("msgResetFail", { err: (r && r.err) || "?" }), "bad");
+      });
+    });
   });
 }
 function loadBackups() {
