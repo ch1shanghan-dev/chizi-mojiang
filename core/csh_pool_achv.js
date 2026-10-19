@@ -162,9 +162,15 @@
 		{ id: "gen_hundred", name: "百将", cat: "武将", rare: 3, modes: [], on: ["over"],
 			desc: "用 50 名不同武将各赢过至少 1 局", hint: "跨对局累计",
 			test: function (c, a) { return c.win && a.distinctWins >= 50; } },
-		{ id: "gen_all_skills", name: "技能全开", cat: "武将", rare: 2, modes: [], on: ["over"],
-			desc: "单局把自己武将的技能全部发动过一遍",
-			test: function (c, a) { return a.skillUsedAll; } },
+		{ id: "gen_all_skills", name: "熟极而流", cat: "武将", rare: 2, modes: [], on: ["over"],
+			/* 原条件是「把武将技能全发动一遍」—— 锁定技/触发技根本不会走 useSkill，
+			   那条永远达不成。改成「同一个技能单局发动 3 次」，可达成且有意义。 */
+			desc: "同一个技能单局发动 3 次",
+			test: function (c, a) {
+				var m = 0, k;
+				for (k in (a.skillUseCount || {})) if (a.skillUseCount[k] > m) m = a.skillUseCount[k];
+				return m >= 3;
+			} },
 		{ id: "gen_niliu", name: "逆流", cat: "武将", rare: 3, modes: [], on: ["over"],
 			desc: "单局把「逆流」类技能触发 3 次以上",
 			test: function (c, a) { return (a.skillUseCount["niliu"] || 0) >= 3; } },
@@ -415,14 +421,14 @@
 	var memStore = null;
 	function load() {
 		try {
-			if (typeof localStorage === "undefined") return memStore || (memStore = { v: VER, got: {}, seen: {} });
+			if (typeof localStorage === "undefined") return memStore || (memStore = { v: VER, got: {}, seen: {}, chars: {} });
 			var raw = localStorage.getItem(KEY);
-			if (!raw) return { v: VER, got: {}, seen: {} };
+			if (!raw) return { v: VER, got: {}, seen: {}, chars: {} };
 			var o = JSON.parse(raw);
-			if (!o || typeof o !== "object") return { v: VER, got: {}, seen: {} };
-			o.got = o.got || {}; o.seen = o.seen || {};
+			if (!o || typeof o !== "object") return { v: VER, got: {}, seen: {}, chars: {} };
+			o.got = o.got || {}; o.seen = o.seen || {}; o.chars = o.chars || {};
 			return o;
-		} catch (e) { return { v: VER, got: {}, seen: {} }; }
+		} catch (e) { return { v: VER, got: {}, seen: {}, chars: {} }; }
 	}
 	function save(o) {
 		memStore = o;
@@ -572,18 +578,37 @@
 			var orig = game.over;
 			if (typeof orig === "function" && !orig.__cshPoolAchv) {
 				var wrapped = function () {
-					try { window.__cshPoolAchvOver && window.__cshPoolAchvOver(); } catch (e) {}
+					try { window.__cshPoolAchvOver && window.__cshPoolAchvOver(arguments[0]); } catch (e) {}
 					return orig.apply(this, arguments);
 				};
 				wrapped.__cshPoolAchv = true;
 				game.over = wrapped;
 			}
-			root.__cshPoolAchvOver = function () {
+			root.__cshPoolAchvOver = function (winner) {
 				try {
 					if (!active()) return;
 					var me = game.me || {};
+					/* 胜负口径：以 game.over(winner) 的实参为准（true / 玩家对象 / 玩家数组）。
+					   拿不准就算"没赢"——宁可漏记一条成就，也不给错的。 */
 					var win = false;
-					try { win = !!(me.isAlive && me.isAlive() && game.players.filter(function (p) { return p.isAlive(); }).length <= 2 && me.won !== false) || !!me.won; } catch (e) { win = false; }
+					try {
+						if (winner === true) win = true;
+						else if (Array.isArray(winner)) win = winner.indexOf(me) >= 0;
+						else if (winner === me) win = true;
+					} catch (eW) { win = false; }
+
+					/* 跨局累计（本命 / 百将）：先读存档里的历史，再判本局，最后统一落盘。
+					   ★ 用"判之前的值 + 本局"注入，避免"本局赢了但本命不吃这局"。 */
+					var cross = { chars: 0, distinct: 0 };
+					try {
+						var st0 = load();
+						var nm0 = (run.meChars && run.meChars[0]) || "";
+						var prev0 = (st0.chars && st0.chars[nm0]) || 0;
+						cross.chars = prev0 + (win ? 1 : 0);
+						cross.distinct = Object.keys(st0.chars || {}).length + ((win && !prev0) ? 1 : 0);
+					} catch (eC) {}
+					run.charWins = cross.chars;
+					run.distinctWins = cross.distinct;
 					var ident = {};
 					try {
 						for (var i = 0; i < game.players.length; i++) ident[game.players[i].seatNum] = game.players[i].identity || "";
@@ -597,6 +622,18 @@
 						survivors: (game.players || []).filter(function (p) { try { return p.isAlive(); } catch (e) { return false; } }).length,
 						ident: ident, landlordSeat: landlord,
 					});
+					/* 落盘跨局累计（只记胜场；赢了才 +1） */
+					try {
+						if (win) {
+							var st1 = load();
+							var nm1 = (run.meChars && run.meChars[0]) || "";
+							if (nm1) {
+								st1.chars = st1.chars || {};
+								st1.chars[nm1] = (st1.chars[nm1] || 0) + 1;
+								save(st1);
+							}
+						}
+					} catch (eP) {}
 					run = null;
 				} catch (e) { try { host.log && host.log("over 异常：" + e); } catch (e2) {} }
 			};

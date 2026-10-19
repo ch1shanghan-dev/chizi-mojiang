@@ -195,6 +195,38 @@ console.log("\n== 9. 存档 ==");
 	ok("未读计数", cs.unread === 1);
 }
 
+console.log("\n== 10. 跨局累计与技能成就 ==");
+{
+	const a = run("identity", { meChars: ["测试武将"] });
+	a.charWins = 19;
+	const neg = pump(a, { t: "over", win: true, turns: 5, survivors: 2, ident: { 0: "zhu", 1: "fan" } });
+	ok("19 胜不判本命（反例）", !neg.includes("gen_main"), neg.join(","));
+	const b = run("identity", { meChars: ["测试武将"] });
+	b.charWins = 20;
+	const pos = pump(b, { t: "over", win: true, turns: 5, survivors: 2, ident: { 0: "zhu", 1: "fan" } });
+	ok("20 胜 → 本命", pos.includes("gen_main"), pos.join(","));
+}
+{
+	const a = run("identity", { meChars: ["某将"] });
+	a.distinctWins = 50;
+	const hit = pump(a, { t: "over", win: true, turns: 5, survivors: 2, ident: { 0: "zhu", 1: "fan" } });
+	ok("50 名武将 → 百将", hit.includes("gen_hundred"), hit.join(","));
+}
+{
+	const a = run("identity");
+	pump(a, { t: "useSkill", seat: 0, skill: "wusheng" });
+	pump(a, { t: "useSkill", seat: 0, skill: "wusheng" });
+	const hit = pump(a, { t: "useSkill", seat: 0, skill: "wusheng" });
+	a.turn = 3;
+	const over = pump(a, { t: "over", win: true, turns: 3, survivors: 2, ident: { 0: "zhu", 1: "fan" } });
+	ok("同一技能发动 3 次 → 熟极而流", over.includes("gen_all_skills"), over.join(","));
+}
+{
+	const a = run("identity", { meChars: ["x"] });
+	const hit = pump(a, { t: "over", win: false, turns: 5, survivors: 3, ident: { 0: "zhu", 1: "fan" } });
+	ok("输了不判本命（反例）", !hit.includes("gen_main"), hit.join(","));
+}
+
 console.log("\n----------------------------------------");
 console.log(fail ? "结论：未通过（PASS " + pass + " / FAIL " + fail + "）" : "结论：通过（PASS " + pass + " / FAIL " + fail + "）");
 process.exit(fail ? 1 : 0);
