@@ -2911,6 +2911,13 @@ async function runBossChecks() {
 			const mg52 = fs.readFileSync(path.join(ROOT, "core", "csh_migrate.js"), "utf8");
 			if (!/csh_pool_achv/.test(mg52)) e52.push("存档键 csh_pool_achv 未登记 csh_migrate（E41 会连带报）");
 			if (!fs.existsSync(path.join(ROOT, "tools", "probe_pool_achv.mjs"))) e52.push("缺 tools/probe_pool_achv.mjs（判定层没有探针就等于没有验证）");
+			const dbgA = fs.readFileSync(path.join(ROOT, "core", "csh_debug.js"), "utf8");
+			/* 2026-10-20 真实事故：成就卡建好了却忘了 appendChild ⇒ 池子世界里那张卡直接不存在，
+			   而 E32（registry/CARDS）和 E52 全都绿 —— 因为没人检查"卡有没有挂上去"。
+			   这里锁死：gb-achv 卡在 document.createElement 之后、紧随的位置必须 appendChild 到列表。 */
+			if (!/gb-achv/.test(dbgA)) e52.push("csh_debug 里没有池子成就入口卡（gb-achv）");
+			else if (!/classList\.add\("gb-achv"\)[\s\S]{0,400}?list\.appendChild\(ac1\)/.test(dbgA)) e52.push("池子成就卡建了但没 appendChild 到列表（成就页会「消失」——2026-10-20 真实踩过）");
+			if (!fs.existsSync(path.join(ROOT, "games", "achv.html"))) e52.push("缺 games/achv.html 成就页");
 		}
 		if (e52.length) fail("执行级 E52：池子成就（" + e52.slice(0, 4).join("；") + "）");
 		else ok("执行级 E52：池子成就引擎（" + ids52.length + " 条规则 · id 唯一 · 事件白名单 8 个 · 联机守卫 · 存档已登记 · 探针在位）");

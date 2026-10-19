@@ -3594,6 +3594,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                         toast("池子成就未就绪（shell 未加载？）");
                     }, false);
                     ac1.classList.add("gb-achv");
+                    list.appendChild(ac1);   /* ← 2026-10-20 修：漏了这一行，卡建了但没挂进列表（成就页因此"消失"） */
                     if (acMid) {
                         var midA = document.createElement("span");
                         midA.className = "gb-mid";
