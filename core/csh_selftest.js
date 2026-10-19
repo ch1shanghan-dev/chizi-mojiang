@@ -511,7 +511,7 @@
 		box.id = OV;
 		/* 内联样式：即使被 noname 全局 div 规则命中，inline 也胜（非 !important 部分） */
 		box.style.cssText = [
-			"position:fixed", "left:12px", "top:12px", "z-index:2147483000",
+			"position:fixed", "left:12px", "top:12px", "z-index:var(--csh-z-panel,2147483000)",
 			"max-width:min(560px,92vw)", "max-height:70vh", "overflow:auto",
 			"background:rgba(18,16,13,.96)", "color:#f2e8d5",
 			"border:1px solid rgba(214,181,110,.5)", "border-radius:10px",

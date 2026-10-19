@@ -2851,6 +2851,14 @@ async function runBossChecks() {
 			const dockShift = new RegExp("csh-shell-" + key + " #csh-shell-dock").test(shellSrc);
 			if (!hasVar && !hasPad && !dockShift) e50.push(f + " 未给壳的右上安全区让位（会被余额胶囊压住）");
 		}
+		/* 【2026-10-20 · 叠层错乱根治】浮层层级只允许 var(--csh-z-*)（真值在 csh_theme.js 的层级表）。
+		   以前 22 处裸 2147xxxx 散在 7 个文件，两个浮层同时打开时谁盖谁纯看数字大小。 */
+		for (const f of fs.readdirSync(path.join(ROOT, "core")).filter((x) => x.endsWith(".js")).map((x) => "core/" + x)
+			.concat(fs.readdirSync(path.join(ROOT, "games")).filter((x) => x.endsWith(".html")).map((x) => "games/" + x))) {
+			const src = fs.readFileSync(path.join(ROOT, f), "utf8");
+			const bad = src.match(/z-index:[^0-9]*2147[0-9]{6}/g);
+			if (bad && bad.some((b) => !b.includes("var(--csh-z-"))) e50.push(f + " 有裸的浮层魔数 z-index（应走 --csh-z-*）");
+		}
 		if (e50.length) fail("执行级 E50：文案不挤压控件（" + e50.slice(0, 4).join("；") + "）");
 		else ok("执行级 E50：文案不挤压控件（设置项名 ≤14 汉字 · 说明 ≤60 汉字 · 控制条溢出可横滚不切按钮 · 状态/玩家/顶栏省略号兜底）");
 

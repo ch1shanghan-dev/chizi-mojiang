@@ -1924,10 +1924,10 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                  * （牌堆/记牌器/对话层等普遍上万甚至几十万），对局中被压在下面；
                  * 现在与技能代码查看器同级（全局最高档），并加全屏暗幕变成真模态。 */
                 "#csh-redeem-bg{position:fixed!important;left:0!important;top:0!important;width:100%!important;height:100%!important;",
-                "z-index:2147482999!important;background:rgba(var(--csh-bg-deep-rgb),.52)!important;animation:cshDbgFade .18s ease-out!important;",
+                "z-index:var(--csh-z-backdrop,2147482999)!important;background:rgba(var(--csh-bg-deep-rgb),.52)!important;animation:cshDbgFade .18s ease-out!important;",
                 "-webkit-backdrop-filter:blur(12px) saturate(130%)!important;backdrop-filter:blur(12px) saturate(130%)!important;}",
                 "#csh-redeem{display:block!important;position:fixed!important;left:50%!important;top:50%!important;",
-                "transform:translate(-50%,-50%)!important;z-index:2147483000!important;width:min(360px,86vw)!important;",
+                "transform:translate(-50%,-50%)!important;z-index:var(--csh-z-panel,2147483000)!important;width:min(360px,86vw)!important;",
                 /* 手机横屏：限高 + 卡内自滚，防整卡超出视口两头被裁（2026-09-30） */
                 "max-height:calc(100dvh - 24px)!important;overflow-y:auto!important;-webkit-overflow-scrolling:touch!important;",
                 "padding:24px 22px 20px!important;border-radius:16px!important;box-sizing:border-box!important;",
@@ -4078,7 +4078,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                  * （血泪 #25：手抄副本漂移 → 截图排版散架 → 差点误判成产品 bug）。 */
                 "#csh-skillcode,#csh-cardinfo{position:fixed!important;left:0!important;top:0!important;width:100%!important;height:100%!important;",
                 "display:flex!important;align-items:center!important;justify-content:center!important;box-sizing:border-box!important;",
-                "z-index:2147483000!important;padding:18px!important;",
+                "z-index:var(--csh-z-panel,2147483000)!important;padding:18px!important;",
                 "background:rgba(var(--csh-bg-deep-rgb),.52)!important;",
                 "-webkit-backdrop-filter:blur(12px) saturate(130%)!important;backdrop-filter:blur(12px) saturate(130%)!important;}",
                 "#csh-skillcode>div,#csh-cardinfo>div{box-sizing:border-box!important;max-height:88%!important;",
@@ -4114,7 +4114,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 
             var box = document.createElement("div");
             box.id = "csh-skillcode";
-            box.style.cssText = "position:fixed;left:0;top:0;width:100%;height:100%;z-index:2147483000;" +
+            box.style.cssText = "position:fixed;left:0;top:0;width:100%;height:100%;z-index:var(--csh-z-panel,2147483000);" +
                 "background:rgba(var(--csh-bg-deep-rgb),.52);-webkit-backdrop-filter:blur(12px) saturate(130%);backdrop-filter:blur(12px) saturate(130%);" +
                 "display:flex;align-items:center;justify-content:center;padding:18px;box-sizing:border-box;";
 
@@ -4247,7 +4247,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 
             var box = document.createElement("div");
             box.id = "csh-cardinfo";
-            box.style.cssText = "position:fixed;left:0;top:0;width:100%;height:100%;z-index:2147483000;" +
+            box.style.cssText = "position:fixed;left:0;top:0;width:100%;height:100%;z-index:var(--csh-z-panel,2147483000);" +
                 "background:rgba(var(--csh-bg-deep-rgb),.52);-webkit-backdrop-filter:blur(12px) saturate(130%);backdrop-filter:blur(12px) saturate(130%);" +
                 "display:flex;align-items:center;justify-content:center;padding:18px;box-sizing:border-box;";
 
@@ -6679,10 +6679,10 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
             st.textContent = [
                 "@keyframes cshExtFade{from{opacity:0;}to{opacity:1;}}",
                 "#csh-extstore-bg{position:fixed!important;left:0!important;top:0!important;width:100%!important;height:100%!important;",
-                "z-index:2147482999!important;background:rgba(8,6,4,.52)!important;animation:cshExtFade .18s ease-out!important;",
+                "z-index:var(--csh-z-backdrop,2147482999)!important;background:rgba(8,6,4,.52)!important;animation:cshExtFade .18s ease-out!important;",
                 "-webkit-backdrop-filter:blur(12px) saturate(130%)!important;backdrop-filter:blur(12px) saturate(130%)!important;}",
                 "#csh-extstore{display:block!important;position:fixed!important;left:50%!important;top:50%!important;",
-                "transform:translate(-50%,-50%)!important;z-index:2147483000!important;width:min(620px,92vw)!important;",
+                "transform:translate(-50%,-50%)!important;z-index:var(--csh-z-panel,2147483000)!important;width:min(620px,92vw)!important;",
                 "max-height:calc(100dvh - 24px)!important;overflow-y:auto!important;-webkit-overflow-scrolling:touch!important;",
                 "padding:20px 20px 16px!important;border-radius:14px!important;box-sizing:border-box!important;",
                 "background:#f6f1e4!important;color:#2a2118!important;",
@@ -7038,10 +7038,10 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
             st.textContent = [
                 "@keyframes cshUpdFade{from{opacity:0;}to{opacity:1;}}",
                 "#csh-update-bg{position:fixed!important;left:0!important;top:0!important;width:100%!important;height:100%!important;",
-                "z-index:2147482999!important;background:rgba(8,6,4,.52)!important;animation:cshUpdFade .18s ease-out!important;",
+                "z-index:var(--csh-z-backdrop,2147482999)!important;background:rgba(8,6,4,.52)!important;animation:cshUpdFade .18s ease-out!important;",
                 "-webkit-backdrop-filter:blur(12px) saturate(130%)!important;backdrop-filter:blur(12px) saturate(130%)!important;}",
                 "#csh-update{display:block!important;position:fixed!important;left:50%!important;top:50%!important;",
-                "transform:translate(-50%,-50%)!important;z-index:2147483000!important;width:min(520px,92vw)!important;",
+                "transform:translate(-50%,-50%)!important;z-index:var(--csh-z-panel,2147483000)!important;width:min(520px,92vw)!important;",
                 "max-height:calc(100dvh - 24px)!important;overflow-y:auto!important;padding:20px 20px 16px!important;border-radius:14px!important;box-sizing:border-box!important;",
                 "background:#f6f1e4!important;color:#2a2118!important;border:1px solid rgba(60,48,28,.25)!important;box-shadow:0 10px 44px rgba(0,0,0,.45)!important;",
                 "font-family:system-ui,-apple-system,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif!important;}",
