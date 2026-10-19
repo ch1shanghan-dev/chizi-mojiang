@@ -6677,19 +6677,26 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
             var REPO_RAW = "https://raw.githubusercontent.com/ch1shanghan-dev/chizi-mojiang/main/";
             /* 三层货单：GitHub（最新） → 本地 store.json（随扩展打包，离线可用） → 内置兜底。
                本地兜底文件在 package.js files 清单内，安装后必在扩展目录。 */
+            /* 【2026-10-19】兜底货单已与 store.json 对齐（门禁 E51 会检查两边条目名一致，
+               防止"改了远端忘了改本地"导致断网时看到的是旧清单）。 */
             var FALLBACK = [
-                { name: "胜负统计", author: "PZ157", repo: "PZ157/noname_sftj", branch: "main", intro: "全模式武将胜负统计 · 胜率排行榜 · AI禁选" },
-                { name: "千幻聆音", author: "玄牡江湖工作室 & 雨", repo: "dragonJadeRan/qianhuan_mine", branch: "main", intro: "武将语音包 · 插件管理 · 制卡器" },
-                { name: "呼风唤雨", author: "shibaiderman096", repo: "shibaiderman096/noname-extension-hufenghuanyu", intro: "武将扩展《呼风唤雨》" },
-                { name: "舰R杀", author: "cvlunicorn", repo: "cvlunicorn/Rkill_heroes", intro: "舰娘主题武将扩展 · 皮肤系统 · 技能动画" },
-                { name: "东方Project", author: "WindySmile512", repo: "WindySmile512/Touhou-Project", intro: "东方 Project 主题武将扩展。⚠ 体积很大，安装耗时较长" },
-                { name: "少女乐队", author: "Antarctics", repo: "Antarctics/GirlsBand-Noname-Expansion", intro: "《少女乐队》主题武将扩展" },
-                { name: "温柔一刀", author: "QCXYLTJ", repo: "QCXYLTJ/The-Gentle-Slash", intro: "《温柔一刀》武将扩展" },
-                { name: "怒焰三国杀", author: "zhonghui1966", repo: "zhonghui1966/nyKill", intro: "还原《怒焰三国杀》玩法与武将" },
-                { name: "AI禁将", author: "nineMangos", repo: "nineMangos/AI-Prohibition", intro: "禁止 AI 选择指定武将" },
-                { name: "AI优化（已停更）", author: "PZ157", repo: "PZ157/noname_AIOptimization", intro: "用于优化 AI 出牌决策的扩展（作者已停更，仍可用）" },
-                { name: "皮肤切换", author: "Ysclmml（yscl）", repo: "Ysclmml/skinSwitch", intro: "武将皮肤切换器，支持联机" },
-                { name: "守林人", author: "VelopeVoice", repo: "VelopeVoice/noname_FirewatchExtension", intro: "明日方舟主题武将扩展《守林人》" },
+                { name: "十周年UI", author: "子右（zziyoo）", repo: "zziyoo/decadeUI", branch: "main", tag: "界面", intro: "十周年风格的整套界面美化，含牌局皮肤与动效。需要无名杀 ≥ 1.11.6" },
+                { name: "胜负统计", author: "PZ157", repo: "PZ157/noname_sftj", branch: "main", tag: "工具", intro: "全模式武将胜负场次统计 · 胜率排行榜 · AI禁选" },
+                { name: "千幻聆音", author: "玄牡江湖工作室 & 雨", repo: "dragonJadeRan/qianhuan_mine", branch: "main", tag: "音效", intro: "武将语音包 · 插件管理 · 制卡器" },
+                { name: "大梦千秋", author: "Loihan", repo: "Loihan/noname-damengqianqiu", branch: "main", tag: "武将", intro: "《大梦千秋》主题武将扩展" },
+                { name: "叠彩峰岭", author: "libccy（官方合集）", repo: "libccy/noname-extension", branch: "master", dir: "叠彩峰岭", tag: "武将", intro: "官方合集里的《叠彩峰岭》武将包" },
+                { name: "海国图志", author: "libccy（官方合集）", repo: "libccy/noname-extension", branch: "master", dir: "海国图志", tag: "武将", intro: "官方合集里的《海国图志》武将包" },
+                { name: "呼风唤雨", author: "shibaiderman096", repo: "shibaiderman096/noname-extension-hufenghuanyu", tag: "武将", intro: "武将扩展《呼风唤雨》" },
+                { name: "舰R杀", author: "cvlunicorn", repo: "cvlunicorn/Rkill_heroes", branch: "master", tag: "武将", intro: "舰娘主题武将扩展 · 皮肤系统 · 技能动画" },
+                { name: "东方Project", author: "WindySmile512", repo: "WindySmile512/Touhou-Project", tag: "武将", intro: "东方 Project 主题武将扩展。⚠ 体积很大，安装耗时较长" },
+                { name: "少女乐队", author: "Antarctics", repo: "Antarctics/GirlsBand-Noname-Expansion", tag: "武将", intro: "《少女乐队》主题武将扩展" },
+                { name: "温柔一刀", author: "QCXYLTJ", repo: "QCXYLTJ/The-Gentle-Slash", tag: "武将", intro: "《温柔一刀》武将扩展" },
+                { name: "怒焰三国杀", author: "zhonghui1966", repo: "zhonghui1966/nyKill", tag: "武将", intro: "还原《怒焰三国杀》玩法与武将" },
+                { name: "大乱斗", author: "PZ157", repo: "PZ157/noname_daluandou", branch: "main", tag: "模式", intro: "仿「大乱斗」的模式扩展" },
+                { name: "AI禁将", author: "nineMangos", repo: "nineMangos/AI-Prohibition", tag: "工具", intro: "禁止 AI 选择指定武将" },
+                { name: "AI优化（已停更）", author: "PZ157", repo: "PZ157/noname_AIOptimization", tag: "工具", intro: "优化 AI 出牌决策（作者已停更，仍可用）" },
+                { name: "皮肤切换", author: "Ysclmml（yscl）", repo: "Ysclmml/skinSwitch", branch: "master", tag: "界面", intro: "武将皮肤切换器，支持联机" },
+                { name: "守林人", author: "VelopeVoice", repo: "VelopeVoice/noname_FirewatchExtension", tag: "武将", intro: "明日方舟主题武将扩展《守林人》" },
             ];
             /* 【2026-10-05 修复】挂 documentElement（与 openRedeem 的 uiHost 同位），绝不挂 body：
                引擎给 body 设 transform:scale 形成独立层叠上下文，挂 body 的浮层 z-index 再大也被压住
@@ -6726,60 +6733,169 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
             listBox.textContent = "载入中…";
             box.appendChild(listBox);
 
-            function installEntry(entry, btn) {
+            /* ---------- 2026-10-19 重写（作者：整体需要优化） ----------
+               旧实现四个硬伤，都是玩家真会踩的：
+               ① **逐文件串行 await**：几百个文件一个一个排队，大包要干等好几分钟；
+               ② **全程装内存**，上限却放到 400MB —— 真下到这个量渲染进程直接 OOM；
+               ③ **只有一个按钮文字当进度**，关掉面板就完全失去反馈。下载其实没停
+                  （fetch 与 DOM 无关），但玩家会以为取消了，然后 3 秒后游戏突然重启；
+               ④ **没有"已装"判断**：装过的还写"安装"，重复点就重复下几百兆。
+               顺带补 `dir` 字段：像 libccy/noname-extension 这种"一个仓库放多个扩展"的合集，
+               过去只能整包下载、然后引擎报「这不是一个扩展」；现在可以只取其中一个子目录。 */
+            var STORE_PARALLEL = 3;                       /* 三路并发，与引擎 multiDownload 同档 */
+            var STORE_RETRY = 2;                          /* 单文件重试次数 */
+            var STORE_MAX_BYTES = 320 * 1024 * 1024;      /* 单次安装上限（内存里要整包装下） */
+            var storeTask = null;                         /* 后台任务：面板关掉也继续，重开能接回来 */
+
+            function fmtMB(n) { return (n / 1048576).toFixed(n >= 10485760 ? 0 : 1) + " MB"; }
+
+            /* 已装版本：以包内为准。`extension_<名>_version` 只在「从网址安装」写一次
+               （见下面检查更新段的同款注释），拿它当唯一真源会显示旧号。 */
+            function installedVer(name) {
+                try {
+                    var p = lib.extensionPack && lib.extensionPack[name];
+                    if (p && p.version) return String(p.version);
+                } catch (e) {}
+                try { return String(lib.config["extension_" + name + "_version"] || ""); } catch (e2) { return ""; }
+            }
+
+            /* 取清单：默认分支 → 递归文件树 → 目录过滤 → 体积合计 + 「根目录是不是扩展」校验 */
+            function loadManifest(entry) {
+                return (async function () {
+                    var branch = entry.branch;
+                    if (!branch) {
+                        var ri = await (await fetch("https://api.github.com/repos/" + entry.repo)).json();
+                        branch = ri.default_branch || "main";
+                    }
+                    var tree = await (await fetch("https://api.github.com/repos/" + entry.repo + "/git/trees/" + branch + "?recursive=1")).json();
+                    if (!tree.tree) throw new Error(tree.message || "文件树获取失败");
+                    var prefix = entry.dir ? String(entry.dir).replace(/\/+$/, "") + "/" : "";
+                    var blobs = tree.tree.filter(function (x) {
+                        return x.type === "blob" && (x.size || 0) < 8 * 1024 * 1024 &&
+                            (!prefix || x.path.indexOf(prefix) === 0);
+                    });
+                    if (!blobs.length) throw new Error(prefix ? ("子目录「" + prefix + "」里没有可下载的文件") : "仓库是空的");
+                    var hasRoot = false, total = 0;
+                    for (var i = 0; i < blobs.length; i++) {
+                        total += blobs[i].size || 0;
+                        var p = prefix ? blobs[i].path.slice(prefix.length) : blobs[i].path;
+                        if (p === "info.json" || p === "extension.js") hasRoot = true;
+                    }
+                    if (!hasRoot) throw new Error("这个仓库的根目录不是扩展（缺 info.json / extension.js）");
+                    return { branch: branch, prefix: prefix, blobs: blobs, total: total };
+                })();
+            }
+
+            /* 三路并发下载：任何一路失败就整体中止（并中断其它路的连接），
+               单文件失败先退避重试，重试用尽才报错 —— 国内直连 raw 偶发 502 是常态。 */
+            function downloadAll(entry, man, onTick, ctrl) {
+                var signal = ctrl ? ctrl.signal : undefined;
+                var data = {}, cursor = 0, done = 0, loaded = 0, total = man.blobs.length, dead = null;
+                function one(f) {
+                    var rel = man.prefix ? f.path.slice(man.prefix.length) : f.path;
+                    var url = "https://raw.githubusercontent.com/" + entry.repo + "/" + man.branch + "/" + encodeURI(f.path);
+                    var tries = 0;
+                    function attempt() {
+                        if (dead) return Promise.reject(dead);
+                        return fetch(url, { cache: "no-store", signal: signal }).then(function (r) {
+                            if (!r.ok) throw new Error("HTTP " + r.status);
+                            return r.arrayBuffer();
+                        }).then(function (buf) {
+                            data[rel] = buf;
+                            done++; loaded += buf.byteLength;
+                            onTick(done, total, rel);
+                        }).catch(function (e) {
+                            if (signal && signal.aborted) throw e;
+                            if (++tries > STORE_RETRY) throw new Error("「" + rel + "」下载失败（" + ((e && e.message) || e) + "）");
+                            return new Promise(function (res) { setTimeout(res, 400 * tries); }).then(attempt);
+                        });
+                    }
+                    return attempt();
+                }
+                function worker() {
+                    if (dead || cursor >= total) return Promise.resolve();
+                    var f = man.blobs[cursor++];
+                    return one(f).then(worker, function (e) { dead = dead || e; throw e; });
+                }
+                var ws = [];
+                for (var i = 0; i < Math.min(STORE_PARALLEL, total); i++) ws.push(worker());
+                return Promise.all(ws).then(function () { return data; });
+            }
+
+            function installEntry(entry, btn, prog) {
+                if (storeTask && storeTask.running) {
+                    toast("正在安装「" + storeTask.name + "」，等它结束再装别的");
+                    return;
+                }
+                var ctrl = (typeof AbortController === "function") ? new AbortController() : null;
+                storeTask = { name: entry.name, running: true, cancelled: false, done: 0, total: 0, ctrl: ctrl };
                 btn.disabled = true;
-                btn.textContent = "获取中…";
+                btn.textContent = "获取清单…";
+                prog.style.display = "block";
+                prog.textContent = "正在读取文件清单…";
+
                 var finish = function () {
-                    btn.textContent = "安装成功";
-                    toast("「" + entry.name + "」安装成功，3 秒后重启");
-                    setTimeout(function () { try { game.reload(); } catch (eR) { location.reload(); } }, 3000);
+                    storeTask = null;
+                    btn.textContent = "已安装";
+                    prog.textContent = "安装完成，正在重启…";
+                    toast("「" + entry.name + "」安装成功，即将重启");
+                    setTimeout(function () { try { game.reload(); } catch (eR) { location.reload(); } }, 2500);
                 };
                 var fail = function (msg) {
+                    storeTask = null;
+                    prog.style.display = "none";
                     btn.disabled = false;
-                    btn.textContent = "重新安装";
+                    btn.textContent = "重试";
                     toast("「" + entry.name + "」安装失败：" + msg);
                 };
-                var promise;
-                if (entry.zip) {
-                    promise = fetch(entry.zip).then(function (r) {
-                        if (!r.ok) throw new Error("HTTP " + r.status);
-                        return r.arrayBuffer();
+
+                loadManifest(entry).then(function (man) {
+                    storeTask.total = man.blobs.length;
+                    prog.textContent = man.blobs.length + " 个文件 · 约 " + fmtMB(man.total) + "，准备下载…";
+                    if (man.total > STORE_MAX_BYTES) throw new Error("体积 " + fmtMB(man.total) + " 超过单次上限 " + fmtMB(STORE_MAX_BYTES));
+                    /* 大包先说清楚要等多久，别让玩家以为卡死；确认框走自绘 UI，不弹原生 */
+                    if (man.total > 80 * 1048576 && lib.cshUI && typeof lib.cshUI.confirm === "function") {
+                        return new Promise(function (res, rej) {
+                            lib.cshUI.confirm({
+                                title: "「" + entry.name + "」大约 " + fmtMB(man.total),
+                                message: "共 " + man.blobs.length + " 个文件，网速一般的话要等几分钟。下载期间可以关掉这个面板，下载会在后台继续。",
+                                ok: "开始下载", cancel: "算了"
+                            }, function (ok) { ok ? res() : rej(new Error("已取消")); });
+                        }).then(function () { return man; });
+                    }
+                    return man;
+                }).then(function (man) {
+                    return downloadAll(entry, man, function (done, total, rel) {
+                        storeTask.done = done;
+                        prog.textContent = "下载中 " + done + " / " + total + " · " + rel;
+                    }, ctrl).then(function (data) {
+                        prog.textContent = "正在写入扩展目录…（共 " + man.blobs.length + " 个文件）";
+                        btn.textContent = "安装中…";
+                        return new Promise(function (res, rej) {
+                            Promise.resolve(game.importExtension(data, function () { finish(); res(); })).catch(rej);
+                        });
                     });
-                } else if (entry.repo) {
-                    promise = (async function () {
-                        var branch = entry.branch;
-                        if (!branch) {
-                            var ri = await (await fetch("https://api.github.com/repos/" + entry.repo)).json();
-                            branch = ri.default_branch;
-                        }
-                        var tree = await (await fetch("https://api.github.com/repos/" + entry.repo + "/git/trees/" + branch + "?recursive=1")).json();
-                        if (!tree.tree) throw new Error(tree.message || "文件树获取失败");
-                        var blobs = tree.tree.filter(function (x) { return x.type === "blob" && (x.size || 0) < 8 * 1024 * 1024; });
-                        var total = blobs.reduce(function (n, x) { return n + (x.size || 0); }, 0);
-                        if (total > 400 * 1024 * 1024) throw new Error("体积过大（约 " + Math.round(total / 1048576) + "MB）");
-                        var data = {}, done = 0;
-                        for (var i = 0; i < blobs.length; i++) {
-                            var f = blobs[i];
-                            var r2 = await fetch("https://raw.githubusercontent.com/" + entry.repo + "/" + branch + "/" + f.path);
-                            if (!r2.ok) throw new Error("下载失败：" + f.path);
-                            data[f.path] = await r2.arrayBuffer();
-                            done++;
-                            btn.textContent = "下载中 " + done + "/" + blobs.length;
-                        }
-                        return data;
-                    })();
-                } else {
-                    promise = Promise.reject(new Error("货单条目缺少 zip/repo 字段"));
-                }
-                promise.then(function (data) {
-                    btn.textContent = "安装中…";
-                    return game.importExtension(data, finish);
-                }).catch(function (e) { fail((e && e.message) || String(e)); });
+                }).catch(function (e) {
+                    if (ctrl && ctrl.signal && ctrl.signal.aborted) return fail("已取消");
+                    fail((e && e.message) || String(e));
+                });
+                /* 取消入口：点进度条本身即取消（不额外占一行按钮） */
+                prog.onclick = function () {
+                    if (!storeTask || !storeTask.running) return;
+                    storeTask.cancelled = true;
+                    try { ctrl.abort(); } catch (eA) {}
+                    toast("已取消「" + entry.name + "」的下载");
+                };
             }
 
             function render(list) {
                 listBox.textContent = "";
                 if (!list || !list.length) { listBox.textContent = "货单为空"; return; }
+                var note = document.createElement("div");
+                note.className = "csh-ext-sub";
+                note.style.marginBottom = "8px";
+                note.textContent = "下载可以放到后台：中途关掉这个面板不会中断，装完会自动重启。点进度文字可取消。";
+                listBox.appendChild(note);
                 list.forEach(function (entry) {
                     var row = document.createElement("div");
                     row.className = "csh-ext-row";
@@ -6787,18 +6903,35 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                     info.className = "csh-ext-info";
                     var nm = document.createElement("div");
                     nm.className = "csh-ext-name";
-                    nm.textContent = entry.name + "　" + (entry.author ? "· " + entry.author : "");
+                    nm.textContent = entry.name + "　" + (entry.author ? "· " + entry.author : "") + (entry.tag ? "　[" + entry.tag + "]" : "");
                     var dsc = document.createElement("div");
                     dsc.className = "csh-ext-desc";
-                    dsc.textContent = entry.intro || "";
-                    info.appendChild(nm); info.appendChild(dsc);
+                    var have = installedVer(entry.name);
+                    dsc.textContent = (entry.intro || "") + (have ? "　（已装 v" + have + "）" : "");
+                    var prog = document.createElement("div");
+                    prog.className = "csh-ext-desc";
+                    prog.style.display = "none";
+                    prog.style.color = "#c9a84c";
+                    prog.style.cursor = "pointer";
+                    info.appendChild(nm); info.appendChild(dsc); info.appendChild(prog);
                     var btn = document.createElement("button");
                     btn.type = "button";
                     btn.className = "csh-ext-btn";
-                    btn.textContent = "安装";
-                    btn.addEventListener("click", function () { installEntry(entry, btn); }, false);
+                    btn.textContent = have ? "重装" : "安装";
+                    btn.addEventListener("click", function () { installEntry(entry, btn, prog); }, false);
                     row.appendChild(info); row.appendChild(btn);
                     listBox.appendChild(row);
+                    /* 面板重开时把还在跑的任务接回来，别让玩家以为被中断了 */
+                    if (storeTask && storeTask.running && storeTask.name === entry.name) {
+                        btn.disabled = true;
+                        btn.textContent = "下载中";
+                        prog.style.display = "block";
+                        prog.textContent = "下载中 " + storeTask.done + " / " + storeTask.total + "（关面板不会停，点这里取消）";
+                        prog.onclick = function () {
+                            storeTask.cancelled = true;
+                            try { storeTask.ctrl && storeTask.ctrl.abort(); } catch (eA) {}
+                        };
+                    }
                 });
             }
             fetch(REPO_RAW + "store.json", { cache: "no-store" }).then(function (r) {

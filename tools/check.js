@@ -2832,6 +2832,57 @@ async function runBossChecks() {
 		if (!/\.csh-topbar \.tb-k\s*\{[^}]*text-overflow\s*:\s*ellipsis/.test(lay50)) e50.push(".csh-topbar .tb-k 缺省略号兜底");
 		if (e50.length) fail("执行级 E50：文案不挤压控件（" + e50.slice(0, 4).join("；") + "）");
 		else ok("执行级 E50：文案不挤压控件（设置项名 ≤14 汉字 · 说明 ≤60 汉字 · 控制条溢出可横滚不切按钮 · 状态/玩家/顶栏省略号兜底）");
+
+		/* ------------------------------------------------------------------ *
+		 * E51（2026-10-19 · 作者：其他扩展功能整体优化，要多挂优质扩展）
+		 * ------------------------------------------------------------------
+		 * 「其他扩展」的货单有两份：远端 store.json（最新）+ 代码里的 FALLBACK（断网兜底）。
+		 * 过去两边各写各的，改了远端忘了改本地 ⇒ 断网时玩家看到的是旧清单、甚至装到已下架的东西。
+		 * 另外货单条目一旦缺 repo / 写成错的格式，面板上会多出一行点了没反应的按钮。
+		 * 这里锁四件事：条目字段完整、名字不重复、两份清单同名同量、安装器支持 dir 与并发。 */
+		const e51 = [];
+		let store51 = null;
+		try {
+			store51 = JSON.parse(fs.readFileSync(path.join(ROOT, "store.json"), "utf8"));
+		} catch (eParse) {
+			e51.push("store.json 不是合法 JSON（" + eParse.message + "）");
+		}
+		const names51 = [];
+		if (store51) {
+			const list51 = store51.extensions || [];
+			if (!list51.length) e51.push("store.json 货单为空");
+			for (const it of list51) {
+				if (!it.name) e51.push("有条目缺 name");
+				else names51.push(it.name);
+				if (!it.repo || !/^[\w.-]+\/[\w.-]+$/.test(it.repo)) e51.push((it.name || "?") + " 的 repo 不是 owner/repo 格式");
+				if (it.dir != null && (typeof it.dir !== "string" || !it.dir.trim())) e51.push((it.name || "?") + " 的 dir 字段为空");
+				const ip = String(it.intro || "").replace(/<[^>]+>/g, "");
+				let iw = 0;
+				for (const ch of ip) iw += ch.charCodeAt(0) > 127 ? 2 : 1;
+				if (!ip) e51.push((it.name || "?") + " 缺 intro（面板上会只有标题）");
+				else if (iw > 120) e51.push((it.name || "?") + " 的 intro 过长（" + iw + " 半角宽 > 120）");
+			}
+			const dup = names51.filter((n, i) => names51.indexOf(n) !== i);
+			if (dup.length) e51.push("货单里重名：" + Array.from(new Set(dup)).join("、"));
+			if (list51.length < 12) e51.push("货单条目过少（" + list51.length + " < 12），作者要求多挂优质扩展");
+		}
+		const dbg51 = fs.readFileSync(path.join(ROOT, "core", "csh_debug.js"), "utf8");
+		const fb51 = dbg51.match(/var FALLBACK = \[([\s\S]*?)\n\s*\];/);
+		if (!fb51) e51.push("csh_debug.js 里找不到 FALLBACK 兜底货单");
+		else {
+			const fbNames = Array.from(fb51[1].matchAll(/name:\s*"([^"]+)"/g)).map((m) => m[1]);
+			const onlyRemote = names51.filter((n) => !fbNames.includes(n));
+			const onlyLocal = fbNames.filter((n) => !names51.includes(n));
+			if (onlyRemote.length) e51.push("store.json 有、FALLBACK 没有：" + onlyRemote.join("、"));
+			if (onlyLocal.length) e51.push("FALLBACK 有、store.json 没有：" + onlyLocal.join("、"));
+		}
+		/* 安装器能力：没有这三样，合集仓库装不了、大包会卡成一条线 */
+		if (!/entry\.dir/.test(dbg51)) e51.push("安装器不支持 dir（合集仓库只能整包下载，引擎会报「这不是一个扩展」）");
+		if (!/STORE_PARALLEL/.test(dbg51)) e51.push("安装器没有并发下载（几百个文件会一个接一个排队）");
+		if (!/AbortController/.test(dbg51) || !/ctrl\.abort\(\)/.test(dbg51)) e51.push("安装器不可取消");
+		if (!/installedVer\s*\(/.test(dbg51)) e51.push("面板不显示已装版本（装过的还会显示「安装」）");
+		if (e51.length) fail("执行级 E51：其他扩展货单/安装器（" + e51.slice(0, 4).join("；") + "）");
+		else ok("执行级 E51：其他扩展（货单 " + names51.length + " 条 · 两份清单同名 · 字段完整 · 支持 dir 子目录 / 并发 / 取消 / 已装识别）");
 	}
 	log("");
 }
