@@ -981,7 +981,7 @@ async function runBossChecks() {
 		const hasEngine = /export const BASE_PRICE/.test(mk14) && /export function ensureDay/.test(mk14)
 			&& /export function trade/.test(mk14) && /export function snapshot/.test(mk14);
 		const girlCount = (mk14.match(/tag:\s*"/g) || []).length;
-		if (!hasCard) fail("执行级 E14：金鳞市未接入 registry（池子休闲卡片）");
+		if (!hasCard) fail("执行级 E14：金鳞市未接入 registry（池子世界卡片）");
 		else if (!hasPage) fail("执行级 E14：games/goldfish.html 缺失");
 		else if (!hasEngine) fail("执行级 E14：市场引擎四件套（BASE_PRICE/ensureDay/trade/snapshot）不完整");
 		else if (girlCount < 50) fail("执行级 E14：妖灵人设不足 50 位（实际 " + girlCount + "）");
@@ -1018,7 +1018,7 @@ async function runBossChecks() {
 		else if (!hasWatch) fail("执行级 E15：skills/boss.js 缺 csh_boss_watch_ext（外传阵亡无法捕获）");
 		else if (!hasGlobal) fail("执行级 E15：bossmode.js 未登记 csh_boss_watch_ext 到 lib.skill.global（全局触发失效）");
 		else if (!hasPage) fail("执行级 E15：games/bossbook.html 缺 renderExtSection / 异界来客 区块");
-		else if (!hasPool) fail("执行级 E15：缺 s.extPool / extRosterAll / snapshotExt（池子休闲里外传卷将恒空态）");
+		else if (!hasPool) fail("执行级 E15：缺 s.extPool / extRosterAll / snapshotExt（池子世界里外传卷将恒空态）");
 		else if (!wiredSnap) fail("执行级 E15：跨模式名册未接电（bossmode 调 snapshotExt / shell 与页面用 extRosterAll）");
 		else if (badPrefix || !goodPrefix) fail("执行级 E15：外传立绘前缀错位（页面在 games/ 下，根相对须 ../../../，不得 ../../）");
 		else ok("执行级 E15：外传卷接线在位（extRoster/recordExt 独立段 + global 捕获 + bossmode 登记 + 跨模式快照 + 页面区块 + 立绘前缀三层）");

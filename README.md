@@ -52,6 +52,8 @@
 - `docs/dev-rules.md` —— 技能与 AI、UI 与布局、经济与统计口径的硬性约定
 - `docs/engine-notes.md` —— 无名杀引擎要点（触发排序、配置键、音频与台词）
 - `docs/ui-kernel.md` —— 界面与网络基座（坐标系、浮层层级、更新与榜单通道）
+- `docs/plan.md` —— 计划总表（P0~P3 待办与阻塞项，问「今天干什么」看这份）
+- `docs/pool-achv.md` —— 池子成就设计方案（操作型成就：事件采集、判定、UI、内容清单）
 - `docs/CHANGELOG.md` —— 版本与轮次留痕
 
 提交前请跑：

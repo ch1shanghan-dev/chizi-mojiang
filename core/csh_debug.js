@@ -6440,7 +6440,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                     { id: "char", name: "池子" },
                     { id: "track", name: "追踪" },
                     { id: "diag", name: "诊断" },
-                    { id: "games", name: "池子休闲", cls: "game" },
+                    { id: "games", name: "池子世界", cls: "game" },
                 ];
                 function setTab(id) {
                     TAB = id;
@@ -6462,7 +6462,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                                 }
                             }
                         } catch (eHb) {
-                            try { console.log("[池子休闲] 离线结算异常", eHb); } catch (e2) {}
+                            try { console.log("[池子世界] 离线结算异常", eHb); } catch (e2) {}
                         }
                     }
                     for (var i = 0; i < tabs.children.length; i++) {
@@ -6613,7 +6613,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                 lib.cshDebugMenu.open();
                 return true;
             } catch (e) {
-                try { console.error("[池子休闲] 打开失败", e); } catch (e2) {}
+                try { console.error("[池子世界] 打开失败", e); } catch (e2) {}
                 try { toast("打开失败: " + ((e && e.message) || e)); } catch (e3) {}
                 return false;
             }

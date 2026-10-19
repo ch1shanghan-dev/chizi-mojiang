@@ -25,15 +25,15 @@ export const cshConfig = {
                「池子休闲」页签进入，而那是开发者工具、入口又在横滚页签条第 11 枚，
                360px 宽的安卓机首屏根本看不到 —— 玩家找不到游戏。
                这里给出与「胜负统计 / 局内互动」同级的一步入口。 */
-            "csh_lobby":{"name":"<span class=\"csh-cfg-btn\">池子休闲</span>","intro":"打开小游戏：德州扑克 / 斗地主 / 廿一点 / UNO。与 AI 同桌，赢池子币。","clear":true,"onclick":function(){
+            "csh_lobby":{"name":"<span class=\"csh-cfg-btn\">池子世界</span>","intro":"打开池子世界：小游戏、生涯大厅、讨伐录、池子成就。与 AI 同桌，赢池子币。","clear":true,"onclick":function(){
                 /* csh_debug 已懒加载：主菜单点按钮时现场拉起模块再落「池子休闲」页签；
                    注意先查 openLobby（懒加载桩阶段 lib.cshDebug 只有诊断转发桩）。 */
                 if(lib.cshDebug && typeof lib.cshDebug.openLobby==="function"){ lib.cshDebug.openLobby(); return false; }
                 if(typeof lib.__cshLoadDebug==="function"){
-                    lib.__cshLoadDebug().then(function(){ try{ lib.cshDebug.openLobby(); }catch(e){ console.error(e); alert("池子休闲打开失败，请重启游戏后再试"); } }).catch(function(e){ console.error(e); alert("池子休闲没能打开，请重启游戏后再试"); });
+                    lib.__cshLoadDebug().then(function(){ try{ lib.cshDebug.openLobby(); }catch(e){ console.error(e); alert("池子世界打开失败，请重启游戏后再试"); } }).catch(function(e){ console.error(e); alert("池子世界没能打开，请重启游戏后再试"); });
                     return false;
                 }
-                alert("池子休闲没能打开，请重启游戏后再试"); return false;
+                alert("池子世界没能打开，请重启游戏后再试"); return false;
             }},
             "csh_interact_panel":{"name":"<span class=\"csh-cfg-btn\">局内互动</span>","intro":"设置局内互动：总开关、互动频率、附带台词。联机不可用。","clear":true,"onclick":function(){ if(!lib.cshInteract||typeof lib.cshInteract.openPanel!=="function"){ alert("局内互动没能打开，请重启游戏后再试"); return false; } lib.cshInteract.openPanel(); return false; }},
             /* ===== 功能开关 ===== */
