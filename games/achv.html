@@ -42,7 +42,10 @@
   }
   body>*{position:relative;z-index:1}
 
-  .hd{flex:0 0 auto;display:flex;align-items:center;gap:10px;margin-bottom:10px}
+  .hd{flex:0 0 auto;display:flex;align-items:center;gap:10px;margin-bottom:10px;
+      /* 右上角是壳的悬浮控制组（余额胶囊 + 关闭）。这里必须让位，否则进度环会被压住。
+         变量由 core/csh_shell.js 注入，单点真源；独立打开时回退同值。 */
+      padding-right:var(--csh-dock-safe,clamp(150px,20vw,200px));}
   .back{
     flex:0 0 auto;height:29px;padding:0 13px;border-radius:999px;cursor:pointer;
     background:rgba(216,189,122,.08);border:1px solid var(--line);

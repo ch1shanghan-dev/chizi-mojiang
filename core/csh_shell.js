@@ -304,6 +304,12 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 			   · 半透明常驻（.62），hover/按下变 1.0 —— 存在感低但不消失；
 			   · 触摸目标 ≥44px（关闭按钮），余额胶囊按内容宽；
 			   · 右侧留 8px、顶部 6px，正好落在骨架给 .csh-topbar 预留的空白带里。 */
+			/* 【2026-10-20 · 底层修复】右上角安全区做成**单一来源的 CSS 变量**。
+			   以前每个页面各写一套 padding-right（122/178/190/200/268px），新页面忘了写就会
+			   被壳的悬浮控制组（余额胶囊 + 关闭）压住 —— 成就页就是这么翻车的。
+			   现在：壳注入 --csh-dock-safe，页面统一 padding-right:var(--csh-dock-safe,回退值)。
+			   ★ 新增 games/ 页面时必须用这个变量，否则门禁 E50 直接红。 */
+			":root{--csh-dock-safe:clamp(150px,20vw,200px);}",
 			"#csh-shell-dock{position:absolute!important;right:8px!important;top:6px!important;z-index:25!important;",
 			"display:flex!important;align-items:center!important;gap:6px!important;",
 			"opacity:.62!important;transition:opacity .18s ease!important;}",
@@ -339,6 +345,9 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 			   148px，间隙 91px 无重叠）。胶囊保持显示（余额有参考价值，不同于
 			   career 的官阶卡同值隐藏）。 */
 			"body.csh-shell-bossbook #csh-shell-dock{right:104px!important;}",
+			/* 【2026-10-20】天下榜同档：它的页眉右侧是页内控件，dock 右移让位。
+			   以前漏了这一条，dock 直接压在标题右侧（与成就页同类的重叠）。 */
+			"body.csh-shell-rank #csh-shell-dock{right:104px!important;}",
 			"#csh-shell-dock button{flex:0 0 auto!important;min-width:44px!important;height:44px!important;",
 			"padding:0!important;font-size:15px!important;line-height:1!important;cursor:pointer!important;user-select:none!important;",
 			"border-radius:999px!important;color:var(--csh-accent)!important;font-weight:800!important;background:rgba(var(--csh-bg-deep-rgb),.80)!important;",

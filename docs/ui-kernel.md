@@ -278,3 +278,24 @@ lib.skill._csh_kami_choice = {
   硬套宿主基座会盖住牌桌中心，那是退步而不是统一。
 - 控制条形态（`#control > .control`）的势力面板目前是"按内容识别 + 内联限宽"，
   通用化为 `csh_uikit` 的一个组件还没做（作者本轮明确排除）。
+
+## 右上安全区（2026-10-20 · 重叠事故后立的规矩）
+
+壳在页面右上角浮着一组控件：**池子币胶囊 + 关闭按钮**（`#csh-shell-dock`，`right:8px/top:6px`，
+宽随余额位数变化，实测上限约 190px）。**任何在顶部右布局内容的页面都必须为它让位。**
+
+二选一（不许有第三种）：
+
+1. **页面让位**（推荐，改页面即可）：`padding-right: var(--csh-dock-safe, clamp(150px,20vw,200px))`
+   —— 变量由 `core/csh_shell.js` 注入，单一真源；独立打开页面时回退同值。
+2. **壳右移**（页面版式动不了时）：在 `core/csh_shell.js` 加
+   `body.csh-shell-<页面key> #csh-shell-dock{right:104px!important;}`。
+   已有：`career` / `bossbook` / `rank`。
+
+**为什么这条必须自动化**：这套安全区此前是"每页各写一套 px"（122/178/190/200/268），
+新页面忘了写就会被胶囊压住 —— 成就页的进度环就是这么被盖住的。现在 **门禁 E50 会对
+`games/` 下七个非牌桌页面逐个检查**：没有 `--csh-dock-safe`、没有 ≥120px 的 `padding-right`、
+壳里也没有该页的右移分支 ⇒ 直接失败。
+
+牌桌四页（texas / doudizhu / blackjack / uno）是整屏 grid、顶部条由骨架 `.csh-topbar` 预留，
+不在此列（`.csh-topbar` 自己带 `padding-right:clamp(148px,19vw,186px)`）。

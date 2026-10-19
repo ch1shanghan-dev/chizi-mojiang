@@ -2836,6 +2836,21 @@ async function runBossChecks() {
 			const src = fs.readFileSync(path.join(ROOT, f), "utf8").replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
 			if (/(?<![\w.])alert\s*\(/.test(src)) e50.push(f + " 里还有裸 alert（应走自绘 toast）");
 		}
+		/* 【2026-10-20 · 重叠事故根治】右上角是壳的悬浮控制组（余额胶囊+关闭），
+		   页面必须为它留出安全区。以前每页各写一套 px，新页忘了写就被压住（成就页翻车）。
+		   现在统一：要么用 --csh-dock-safe，要么至少 120px 的 padding-right。
+		   牌桌四页是整屏 grid、无顶部条，不在此列。 */
+		for (const f of ["achv.html", "bossbook.html", "career.html", "codex.html", "goldfish.html", "rank.html", "save.html"]) {
+			const fp = path.join(ROOT, "games", f);
+			if (!fs.existsSync(fp)) continue;
+			const hs = fs.readFileSync(fp, "utf8");
+			const key = f.replace(/\.html$/, "");
+			const shellSrc = fs.readFileSync(path.join(ROOT, "core", "csh_shell.js"), "utf8");
+			const hasVar = hs.includes("--csh-dock-safe");
+			const hasPad = /padding-right:\s*(?:clamp\(\s*)?(\d{2,3})px/.test(hs) && Number((hs.match(/padding-right:\s*(?:clamp\(\s*)?(\d{2,3})px/) || [0, 0, 0])[1]) >= 120;
+			const dockShift = new RegExp("csh-shell-" + key + " #csh-shell-dock").test(shellSrc);
+			if (!hasVar && !hasPad && !dockShift) e50.push(f + " 未给壳的右上安全区让位（会被余额胶囊压住）");
+		}
 		if (e50.length) fail("执行级 E50：文案不挤压控件（" + e50.slice(0, 4).join("；") + "）");
 		else ok("执行级 E50：文案不挤压控件（设置项名 ≤14 汉字 · 说明 ≤60 汉字 · 控制条溢出可横滚不切按钮 · 状态/玩家/顶栏省略号兜底）");
 
