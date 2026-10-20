@@ -1659,6 +1659,31 @@ export function cshContent(config, pack) { try {
     // 全部挂在 lib.cshShoushaFx 属性上，方法内不引用外部闭包，可随 game.broadcastAll 安全下发到联机各端
     lib.cshShoushaFx = {
         _cssOk: false,
+        /* ---------- 素材级演出注册表（2026-10-20 · docs/skill-fx-plan.md §2.1 落地）----------
+           唯一真值：加一支新演出 = 表里加一行（素材入 effect/ + 技能侧 play/durOf 两行），
+           不再改 _dur / play 分支 / 包装函数三处（历史三处模型的收敛终点）。
+           字段：
+             kind     "video"（mp4 横幅）| "frames"（帧序列，分支待素材落地，见文件末 TODO）
+             pipe     "banner"（_bannerVideo 通用管线）| "legacy"（独立实现，fn 指名）
+             file     effect/ 下文件名（门禁 E56 与磁盘对账）
+             dur      素材时长 + 余量（ms）；技能侧 game.pause 与 play 的重入窗都取它
+             revealDur/ wrapClass  仅 banner 管线用（羽化与容器类）
+             fallback 素材 error 时的 CSS 兜底函数名（legacy 管线专用）
+           ⚠ 必须挂在 lib.cshShoushaFx 属性上（不能是模块级 var）：play() 会被
+             game.broadcast 下发到联机各端 eval，闭包变量在客户端作用域不存在。 */
+        MEDIA: {
+            niliu: { kind: "video", pipe: "legacy", fn: "_niliuVideo", file: "csh_daaixianzun_niliuhushenyin_banner.mp4", dur: 23300, fallback: "_niliu" },
+            quedi: { kind: "video", pipe: "banner", file: "csh_wenyang_quedi_banner.mp4", dur: 2800, revealDur: 2.3, wrapClass: "csh-quedi-banner" },
+            paiyi: { kind: "video", pipe: "banner", file: "csh_zhonghui_paiyi_banner.mp4", dur: 3100, revealDur: 3.03, wrapClass: "csh-paiyi-banner" },
+            liegong: { kind: "video", pipe: "banner", file: "csh_mmhz_liegong_banner.mp4", dur: 3060, revealDur: 3.0, wrapClass: "csh-liegong-banner" },
+            luanwu: { kind: "video", pipe: "banner", file: "csh_qw_luanwu_banner.mp4", dur: 3760, revealDur: 3.7, wrapClass: "csh-luanwu-banner" },
+            duwu: { kind: "video", pipe: "banner", file: "csh_zhugeke_duwu_banner.mp4", dur: 2060, revealDur: 2.0, wrapClass: "csh-duwu-banner" },
+            pojun: { kind: "video", pipe: "banner", file: "csh_jjxs_pojun_banner.mp4", dur: 2060, revealDur: 2.0, wrapClass: "csh-pojun-banner" },
+            yannv1: { kind: "video", pipe: "banner", file: "csh_lvlingqi_yannv_banner.mp4", dur: 1860, revealDur: 1.8, wrapClass: "csh-yannv1-banner" },
+            /* 新素材照抄一行，例如：
+               xxx: { kind:"video", pipe:"banner", file:"csh_<武将>_<技>_banner.mp4", dur:3000, revealDur:3.0, wrapClass:"csh-xxx-banner" },
+               yyy: { kind:"frames", pipe:"banner", file:"csh_<武将>_<技>", prefix:"f", count:48, fps:24, dur:2000 }, */
+        },
         // paiyi 3100：素材裁掉头尾静止段后 91 帧 / 3.033s，留 ~70ms 余量
         // 技能横幅时长：必须 ≥ 素材真实时长，否则 game.pause 会在视频播完前就放开
         // （尾巴被下一段结算压掉）。quedi 69帧/2.300s、paiyi 91帧/3.033s、
@@ -1731,18 +1756,30 @@ export function cshContent(config, pack) { try {
                 var clear = function () {
                     try { self._running[type] = false; } catch (e0) {}
                 };
+                /* 2026-10-20：素材级演出查 MEDIA 注册表（单一真值，加素材只改表）。
+                   表外类型（diankuang/wanjun/kill/recover/guilai）走原路：
+                   CSS 大字类日常由 cshMobileFx（键控清单）播放，本路径只是兜底。 */
+                var m = this.MEDIA && this.MEDIA[type];
+                if (m) {
+                    setTimeout(clear, this.durOf(type) + 500);
+                    if (m.pipe === "legacy" && m.fn && typeof this[m.fn] === "function") { this[m.fn](); return; }
+                    if (m.kind === "frames") { console.warn("[池子特效] frames 分支待素材落地（" + type + "）"); clear(); return; }
+                    this._bannerVideo(m);
+                    return;
+                }
                 setTimeout(clear, (this._dur && (this._dur[type] || (type === "kill" ? 3500 : 3000))) || 3500);
-                if (type === "niliu") this._niliuVideo();
-                else if (type === "quedi") this._quediVideo();
-                else if (type === "paiyi") this._paiyiVideo();
-                else if (type === "liegong") this._liegongVideo();
-                else if (type === "luanwu") this._luanwuVideo();
-                else if (type === "duwu") this._duwuVideo();
-                else if (type === "pojun") this._pojunVideo();
-                else if (type === "yannv1") this._yannv1Video();
-                else if (type === "guilai") this._guilai();
+                if (type === "guilai") this._guilai();
                 else clear();
             } catch (e) { }
+        },
+        /* 演出时长查询（技能侧只认这个入口，不许再直读 _dur/_MEDIA 内部结构） */
+        durOf: function (t) {
+            var m = this.MEDIA && this.MEDIA[t];
+            if (m && m.dur) return m.dur;
+            var d = this._dur && this._dur[t];
+            if (typeof d === "number") return d;
+            if (t === "kill") return 3500;
+            return 3000;
         },
         _shake: function (level) {
             var arena = document.getElementById("arena");
@@ -1912,7 +1949,8 @@ export function cshContent(config, pack) { try {
             }
         },
         _niliuVideo: function (onDone) {
-            var D = this._dur.niliu || 23300;
+            var _nm = this.MEDIA && this.MEDIA.niliu;
+            var D = (_nm && _nm.dur) || this._dur.niliu || 23300;
             var layer = this._layer();
             this._bg(layer, "radial-gradient(ellipse at 50% 50%,rgba(8,18,32,.18) 0%,rgba(3,8,16,.28) 100%)", Math.min(D, 1800));
             var wrap = document.createElement("div");
@@ -2314,7 +2352,8 @@ export function cshContent(config, pack) { try {
          */
         _bannerVideo: function (opts, onDone) {
             var o = opts || {};
-            var D = (this._dur && o.durKey && this._dur[o.durKey]) || o.fallbackDur || 3000;
+            /* dur 优先取注册表值（o 即 MEDIA 条目）；durKey/fallbackDur 为旧调用形状兼容 */
+            var D = o.dur || (this._dur && o.durKey && this._dur[o.durKey]) || o.fallbackDur || 3000;
             try {
                 var layer = this._layer();
                 this._bg(layer, "radial-gradient(ellipse at 50% 50%,rgba(8,18,32,.18) 0%,rgba(3,8,16,.28) 100%)", Math.min(D, 1200));
@@ -2375,61 +2414,14 @@ export function cshContent(config, pack) { try {
             }
         },
 
-        // 文鸯·却敌：69 帧 / 2.300s（源片尾帧是硬切黑帧，已裁掉，见 tools/check_blackframe.py）
-        _quediVideo: function (onDone) {
-            this._bannerVideo({
-                file: "csh_wenyang_quedi_banner.mp4", durKey: "quedi",
-                fallbackDur: 2800, revealDur: 2.3, wrapClass: "csh-quedi-banner"
-            }, onDone);
-        },
-
-        // 钟会·排异：91 帧 / 3.033s（裁掉头 0~15 与尾 107~112 的静止段）
-        _paiyiVideo: function (onDone) {
-            this._bannerVideo({
-                file: "csh_zhonghui_paiyi_banner.mp4", durKey: "paiyi",
-                fallbackDur: 3100, revealDur: 3.03, wrapClass: "csh-paiyi-banner"
-            }, onDone);
-        },
-
-        // 谋谋黄忠·烈弓：90 帧 / 3.000s（完整动作循环）
-        _liegongVideo: function (onDone) {
-            this._bannerVideo({
-                file: "csh_mmhz_liegong_banner.mp4", durKey: "liegong",
-                fallbackDur: 3000, revealDur: 3.0, wrapClass: "csh-liegong-banner"
-            }, onDone);
-        },
-
-        // 贾诩·乱武：111 帧 / 3.700s（完整动作循环）
-        _luanwuVideo: function (onDone) {
-            this._bannerVideo({
-                file: "csh_qw_luanwu_banner.mp4", durKey: "luanwu",
-                fallbackDur: 3700, revealDur: 3.7, wrapClass: "csh-luanwu-banner"
-            }, onDone);
-        },
-
-        // 诸葛恪·黩武：60 帧 / 2.000s（Spine 11803_2 GongJi 渲染，1158x576 与既有横幅同规格）
-        _duwuVideo: function (onDone) {
-            this._bannerVideo({
-                file: "csh_zhugeke_duwu_banner.mp4", durKey: "duwu",
-                fallbackDur: 2000, revealDur: 2.0, wrapClass: "csh-duwu-banner"
-            }, onDone);
-        },
-
-        // 界界徐盛·破军：Spine 15803_1 GongJi 骨骼动作渲染（角色+自身BeiJing背景），1158x576 / 2.000s / 30fps，与黩武同规格
-        _pojunVideo: function (onDone) {
-            this._bannerVideo({
-                file: "csh_jjxs_pojun_banner.mp4", durKey: "pojun",
-                fallbackDur: 2000, revealDur: 2.0, wrapClass: "csh-pojun-banner"
-            }, onDone);
-        },
-
-        // 吕玲绮·焰女：源 GIF 438x316 原生分辨率/帧时长直转（60帧 1.80s），contain 展示
-        _yannv1Video: function (onDone) {
-            this._bannerVideo({
-                file: "csh_lvlingqi_yannv_banner.mp4", durKey: "yannv1",
-                fallbackDur: 1800, revealDur: 1.8, wrapClass: "csh-yannv1-banner"
-            }, onDone);
-        },
+        /* 【2026-10-20】原 7 个一行包装函数（_quediVideo/_paiyiVideo/_liegongVideo/
+           _luanwuVideo/_duwuVideo/_pojunVideo/_yannv1Video）已删除 —— 参数全部上移到
+           本对象顶部 MEDIA 注册表（file/dur/revealDur/wrapClass 同名字段），play() 查表后
+           把条目直接当 opts 传给 _bannerVideo。加新演出改表一行即可，不再写包装。
+           各素材的帧数/裁剪说明（历史信息不丢）：
+             却敌 69帧/2.300s（片尾黑帧已裁，tools/check_blackframe.py）· 排异 91帧/3.033s（裁头0~15尾107~112）
+             烈弓 90帧/3.000s · 乱武 111帧/3.700s · 黩武 60帧/2.000s（Spine 渲染，1158x576）
+             破军 Spine 骨骼渲染 1158x576/30fps · 焰女 源 GIF 438x316 直转 60帧/1.80s */
 
         _guilai: function () {
             var D = this._dur.guilai;

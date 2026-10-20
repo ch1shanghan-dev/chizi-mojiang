@@ -7862,9 +7862,9 @@ const cshSkillPack = {
                     } catch (eFx1) {}
                     var waitMs = 3760;
                     try {
-                        if (lib.cshShoushaFx && lib.cshShoushaFx._dur && lib.cshShoushaFx._dur.luanwu) {
-                            waitMs = lib.cshShoushaFx._dur.luanwu;
-                        }
+                        if (lib.cshShoushaFx && typeof lib.cshShoushaFx.durOf === "function") {
+                            waitMs = lib.cshShoushaFx.durOf("luanwu");
+    }
                     } catch (eFx2) {}
                     // 暂停至横幅播完。resume 必须由 setTimeout 独立调度兜底——
                     // 本引擎无 event.wait（调用即抛错，被空 catch 吞掉后 pause 永不恢复＝卡死），
@@ -11403,9 +11403,9 @@ const cshSkillPack = {
                     } catch (eFx1) {}
                     var waitMs = 2000;
                     try {
-                      if (lib.cshShoushaFx && lib.cshShoushaFx._dur && lib.cshShoushaFx._dur.pojun) {
-                        waitMs = lib.cshShoushaFx._dur.pojun;
-                      }
+                      if (lib.cshShoushaFx && typeof lib.cshShoushaFx.durOf === "function") {
+                        waitMs = lib.cshShoushaFx.durOf("pojun");
+    }
                     } catch (eFx2) {}
                     try {
                       game.pause();
@@ -11554,9 +11554,9 @@ const cshSkillPack = {
                     } catch (eFx1) {}
                     var waitMs = 3060;
                     try {
-                        if (lib.cshShoushaFx && lib.cshShoushaFx._dur && lib.cshShoushaFx._dur.liegong) {
-                            waitMs = lib.cshShoushaFx._dur.liegong;
-                        }
+                        if (lib.cshShoushaFx && typeof lib.cshShoushaFx.durOf === "function") {
+                            waitMs = lib.cshShoushaFx.durOf("liegong");
+    }
                     } catch (eFx2) {}
                     try {
                         game.pause();
@@ -12388,10 +12388,10 @@ const cshSkillPack = {
                     } catch (e1) {}
                     "step 2";
                     if (!event._poyinOk) return;
-                    // 暂停至动画播完（默认 2.8s，可在 _dur.quedi 调整）
+                    // 暂停至动画播完（默认 2.8s，时长真值在 cshShoushaFx.MEDIA 表）
                     var waitMs = 2800;
                     try {
-                        if (lib.cshShoushaFx && lib.cshShoushaFx._dur && lib.cshShoushaFx._dur.quedi) waitMs = lib.cshShoushaFx._dur.quedi;
+                        if (lib.cshShoushaFx && typeof lib.cshShoushaFx.durOf === "function") waitMs = lib.cshShoushaFx.durOf("quedi");
                     } catch (e2) {}
                     game.pause();
                     setTimeout(function () {
@@ -14940,9 +14940,9 @@ const cshSkillPack = {
                     } catch (eFx1) {}
                     var waitMs = 1800;
                     try {
-                        if (lib.cshShoushaFx && lib.cshShoushaFx._dur && lib.cshShoushaFx._dur.yannv1) {
-                            waitMs = lib.cshShoushaFx._dur.yannv1;
-                        }
+                        if (lib.cshShoushaFx && typeof lib.cshShoushaFx.durOf === "function") {
+                            waitMs = lib.cshShoushaFx.durOf("yannv1");
+    }
                     } catch (eFx2) {}
                     try {
                         game.pause();
@@ -18633,9 +18633,9 @@ const cshSkillPack = {
                                 } catch (eFx1) {}
                                 var waitMs = 3100;
                                 try {
-                                    if (lib.cshShoushaFx && lib.cshShoushaFx._dur && lib.cshShoushaFx._dur.paiyi) {
-                                        waitMs = lib.cshShoushaFx._dur.paiyi;
-                                    }
+                                    if (lib.cshShoushaFx && typeof lib.cshShoushaFx.durOf === "function") {
+                                        waitMs = lib.cshShoushaFx.durOf("paiyi");
+    }
                                 } catch (eFx2) {}
                                 try {
                                     game.pause();
@@ -27078,9 +27078,9 @@ const cshSkillPack = {
 			} catch (eFx1) {}
 			var waitMs = 2000;
 			try {
-				if (lib.cshShoushaFx && lib.cshShoushaFx._dur && lib.cshShoushaFx._dur.duwu) {
-					waitMs = lib.cshShoushaFx._dur.duwu;
-				}
+				if (lib.cshShoushaFx && typeof lib.cshShoushaFx.durOf === "function") {
+					waitMs = lib.cshShoushaFx.durOf("duwu");
+    }
 			} catch (eFx2) {}
 			try {
 				game.pause();

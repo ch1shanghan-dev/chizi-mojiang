@@ -27,7 +27,7 @@
 
 | # | 事项 | 文档 | 卡在哪 |
 |---|---|---|---|
-| 5 | 技能演出（素材级，不是字体特效） | `docs/skill-fx-plan.md` | 素材。**可先做**：把 `EFFECT_MEDIA` 注册表落地（以后加一支素材只改一行，不再改三处代码） |
+| 5 | 技能演出（素材级，不是字体特效） | `docs/skill-fx-plan.md` | 素材。**注册表已落地（10-20，E56 + 探针 33/0）**：加素材 = 表里一行 + effect/ 文件 + 技能侧两行；剩：等作者素材 + frames 分支实现 + 浏览器实测流程 |
 | 6 | 武将立绘高清化 | `docs/art-direction.md` §5.2 | 素材 |
 | 7 | TTS 语音 | `docs/tts-plan.md` | 素材 / 方案确认 |
 | 8 | 动态皮肤转 WebP | `docs/dynamic-skin-webp-proposal.md` | 提案待批 |

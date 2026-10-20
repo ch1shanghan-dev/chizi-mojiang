@@ -3154,6 +3154,59 @@ async function runBossChecks() {
 		if (car55 && !/r\.retired/.test(car55)) e55.push("生涯页没有「绝版」标记（玩家看不出退休与普通条目的区别）");
 		if (e55.length) fail("执行级 E55：生涯成就退休层（" + e55.slice(0, 4).join("；") + "）");
 		else ok("执行级 E55：生涯成就退休层（软下线机制在位 · 过滤规则锁死 · 幽灵 key 有校验 · C 形态禁入）");
+
+		/* ------------------------------------------------------------------ *
+		 * E56（2026-10-20 · 演出素材注册表 EFFECT_MEDIA / cshShoushaFx.MEDIA）
+		 * ------------------------------------------------------------------
+		 * 方案见 docs/skill-fx-plan.md §2。锁五件事：
+		 *   ① 表挂 lib.cshShoushaFx 属性（不能模块级 var——play 会被联机广播下发 eval）；
+		 *   ② 条目字段齐、kind 合法、dur 合理；
+		 *   ③ 表内 file 与 effect/ 磁盘双向对账（防「加了素材忘登记」与「登记了没文件」）；
+		 *   ④ play() 查表分派 + durOf 入口在位；
+		 *   ⑤ 技能侧不许再直读 _dur（时长真值只有表一处）。 */
+		const e56 = [];
+		const ct56 = fs.readFileSync(path.join(ROOT, "main", "content.js"), "utf8");
+		const sk56 = fs.readFileSync(path.join(ROOT, "skills", "index.js"), "utf8");
+		const efxDir = path.join(ROOT, "effect");
+		/* 表体提取前先剥块注释（表内有「照抄一行」示例，不当真条目） */
+		const mediaBlock = ct56.match(/MEDIA: \{([\s\S]*?)\n        \},/);
+		const mediaBody = mediaBlock ? mediaBlock[1].replace(/\/\*[\s\S]*?\*\//g, "") : "";
+		if (!/MEDIA: \{/.test(ct56)) e56.push("cshShoushaFx 缺 MEDIA 注册表");
+		else if (!/lib\.cshShoushaFx = \{[\s\S]{0,3000}?MEDIA: \{/.test(ct56)) e56.push("MEDIA 不在 lib.cshShoushaFx 属性上（联机广播下发后闭包丢失）");
+		let entries56 = {};
+		if (mediaBlock) {
+			for (const m of mediaBody.matchAll(/(\w+):\s*\{\s*kind:\s*"(\w+)",([^}]*)\}/g)) {
+				entries56[m[1]] = { kind: m[2], body: m[3] };
+			}
+			const keys56 = Object.keys(entries56);
+			if (keys56.length < 8) e56.push("注册表条目不足 8（现役 8 支视频演出，当前 " + keys56.length + "）");
+			for (const k in entries56) {
+				const e = entries56[k];
+				if (["video", "frames"].indexOf(e.kind) < 0) e56.push(k + " kind 非法：" + e.kind);
+				if (!/file:\s*"([^"]+)"/.test(e.body)) { e56.push(k + " 缺 file"); continue; }
+				const file = (e.body.match(/file:\s*"([^"]+)"/) || [])[1];
+				if (!fs.existsSync(path.join(efxDir, file))) e56.push(k + " 的素材文件不在 effect/：" + file);
+				const dm = e.body.match(/dur:\s*(\d+)/);
+				if (!dm || !(Number(dm[1]) >= 500 && Number(dm[1]) <= 60000)) e56.push(k + " 的 dur 非法（" + (dm ? dm[1] : "缺") + "，应 500~60000ms）");
+				if (!/pipe:\s*"(banner|legacy)"/.test(e.body)) e56.push(k + " 缺 pipe 字段");
+				if (/pipe:\s*"legacy"/.test(e.body) && !/fn:\s*"_\w+"/.test(e.body)) e56.push(k + " legacy 管线缺 fn（实现函数名）");
+			}
+			/* 反向对账：effect/ 里的 banner 素材必须都在表内（防加了文件忘登记） */
+			const diskMp4 = fs.existsSync(efxDir) ? fs.readdirSync(efxDir).filter((f) => f.endsWith(".mp4")) : [];
+			const regFiles = [];
+			for (const k in entries56) {
+				const fm = entries56[k].body.match(/file:\s*"([^"]+)"/);
+				if (fm) regFiles.push(fm[1]);
+			}
+			for (const f of diskMp4) if (regFiles.indexOf(f) < 0) e56.push("effect/" + f + " 没登记进 MEDIA（加了素材忘登记=演出永远不播）");
+		}
+		if (!/this\.MEDIA && this\.MEDIA\[type\]/.test(ct56)) e56.push("play() 没有查 MEDIA 表（分派还是硬分支）");
+		if (!/durOf: function/.test(ct56)) e56.push("缺 durOf 入口（技能侧只能认这个）");
+		if (typeof durOfProbe56 !== "function") { /* 占位，防误删下面探针调用 */ }
+		const bareDur56 = sk56.match(/(?<!\w)lib\.cshShoushaFx\._dur\.\w+/g) || [];
+		if (bareDur56.length) e56.push("skills/index.js 还有 " + bareDur56.length + " 处直读 _dur（应走 durOf）");
+		if (e56.length) fail("执行级 E56：演出素材注册表（" + e56.slice(0, 4).join("；") + "）");
+		else ok("执行级 E56：演出素材注册表（" + Object.keys(entries56).length + " 条 · 字段齐 · 与 effect/ 双向对账 · play 查表 · durOf 入口 · 技能侧零直读）");
 	}
 	log("");
 }
