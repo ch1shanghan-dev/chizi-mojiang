@@ -1924,7 +1924,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                  * （牌堆/记牌器/对话层等普遍上万甚至几十万），对局中被压在下面；
                  * 现在与技能代码查看器同级（全局最高档），并加全屏暗幕变成真模态。 */
                 "#csh-redeem-bg{position:fixed!important;left:0!important;top:0!important;width:100%!important;height:100%!important;",
-                "z-index:var(--csh-z-backdrop,2147482999)!important;background:rgba(var(--csh-bg-deep-rgb),.52)!important;animation:cshDbgFade .18s ease-out!important;",
+                "z-index:var(--csh-z-panel,2147483000)!important;background:rgba(var(--csh-bg-deep-rgb),.52)!important;animation:cshDbgFade .18s ease-out!important;",
                 "-webkit-backdrop-filter:blur(12px) saturate(130%)!important;backdrop-filter:blur(12px) saturate(130%)!important;}",
                 "#csh-redeem{display:block!important;position:fixed!important;left:50%!important;top:50%!important;",
                 "transform:translate(-50%,-50%)!important;z-index:var(--csh-z-panel,2147483000)!important;width:min(360px,86vw)!important;",
@@ -6679,7 +6679,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
             st.textContent = [
                 "@keyframes cshExtFade{from{opacity:0;}to{opacity:1;}}",
                 "#csh-extstore-bg{position:fixed!important;left:0!important;top:0!important;width:100%!important;height:100%!important;",
-                "z-index:var(--csh-z-backdrop,2147482999)!important;background:rgba(8,6,4,.52)!important;animation:cshExtFade .18s ease-out!important;",
+                "z-index:var(--csh-z-panel,2147483000)!important;background:rgba(8,6,4,.52)!important;animation:cshExtFade .18s ease-out!important;",
                 "-webkit-backdrop-filter:blur(12px) saturate(130%)!important;backdrop-filter:blur(12px) saturate(130%)!important;}",
                 "#csh-extstore{display:block!important;position:fixed!important;left:50%!important;top:50%!important;",
                 "transform:translate(-50%,-50%)!important;z-index:var(--csh-z-panel,2147483000)!important;width:min(620px,92vw)!important;",

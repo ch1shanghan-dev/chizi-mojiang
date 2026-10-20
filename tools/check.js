@@ -2896,6 +2896,15 @@ async function runBossChecks() {
 				}
 				if (!("modal" in table)) e50.push("层级表缺 modal 档（确认框会被 panel 压住）");
 				else if (table.modal <= table.panel) e50.push("modal 档必须高于 panel");
+				/* 层序纪律（2026-10-20 下午 · 作者实测「池子世界浮层父子关系错」）：
+				   壳（生涯/讨伐/天下榜/行囊/成就/游戏）从调试面板内打开，必须盖过调试遮罩；
+				   确认框必须盖过壳（壳内页面的重置确认，历史遗留坑）；
+				   商店/兑换暗幕挂 documentElement 与调试遮罩同级，必须用 panel 档显式压过。 */
+				if ("shell" in table && "backdrop" in table && table.shell <= table.backdrop) e50.push("shell 档必须高于 backdrop（从池子世界打开的游戏壳会被调试面板盖住——作者实测踩过）");
+				if ("shell" in table && "modal" in table && table.modal <= table.shell) e50.push("modal 档必须高于 shell（壳内页面的确认框会被壳盖住）");
+				const dbgZ = fs.readFileSync(path.join(ROOT, "core", "csh_debug.js"), "utf8");
+				if (!/#csh-extstore-bg\{[^}]*z-index:var\(--csh-z-panel/.test(dbgZ)) e50.push("商店暗幕没用 panel 档（与调试遮罩同档靠 DOM 顺序，顺序一反就被压）");
+				if (!/#csh-redeem-bg\{[^}]*z-index:var\(--csh-z-panel/.test(dbgZ)) e50.push("兑换暗幕没用 panel 档（同商店问题）");
 			}
 		}
 		/* 【2026-10-20】行囊页三处破坏性操作（回滚/解包/重置）必须走自绘确认。
