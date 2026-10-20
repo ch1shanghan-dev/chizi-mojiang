@@ -74,5 +74,7 @@ jobs:
             也可以直接把 zip 拖进游戏窗口导入。
 
             详细变更见 `docs/CHANGELOG.md`。
-          files: chizi-mojiang_v*.zip
-          fail_on_unmatched_files: true
+          # 【2026-10-20】不再由 CI 上传 zip 资产：CI 的包没跑门禁/探针，且与手动通道
+          # （gh.sh release upload，ASCII 名 + 核对）双轨并挂会让 release 出现两份资产
+          # （v4.0.8 实测踩到：CI 份旧代码 + 手动份修复版并存）。资产只走手动通道，
+          # 这里仅创建/更新 Release 说明。构建产物仍可作 workflow artifact 备查。
