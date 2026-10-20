@@ -369,9 +369,9 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                 /* ---------- 遮罩 ---------- */
                 /* 【2026-09-30 修复】原为 999999，低于 #csh-dbg-overlay 的 1000001
                    ⇒ 调试面板开着时打开胜负统计会被压在下面。
-                   提到 1000003：高于调试面板(1000001)与局内互动(1000002)，与本扩展其它浮层一致。
-                   （本 overlay 本身已正确挂在 documentElement 上，纯粹是数值差一档。） */
-                "#csh-wr-overlay{position:fixed!important;left:0!important;top:0!important;width:100%!important;height:100%!important;z-index:1000003!important;",
+                  层级走 --csh-z-winrate（2026-10-20 收编：旧 1000003 档低于商店暗幕 2147482999，
+                  与大面板同开时会被压；现与层级表同源，高于调试遮罩与互动层）。 */
+                "#csh-wr-overlay{position:fixed!important;left:0!important;top:0!important;width:100%!important;height:100%!important;z-index:var(--csh-z-winrate,2147482150)!important;",
                 "display:flex!important;justify-content:center!important;box-sizing:border-box!important;",
                 "padding:env(safe-area-inset-top,0px) 0 env(safe-area-inset-bottom,0px)!important;",
                 "background:radial-gradient(120% 80% at 50% 0%,rgba(216,180,106,.10),rgba(0,0,0,0) 60%),rgba(6,5,4,.86)!important;",

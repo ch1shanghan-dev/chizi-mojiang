@@ -1297,7 +1297,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
         try {
             var ta = document.createElement("textarea");
             ta.value = txt;
-            ta.style.cssText = "position:fixed;left:0;top:0;width:90%;height:60%;z-index:1000002;opacity:0.95;";
+            ta.style.cssText = "position:fixed;left:0;top:0;width:90%;height:60%;z-index:var(--csh-z-toast,2147483050);opacity:0.95;";
             /* 【2026-09-30 第六轮】原先挂 document.body —— 引擎在手机端给 body 加
                transform:scale(0.4)，body 因而自成层叠上下文，ta 被囚在 body 内，
                无论 z-index 写多大都压在挂 documentElement 的 #csh-dbg-overlay(1000001) 之下：
@@ -1631,7 +1631,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
             st.textContent = [
                 "@keyframes cshDbgToastIn{from{opacity:0;transform:translateY(-10px);}to{opacity:1;transform:translateY(0);}}",
                 "#" + TOAST_HOST_ID + "{position:fixed!important;left:50%!important;top:11%!important;transform:translateX(-50%)!important;",
-                "z-index:1000090!important;display:flex!important;flex-direction:column!important;align-items:center!important;gap:8px!important;",
+                "z-index:var(--csh-z-toast,2147483050)!important;display:flex!important;flex-direction:column!important;align-items:center!important;gap:8px!important;",
                 "pointer-events:none!important;width:max-content!important;max-width:86%!important;",
                 "font-family:system-ui,-apple-system,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif!important;}",
                 "#" + TOAST_HOST_ID + " .csh-dbg-toast{position:static!important;display:block!important;box-sizing:border-box!important;",
@@ -1668,7 +1668,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                 /* ---------- 遮罩：全屏铺满（§E.1） ----------
                  * inset:0 + var(--csh-paper)，**不加模糊**（手机 GPU 吃不住，且模糊对纯色底无收益） */
                 "#csh-dbg-overlay{position:fixed!important;left:0!important;top:0!important;right:0!important;bottom:0!important;",
-                "width:100%!important;height:100%!important;height:100dvh!important;z-index:1000001!important;",
+                "width:100%!important;height:100%!important;height:100dvh!important;z-index:var(--csh-z-backdrop,2147482999)!important;",
                 "display:block!important;pointer-events:auto!important;box-sizing:border-box!important;",
                 "background:var(--csh-paper)!important;",
                 "font-family:system-ui,-apple-system,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif!important;animation:cshDbgFade .18s ease-out!important;",
@@ -7862,7 +7862,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                            字体换回**宋体粗**：书法体在 20 出头的小尺寸里笔画会糊在一起，
                            而宋体有笔锋、有起收、横细竖粗 —— 清晰又不中庸，正好是"印章/纸墨"的调性。
                            ══════════════════════════════════════════════════════════ */
-                        "#csh-dbg-float-btn{position:fixed!important;z-index:999990!important;box-sizing:border-box!important;",
+                        "#csh-dbg-float-btn{position:fixed!important;z-index:var(--csh-z-float,2147482250)!important;box-sizing:border-box!important;",
                         "width:clamp(38px,10vmin,44px)!important;height:clamp(38px,10vmin,44px)!important;border-radius:50%!important;",
                         "display:flex!important;align-items:center!important;justify-content:center!important;",
                         "padding:0!important;margin:0!important;overflow:hidden!important;",

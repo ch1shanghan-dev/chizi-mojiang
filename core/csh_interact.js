@@ -1529,7 +1529,7 @@ import GEN_LINES from "./csh_interact_lines_gen.js";
 		st.textContent = [
 			"@keyframes cshIaFade{from{opacity:0;}to{opacity:1;}}",
 			"@keyframes cshIaRise{from{opacity:0;transform:translateY(14px);}to{opacity:1;transform:translateY(0);}}",
-			"#" + OV_ID + "{position:fixed!important;left:0!important;top:0!important;width:100%!important;height:100%!important;z-index:1000002!important;",
+			"#" + OV_ID + "{position:fixed!important;left:0!important;top:0!important;width:100%!important;height:100%!important;z-index:var(--csh-z-overlay,2147482100)!important;",
 			"display:flex!important;align-items:center!important;justify-content:center!important;pointer-events:auto!important;",
 			"background:rgba(var(--csh-bg-deep-rgb),.52)!important;",
 			"-webkit-backdrop-filter:blur(10px) saturate(140%)!important;backdrop-filter:blur(10px) saturate(140%)!important;",
@@ -1755,7 +1755,7 @@ import GEN_LINES from "./csh_interact_lines_gen.js";
 		function openCustomPanel() {
 			var ov = document.createElement("div");
 			ov.id = "csh-ia-cust-ov";
-			ov.style.cssText = "position:fixed!important;left:0;top:0;width:100%;height:100%;z-index:1000004!important;"
+			ov.style.cssText = "position:fixed!important;left:0;top:0;width:100%;height:100%;z-index:var(--csh-z-overlay,2147482100)!important;"
 				+ "display:flex;align-items:center;justify-content:center;background:rgba(var(--csh-bg-deep-rgb),.52)!important;"
 				+ "backdrop-filter:blur(10px) saturate(140%);-webkit-backdrop-filter:blur(10px) saturate(140%);";
 			ov.addEventListener("click", function (ev) { if (ev.target === ov) ov.parentNode.removeChild(ov); }, true);

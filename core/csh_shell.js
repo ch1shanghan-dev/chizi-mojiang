@@ -285,7 +285,7 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 			"@keyframes cshShUp{from{transform:translateY(12px);opacity:0;}to{transform:translateY(0);opacity:1;}}",
 			/* 外壳：全屏遮罩，禁止 100vw/100vh，用 100% */
 			"#" + OV_ID + "{position:fixed!important;left:0!important;top:0!important;width:100%!important;height:100%!important;",
-			"z-index:1000020!important;display:block!important;pointer-events:auto!important;",
+			"z-index:var(--csh-z-shell,2147482200)!important;display:block!important;pointer-events:auto!important;",
 			"background:rgba(var(--csh-bg-deep-rgb),.96)!important;",
 			"font-family:'Microsoft YaHei','PingFang SC','STHeiti',sans-serif!important;",
 			/* ★ 2026-09-29：壳内文字全局抗锯齿（深色底上亚像素渲染会出彩边，用户反馈"散光"）。
@@ -406,7 +406,7 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 			"#csh-shell-rot .csh-sh-rbox{text-align:center!important;font-size:var(--csh-lfs-lg,14px)!important;line-height:1.9!important;color:var(--csh-bg)!important;}",
 			/* ---------- 入场收费屏（§F.3） ---------- */
 			"#" + FEE_ID + "{position:fixed!important;left:0!important;top:0!important;width:100%!important;height:100%!important;",
-			"z-index:1000030!important;display:flex!important;align-items:center!important;justify-content:center!important;",
+			"z-index:var(--csh-z-shell,2147482200)!important;display:flex!important;align-items:center!important;justify-content:center!important;",
 			"padding:12px!important;box-sizing:border-box!important;",
 			"background:rgba(var(--csh-bg-deep-rgb),.94)!important;font-family:'Microsoft YaHei','PingFang SC','STHeiti',sans-serif!important;",
 			"-webkit-font-smoothing:antialiased!important;text-rendering:optimizeLegibility!important;",

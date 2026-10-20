@@ -903,7 +903,7 @@ export function cshContent(config, pack) { try {
                 "}",
                 ".csh_guiyan_shake{animation:csh_guiyan_shake .7s ease-in-out;}",
                 ".csh_guiyan_shake_big{animation:csh_guiyan_shake 1.1s ease-in-out;}",
-                ".csh_guiyan_mist{position:fixed;inset:0;z-index:9999;pointer-events:none;opacity:0;",
+                ".csh_guiyan_mist{position:fixed;inset:0;z-index:var(--csh-z-scene-top,999);pointer-events:none;opacity:0;",
                 "transition:opacity 1.2s ease-in-out;",
                 "background:radial-gradient(ellipse at center,rgba(90,0,0,.22) 0%,rgba(55,0,0,.5) 55%,rgba(16,0,0,.88) 100%);}",
                 ".csh_guiyan_mist_big{background:radial-gradient(ellipse at center,rgba(140,0,0,.3) 0%,rgba(80,0,0,.62) 50%,rgba(20,0,0,.95) 100%);}",
@@ -1683,7 +1683,7 @@ export function cshContent(config, pack) { try {
                 /* 注：神/魔选势力面板滚动条（engine-compat C4）**不在这里**——
                    本块是击杀特效的懒注入（要等第一次特效才跑），而选将面板开局就出现。
                    正确落点 = cshEgScrollApply()（content 加载即执行）。此处曾误挂，已迁出。 */
-                ".csh_ssfx_layer{position:fixed;inset:0;z-index:10000;pointer-events:none;overflow:hidden;}",
+                ".csh_ssfx_layer{position:fixed;inset:0;z-index:var(--csh-z-ssfx,1000);pointer-events:none;overflow:hidden;}",
                 ".csh_ssfx_bgfade{animation:csh_ssfx_bgfade 2.4s ease-in-out forwards;}",
                 "@keyframes csh_ssfx_bgfade{0%{opacity:0;}12%{opacity:1;}78%{opacity:1;}100%{opacity:0;}}",
                 "@keyframes csh_ssfx_shake_x{0%,100%{transform:translate(0,0);}10%{transform:translate(-10px,6px);}20%{transform:translate(9px,-7px);}30%{transform:translate(-8px,-5px);}40%{transform:translate(7px,7px);}50%{transform:translate(-6px,4px);}60%{transform:translate(5px,-5px);}70%{transform:translate(-4px,3px);}80%{transform:translate(3px,-3px);}90%{transform:translate(-2px,2px);}}",

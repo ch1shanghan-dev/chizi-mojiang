@@ -2864,12 +2864,39 @@ async function runBossChecks() {
 			if (!hasVar && !hasPad && !dockShift) e50.push(f + " 未给壳的右上安全区让位（会被余额胶囊压住）");
 		}
 		/* 【2026-10-20 · 叠层错乱根治】浮层层级只允许 var(--csh-z-*)（真值在 csh_theme.js 的层级表）。
-		   以前 22 处裸 2147xxxx 散在 7 个文件，两个浮层同时打开时谁盖谁纯看数字大小。 */
+		   以前 22 处裸 2147xxxx 散在 7 个文件，两个浮层同时打开时谁盖谁纯看数字大小。
+		   2026-10-20 下午扩扫描：不止 2147xxxx —— 旧 100xxxx / 999990 档同样中招
+		  （商店暗幕 2147482999 会压过 toast 1000090 / 确认框 1000010，作者实测踩到）。 */
 		for (const f of fs.readdirSync(path.join(ROOT, "core")).filter((x) => x.endsWith(".js")).map((x) => "core/" + x)
-			.concat(fs.readdirSync(path.join(ROOT, "games")).filter((x) => x.endsWith(".html")).map((x) => "games/" + x))) {
+			.concat(fs.readdirSync(path.join(ROOT, "games")).filter((x) => x.endsWith(".html")).map((x) => "games/" + x))
+			.concat(fs.readdirSync(path.join(ROOT, "main")).filter((x) => x.endsWith(".js")).map((x) => "main/" + x))) {
 			const src = fs.readFileSync(path.join(ROOT, f), "utf8");
-			const bad = src.match(/z-index:[^0-9]*2147[0-9]{6}/g);
-			if (bad && bad.some((b) => !b.includes("var(--csh-z-"))) e50.push(f + " 有裸的浮层魔数 z-index（应走 --csh-z-*）");
+			const bad = src.match(/z-index:[^0-9var]{0,12}\d{5,}/g);
+			if (bad && bad.some((b) => !b.includes("var(--csh-z-"))) e50.push(f + " 有裸的浮层魔数 z-index（应走 --csh-z-*）：" + bad.filter((b) => !b.includes("var(--csh-z-")).slice(0, 2).join(" / "));
+		}
+		/* 【2026-10-20 下午 · 两套体系一致性】csh_uikit.js 的 CSH_Z 常量与 csh_theme.js 的
+		   --csh-z-* 表必须同值 —— 10-20 凌晨的裂缝就是「表改了、常量没改」：
+		   确认框 1000010 被商店暗幕 2147482999 压住点不到（安装无进度）。 */
+		{
+			const ukSrc = fs.readFileSync(path.join(ROOT, "core", "csh_uikit.js"), "utf8");
+			const thSrc = fs.readFileSync(path.join(ROOT, "core", "csh_theme.js"), "utf8");
+			const zBlock = ukSrc.match(/export const CSH_Z = \{([\s\S]*?)\};/);
+			const tableBlock = thSrc.match(/var Z = \[([\s\S]*?)\];/);
+			if (!zBlock) e50.push("csh_uikit.js 里找不到 CSH_Z");
+			else if (!tableBlock) e50.push("csh_theme.js 里找不到层级表 Z");
+			else {
+				const consts = {};
+				for (const m of zBlock[1].matchAll(/(\w+):\s*(\d+)/g)) consts[m[1]] = Number(m[2]);
+				const table = {};
+				for (const m of tableBlock[1].matchAll(/\["(\w+)",\s*(\d+)\]/g)) table[m[1]] = Number(m[2]);
+				for (const k in consts) {
+					if (k === "scene" || k === "sceneTop") continue;   /* 对局内演出，游戏页 iframe 自成体系 */
+					if (!(k in table)) e50.push("CSH_Z." + k + "（" + consts[k] + "）在主题层级表里没有对应档位");
+					else if (table[k] !== consts[k]) e50.push("CSH_Z." + k + "=" + consts[k] + " ≠ 层级表 " + table[k] + "（两套体系数值脱节，必现互压）");
+				}
+				if (!("modal" in table)) e50.push("层级表缺 modal 档（确认框会被 panel 压住）");
+				else if (table.modal <= table.panel) e50.push("modal 档必须高于 panel");
+			}
 		}
 		/* 【2026-10-20】行囊页三处破坏性操作（回滚/解包/重置）必须走自绘确认。
 		   代码层面锁两件事：有 ask() 统一入口、裸 window.confirm 只剩它内部那一处兜底。
