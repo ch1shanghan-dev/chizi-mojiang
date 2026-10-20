@@ -670,7 +670,7 @@ const cshSkillPack = {
                         .set("cardsx", cards)
                         .set("ai", card => {
                             const target = get.player();
-                            if (target.isTurnedOver() || target.hp <= 1) return -1;
+                            if (target.hasSkillTag("noturn") || target.isTurnedOver() || target.hp <= 1) return -1;
                             return 20 - get.value(card, target) - cards.length * 5;
                         })
                         .forResult();
@@ -685,17 +685,20 @@ const cshSkillPack = {
                     order: 9,
                     result: {
                         player(player, target) {
-                            return 0.3;
+                            return 0;
                         },
                         target(player, target) {
-                            const att = get.attitude(player, target);
-                            if (att >= 0) return 0;
-                            let eff = get.damageEffect(target, player, player) * 0.35;
-                            // 手牌少 / 残血更痛；已翻面则翻面收益低
-                            if (target.countCards("h") <= 2) eff -= 0.9;
-                            if (target.hp <= 2) eff -= 0.7;
-                            if (target.isTurnedOver()) eff += 0.6;
-                            return eff - 1.2;
+                            if (!target) return 0;
+                            const n = Math.max(1, ui.selected.cards.length);
+                            const selfAtt = Math.max(1, get.attitude(target, target));
+                            // 目标会选择对自己更有利的一项；翻回正面/免翻面也照常摸牌。
+                            const turn = target.hasSkillTag("noturn") ? 0 : (target.isTurnedOver() ? 2 : -2);
+                            const draw = get.effect(target, { name: "draw" }, target, target) / selfAtt;
+                            const flipDraw = turn + draw * n;
+                            if (target.countCards("he") < n) return flipDraw;
+                            // 实际是失去体力，不应被伤害免疫/受伤收益替代。
+                            const discardHp = get.effect(target, { name: "losehp" }, target, target) / selfAtt - n * 0.5;
+                            return Math.max(flipDraw, discardHp);
                         },
                     },
                 },
@@ -1207,19 +1210,33 @@ const cshSkillPack = {
                     order: 7.2,
                     result: {
                         target(player, target) {
+                            if (!player || !target || !player.canCompare(target)) return 0;
                             const att = get.attitude(player, target);
                             if (att >= 0) return 0;
-                            const nums = player.getCards("h").map(c => get.number(c) || 0);
-                            if (!nums.length) return 0;
-                            const maxN = Math.max(...nums);
-                            let teff = get.damageEffect(target, player, player);
-                            if (teff > 0) teff = -teff;
-                            // 有大点才拼
-                            if (maxN >= 11) teff -= 0.6;
-                            else if (maxN >= 8) teff -= 0.2;
-                            else teff += 0.5; // 点小数不拼
-                            if (target.hp <= 2) teff -= 0.5;
-                            return teff;
+                            const hit = get.damageEffect(target, player, player);
+                            if (hit <= 0) return 0;
+                            // 与当前引擎默认拼点选牌保持同一偏好，避免高点桃被保留后仍按它预测。
+                            let own, best = -Infinity;
+                            for (const c of player.getCards("h")) {
+                                const value = get.value(c, player);
+                                const number = player.hasSkillTag("forceWin", null, { card: c }) ? 13 : (get.number(c, player) || 0);
+                                const score = number - value / 5 - (value >= 8 && get.type(c) !== "equip" ? 6 : 0) - (c.name === "du" ? 5 : 0);
+                                if (score > best) { best = score; own = c; }
+                            }
+                            if (!own) return 0;
+                            const number = player.hasSkillTag("forceWin", null, { card: own }) ? 13 : (get.number(own, player) || 0);
+                            if (number <= 0) return 0;
+                            const known = typeof target.getKnownCards === "function" ? target.getKnownCards(player) : [];
+                            const unknown = Math.max(0, target.countCards("h") - known.length);
+                            const knownMax = known.reduce((max, c) => Math.max(max, get.number(c, target) || 0), 0);
+                            // 暗牌仅按公开张数作 1~13 均匀点数估计，比较其最大值；不读取真实暗牌。
+                            const below = Math.max(0, Math.min(1, (number - 1) / 13));
+                            const atMost = Math.max(0, Math.min(1, number / 13));
+                            const win = knownMax < number ? Math.pow(below, unknown) : 0;
+                            const lose = knownMax > number ? 1 : 1 - Math.pow(atMost, unknown);
+                            const risk = get.damageEffect(player, target, player);
+                            const utility = win * hit + lose * risk - Math.max(0, get.value(own, player)) * 0.15;
+                            return -Math.max(0, utility);
                         },
                     },
                     tag: { damage: 1 },
@@ -12200,15 +12217,15 @@ const cshSkillPack = {
                             switch (get.suit(ui.selected.cards[0])) {
                                 case "heart":
                                     if (att > 0) return target.hp <= 2 ? 2.5 : 0.8;
-                                    return -0.5;
+                                    return 0.5; // 回复保护对目标有利；敌我态度由引擎乘算
                                 case "diamond":
                                     if (att > 0) return 1.8 + Math.min(1.5, target.countCards("h") * 0.2);
-                                    return -0.3;
+                                    return 0.3;
                                 case "club":
                                     if (att < 0) return -1.5 - Math.min(2, target.countCards("h", "shan") * 0.6);
                                     return 0.2;
                                 case "spade":
-                                    if (att < 0) return get.damageEffect(target, player, player, "thunder") * 0.9;
+                                    if (att < 0) return get.damageEffect(target, player, target, "thunder") * 0.9;
                                     return -1;
                                 default:
                                     return 0;
@@ -14121,7 +14138,7 @@ const cshSkillPack = {
                             var att = get.attitude(player, target);
                             if (att >= 0) return 0;
                             // 敌方：残血或牌少时逼杀收益高（分值取负，目标态度为 -1 后即为正收益）
-                            var shaEff = get.effect(target, { name: "sha" }, player, player);
+                            var shaEff = get.effect(target, { name: "sha" }, player, target);
                             if (target.hp <= 2 || target.countCards("h") <= 1) return shaEff * 1.1 - 0.8;
                             // 牌多则逼交收益
                             return -1.6 - Math.min(2, target.countCards("he") * 0.25);
@@ -14188,7 +14205,7 @@ const cshSkillPack = {
                                 target(player, target) {
                                     const att = get.attitude(player, target);
                                     if (att >= 0) return 0;
-                                    const shaEff = get.effect(target, { name: "sha" }, player, player);
+                                    const shaEff = get.effect(target, { name: "sha" }, player, target);
                                     // 残血/少牌：逼杀收益
                                     if (target.hp <= 2 || target.countCards("h") <= 1) {
                                         return shaEff * 1.2 - 0.6;
@@ -14260,19 +14277,28 @@ const cshSkillPack = {
                     player.swapHandcards(target);
                 },
                 // 交换价值评估（联机安全：无闭包，挂技能对象供各端 AI 本地调用）
-                // _advantage = 目标手牌对我与其自身的价值之和 - 我的手牌对我与其自身的价值之和
-                // 对敌人：即"我方增益 + 敌方减益"的实力差变化；对队友：即全队总价值变化
+                // 仅用自己手牌、引擎认可的已知牌及公开牌数；队友按全队交换前后的净收益评估。
                 _advantage: function(player,target){
-                    var tgCards=target.getCards('h');
+                    if(!player||!target||player===target||Math.abs(target.countCards('h')-player.countCards('h'))>1) return 0;
+                    var tgCards=typeof target.getKnownCards==='function'?target.getKnownCards(player):[];
                     var myCards=player.getCards('h');
-                    var num=0;
+                    var ally=get.attitude(player,target)>0;
+                    // get.value(card,target) 还会按对方暗手牌的同名牌数量估值，不能间接偷看。
+                    function publicValue(card){
+                        var info=get.info(card), a=info&&info.ai;
+                        var value=a&&(a.value!==undefined?a.value:(a.basic&&a.basic.value));
+                        if(Array.isArray(value)) value=value[0];
+                        return typeof value==='number'&&isFinite(value)?value:5;
+                    }
+                    // 未知牌按单边价值5估计；不调用 get.value 读取暗牌，也不虚构队友间的价值差。
+                    var num=ally?0:Math.max(0,target.countCards('h')-tgCards.length)*10;
                     for(var i=0;i<tgCards.length;i++){
                         num+=get.value(tgCards[i],player);
-                        num+=get.value(tgCards[i],target);
+                        num+=(ally?-1:1)*publicValue(tgCards[i]);
                     }
                     for(var i=0;i<myCards.length;i++){
                         num-=get.value(myCards[i],player);
-                        num-=get.value(myCards[i],target);
+                        num+=(ally?1:-1)*publicValue(myCards[i]);
                     }
                     return num;
                 },
@@ -14295,6 +14321,7 @@ const cshSkillPack = {
                     },
                     result: {
                         player: function(player,target){
+                            if(!player||!target||player===target) return 0;
                             var att=get.attitude(player,target);
                             var adv=lib.skill.csh_jiaomeng._advantage(player,target);
                             if(att>0){
@@ -14311,11 +14338,12 @@ const cshSkillPack = {
                             return num;
                         },
                         target: function(player,target){
+                            if(!player||!target||player===target) return 0;
                             var att=get.attitude(player,target);
                             var adv=lib.skill.csh_jiaomeng._advantage(player,target);
                             if(adv<=0) return 0;
                             if(att<0) return -Math.min(4,adv/3);
-                            if(att>0) return -Math.min(1.5,adv/8);
+                            if(att>0) return 0; // 队伍净收益已由 result.player 计入，不再把队友收益当损失。
                             return -Math.min(2,adv/5);
                         },
                     },
@@ -23274,8 +23302,9 @@ const cshSkillPack = {
                             if (!missing) return -0.5;
                             if (target === player) return Math.min(3, missing * 1.2);
                             if (att > 0) return Math.min(3, missing * 1.1);
-                            if (att < 0) return -Math.min(3, 1 + missing * 1.3);
-                            return -0.5;
+                            // 回复是目标收益；返回负值会被敌对态度再翻成正收益。
+                            if (att < 0) return Math.min(3, 1 + missing * 1.3);
+                            return 0.5;
                         },
                     },
                 },
@@ -26981,7 +27010,7 @@ const cshSkillPack = {
 					if (target.countCards("j") > 0) score += 1.5;
 					if (target.countCards("h") >= 3) score += 0.6;
 					if (target.hp <= 2) score += 0.4;
-					return score;
+					return -score; // 当前 score 已是发动者视角，目标评分需反向
 				},
 			},
 			tag: {
@@ -27112,7 +27141,7 @@ const cshSkillPack = {
 					// 弃牌代价：目标体力越高越亏，略降分
 					eff -= Math.max(0, target.hp - 1) * 0.35;
 					// 自己牌不够或牌质量很高时再由 check 控；此处只评目标
-					return eff;
+					return -eff; // 引擎还会乘目标态度，不能再次返回发动者收益
 				},
 				player(player, target) {
 					// 若可能触发自掉血（目标被打到濒死且可能存活），略扣

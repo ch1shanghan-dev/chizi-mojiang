@@ -95,6 +95,7 @@ lib.cshUI.confirm({
 
 - 自绘、挂 `documentElement`、`z-index` 走 `CSH_Z.modal`；Esc 取消 / Enter 确定 / 点遮罩取消。
 - 已替换：胜负统计的删除/重置阵营/清空本模式。原生 `confirm` 只作为基座缺席时的兜底。
+- 2026-10-21 第一批：替换确认框必须走实例的幂等取消入口（返回值 close / layer.__cshClose），旧回调只返回一次 false；不得只移除 DOM 留下 keydown。新实例先具备完整关闭入口，再取消旧实例，允许取消回调同步新开弹窗；只有当前实例消费按键，关闭时清理焦点定时器。`tools/probe_first_batch.mjs --browser <Chrome路径>` 已验证生命周期，不代表完整焦点/读屏或游戏实机已验收。
 
 ---
 

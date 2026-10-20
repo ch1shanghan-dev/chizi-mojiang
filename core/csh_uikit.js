@@ -249,9 +249,9 @@ function toast(msg, opt) {
 function confirmBox(opts, cb) {
     opts = (typeof opts === "string") ? { message: opts } : (opts || {});
     ensureStyle();
+    var old = null;
     try {
-        var old = document.getElementById(CF_ID);
-        if (old && old.parentNode) old.parentNode.removeChild(old);
+        old = document.getElementById(CF_ID);
     } catch (e0) {}
     var layer = document.createElement("div");
     layer.id = CF_ID;
@@ -280,23 +280,37 @@ function confirmBox(opts, cb) {
     (document.documentElement || document.body).appendChild(layer);
 
     var done = false;
+    var focusTimer = 0;
     function fin(v) {
         if (done) return;
         done = true;
+        try { if (focusTimer) clearTimeout(focusTimer); } catch (eT) {}
         try { document.removeEventListener("keydown", onKey, true); } catch (eK) {}
         try { if (layer.parentNode) layer.parentNode.removeChild(layer); } catch (eR) {}
         try { if (typeof cb === "function") cb(!!v); } catch (eC) {}
     }
     function onKey(e) {
+        if (done || document.getElementById(CF_ID) !== layer) return;
         if (e.key === "Escape" || e.keyCode === 27) { try { e.preventDefault(); e.stopPropagation(); } catch (eP) {} fin(false); }
         else if (e.key === "Enter" || e.keyCode === 13) { try { e.preventDefault(); e.stopPropagation(); } catch (eP2) {} fin(true); }
     }
+    var handle = { el: layer, close: function () { fin(false); } };
+    layer.__cshClose = handle.close;
     document.addEventListener("keydown", onKey, true);
     layer.addEventListener("click", function (e) { if (e.target === layer) fin(false); }, false);
     cancel.addEventListener("click", function (e) { try { e.stopPropagation(); } catch (eS) {} fin(false); }, false);
     ok.addEventListener("click", function (e) { try { e.stopPropagation(); } catch (eS) {} fin(true); }, false);
-    setTimeout(function () { try { ok.focus(); } catch (eF) {} }, 30);
-    return { el: layer, close: function () { fin(false); } };
+    /* 先让新实例具备完整关闭入口，再取消旧实例。旧回调可能同步再开一个框，
+       该框会经同一入口取消本实例，始终只留下最后一次打开的框与监听器。 */
+    try {
+        if (old && typeof old.__cshClose === "function") old.__cshClose();
+        else if (old && old.parentNode) old.parentNode.removeChild(old);
+    } catch (eOld) {}
+    if (!done) focusTimer = setTimeout(function () {
+        if (done || document.getElementById(CF_ID) !== layer) return;
+        try { ok.focus(); } catch (eF) {}
+    }, 30);
+    return handle;
 }
 
 export function installUIKit() {

@@ -282,16 +282,17 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                 var st=collect(p);
                 var nm=charNames(p);
                 for(var j=0;j<nm.length;j++) record(mode,nm[j],win,st);
+                // 个人角色战绩与身份无关：对决可能无 identity，国战是 wei/shu 等势力。
+                if(p==me2){
+                    for(var j=0;j<nm.length;j++) recordMe("chars",nm[j],win);
+                }
                 // 阵营胜率：按身份入账，明忠并入忠臣；渲染时主忠合并
                 var idn=p.identity;
                 if(idn=="mingzhong") idn="zhong";
                 if(idn=="zhu"||idn=="zhong"||idn=="fan"||idn=="nei"||idn=="commoner"){
                     recordCamp(idn,win);
-                    // 玩家操控：本地玩家自己的角色战绩与身份战绩
-                    if(p==me2){
-                        for(var j=0;j<nm.length;j++) recordMe("chars",nm[j],win);
-                        recordMe("camps",idn,win);
-                    }
+                    // 只有身份标签有效时，才累加本地玩家的身份战绩。
+                    if(p==me2) recordMe("camps",idn,win);
                 }
             }
         }
@@ -379,7 +380,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                 "font-family:'Microsoft YaHei','PingFang SC','STHeiti',sans-serif!important;animation:cshWrFade .18s ease-out!important;}",
                 /* ---------- 面板外壳 ----------
                  * margin:auto + 去 align-items:center：内容高于屏幕时顶端不会被顶出可视区 */
-                "#csh-wr-panel{position:relative!important;display:block!important;box-sizing:border-box!important;margin:auto!important;",
+                "#csh-wr-panel{--csh-wr-muted:#b3a791;position:relative!important;display:block!important;box-sizing:border-box!important;margin:auto!important;",
                 /* overflow-x 用 auto 而非 hidden 兜底：【2026-10-01 紧凑化】后武将排行整表
                  * 约 680px，≥760px 视口一屏装完不再出现横滑条；更窄的视口回落为横滚
                  * （表格自带 min-width:640px + 前两列吸附），用 hidden 会直接裁掉右侧列。 */
@@ -395,6 +396,8 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                 "#csh-wr-panel::-webkit-scrollbar-thumb{background:rgba(216,180,106,.26);border-radius:5px;}",
                 "#csh-wr-panel::-webkit-scrollbar-thumb:hover{background:rgba(216,180,106,.46);}",
                 "#csh-wr-panel *{box-sizing:border-box!important;}",
+                /* 信息文字不继承宿主光晕/描边；下方标题单独保留轻阴影。 */
+                "#csh-wr-panel,#csh-wr-panel *{text-shadow:none!important;-webkit-text-stroke:0!important;}",
                 /* 引擎全局 div{position:absolute;display:inline-block;transition:all .5s} 必须整体复位 */
                 "#csh-wr-panel div{position:static!important;display:block!important;}",
                 "#csh-wr-panel span{position:static!important;display:inline-block!important;}",
@@ -428,7 +431,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                 "transition:color .18s ease,border-color .18s ease!important;}",
                 "#csh-wr-panel .csh-wr-tab:hover{color:#f0e3c4!important;}",
                 "#csh-wr-panel .csh-wr-tab.on{color:#f6e3b0!important;font-weight:700!important;border-bottom-color:rgba(216,180,106,.9)!important;",
-                "text-shadow:0 0 14px rgba(216,180,106,.4)!important;}",
+                "text-shadow:none!important;}",
                 /* ---------- KPI ---------- */
                 "#csh-wr-panel .csh-wr-kpis{display:flex!important;flex-wrap:wrap!important;gap:10px!important;margin:0 0 16px!important;}",
                 /* 【2026-09-30 空间修复】min-width 132→104：手机可用内容宽约 330px，
@@ -439,10 +442,10 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                 "border:1px solid rgba(216,180,106,.2)!important;box-shadow:0 6px 18px rgba(0,0,0,.35)!important;}",
                 "#csh-wr-panel .csh-wr-kpi .k{font-size:var(--csh-lfs-cap2,11.5px)!important;color:#9d947e!important;letter-spacing:1px!important;}",
                 "#csh-wr-panel .csh-wr-kpi .v{font-size:var(--csh-lfs-2xl,22px)!important;font-weight:700!important;color:#f6e3b0!important;margin-top:4px!important;",
-                "font-family:Consolas,Menlo,monospace!important;text-shadow:0 0 16px rgba(216,180,106,.28)!important;}",
-                "#csh-wr-panel .csh-wr-kpi .n{font-size:var(--csh-lfs-cap,11px)!important;color:#7f7767!important;margin-top:2px!important;}",
-                "#csh-wr-panel .csh-wr-kpi.hi .v{color:#8fe6cf!important;text-shadow:0 0 16px rgba(127,216,196,.3)!important;}",
-                "#csh-wr-panel .csh-wr-kpi.lo .v{color:#f0a3b0!important;text-shadow:0 0 16px rgba(214,110,124,.3)!important;}",
+                "font-family:Consolas,Menlo,monospace!important;text-shadow:none!important;}",
+                "#csh-wr-panel .csh-wr-kpi .n{font-size:var(--csh-lfs-sm,12px)!important;color:var(--csh-wr-muted)!important;margin-top:2px!important;}",
+                "#csh-wr-panel .csh-wr-kpi.hi .v{color:#8fe6cf!important;text-shadow:none!important;}",
+                "#csh-wr-panel .csh-wr-kpi.lo .v{color:#f0a3b0!important;text-shadow:none!important;}",
                 /* ---------- 区块标题 ---------- */
                 "#csh-wr-panel .csh-wr-sec{display:flex!important;align-items:center!important;gap:10px!important;margin:6px 0 10px!important;}",
                 "#csh-wr-panel .csh-wr-sec .t{font-size:var(--csh-lfs-lg,14px)!important;color:#e6d7ac!important;letter-spacing:2px!important;font-weight:600!important;white-space:nowrap!important;}",
@@ -502,9 +505,9 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                 "#csh-wr-panel thead th:hover{color:#fbeec4!important;background:linear-gradient(180deg,#2c2417,#1e170c)!important;}",
                 "#csh-wr-panel thead th.nosort{cursor:default!important;}",
                 "#csh-wr-panel thead th.nosort:hover{color:#e0c98c!important;background:linear-gradient(180deg,#241d13,#191309)!important;}",
-                "#csh-wr-panel thead th.on{color:#fbeec4!important;text-shadow:0 0 12px rgba(216,180,106,.45)!important;}",
+                "#csh-wr-panel thead th.on{color:#fbeec4!important;text-shadow:none!important;}",
                 /* 脚注 / 口径说明 */
-                "#csh-wr-panel .csh-wr-note{display:block!important;margin:2px 0 12px!important;font-size:var(--csh-lfs-cap2,11.5px)!important;line-height:1.7!important;color:#8b8271!important;letter-spacing:.2px!important;}",
+                "#csh-wr-panel .csh-wr-note{display:block!important;margin:2px 0 12px!important;font-size:var(--csh-lfs-sm,12px)!important;line-height:1.7!important;color:var(--csh-wr-muted)!important;letter-spacing:.2px!important;}",
                 "#csh-wr-panel tbody td{padding:7px 6px!important;font-size:var(--csh-lfs-md,13px)!important;text-align:center!important;white-space:nowrap!important;",
                 "color:#ddd4c0!important;border-bottom:1px solid rgba(216,180,106,.09)!important;transition:background .14s ease!important;}",
                 "#csh-wr-panel tbody tr:hover td{background:rgba(216,180,106,.055)!important;}",
@@ -554,7 +557,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                 "#csh-wr-panel .csh-wr-danger:hover{border-color:rgba(230,130,144,.85)!important;background:linear-gradient(180deg,rgba(214,110,124,.26),rgba(214,110,124,.08))!important;}",
                 /* ---------- 过滤栏 / 删除（2026-10-01 D1/D2/D3/D5） ---------- */
                 "#csh-wr-filter{display:flex!important;flex-wrap:wrap!important;gap:8px!important;align-items:center!important;margin:10px 0 2px!important;}",
-                "#csh-wr-panel .csh-wr-flabel{font-size:var(--csh-lfs-sm,12px)!important;color:#8b8271!important;}",
+                "#csh-wr-panel .csh-wr-flabel{font-size:var(--csh-lfs-sm,12px)!important;color:var(--csh-wr-muted)!important;}",
                 "#csh-wr-panel .csh-wr-fbtn{display:inline-block!important;cursor:pointer!important;padding:6px 12px!important;min-height:32px!important;border-radius:999px!important;border:1px solid rgba(216,180,106,.3)!important;color:#a99f88!important;}",
                 "#csh-wr-panel .csh-wr-fbtn.on{border-color:rgba(216,180,106,.8)!important;color:#e3d6b2!important;background:rgba(216,180,106,.18)!important;}",
                 "#csh-wr-search{flex:1 1 140px!important;min-width:120px!important;padding:8px 12px!important;border-radius:999px!important;border:1px solid rgba(216,180,106,.3)!important;background:rgba(0,0,0,.25)!important;color:#e3d6b2!important;font-size:var(--csh-lfs-md,13px)!important;}",
@@ -564,7 +567,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                 "#csh-wr-empty{display:block!important;padding:46px 16px!important;text-align:center!important;color:#a99f88!important;}",
                 "#csh-wr-panel .csh-wr-empty-icon{font-size:var(--csh-lfs-2xl,22px)!important;color:rgba(216,180,106,.5)!important;margin-bottom:12px!important;letter-spacing:8px!important;}",
                 "#csh-wr-panel .csh-wr-empty-t{font-size:var(--csh-lfs-lg2,15px)!important;color:#ddd2b6!important;letter-spacing:1px!important;}",
-                "#csh-wr-panel .csh-wr-empty-n{margin-top:8px!important;font-size:var(--csh-lfs-sm2,12.5px)!important;color:#8b8271!important;line-height:1.8!important;}",
+                "#csh-wr-panel .csh-wr-empty-n{margin-top:8px!important;font-size:var(--csh-lfs-sm2,12.5px)!important;color:var(--csh-wr-muted)!important;line-height:1.8!important;}",
                 /* ---------- 移动端压缩 ----------
                  * 必须放在整张表最后：同一选择器 + 同为 !important 时后写的生效，
                  * 放前面会被上面的基础规则原样盖回去（历史 bug）。
@@ -577,12 +580,12 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                    3×(33.333%−7px) + 2×10px(gap) = 100% − 1px，正好放下。 */
                 "#csh-wr-panel .csh-wr-kpi{padding:8px 10px!important;min-width:0!important;flex:1 1 calc(33.333% - 7px)!important;}",
                 "#csh-wr-panel .csh-wr-kpi .v{font-size:var(--csh-lfs-xl3,18px)!important;}",
-                "#csh-wr-panel .csh-wr-kpi .n{font-size:var(--csh-lfs-micro2,10.5px)!important;}",
+                "#csh-wr-panel .csh-wr-kpi .n{font-size:var(--csh-lfs-sm,12px)!important;}",
                 "#csh-wr-panel thead th{padding:6px 6px!important;font-size:var(--csh-lfs-cap2,11.5px)!important;}",
                 "#csh-wr-panel tbody td{padding:5px 6px!important;font-size:var(--csh-lfs-sm2,12.5px)!important;}",
                 "#csh-wr-panel .csh-wr-sec{margin-top:9px!important;}",
                 "#csh-wr-panel table{margin:0 0 4px!important;}",
-                "#csh-wr-panel .csh-wr-note{font-size:var(--csh-lfs-cap2,11.5px)!important;margin:2px 0 8px!important;}",
+                "#csh-wr-panel .csh-wr-note{font-size:var(--csh-lfs-sm,12px)!important;margin:2px 0 8px!important;}",
                 "#csh-wr-panel td.rate{min-width:88px!important;}",
                 /* 【2026-09-30 第六轮】触摸目标：模式分段/视图页签/翻页/危险操作原本高约 31~37px，
                    低于 §E.1 的 44px 红线。仅移动端把上下内距加到 14px（≈44px 高），文字仍居中。 */
@@ -630,7 +633,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                 "#csh-wr-cards .wr-games{color:#9d947e!important;}",
                 /* 「均伤 4.14」这类键值对：标签弱化、数值保留对比度，靠 gap 分隔而不画线 */
                 "#csh-wr-cards .wr-m{white-space:nowrap!important;}",
-                "#csh-wr-cards .wr-m i{font-style:normal!important;color:#8b8271!important;margin-right:3px!important;font-size:var(--csh-lfs-cap2,11.5px)!important;}",
+                "#csh-wr-cards .wr-m i{font-style:normal!important;color:var(--csh-wr-muted)!important;margin-right:3px!important;font-size:var(--csh-lfs-sm,12px)!important;}",
                 /* 删除按钮：贴到卡片右上角，命中区仍保 44px（§E.1 触摸红线） */
                 "#csh-wr-cards .csh-wr-del{position:absolute!important;top:8px!important;right:0!important;",
                 "width:44px!important;height:44px!important;min-width:44px!important;min-height:44px!important;}",
@@ -639,7 +642,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                 "@media (max-width:399px){",
                 "#csh-wr-cards .wr-t2{gap:2px 7px!important;font-size:var(--csh-lfs-sm,12px)!important;}",
                 "#csh-wr-cards .wr-t2 .csh-wr-pct{font-size:var(--csh-lfs-sm,12px)!important;}",
-                "#csh-wr-cards .wr-m i{font-size:var(--csh-lfs-cap,11px)!important;margin-right:2px!important;}",
+                "#csh-wr-cards .wr-m i{font-size:var(--csh-lfs-sm,12px)!important;margin-right:2px!important;}",
                 "}",
                 /* ============================================================
                  * 导入 / 导出 / 清空浮层（2026-10-18）
@@ -1247,7 +1250,7 @@ function filterBar(){
             var html=[panelHead(),navBar()];
             if(!arr.length&&!mtotal){
                 html.push(emptyBox("暂无玩家操控数据",
-                    "完成一局身份场后，你操控的角色胜率与身份战绩会自动记录在这里。"));
+                    "完成一局单机对局后，操控过的角色战绩会记录在这里；身份战绩单独统计。"));
                 html.push(footBar(false));
                 root.innerHTML=html.join("");
                 return;

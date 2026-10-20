@@ -1,6 +1,6 @@
 # 池子魔将
 
-> 无名杀（Noname）武将扩展 · 当前版本 **4.0.7**
+> 无名杀（Noname）武将扩展 · 当前版本 **4.0.9**
 
 一套以「魔将」为主题的无名杀扩展：在标准对局之上补一整套武将、卡牌与技能，
 外加若干可选的衍生玩法（小游戏、BOSS 挑战、生涯与经济系统）。
@@ -55,12 +55,15 @@
 - `docs/plan.md` —— 计划总表（P0~P3 待办与阻塞项，问「今天干什么」看这份）
 - `docs/pool-achv.md` —— 池子成就设计方案（操作型成就：事件采集、判定、UI、内容清单）
 - `docs/CHANGELOG.md` —— 版本与轮次留痕
+- [池子魔将维护与更新 skill](docs/skills/chizi-mojiang-maintenance/SKILL.md) —— 非武将系统的研究、缺陷证据、修复批次与验收；确认框/个人战绩/互动延迟已修复，经济与界面后续进度见 backlog
+- [本轮审计与优化报告](docs/audit/CODEX_AUDIT_REPORT.md) —— 桌面优化方案、完整结构索引、技能 AI 两批复核与修复、统计文字截图和待实机项目
 
 提交前请跑：
 
 ```bash
 node tools/check.js            # 语法 / 自由变量 / import / 版本三处一致 / 断言组
 node tools/simulate_world.js   # 世界与结算桥回归
+node tools/probe_first_batch.mjs # 确认框生命周期与四模式个人战绩；--browser <Chrome路径> 可补真实 DOM
 ```
 
 ## 声明

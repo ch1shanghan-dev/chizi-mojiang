@@ -671,6 +671,30 @@ import GEN_LINES from "./csh_interact_lines_gen.js";
 		if (!player || typeof player.isIn !== "function" || !player.isIn()) return false;
 		return !!(player.node && player.node.avatar);
 	}
+	// 延迟表现只属于安排它的这一局；执行前重新检查开关和参与者。
+	// 终局台词走 onGameOver 的同步通道，不经这里。
+	var sceneEpoch = 0;
+	var sceneChatEpoch = 0;
+	var sceneTimers = new Set();
+	function clearSceneTasks() {
+		sceneEpoch++;
+		sceneTimers.forEach(function (timer) { clearTimeout(timer); });
+		sceneTimers.clear();
+	}
+	function queueScene(callback, delay, speaker, other, chat) {
+		var epoch = sceneEpoch;
+		var chatEpoch = sceneChatEpoch;
+		var players = game.players;
+		var timer = setTimeout(function () {
+			sceneTimers.delete(timer);
+			if (epoch !== sceneEpoch || players !== game.players || !isEnabled() || _status.over) return;
+			if (!isAI(speaker) || game.players.indexOf(speaker) < 0) return;
+			if (other && (!usable(other) || game.players.indexOf(other) < 0)) return;
+			if (chat && (chatEpoch !== sceneChatEpoch || cfg(KEY.chat, true) === false)) return;
+			callback();
+		}, delay);
+		sceneTimers.add(timer);
+	}
 	function relation(from, to) {
 		var att = get.attitude(from, to);
 		if (att > 0) return "ally";
@@ -755,9 +779,9 @@ import GEN_LINES from "./csh_interact_lines_gen.js";
 	function riposte(victim, name, attacker) {
 		if (name !== "egg" && name !== "shoe") return;
 		if (!isAI(victim)) return;               // 只有 AI 回嘴；玩家被砸不代答
+		var prev = attacker ? lastEvent.get(pairKey(victim, attacker)) : null;
 		recordEvent(victim, attacker, "hitBack");
 		if (Math.random() > 0.35) { chorus(victim, attacker, "assistHit"); return; }
-		var prev = attacker ? lastEvent.get(pairKey(victim, attacker)) : null;
 		var cat = (prev === "hit" || prev === "hitBack") ? "memHitBack" : "hitBack";
 		var lines = mergedLines(cat);
 		if (!lines || !lines.length) return;
@@ -765,10 +789,10 @@ import GEN_LINES from "./csh_interact_lines_gen.js";
 		if (!line) return;
 		var tName = attacker ? (attacker === game.me ? "你" : tr(attacker)) : "";
 		if (tName && line.indexOf("{t}") >= 0) line = line.replace(/\{t\}/g, tName);
-		setTimeout(function () {
+		queueScene(function () {
 			try { victim.chat(line); } catch (e) { logError("riposte chat", e); }
 			if (Math.random() < 0.35) chorus(victim, attacker, "assistHit");
-		}, 600 + Math.random() * 800);
+		}, 600 + Math.random() * 800, victim, attacker, true);
 	}
 	/* 第三方帮腔（2026-10-06 第二批）：subject 被挑衅/被救之后，subject 的盟友里
 	   随机一人小概率隔空接一句（cat 决定怼人或夸人）——只 chat 不抛掷、不升级冲突、
@@ -792,9 +816,9 @@ import GEN_LINES from "./csh_interact_lines_gen.js";
 		if (!line) return;
 		var tName = other === game.me ? "你" : tr(other);
 		if (tName && line.indexOf("{t}") >= 0) line = line.replace(/\{t\}/g, tName);
-		setTimeout(function () {
+		queueScene(function () {
 			try { who.chat(line); } catch (e) { logError("chorus chat", e); }
-		}, 700 + Math.random() * 900);
+		}, 700 + Math.random() * 900, who, other, true);
 	}
 	// 连击（2026-09-28 用户需求 / 2026-09-29 升级）：鸡蛋连砸 / 鲜花连送，制造「气势」。
 	// chance=进入连击的概率；weights=[[追加次数, 权重], ...]（权重和 100）；gap=[最小间隔ms, 最大间隔ms]。
@@ -828,14 +852,14 @@ import GEN_LINES from "./csh_interact_lines_gen.js";
 		for (var i = 0; i < n; i++) {
 			t += b.gap[0] + Math.random() * (b.gap[1] - b.gap[0]);
 			(function (delay) {
-				setTimeout(function () {
+				queueScene(function () {
 					try {
 						if (!usable(from) || !usable(to)) return;
 						playEmotion(from, to, name);
 					} catch (e) {
 						logError("burst " + name, e);
 					}
-				}, delay);
+				}, delay, from, to, false);
 			})(t);
 		}
 	}
@@ -899,7 +923,7 @@ import GEN_LINES from "./csh_interact_lines_gen.js";
 		if (!info || Math.random() > EMO_TRIPLE_CHANCE) return;
 		for (var i = 1; i <= 2; i++) {
 			(function (n) {
-				setTimeout(function () {
+				queueScene(function () {
 					try {
 						if (typeof from.emotion !== "function") return;
 						var id = ((info.id - 1 + n * 3) % info.max) + 1;
@@ -907,7 +931,7 @@ import GEN_LINES from "./csh_interact_lines_gen.js";
 					} catch (e) {
 						logError("emotion triple", e);
 					}
-				}, 400 * n);
+				}, 400 * n, from, null, false);
 			})(i);
 		}
 	}
@@ -1083,6 +1107,8 @@ import GEN_LINES from "./csh_interact_lines_gen.js";
 			return { total: total, round: roundState.round, roundCount: roundState.count };
 		},
 		reset: function () {
+			clearSceneTasks();
+			lastChorus = 0;
 			lastGlobal = 0;
 			lastByPlayer.clear();
 			roundState.round = -1;
@@ -1100,6 +1126,8 @@ import GEN_LINES from "./csh_interact_lines_gen.js";
 		// 开局问候只在本局第一次 gameStart 触发时执行
 		claimGameStart: function () {
 			if (greetedPlayers === game.players) return false;
+			clearSceneTasks();
+			lastChorus = 0;
 			greetedPlayers = game.players;
 			/* 一局一清（2026-10-06）：防复读环 / 配对计数 / 配对事件账本 / 宿敌快照
 			   都是"局内记忆"，跨局要重置 */
@@ -1251,9 +1279,9 @@ import GEN_LINES from "./csh_interact_lines_gen.js";
 					var ln = pickLine(mergedLines("crowd"));
 					if (ln) {
 						var ol = randomOne(onlookers);
-						setTimeout(function () {
+						queueScene(function () {
 							try { ol.chat(ln); } catch (eC) {}
-						}, 500 + Math.random() * 700);
+						}, 500 + Math.random() * 700, ol, player, true);
 					}
 				}
 			} catch (eCd) {}
@@ -1274,6 +1302,7 @@ import GEN_LINES from "./csh_interact_lines_gen.js";
 		// 直接 say(force) —— 靠「终局只发生一次」天然防刷屏。
 		// 说话者不做 isAI 判定：终局时 isIn 可能已失效，改用「有渲染节点且非玩家本人」。
 		onGameOver: function (win, meSide) {
+			clearSceneTasks();
 			if (win === undefined) return;
 			if (!isEnabled()) return;
 			game.players.forEach(function (p) {
@@ -1623,6 +1652,9 @@ import GEN_LINES from "./csh_interact_lines_gen.js";
 		} catch (_e2) {}
 	}
 	function saveCfg(key, val) {
+		// 关掉再迅速打开也不复活旧表现；台词开关不打断连击/表情。
+		if (key === KEY.enable && val === false) clearSceneTasks();
+		if (key === KEY.chat && val === false) sceneChatEpoch++;
 		try {
 			if (typeof game !== "undefined" && typeof game.saveConfig === "function") {
 				game.saveConfig(key, val);

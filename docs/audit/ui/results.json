@@ -1,0 +1,365 @@
+{
+  "scope": "actual winrate module in Chromium with fixture data; not running Noname",
+  "cases": [
+    {
+      "case": {
+        "name": "desktop",
+        "w": 1200,
+        "h": 820,
+        "scale": 1
+      },
+      "checks": [
+        {
+          "name": "actual panel opened",
+          "passed": true
+        },
+        {
+          "name": "clear text .csh-wr-kpi .v",
+          "passed": true,
+          "detail": "none"
+        },
+        {
+          "name": "clear text .csh-wr-kpi .n",
+          "passed": true,
+          "detail": "none"
+        },
+        {
+          "name": "clear text .csh-wr-tab.on",
+          "passed": true,
+          "detail": "none"
+        },
+        {
+          "name": "clear text #csh-wr-table th.on",
+          "passed": true,
+          "detail": "none"
+        },
+        {
+          "name": "small helper text at least 12px",
+          "passed": true,
+          "detail": "12px"
+        },
+        {
+          "name": "helper contrast against conservative light panel sample >=4.5",
+          "passed": true,
+          "detail": 6.324771314708725
+        },
+        {
+          "name": "outside shadow preserved",
+          "passed": true,
+          "detail": "rgb(255, 0, 0) 0px 0px 18px"
+        },
+        {
+          "name": "decorative title shadow retained",
+          "passed": true
+        },
+        {
+          "name": "panel fits real viewport despite body scaling",
+          "passed": true,
+          "detail": {
+            "left": 70,
+            "right": 1130,
+            "top": 7,
+            "bottom": 813,
+            "width": 1200,
+            "height": 820
+          }
+        },
+        {
+          "name": "mobile card view / desktop table switch",
+          "passed": true
+        },
+        {
+          "name": "sort click changes state",
+          "passed": true
+        },
+        {
+          "name": "personal tab click renders",
+          "passed": true
+        },
+        {
+          "name": "close removes overlay",
+          "passed": true
+        },
+        {
+          "name": "reopen creates one panel",
+          "passed": true
+        },
+        {
+          "name": "Escape closes actual panel",
+          "passed": true
+        }
+      ],
+      "screenshot": "winrate-desktop.png"
+    },
+    {
+      "case": {
+        "name": "portrait",
+        "w": 390,
+        "h": 844,
+        "scale": 1
+      },
+      "checks": [
+        {
+          "name": "actual panel opened",
+          "passed": true
+        },
+        {
+          "name": "clear text .csh-wr-kpi .v",
+          "passed": true,
+          "detail": "none"
+        },
+        {
+          "name": "clear text .csh-wr-kpi .n",
+          "passed": true,
+          "detail": "none"
+        },
+        {
+          "name": "clear text .csh-wr-tab.on",
+          "passed": true,
+          "detail": "none"
+        },
+        {
+          "name": "clear text #csh-wr-table th.on",
+          "passed": true,
+          "detail": "none"
+        },
+        {
+          "name": "small helper text at least 12px",
+          "passed": true,
+          "detail": "12px"
+        },
+        {
+          "name": "helper contrast against conservative light panel sample >=4.5",
+          "passed": true,
+          "detail": 6.324771314708725
+        },
+        {
+          "name": "outside shadow preserved",
+          "passed": true,
+          "detail": "rgb(255, 0, 0) 0px 0px 18px"
+        },
+        {
+          "name": "decorative title shadow retained",
+          "passed": true
+        },
+        {
+          "name": "panel fits real viewport despite body scaling",
+          "passed": true,
+          "detail": {
+            "left": 11.703125,
+            "right": 378.296875,
+            "top": 7,
+            "bottom": 837,
+            "width": 390,
+            "height": 844
+          }
+        },
+        {
+          "name": "mobile card view / desktop table switch",
+          "passed": true
+        },
+        {
+          "name": "sort click changes state",
+          "passed": true
+        },
+        {
+          "name": "personal tab click renders",
+          "passed": true
+        },
+        {
+          "name": "close removes overlay",
+          "passed": true
+        },
+        {
+          "name": "reopen creates one panel",
+          "passed": true
+        },
+        {
+          "name": "Escape closes actual panel",
+          "passed": true
+        }
+      ],
+      "screenshot": "winrate-portrait.png"
+    },
+    {
+      "case": {
+        "name": "landscape",
+        "w": 915,
+        "h": 412,
+        "scale": 0.6
+      },
+      "checks": [
+        {
+          "name": "actual panel opened",
+          "passed": true
+        },
+        {
+          "name": "clear text .csh-wr-kpi .v",
+          "passed": true,
+          "detail": "none"
+        },
+        {
+          "name": "clear text .csh-wr-kpi .n",
+          "passed": true,
+          "detail": "none"
+        },
+        {
+          "name": "clear text .csh-wr-tab.on",
+          "passed": true,
+          "detail": "none"
+        },
+        {
+          "name": "clear text #csh-wr-table th.on",
+          "passed": true,
+          "detail": "none"
+        },
+        {
+          "name": "small helper text at least 12px",
+          "passed": true,
+          "detail": "12px"
+        },
+        {
+          "name": "helper contrast against conservative light panel sample >=4.5",
+          "passed": true,
+          "detail": 6.324771314708725
+        },
+        {
+          "name": "outside shadow preserved",
+          "passed": true,
+          "detail": "rgb(255, 0, 0) 0px 0px 18px"
+        },
+        {
+          "name": "decorative title shadow retained",
+          "passed": true
+        },
+        {
+          "name": "panel fits real viewport despite body scaling",
+          "passed": true,
+          "detail": {
+            "left": 27.453125,
+            "right": 887.546875,
+            "top": 7,
+            "bottom": 405,
+            "width": 915,
+            "height": 412
+          }
+        },
+        {
+          "name": "mobile card view / desktop table switch",
+          "passed": true
+        },
+        {
+          "name": "sort click changes state",
+          "passed": true
+        },
+        {
+          "name": "personal tab click renders",
+          "passed": true
+        },
+        {
+          "name": "close removes overlay",
+          "passed": true
+        },
+        {
+          "name": "reopen creates one panel",
+          "passed": true
+        },
+        {
+          "name": "Escape closes actual panel",
+          "passed": true
+        }
+      ],
+      "screenshot": "winrate-landscape.png"
+    },
+    {
+      "case": {
+        "name": "zoom",
+        "w": 720,
+        "h": 600,
+        "scale": 1.5
+      },
+      "checks": [
+        {
+          "name": "actual panel opened",
+          "passed": true
+        },
+        {
+          "name": "clear text .csh-wr-kpi .v",
+          "passed": true,
+          "detail": "none"
+        },
+        {
+          "name": "clear text .csh-wr-kpi .n",
+          "passed": true,
+          "detail": "none"
+        },
+        {
+          "name": "clear text .csh-wr-tab.on",
+          "passed": true,
+          "detail": "none"
+        },
+        {
+          "name": "clear text #csh-wr-table th.on",
+          "passed": true,
+          "detail": "none"
+        },
+        {
+          "name": "small helper text at least 12px",
+          "passed": true,
+          "detail": "12px"
+        },
+        {
+          "name": "helper contrast against conservative light panel sample >=4.5",
+          "passed": true,
+          "detail": 6.324771314708725
+        },
+        {
+          "name": "outside shadow preserved",
+          "passed": true,
+          "detail": "rgb(255, 0, 0) 0px 0px 18px"
+        },
+        {
+          "name": "decorative title shadow retained",
+          "passed": true
+        },
+        {
+          "name": "panel fits real viewport despite body scaling",
+          "passed": true,
+          "detail": {
+            "left": 21.609375,
+            "right": 698.40625,
+            "top": 7,
+            "bottom": 578,
+            "width": 720,
+            "height": 600
+          }
+        },
+        {
+          "name": "mobile card view / desktop table switch",
+          "passed": true
+        },
+        {
+          "name": "sort click changes state",
+          "passed": true
+        },
+        {
+          "name": "personal tab click renders",
+          "passed": true
+        },
+        {
+          "name": "close removes overlay",
+          "passed": true
+        },
+        {
+          "name": "reopen creates one panel",
+          "passed": true
+        },
+        {
+          "name": "Escape closes actual panel",
+          "passed": true
+        }
+      ],
+      "screenshot": "winrate-zoom.png"
+    }
+  ]
+}
