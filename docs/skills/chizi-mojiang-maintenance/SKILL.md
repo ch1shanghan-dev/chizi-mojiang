@@ -80,3 +80,7 @@ node <本skill目录>/scripts/probe_noncharacter.cjs --root <扩展根目录>
 项目内 `docs/audit/CODEX_AUDIT_REPORT.md` 汇总本轮审计与未验证项，不能把完整索引当成全项通过。
 UI-01/ST-01 的正式回归为项目 `tools/probe_first_batch.mjs`（VM 56 项，带 --browser 时另加 15 项 Chromium DOM）。
 源码重构后适配探针或迁入正式测试；桩不能冒充浏览器或无名杀实机验收。
+
+同日第三批交付补丁：EC-01 市场原子检查点/配置同步，隔离故障 **52/0**、真实 Chromium 存储 **12/0**；AI-03 显式恩怨方向后互动专项 **113/0**；UI-02 原生按钮/焦点/键盘专项 Chromium **35/0**，原确认链/统计 **71/0**。初次交付曾仅在隔离副本；作者开放权限后已应用实际安装目录并通过主门禁及世界188/0，详见项目 `docs/audit/THIRD_BATCH_20261021.md`。钱包内部检查点与便携迁移的扁平化契约需共同维护。
+
+神将补选/势力滚动专项（同日）：两个独立开关均默认关闭，仅作兼容兜底。补选入口及await后重查，失败释放自己的预留标记；滚动按属性归还样式，动态识别与resize更新，窄屏/缩放控制条钳制。`tools/probe_kami.cjs` **61/0**（改前43/18），`tools/probe_eg_scroll.mjs` 真实Chromium **49/0**（改前30/19）；旧egwidth/egnoflash入口已委托真实源码探针。当前没有唯一外部责任扩展的证据，不沿用旧文档归因；详见项目 `docs/audit/KAMI_SCROLL_AUDIT_20261021.md`。

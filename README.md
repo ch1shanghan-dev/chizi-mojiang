@@ -57,6 +57,7 @@
 - `docs/CHANGELOG.md` —— 版本与轮次留痕
 - [池子魔将维护与更新 skill](docs/skills/chizi-mojiang-maintenance/SKILL.md) —— 非武将系统的研究、缺陷证据、修复批次与验收；确认框/个人战绩/互动延迟已修复，经济与界面后续进度见 backlog
 - [本轮审计与优化报告](docs/audit/CODEX_AUDIT_REPORT.md) —— 桌面优化方案、完整结构索引、技能 AI 两批复核与修复、统计文字截图和待实机项目
+- [第三批维护补丁](docs/audit/THIRD_BATCH_20261021.md) —— 市场存档恢复、成对恩怨与确认框焦点；验证结果、存档影响及应用状态
 
 提交前请跑：
 

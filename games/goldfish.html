@@ -339,6 +339,8 @@ function parentMarket() {
   return null;
 }
 function loadSnap(cb) {
+  var receive = cb;
+  cb = function (snap) { if (snap && snap.saveError) toast(snap.saveError); receive(snap); };
   if (Bridge.active) {
     Bridge.call("shell-goldfish", null, function (ok, snap) {
       if (ok && snap && snap.list && snap.list.length) { cb(snap); return; }
@@ -358,8 +360,8 @@ function doTrade(id, n, side, cb) {
      本地兜底只保留给"非桥环境"（file:// 直开预览）这一条真实需要。 */
   if (Bridge.active) {
     Bridge.call("shell-trade", { id: id, n: n, side: side }, function (ok, res) {
-      if (ok && res) { cb(res); return; }
-      cb({ ok: false, msg: "交易通道超时，已放弃本次操作——请确认持仓后重试" });
+      if (res) { cb(res); return; }
+      cb({ ok: false, msg: "暂未收到交易结果，请确认持仓后再操作" });
     });
     return;
   }

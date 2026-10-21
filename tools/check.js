@@ -1082,20 +1082,17 @@ async function runBossChecks() {
 		fail("执行级 E17 执行异常：" + e17.message);
 	}
 
-	/* E18（2026-10-14 审计 · 经济安全守护）：钱相关通道不许静默吞账/重放 ——
-	   ① 买：`done !== true` 即拒（不得把"未知返回值"当成功）；
-	   ② 卖：**先确认入账再扣持仓**（否则钱包异常=白卖）；
-	   ③ 体验金/分红：入账成功才落标记；失败挂 pendingDiv 下次补发；
-	   ④ 金鳞市页面的交易桥**不得做本地重放兜底**（Bridge 超时也会回 ok=false，
-	      再走父窗 M.trade 就会真买两次）。 */
+	/* E18：以真实钱包/市场函数的故障行为取代旧的赋值顺序正则。
+	   覆盖钱包失败、宿主事务中止/超时/迟到完成、流水恢复、重启及开户礼/分红幂等。
+	   页面交易桥仍禁止失败后本地重放。 */
 	{
-		const mText = fs.readFileSync(path.join(ROOT, "core", "csh_market.js"), "utf8");
 		const gText = fs.readFileSync(path.join(ROOT, "games", "goldfish.html"), "utf8");
-		const buyStrict = /done !== true/.test(mText);
-		const sellSafe = /const gain = price \* n \* \(1 - TRADE_FEE\);\s*\n\s*\/\*[^*]*\*\/\s*\n\s*if \(!pay\(/.test(mText)
-			|| /if \(!pay\(Math\.round\(gain\)/.test(mText);
-		const giftSafe = /if \(pay\(WELCOME_GIFT[^)]*\)\) s\.gift = true/.test(mText);
-		const pendSafe = /s\.pendingDiv \+= gain/.test(mText) && /function pay\s*\(/.test(mText);
+		let economicSafe = false;
+		try {
+			const result = JSON.parse(execFileSync(process.execPath, [path.join(ROOT, "tools/probe_market_persistence.mjs")],
+				{ encoding: "utf8", timeout: 10000, windowsHide: true }));
+			economicSafe = result.passed > 0 && result.failed === 0;
+		} catch (error) { fail("执行级 E18：市场持久化故障回归失败：" + error.message.slice(0, 160)); }
 		const dblRaw = bossBlockOf(gText, "function doTrade(");
 		/* 去注释后再判（注释里也会出现 M.trade() 字样） */
 		const dbl = dblRaw ? dblRaw.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "") : "";
@@ -1104,12 +1101,8 @@ async function runBossChecks() {
 		const bridgeSafe = !!dbl
 			&& (dbl.match(/M\.trade\(/g) || []).length === 1
 			&& /Bridge\.active\) \{[\s\S]*?cb\(\{\s*ok:\s*false[\s\S]*?\n\s*\}\s*\);\s*\n\s*return;/.test(dbl);
-		if (!buyStrict) fail("执行级 E18：金鳞市买入未做严格扣款确认（done !== true）");
-		else if (!sellSafe) fail("执行级 E18：金鳞市卖出未「先入账再扣持仓」（钱包异常时会白卖）");
-		else if (!giftSafe) fail("执行级 E18：体验金标记未与入账绑定（失败会永久吞掉开户礼）");
-		else if (!pendSafe) fail("执行级 E18：分红失败未挂 pendingDiv 补发（会静默吞掉分红）");
-		else if (!bridgeSafe) fail("执行级 E18：金鳞市 doTrade 桥分支仍在失败时本地重放（Bridge 超时 ⇒ 双买双卖）");
-		else ok("执行级 E18：金鳞市经济安全（严格扣款 · 先入账后扣仓 · 记账失败挂账补发 · 交易桥不重放）");
+		if (!bridgeSafe) fail("执行级 E18：金鳞市 doTrade 桥分支仍在失败时本地重放（Bridge 超时 ⇒ 双买双卖）");
+		else if (economicSafe) ok("执行级 E18：金鳞市余额/持仓原子提交、失败/重启恢复、流水幂等与桥不重放通过");
 	}
 
 	/* E19（2026-10-14 审计 · 「静默永不发动」三例回归守卫）：这三条都是**改前完全
@@ -1890,7 +1883,8 @@ async function runBossChecks() {
 		scan30(path.join(ROOT, "games"));
 		if (bad30.length) e30.push("入账调用点缺字符串来源（会被 CBY 防护丢掉）：" + bad30.slice(0, 4).join("；"));
 		const mk30 = fs.readFileSync(path.join(ROOT, "core", "csh_market.js"), "utf8");
-		if (!/typeof reason !== "string"/.test(mk30)) e30.push("金鳞市 pay() 未做同样的来源守卫");
+		if (!/wallet\.commitMarket\(s,/.test(mk30) || !/function commitMarket\(state, delta, reason\)[\s\S]*?typeof reason !== "string"/.test(wt30))
+			e30.push("金鳞市原子提交缺少钱包来源守卫");
 		/* 同桌好感 */
 		const af30 = fs.readFileSync(path.join(ROOT, "core", "csh_affection.js"), "utf8");
 		if (!/export function notePlay\s*\(/.test(af30)) e30.push("缺 notePlay（同桌游玩好感）");
@@ -2511,7 +2505,7 @@ async function runBossChecks() {
 		/* ★ 2026-10-18 第二修（作者实机录像：装了很多扩展的用户，势力 20+ 个，右侧整列出屏）
 		   根因 = .buttons 宽度跟着不受控的父容器走。headless 实测：父宽 1400 时
 		   .buttons 被撑到 1392，一行 9 个，最后一列在 x=1392 而屏幕只有 884。
-		   修法 = width:min(100%, 视口宽/缩放)。任何一条被删都会让「宽 dialog」场景重新出屏。 */
+		   当前修法 = dialog 的 max-width + .buttons 的 max-width:100%，不主动写 width。 */
 		else if (!/function cshEgCapW\s*\(/.test(ct45)) fail("执行级 E45：缺宽度上界 cshEgCapW（势力多时会横向出屏）");
 		/* ★ 2026-10-18 第三修（作者：「每次出现这个自适应窗口会这样一下」）：
 		   宽度上界只能靠 dialog 自己的 max-width —— 那是**被动**属性，只在超屏时生效，
@@ -2524,10 +2518,11 @@ async function runBossChecks() {
 		else if (!/\.csh-egsc \.csh-egdlg \.buttons\{max-width:100%/.test(ct45)) fail("执行级 E45：.buttons 缺 max-width:100% 兜底");
 		else if (/setProperty\("width",\s*"min\(100%,/.test(ct45)) fail("执行级 E45：内联又给 .buttons 设 width 了（同上）");
 		else if (/c\.style\.paddingRight\s*=\s*Math\.round/.test(ct45)) fail("执行级 E45：又给内容区加 padding-right（内容变窄 → 列数跳变）");
-		else if (!/dlg\.style\.maxWidth\s*=\s*capW/.test(ct45)) fail("执行级 E45：缺 dialog 自身的 maxWidth（宽度上界失去依托）");
-		else if (!/overflowX\s*=\s*"hidden"/.test(ct45)) fail("执行级 E45：横向滚动未关（会多出一条压在按钮上的横条）");
-		else if (!/maxHeight/.test(ct45) || !/content-container/.test(ct45)) fail("执行级 E45：缺对话框封顶 / 原生滚动容器接管");
-		else if (!/cshEgUnstyle/.test(ct45)) fail("执行级 E45：缺样式还原（关掉开关后 70vh 会粘在面板上）");
+		else if (!/cshEgWrite\(dlg, dlg, "max-width", capW \+ "px"\)/.test(ct45)) fail("执行级 E45：缺 dialog 自身的 max-width（宽度上界失去依托）");
+		else if (!/cshEgWrite\(dlg, c, "overflow-x", "hidden"\)/.test(ct45)) fail("执行级 E45：横向滚动未关（会多出一条压在按钮上的横条）");
+		else if (!/cshEgWrite\(dlg, dlg, "max-height", cap \+ "px"\)/.test(ct45) || !/cshEgWrite\(dlg, c, "overflow-y", "auto"\)/.test(ct45) || !/content-container/.test(ct45)) fail("执行级 E45：缺对话框封顶 / 原生滚动容器接管");
+		else if (!/function cshEgRestore/.test(ct45) || !/current !== item.written/.test(ct45) || !/cshEgRelease\(dlg, "csh-egdlg"\)/.test(ct45)) fail("执行级 E45：缺有归属的样式还原（不得清空宿主原有或后写样式）");
+		else if (/cshEgWrite\([^\n]*, "(?:width|padding-right)"/.test(ct45)) fail("执行级 E45：滚动辅助主动改 width/padding-right（会改变正常按钮列数）");
 		else if (!/cshEgIsGroupControl/.test(ct45) || !/cshEgStyleGroupControl/.test(ct45)) fail("执行级 E45：缺控制条形态（2v2 冷/暖方势力走 chooseControl，不处理 = 只有身份场生效）");
 		else if (!/csh_eg_group_scroll/.test(cf45) || !/__cshEgScrollApply/.test(cf45)) fail("执行级 E45：设置开关未接线（csh_eg_group_scroll → __cshEgScrollApply）");
 		/* ★ 深夜八·修「关了他又自动打开」：引擎（optionsMenu.js:305 / exetensionMenu.js:135）

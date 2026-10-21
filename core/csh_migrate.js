@@ -956,6 +956,17 @@ import { lib, game } from "../../../noname.js";
 				body[k] = lsJSON(lsKey, null);
 			}
 		}
+		/* 市场检查点已经与余额共同落盘，不能导出仍旧的 config 持仓。
+		   迁移文件扁平化成原有 wallet/goldfish/ledger 三域，不携带本机同步任务。 */
+		var pending = body.wallet && body.wallet.marketPending;
+		if (pending && pending.state) {
+			body.goldfish = pending.state;
+			if (pending.entry) {
+				var list = Array.isArray(body.ledger) ? body.ledger.slice() : [];
+				if (!list.some(function (e) { return e && e.marketTx === pending.id; })) list.unshift(pending.entry);
+				body.ledger = list;
+			}
+		}
 		return body;
 	}
 
@@ -992,6 +1003,7 @@ import { lib, game } from "../../../noname.js";
 		});
 	}
 	function rollback(stamp) {
+		if (marketBusy()) return { ok: false, err: "市场存档正在同步，请稍后重试" };
 		var k = K_BACKUP_PREFIX + stamp;
 		var d = lsJSON(k, null);
 		if (!d) return { ok: false, err: "备份不存在" };
@@ -1023,6 +1035,7 @@ import { lib, game } from "../../../noname.js";
 		"csh_ddz_name", "csh_uno_name", "csh_net_name", "csh_net_sig",
 	];
 	function reset() {
+		if (marketBusy()) return { ok: false, err: "市场存档正在同步，请稍后重试" };
 		var cleared = [];
 		var i, k;
 		for (i = 0; i < RESET_KEYS.length; i++) {
@@ -1326,12 +1339,18 @@ import { lib, game } from "../../../noname.js";
 		if (!ins.ok) return ins;
 		var diff = diffOf(ins.data);
 		if (opts.dryRun) return { ok: true, dryRun: true, diff: diff, summary: ins.summary };
+		if (marketBusy()) return { ok: false, err: "市场存档正在同步，请稍后重试" };
 		var stamp = pushBackup();
 		applyAll(ins.data, false);
 		/* 通知各模块重载（2026-09-29：改走 reloadWallet，此前引用不存在的字段） */
 		var reloaded = reloadWallet();
 		logMsg("导入已应用（备份 " + stamp + "，钱包重载 " + (reloaded ? "成功" : "已跳过") + "）");
 		return { ok: true, applied: true, backup: stamp, diff: diff, summary: ins.summary, reloaded: reloaded };
+	}
+	function marketBusy() {
+		var market = lib.cshMarket;
+		var W = lib.cshWallet && lib.cshWallet.wallet;
+		return !!((market && market.pending && market.pending()) || (W && W.marketPending && W.marketPending()));
 	}
 
 	/* ---------- 自检 ---------- */

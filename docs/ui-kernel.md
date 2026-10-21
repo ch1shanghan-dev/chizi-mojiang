@@ -99,6 +99,8 @@ lib.cshUI.confirm({
 
 ---
 
+确认框 2026-10-21 第三批补丁：原生 button、命名 dialog，Tab/Shift+Tab 循环，Enter/Space 激活当前按钮；危险操作初始聚焦取消。关闭恢复原入口，替换/回调重入共享背景 inert 锁且保留宿主原值。高层系统浮层可拥有焦点和 Esc，下层程序关闭不抢焦点。`tools/probe_confirm_focus.mjs` 真实 Chromium 35/0，游戏实机仍待验；证据与交付状态见 [第三批记录](audit/THIRD_BATCH_20261021.md)。
+
 ## 5. 网络容灾（两个"鸡肋"功能的解法）
 
 ### 5.1 检查更新（2026-10-18 起：小包优先 + 逐文件回退）
@@ -157,7 +159,7 @@ lib.cshUI.confirm({
 
 ---
 
-## 5.3 神武将 "选势力"（`core/csh_rules.js` · 2026-10-18 第四版）
+## 5.3 神将补选与势力面板自适应（2026-10-21 复核）
 
 ### 先回答一个容易被说错的问题：引擎到底有没有"入口"
 
@@ -169,7 +171,7 @@ lib.cshUI.confirm({
 | `player.changeGroup(group, log, broadcast)` | `player.js:3197` | 通用改势力，**自带联机广播** |
 | `lib.skill._doublegroup_choice` | `skill.js:1407` | 通用技能，但 filter 写死 `type === "double"` |
 
-但"**弹窗让玩家选**"这个流程，唯一完整实现写在 `mode/identity.js:2358-2372`，是**身份模式私有**代码：
+本机引擎的身份场选将流程在 `mode/identity.js:2358-2372` 使用这些零件让玩家选择：
 
 ```js
 const groups = get.selectGroup(name);
@@ -191,11 +193,8 @@ if (groups.length) {
 | 同将（brawl） | ❌ 只给 AI | `brawl.js:2733` 的 `choose_group` 是随机赋势力，不弹窗 |
 | 国战 | 另一套 | `guozhan/src/patch/content.js` 的 `chooseGroupResult`（野心家机制） |
 
-⇒ 所以只能由扩展补流程。**这不是野路子**：生态里最成熟的 UI 扩展做的是同一件事 ——
-十周年UI 的 `_slyh`（`src/skills/sub-skills.js`）：自写全局技 + `chooseButton(vcard)` + 直接改 `player.group`。
-差别只在 filter：**它接"自定义势力"**（`!lib.group.includes(player.group)`，比如"佛"），
-**本技能接 `shen`** —— 因为 `lib.group = ["wei","shu","wu","qun","jin","shen"]` 里**有** shen，
-两个条件天然不重叠。
+本扩展以可选规则技补齐未处理的流程。本机十周年UI的 `_slyh`（`src/skills/sub-skills.js`）也用全局技、原生选择框及改势力，但它只接**存在且未注册进lib.group的当前势力**，并排除国战，候选只有前五个势力。
+本技能接角色原始势力`shen`；通常`shen`已注册，两者条件不重叠。不能因为_slyh优先级高，就推断它必定处理了所有神将或是面板问题来源。
 
 > 曾经试过"交给引擎"，两条路都死：
 > **A 补 `doubleGroup`** —— 能弹，但选将界面会把它逐个画到立绘右上角
@@ -210,20 +209,24 @@ lib.skill._csh_kami_choice = {
   trigger: { global: "gameStart", player: "enterGame" },   // 与 _doublegroup_choice 同构
   firstDo: true, forced: true, popup: false, priority: 25, charlotte: true, global: true,
   filter: 逐条显式判定（见下）
-  content: player._groupChosen = "shen"                     // 先落标记再问，防重入
+  content: 重查判定 → WeakMap令牌及_groupChosen临时预留
         → chooseButton(["请选择你的势力", [vcard...]], true).set("direct", true)
-        → player.changeGroup(g, false, false)
+        → 重查令牌/角色/模式/开关/势力及候选
+        → await player.changeGroup(g, false)
+        → 失败/取消只释放自己的预留，不覆盖别人的标记
 }
 ```
+
+`changeGroup`第二参数false只关日志；本机第三参数只有字符串`"nobroadcast"`才禁止广播，布尔false不会禁止。沿用原生广播不代表已完成联机验收。
 
 **filter 的判定顺序**（顺序本身是设计，不是随便排的）：
 
 | # | 条件 | 拒因码 | 为什么在这个位置 |
 | --- | --- | --- | --- |
 | 1 | 扩展开关（设置页「神将补选势力」） | `ext-config-off` | 最便宜；关掉后连 character 都不查 |
-| 2 | `player._groupChosen` | `already-chosen` | 我们的防重入标记 |
+| 2 | 本层进行中的令牌 / `player._groupChosen` | `choice-pending` / `already-chosen` | 防重入，完成时只允许自己的预留通过 |
 | 3 | 角色 `info.group === "shen"` | `group-not-shen:xxx` | **devil 是魔王/小怪全家**（190+ 条），只认 shen ⇒ BOSS 模式天然安全，连模式白名单都不用 |
-| 4 | `player.group` 仍是 `"shen"` | `player-group-changed:xxx` | **让位守卫**：别人已经改过就放弃（防弹两次） |
+| 4 | `player.group` 仍是 `"shen"` 或未赋值 | `player-group-changed:xxx` | **让位守卫**：别人已经改过就放弃（防弹两次） |
 | 5 | 无 `doubleGroup` / `initGroup` | `is-double-group` / `has-initgroup` | 双势力归引擎那个技能 |
 | 6 | 无 `hasHiddenSkill` | `hidden-skill` | 与引擎 kami 分支同口径 |
 | 7 | 引擎 `choose_group` 不是显式 `false` | `config-off` | 尊重引擎开关，缺键按开 |
@@ -235,30 +238,33 @@ lib.skill._csh_kami_choice = {
 
 | 设置项 | 默认 | 管什么 | 不管什么 |
 | --- | --- | --- | --- |
-| **神将补选势力** | **关** | 「**弹不弹**」—— 上游 | 不管面板尺寸；身份场不归它管（引擎自己弹）；适用于斗地主/对决等引擎留了空实现的模式 |
+| **神将补选势力** | **关** | 原有流程漏掉时补问 | 不管面板尺寸；身份场通常由引擎完成，未处理时也可兜底；适用于斗地主/对决等 |
 | 势力面板自适应 | 关 | 「**弹出来之后，势力太多放不下时尺寸怎么管**」—— 下游 | **完全不影响弹不弹**；关掉也照样弹 |
 
 两者是**上下游**关系，不是同一件事。之前只有一个开关（下游那个），名字叫「选将势力面板滚动条」，
 听起来像"选势力功能的开关"，作者因此困惑过 —— 现在拆开并在文案里写明。
 
-**为什么上游默认关（2026-10-18 作者定案）**：不是不想做，是**生态里已经有人在做了** ——
-综漫季刊八自带自定义势力（`zm8ru` / `zm8lin` / `zm8do` / `zm8ke` 等，实测在
-`extension/综漫季刊八/extension.js` 里注册），身份场的 `chooseButtonOL` 会把这些势力一起弹出来；
-十周年UI 的 `_slyh` 又覆盖了另一类。**再叠一层"我们也弹"，只会让玩家被问两次。**
+两个功能均按作者要求默认关闭，运行时必须配置显式true才启用。原流程已经能选，就保持补选关闭；仅有势力面板截断/滚不动时，可以只开尺寸自适应。
 
-所以这个组合真正的价值是**下游**：那些扩展把势力塞进了引擎，却没管"数量一多面板放不下"，
-面板被截断（作者录像里那一幕）。**上游关掉、下游打开，就能救别人的半成品，而自己不多弹一次。**
+旧记录曾根据`group_zm8*`归因“综漫季刊八”；本轮安装清单没有该扩展，未能唯一复现外部责任来源。注册势力、触发选择和修改面板布局是三件事，不能互相代证。本轮也修复了辅助层自身的问题，当前证据见[专项报告](audit/KAMI_SCROLL_AUDIT_20261021.md)。
 
 ### 与别的扩展会不会冲突
 
 | 冲突面 | 有没有 | 兜底 |
 | --- | --- | --- |
-| **样式 / 美化** | ❌ 没有 | 开关只被 filter 读一次，**不产生 DOM、不改样式**；面板是引擎原生 `chooseButton`，美化扩展本来就在接管它，我们不碰 |
-| **重复弹窗**（别人也做同一件事） | ⚠ 理论有 | **让位守卫**：`player.group` 已不是 `shen` ⇒ 说明别人先改成功了 ⇒ 自动放弃。十周年UI 的 `_slyh` priority 是 `Infinity`，会抢在前面，我们必然让位 |
-| **改坏 BOSS 模式** | ❌ 没有 | 只认 `shen`，devil 全家不碰 |
-| **改坏普通武将** | ❌ 没有 | 不碰 `doubleGroup` / `initGroup`，E49 红灯拦着 |
+| **样式 / 美化** | 依赖宿主布局 | 补选使用原生chooseButton；滚动层按属性保存/归还原样式和important，保留宿主后写值；不再清空从未写过的width/padding |
+| **重复弹窗/迟到覆盖** | 有接管守卫 | content入口及await后重查；其他扩展已改势力/标记就让位；无法阻止不遵守相同约定的外部代码主动再弹 |
+| **BOSS模式与普通角色** | 范围守卫 | 仅原始shen，devil/普通势力不补选；不修改doubleGroup/initGroup或角色定义 |
 
-实在撞上了，关掉「神将补选势力」这一项即可 —— **立即生效**，不用重启。
+关闭补选后新流程不再进入，已经打开的原生选择框返回时会丢弃旧结果，不强制关闭宿主弹窗。关闭自适应则立即停止观察并归还本层样式。
+
+### 滚动层的当前实现与验收
+
+- 内容判定命中势力dialog后才打`.csh-egdlg`，明确排除菜单，标题须为选择势力语句；普通武将选择对照不接管。
+- 按实际矩形/offset换算缩放后的局部px封顶；原生`.content-container`纵滚，`.buttons`仅max-width，不写width/padding。
+- `#control .control`势力条横滚，封顶包含padding，并修正窄屏/放大时偏离视口的锚点。
+- 变更节点分帧重验，支持包裹插入、面板复用、文本变化、后注册势力；resize/visualViewport resize更新，移除及关闭释放，无轮询。
+- `probe_kami.cjs`实际模块VM **61/0**（改前43/18）；`probe_eg_scroll.mjs`真实源码+原生CSS的Chromium **49/0**（改前30/19），覆盖五档scale/zoom、实际滚轮和末项指针命中。旧宽度/noflash入口已委托此专项，不再复制旧实现。游戏、十周年UI完整流程、安卓触摸与联机待验。
 
 ---
 

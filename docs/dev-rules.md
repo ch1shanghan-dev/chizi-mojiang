@@ -108,6 +108,7 @@ hover/按下 1.0，触摸目标 ≥44px）。余额必须常驻（2026-09-28 作
 
 - **钱包**（`csh_wallet.js`）：全扩展唯一账本；写操作幂等；总上限 `PC_CAP`；
   门票/带入/回收率/名次系数唯一来源 registry；豪赌桌门槛 `买入 ≥ 200,000`。
+- **金鳞市持久化**：余额与持仓/流水检查点走钱包 `commitMarket` 的同一次严格写入；配置库同步成功后才清检查点。市场读未同步检查点，迁移导出扁平化。不得改回 `await game.saveConfig()` 或先扣款后依赖同步 try/catch 回滚。故障验证见 [第三批记录](audit/THIRD_BATCH_20261021.md)。
 - **胜负统计**（`csh_winrate.js`）：按 `player.name1 / name2` 记账（双将各记一条）。
   本地玩家的 `me.chars` 与身份标签无关，四模式均应记录；`me.camps` 仅在身份标签有效时记录，不用国战势力名或空 identity 建身份账。历史漏账不猜测回填。
   **十常侍特例**：`player.name === "shichangshi"` 时只记本体 —— 它的 `name1/name2` 是当前两名**化身**

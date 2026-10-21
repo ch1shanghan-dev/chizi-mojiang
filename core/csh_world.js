@@ -1086,7 +1086,7 @@ import { MINIONS } from "./csh_bossdata.js";
 	   互动桥：砸鸡蛋 +1 / 队友阵亡 +2），却被 playOne 拿去调整 A 与任意对手的胜率：
 	   A 被玩家砸过鸡蛋，就会在与 C 的牌桌上莫名更凶。
 	   现在：grudges = { 对象键: 仇恨值 }，玩家用 PLAYER_GRUDGE_KEY；
-	   AI 之间的键位已就绪（宿敌 / 借贷 / 复仇 等后续玩法的地基），今日无写入方即为空表。 */
+	   局内互动按「被砸者→出手者」「复仇者→凶手」写入，AI 之间使用名册 id。 */
 	function grudgeValue(a, targetKey) {
 		if (!a || !a.grudges || typeof a.grudges !== "object") return 0;
 		var v = a.grudges[targetKey];
@@ -1523,7 +1523,7 @@ import { MINIONS } from "./csh_bossdata.js";
 	   6. 恩怨值（§5.1 #12）—— 成对模型（2026-10-03）
 	   ------------------------------------------------------------
 	   入参 targetKey 缺省 = 玩家本人（历史上唯一的写入方就是玩家互动）。
-	   API 形状保持 addGrudge(id, n) / grudge(id) 不变，互动桥无需改动。 */
+	   保留旧的双参 API；互动桥显式传对方键，避免 AI 互相攻击误记到玩家。 */
 	function addGrudge(id, n, targetKey) {
 		var a = byId(id);
 		if (!a) return null;

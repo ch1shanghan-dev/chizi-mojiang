@@ -17,7 +17,8 @@ const path = require("path");
 const vm = require("vm");
 
 const ROOT = path.resolve(__dirname, "..");
-const SRC = path.join(ROOT, "core", "csh_rules.js");
+const sourceAt = process.argv.indexOf("--source");
+const SRC = sourceAt < 0 ? path.join(ROOT, "core", "csh_rules.js") : process.argv[sourceAt + 1];
 
 let pass = 0, failCnt = 0;
 const fails = [];
@@ -236,6 +237,55 @@ const C = (p) => lib.skill._csh_kami_choice.content({ name: "gameStart" }, {}, p
 		ck("chooseButton 抛错被吞（不阻断开局）", err === null);
 	}
 
+	console.log("== D. 异步生命周期与兼容接管 ==");
+	{
+		const p = mk("shen_zhaoyun", { playerGroup: "wei" });
+		await C(p);
+		ck("content 入口重查：其他扩展已接管就不再弹", !p.asked && !p.changed);
+	}
+	{
+		const p = mk("shen_zhaoyun");
+		p.chooseButton = () => { throw new Error("fixture error"); };
+		await C(p);
+		ck("选择抛错留下可诊断的原因", kamiStatus().lastWhy && /choice-error/.test(kamiStatus().lastWhy.reason));
+		ck("选择抛错释放已选标记，允许重新触发", !p._groupChosen && F(p));
+	}
+	{
+		const p = mk("shen_zhaoyun");
+		p.chooseButton = () => ({ set(){return this;}, forResult:async()=>({bool:false}) });
+		await C(p);ck("取消选择释放标记", !p._groupChosen);
+	}
+	{
+		const p = mk("shen_zhaoyun", {pick:"not_registered"});await C(p);
+		ck("拒绝不在候选列表中的返回势力", !p.changed && !p._groupChosen);
+	}
+	{
+		const p = mk("shen_zhaoyun");p.changeGroup = async()=>{throw new Error("change fixture");};await C(p);
+		ck("changeGroup 失败释放标记", !p._groupChosen);
+	}
+	for (const type of ["external-group", "extension-off", "engine-off", "mode-change", "character-change", "external-marker"]) {
+		const p=mk("shen_zhaoyun");let resolve;
+		const promise=new Promise(r=>{resolve=r;});
+		p.chooseButton=()=>{p.asked=(p.asked||0)+1;return{set(){return this;},forResult(){return promise;}};};
+		const pending=C(p);
+		if(type==="external-group")p.group="wei";
+		if(type==="extension-off")lib.config["extension_池子魔将_csh_kami_group"]=false;
+		if(type==="engine-off")CONFIG.choose_group=false;
+		if(type==="mode-change")MODE="guozhan";
+		if(type==="character-change")p.name1=p.name="re_liubei";
+		if(type==="external-marker")p._groupChosen="double";
+		resolve({bool:true,links:[["","","group_wu"]]});await pending;
+		ck("等待中状态改变后丢弃旧选择: "+type,!p.changed);
+		ck("等待中取消只释放自己的标记: "+type,type==="external-marker"?p._groupChosen==="double":!p._groupChosen);
+		lib.config["extension_池子魔将_csh_kami_group"]=true;CONFIG.choose_group=true;MODE="doudizhu";
+	}
+	{
+		const p=mk("shen_zhaoyun");let resolve;
+		const promise=new Promise(r=>{resolve=r;});
+		p.chooseButton=()=>{p.asked=(p.asked||0)+1;return{set(){return this;},forResult(){return promise;}};};
+		const first=C(p),second=C(p);resolve({bool:true,links:[["","","group_shu"]]});await Promise.all([first,second]);
+		ck("异步重入只打开一次选择框",p.asked===1);
+	}
 	console.log("");
 	console.log("----------------------------------------");
 	if (failCnt) { console.log("结论：未通过，" + failCnt + " 项失败：" + fails.join(" / ")); process.exit(1); }

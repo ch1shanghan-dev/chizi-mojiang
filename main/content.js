@@ -58,13 +58,62 @@ import { cshBossPackHide } from "../character/boss.js";
      修法：CSS 只认 JS 内容判定后打上的 `.csh-egdlg`（全局 `:has` 规则永久废弃）；
           打标器显式排除 `.menu` / `.menu-container`；封顶按「真实可视像素 ÷ 实际缩放」
           换算成局部 px；关开关或撤销标记时把内联样式一并还原。
-   成本：只在新节点插入时做一次 closest('.dialog')，O(1)；没有全表轮询。 */
+   当前按变更节点和窗口尺寸分帧处理；只跟踪命中过的面板，不轮询整页。 */
 var _cshEgMO = null;
-var _cshEgGroupNames = null;
+var _cshEgFrame = 0;
+var _cshEgQueue = new Set();
+var _cshEgTracked = new Set();
+var _cshEgStyles = new WeakMap();
+var _cshEgOwnedNodes = new WeakMap();
+var _cshEgSelf = new WeakMap();
+/* 只归还本层仍持有的属性，保留原值/important，以及宿主后来写入的值。 */
+function cshEgRemember(node) {
+    _cshEgSelf.set(node, { style: node.style.cssText, cls: node.className });
+}
+function cshEgWrite(owner, node, property, value, priority) {
+    var state = _cshEgStyles.get(node);
+    if (!state) { state = {}; _cshEgStyles.set(node, state); }
+    var current = node.style.getPropertyValue(property), currentPriority = node.style.getPropertyPriority(property);
+    var item = state[property];
+    if (!item || current !== item.written || currentPriority !== item.writtenPriority) {
+        item = state[property] = { value: current, priority: currentPriority };
+    }
+    priority = priority || "";
+    if (current !== value || currentPriority !== priority) node.style.setProperty(property, value, priority);
+    item.written = node.style.getPropertyValue(property);
+    item.writtenPriority = node.style.getPropertyPriority(property);
+    var nodes = _cshEgOwnedNodes.get(owner);
+    if (!nodes) { nodes = new Set(); _cshEgOwnedNodes.set(owner, nodes); }
+    nodes.add(node);
+    cshEgRemember(node);
+}
+function cshEgRestore(node, property) {
+    var state = _cshEgStyles.get(node);
+    if (!state) return;
+    var keys = property ? [property] : Object.keys(state);
+    keys.forEach(function (key) {
+        var item = state[key];
+        if (!item) return;
+        if (node.style.getPropertyValue(key) === item.written && node.style.getPropertyPriority(key) === item.writtenPriority) {
+            if (item.value) node.style.setProperty(key, item.value, item.priority);
+            else node.style.removeProperty(key);
+        }
+        delete state[key];
+    });
+    if (!Object.keys(state).length) _cshEgStyles.delete(node);
+    cshEgRemember(node);
+}
+function cshEgRelease(owner, className) {
+    var nodes = _cshEgOwnedNodes.get(owner);
+    if (nodes) nodes.forEach(function (node) { cshEgRestore(node); });
+    _cshEgOwnedNodes.delete(owner);
+    _cshEgTracked.delete(owner);
+    owner.classList.remove(className);
+    cshEgRemember(owner);
+}
 /* 势力译名集（用 lib.group + lib.translate 现算，不抄第二份名单）——用于「按按钮文字判定」 */
 function cshEgGroupNameSet() {
-    if (_cshEgGroupNames) return _cshEgGroupNames;
-    var set = {};
+    var set = Object.create(null); // 扩展可在启动后注册势力，不缓存旧名册。
     try {
         var gs = (typeof lib !== "undefined" && lib.group) || [];
         for (var i = 0; i < gs.length; i++) {
@@ -73,7 +122,6 @@ function cshEgGroupNameSet() {
             try { var tn = lib.translate && lib.translate[g]; if (tn) set[String(tn)] = 1; } catch (e1) {}
         }
     } catch (e0) {}
-    _cshEgGroupNames = set;
     return set;
 }
 /* 主菜单 / 图鉴：引擎 createMenu 造的是 `.main.menu.dialog`（ui/create/menu/index.js:135），
@@ -101,14 +149,14 @@ function cshEgIsGroupDialog(dlg) {
         if (tx && (names[tx] || (tx.length <= 3 && names[tx.replace(/国$/, "")]))) hit++;
     }
     /* 标题可能落在 .caption（chooseButton）也可能落在 .prompt（chooseControl / 某些模式），
-       两边都认；**只要标题提到「势力」就按势力面板处理**（菜单/图鉴已在上面排除）。
+       两边都认，但必须是在选择势力；「请选择某势力武将」不能误作势力选择。
        2026-10-18 修复「只有身份场生效」：2v2 的冷/暖方势力走 chooseControl（控制条），
        身份场走 chooseButton（对话框）；另外部分模式只有 2 个势力按钮，旧的 hit>=3 会漏。 */
     var capHit = false;
     try {
         var caps = dlg.querySelectorAll(".caption,.prompt");
         for (var c = 0; c < caps.length; c++) {
-            if ((caps[c].textContent || "").indexOf("势力") >= 0) { capHit = true; break; }
+            if (/(?:选择|选取|选定|更改|变更)[^。！？!?\n]{0,24}势力\s*[：:。！？!?]?\s*$|^\s*势力(?:选择|选取|选定)\s*[：:。！？!?]?\s*$/.test(caps[c].textContent || "")) { capHit = true; break; }
         }
     } catch (eC) {}
     if (capHit) return true;
@@ -158,7 +206,7 @@ function cshEgCapPx(dlg) {
     var top = 0;
     try { top = Math.max(0, Math.min(dlg.getBoundingClientRect().top || 0, vh)); } catch (e2) {}
     var cap = Math.floor((vh - top - 8) / cshEgViewScale(dlg)); // 8px 呼吸位
-    return Math.max(200, cap);
+    return Math.max(1, cap);
 }
 /* ★ 宽度上界（2026-10-18 第二修 · 作者提供的实机录像）
    ------------------------------------------------------------------
@@ -186,68 +234,40 @@ function cshEgCapW(dlg) {
     var vw = 0;
     try { vw = window.innerWidth || document.documentElement.clientWidth || 0; } catch (e) {}
     if (!vw) return 0;
-    return Math.max(220, Math.floor((vw - 16) / cshEgViewScale(dlg)));
+    return Math.max(1, Math.floor((vw - 16) / cshEgViewScale(dlg)));
 }
 /* ★ 直接写内联样式（不靠 CSS 选择器的 `>` / :has / 优先级）：结构怎么变都按得住。
    封顶值必须是 px（按真实缩放换算），不能写 vh —— 见 cshEgViewScale 注释。 */
 function cshEgStyleGroupDialog(dlg) {
     try {
-        var cap = cshEgCapPx(dlg);
-        var capW = cshEgCapW(dlg);
-        if (cap) dlg.style.maxHeight = cap + "px";
-        /* 对话框本身也钳宽：插件把它拉到 96% 时，靠 maxWidth + 自身的居中 transform
-           会重新回到屏幕中间（translateX(-50%) 按自身宽度算，宽度一变就自动重算）。 */
-        if (capW) dlg.style.maxWidth = capW + "px";
-        dlg.style.overflow = "hidden";
-        dlg.style.overscrollBehavior = "contain";
-        /* ★ 不再下发 --csh-egw（2026-10-18 第三修）：它唯一的消费者是
-           `.buttons{width:min(100%,var(--csh-egw))}`，而那条规则已经因为"主动改布局"
-           被删除。留着变量只会让下一个人以为还有东西在用它。 */
+        var cap = cshEgCapPx(dlg), capW = cshEgCapW(dlg);
+        if (cap) cshEgWrite(dlg, dlg, "max-height", cap + "px");
+        if (capW) cshEgWrite(dlg, dlg, "max-width", capW + "px");
+        cshEgWrite(dlg, dlg, "overflow-x", "hidden");
+        cshEgWrite(dlg, dlg, "overflow-y", "hidden");
+        cshEgWrite(dlg, dlg, "overscroll-behavior", "contain");
         var boxes = dlg.querySelectorAll(".content-container");
         if (!boxes.length) boxes = dlg.querySelectorAll(".content");
         for (var i = 0; i < boxes.length; i++) {
             var c = boxes[i];
-            if (!c || !c.style) continue;
-            /* 横向改 hidden：宽度已经靠 min() 钳住并换行了，不需要横向滚；
-               留着 auto 只会多出一条压在按钮上的横条（录像里那条橙色线就是它）。 */
-            c.style.overflowX = "hidden";
-            c.style.overflowY = "auto";
-            c.style.webkitOverflowScrolling = "touch";
-            c.style.overscrollBehavior = "contain";
-            c.style.scrollbarColor = "rgba(255,255,255,.45) rgba(0,0,0,.22)";
-            /* ★ 不设 padding-right（2026-10-18 第三修）。
-               旧实现为了给滚动条让位加 10px 内边距 —— 但这会让内容区**变窄**，
-               与"绝不主动改布局"的纪律直接冲突（它正是列数跳变的另一半原因）。
-               滚动条改窄到 8px + 半透明（见 CSS 的 ::-webkit-scrollbar），压在按钮边缘不碍事。
-               box-sizing 保留：它不改变宽度，只是让 max-width 的算法与内边距一致。 */
-            try { c.style.boxSizing = "border-box"; } catch (eB) {}
+            cshEgWrite(dlg, c, "overflow-x", "hidden");
+            cshEgWrite(dlg, c, "overflow-y", "auto");
+            cshEgWrite(dlg, c, "-webkit-overflow-scrolling", "touch");
+            cshEgWrite(dlg, c, "overscroll-behavior", "contain");
+            cshEgWrite(dlg, c, "scrollbar-color", "rgba(255,255,255,.45) rgba(0,0,0,.22)");
+            cshEgWrite(dlg, c, "box-sizing", "border-box");
         }
-        /* 按钮墙：**只封顶，绝不设 width**（见 cshEgScrollApply 里那条 CSS 的注释）。
-           设 width 会覆盖引擎的 `calc(100% - 8px)` ⇒ 宽 8px ⇒ 按钮列数在临界值上跳变，
-           那正是作者看到的"从图一变成图二"。压制插件用的 !important 只需要 max-width。 */
         var bars = dlg.querySelectorAll(".buttons");
         for (var j = 0; j < bars.length; j++) {
-            var b = bars[j];
-            if (!b || !b.style) continue;
-            try {
-                b.style.setProperty("max-width", "100%", "important");
-                b.style.setProperty("box-sizing", "border-box", "important");
-            } catch (eBs) {}
+            cshEgWrite(dlg, bars[j], "max-width", "100%", "important");
+            cshEgWrite(dlg, bars[j], "box-sizing", "border-box", "important");
         }
-        /* 实测纠偏：万一插件把 left 定死（不是居中），maxWidth 救不了右边界，这里再推回来。
-           只在真溢出时动一次，不动就不碰 —— 避免和插件的定位/动画打架。 */
-        try {
-            var r = dlg.getBoundingClientRect();
-            var vw = window.innerWidth || document.documentElement.clientWidth || 0;
-            var z = cshEgViewScale(dlg) || 1;
-            if (vw && r.right > vw - 4) {
-                var dx = Math.ceil((r.right - (vw - 4)) / z);
-                dlg.style.marginLeft = (-dx) + "px";
-            } else if (vw && r.left < 4) {
-                var dx2 = Math.ceil((4 - r.left) / z);
-                dlg.style.marginLeft = dx2 + "px";
-            }
-        } catch (eSh) {}
+        // Remove only our previous correction before remeasuring after resize/zoom.
+        cshEgRestore(dlg, "margin-left");
+        var r = dlg.getBoundingClientRect(), vw = window.innerWidth || document.documentElement.clientWidth || 0;
+        var z = cshEgViewScale(dlg) || 1, margin = parseFloat(getComputedStyle(dlg).marginLeft) || 0;
+        if (vw && r.right > vw - 4) cshEgWrite(dlg, dlg, "margin-left", (margin - Math.ceil((r.right - (vw - 4)) / z)) + "px");
+        else if (vw && r.left < 4) cshEgWrite(dlg, dlg, "margin-left", (margin + Math.ceil((4 - r.left) / z)) + "px");
     } catch (eS) {}
 }
 /* 控制条限宽 + 横向滚动（2v2 冷/暖方势力）：不裁按钮、可左右滑。
@@ -256,126 +276,109 @@ function cshEgStyleGroupControl(bar) {
     try {
         var vw = window.innerWidth || document.documentElement.clientWidth || 0;
         if (!vw) return;
-        bar.style.maxWidth = Math.max(180, Math.floor((vw - 16) / cshEgViewScale(bar))) + "px";
-        bar.style.overflowX = "auto";
-        bar.style.overflowY = "hidden";
-        bar.style.webkitOverflowScrolling = "touch";
-        bar.style.overscrollBehavior = "contain";
-        bar.style.scrollbarWidth = "thin";
-        try { bar.style.transform = "translateX(-" + Math.round(bar.offsetWidth / 2) + "px)"; } catch (e2) {}
+        cshEgWrite(bar, bar, "max-width", Math.max(1, Math.floor((vw - 16) / cshEgViewScale(bar))) + "px");
+        cshEgWrite(bar, bar, "box-sizing", "border-box");
+        cshEgWrite(bar, bar, "overflow-x", "auto");
+        cshEgWrite(bar, bar, "overflow-y", "hidden");
+        cshEgWrite(bar, bar, "-webkit-overflow-scrolling", "touch");
+        cshEgWrite(bar, bar, "overscroll-behavior", "contain");
+        cshEgWrite(bar, bar, "scrollbar-width", "thin");
+        // Native #control may collapse to zero width on a narrow/scaled viewport.
+        // Its 50% anchor then lies off-centre; cap the final position as well as width.
+        var z = cshEgViewScale(bar), offset = -Math.round(bar.offsetWidth / 2);
+        var parent = bar.offsetParent;
+        if (parent) {
+            var anchor = parent.getBoundingClientRect().left + (parent.clientLeft + bar.offsetLeft) * z;
+            var left = anchor + offset * z;
+            var target = Math.max(4, Math.min(left, vw - 4 - bar.offsetWidth * z));
+            offset += (target - left) / z;
+        }
+        cshEgWrite(bar, bar, "transform", "translateX(" + offset + "px)");
     } catch (eC) {}
 }
 function cshEgUnstyleControl(bar) {
-    try {
-        if (!bar) return;
-        bar.style.maxWidth = "";
-        bar.style.overflowX = "";
-        bar.style.overflowY = "";
-        bar.style.webkitOverflowScrolling = "";
-        bar.style.overscrollBehavior = "";
-        bar.style.scrollbarWidth = "";
-        bar.classList.remove("csh-egctrl");
-        try { bar.style.transform = "translateX(-" + Math.round(bar.offsetWidth / 2) + "px)"; } catch (e2) {}
-    } catch (e) {}
+    if (bar) cshEgRelease(bar, "csh-egctrl");
 }
 /* 还原：关开关 / 面板复用 / 误标时把内联样式与标记一起撤掉（旧实现只加不减，
    关掉开关后 70vh 与滚动条仍粘在菜单上 —— 作者实机「关闭之后」那张图的根因）。 */
 function cshEgUnstyle(dlg) {
-    try {
-        if (!dlg) return;
-        dlg.style.maxHeight = "";
-        dlg.style.maxWidth = "";
-        dlg.style.overflow = "";
-        dlg.style.overscrollBehavior = "";
-        dlg.style.marginLeft = "";
-        try { dlg.style.removeProperty("--csh-egw"); } catch (eV) {}
-        var boxes = dlg.querySelectorAll(".content-container");
-        if (!boxes.length) boxes = dlg.querySelectorAll(".content");
-        for (var i = 0; i < boxes.length; i++) {
-            var c = boxes[i];
-            if (!c || !c.style) continue;
-            c.style.overflowY = "";
-            c.style.overflowX = "";
-            c.style.webkitOverflowScrolling = "";
-            c.style.overscrollBehavior = "";
-            c.style.scrollbarColor = "";
-            c.style.paddingRight = "";
-            c.style.boxSizing = "";
-        }
-        var bars = dlg.querySelectorAll(".buttons");
-        for (var j = 0; j < bars.length; j++) {
-            var b = bars[j];
-            if (!b || !b.style) continue;
-            try {
-                b.style.removeProperty("width");
-                b.style.removeProperty("max-width");
-                b.style.removeProperty("box-sizing");
-            } catch (eB) {}
-        }
-        dlg.classList.remove("csh-egdlg");
-    } catch (eU) {}
+    if (dlg) cshEgRelease(dlg, "csh-egdlg");
 }
 function cshEgClearAll() {
-    try {
-        var list = document.querySelectorAll(".csh-egdlg");
-        for (var i = 0; i < list.length; i++) cshEgUnstyle(list[i]);
-        var bars = document.querySelectorAll(".csh-egctrl");
-        for (var j = 0; j < bars.length; j++) cshEgUnstyleControl(bars[j]);
-    } catch (eC) {}
+    Array.from(_cshEgTracked).forEach(function (node) {
+        if (node.classList.contains("csh-egctrl")) cshEgUnstyleControl(node);
+        else cshEgUnstyle(node);
+    });
 }
 function cshEgTryTag(el) {
     try {
+        if (el && el.nodeType === 3) el = el.parentElement;
         if (!el || el.nodeType !== 1) return;
-        /* ① 控制条形态（2v2 冷/暖方势力 = chooseControl → .control，不在 dialog 里） */
-        var bar = (el.classList && el.classList.contains("control")) ? el
-            : (el.closest ? el.closest(".control") : null);
-        if (bar && !bar.classList.contains("csh-egctrl") && !(bar.closest && bar.closest(".dialog"))) {
-            if (cshEgIsGroupControl(bar)) {
-                bar.classList.add("csh-egctrl");
-                cshEgStyleGroupControl(bar);
-                try {
-                    if (lib.cshDebug && typeof lib.cshDebug.info === "function")
-                        lib.cshDebug.info("eg-scroll 命中势力控制条 · 按钮数=" + bar.children.length);
-                } catch (eD0) {}
+        var candidates = new Set();
+        if (el.matches(".dialog,#control .control")) candidates.add(el);
+        var dialog = el.closest(".dialog"), control = el.closest("#control .control");
+        if (dialog) candidates.add(dialog);
+        if (control) candidates.add(control);
+        el.querySelectorAll(".dialog,#control .control").forEach(function (node) { candidates.add(node); });
+        candidates.forEach(function (node) {
+            var bar = node.matches("#control .control") && !node.closest(".dialog");
+            var className = bar ? "csh-egctrl" : "csh-egdlg";
+            var matched = node.isConnected && (bar ? cshEgIsGroupControl(node) : cshEgIsGroupDialog(node));
+            if (!matched) {
+                if (_cshEgTracked.has(node)) cshEgRelease(node, className);
+                return;
             }
-        }
-        /* ② 对话框形态 */
-        var dlg = (el.classList && el.classList.contains("dialog")) ? el
-            : (el.closest ? el.closest(".dialog") : null);
-        if (!dlg || dlg.classList.contains("csh-egdlg")) return;
-        if (!cshEgIsGroupDialog(dlg)) return;
-        dlg.classList.add("csh-egdlg");
-        cshEgStyleGroupDialog(dlg);
-        try {
-            if (lib.cshDebug && typeof lib.cshDebug.info === "function")
-                lib.cshDebug.info("eg-scroll 命中势力面板 · dialog=[" + dlg.className + "] 挂点=[" +
-                    ((dlg.parentNode && dlg.parentNode.className) || "?") + "] content-container=" +
-                    (dlg.querySelector(".content-container") ? "有" : "无") + " 按钮数=" +
-                    dlg.querySelectorAll(".buttons .button").length);
-        } catch (eD) {}
+            node.classList.add(className);
+            _cshEgTracked.add(node);
+            if (bar) cshEgStyleGroupControl(node);
+            else cshEgStyleGroupDialog(node);
+            cshEgRemember(node);
+        });
     } catch (eT) {}
 }
 function cshEgGroupObserve(on) {
     try {
         if (_cshEgMO) { _cshEgMO.disconnect(); _cshEgMO = null; }
+        window.removeEventListener("resize", cshEgResize);
+        if (window.visualViewport) window.visualViewport.removeEventListener("resize", cshEgResize);
+        if (_cshEgFrame) { cancelAnimationFrame(_cshEgFrame); _cshEgFrame = 0; }
+        _cshEgQueue.clear();
         if (!on) { cshEgClearAll(); return; }
         if (typeof window === "undefined" || !window.MutationObserver) return;
-        /* ★ 监听 documentElement 而不是 ui.arena：arena 元素可能随开局被重建，
-           若绑在旧元素上，观察器等于挂在一个已摘除的节点上、永不触发
-           （这正是「身份模式生效、其他模式全失效」的最强嫌疑）。 */
         _cshEgMO = new MutationObserver(function (muts) {
             for (var i = 0; i < muts.length; i++) {
-                var added = muts[i].addedNodes;
-                for (var j = 0; j < added.length; j++) cshEgTryTag(added[j]);
+                var mutation = muts[i], target = mutation.target;
+                if (mutation.type === "attributes") {
+                    var known = _cshEgSelf.get(target);
+                    if (known && (mutation.attributeName === "style" ? known.style === target.style.cssText : known.cls === target.className)) continue;
+                    if (target === document.body || /^(arena|window|control)$/.test(target.id)) cshEgResize();
+                }
+                cshEgSchedule(target);
+                for (var j = 0; j < mutation.addedNodes.length; j++) cshEgSchedule(mutation.addedNodes[j]);
             }
         });
-        _cshEgMO.observe(document.documentElement, { childList: true, subtree: true });
-        /* 首扫一次（进入本局前可能已有面板/控制条在场） */
-        var ds = document.querySelectorAll(".dialog");
-        for (var k = 0; k < ds.length; k++) cshEgTryTag(ds[k]);
-        var cs = document.querySelectorAll("#control .control");
-        for (var m = 0; m < cs.length; m++) cshEgTryTag(cs[m]);
+        _cshEgMO.observe(document.documentElement, {
+            childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ["class", "style"]
+        });
+        window.addEventListener("resize", cshEgResize);
+        if (window.visualViewport) window.visualViewport.addEventListener("resize", cshEgResize);
+        document.querySelectorAll(".dialog,#control .control").forEach(cshEgTryTag);
     } catch (eO) {}
+}
+function cshEgSchedule(node) {
+    if (node) _cshEgQueue.add(node);
+    if (_cshEgFrame) return;
+    _cshEgFrame = requestAnimationFrame(function () {
+        _cshEgFrame = 0;
+        var pending = Array.from(_cshEgQueue); _cshEgQueue.clear();
+        pending.forEach(cshEgTryTag);
+        Array.from(_cshEgTracked).forEach(function (owner) {
+            if (!owner.isConnected) cshEgRelease(owner, owner.classList.contains("csh-egctrl") ? "csh-egctrl" : "csh-egdlg");
+        });
+    });
+}
+function cshEgResize() {
+    _cshEgTracked.forEach(cshEgSchedule);
 }
 function cshEgScrollApply(force) {
     try {
@@ -502,7 +505,7 @@ export function cshContent(config, pack) { try {
        ★pack（扩展包原始对象）随参数保留（bossdata 的纯构造入口同签名，便于未来扩展）。 */
     cshBossModeInstall(config, pack);
     /* ★ 本体兼容：选将势力面板滚动条（engine-compat C4）——必须在此即执行（不能等任何懒加载）。
-       开关 = 设置项 csh_eg_group_scroll（默认开 · 改动即时生效，见 config.js 的 onclick）。 */
+       开关 = 设置项 csh_eg_group_scroll（默认关 · 改动即时生效，见 config.js 的 onclick）。 */
     cshEgScrollApply();
     if (typeof cshVoices === "object" && cshVoices) Object.assign(lib.translate, cshVoices);
     try {

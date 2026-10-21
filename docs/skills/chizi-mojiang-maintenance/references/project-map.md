@@ -33,6 +33,8 @@
 
 - csh_registry：CATALOG/ORDER/settlePlan，11 页中只有 4 个牌桌游戏。
 - csh_wallet：KEYS、scheduleSave/flushSave、流水；不增加页面私有余额。
+- 市场第三批补丁：commitMarket 将余额、持仓检查点和待补流水共同保存；marketPending 未完成时市场读检查点，config 同步确认后 completeMarket 清理。迁移 collect 扁平化检查点，未同步时不覆盖导入/回滚/重置；交付安装状态见第三批报告。
+- 势力兼容：`core/csh_rules.js` 注册可选神将补选技；`main/content.js` 的cshEg*处理其他来源的势力面板与控制条；分别由config.js开关，缺键关闭。实际源码探针为probe_kami.cjs/probe_eg_scroll.mjs，旧宽度工具仅保留入口。当前未定位唯一外部责任扩展。
 - csh_migrate：KEY_DEFS、clean*、cfgGet/cfgPut、导入内存重载；不能一律扫 localStorage 替代。
 - csh_world：grudge(id,targetKey)/addGrudge(id,n,targetKey) 缺省目标为玩家。AI↔AI 调用需核对方向与 ID。
 - csh_interact：pairKey、recordEvent、lastEvent、pairStats、pairImp 是局内记忆，不等于永久世界档案。

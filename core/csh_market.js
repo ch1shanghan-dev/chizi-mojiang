@@ -1,7 +1,7 @@
 /* ============================================================
    池子魔将 · 金鳞市（股市小游戏）市场引擎 + 二十位妖灵人设
    ------------------------------------------------------------
-   ★ 唯一数据源：存档 = lib.config["extension_池子魔将_goldfish"]（saveConfig 范式）。
+   ★ 市场档在宿主 config；未同步提交以钱包内的持仓检查点为准，重启后继续同步。
    ★ 价格模型（作者定案："长期看涨、幅度克制、短期波动给挑战性"）：
        每日价格 = 现价 ×(1 + 长期漂移 + 短期噪声)，再向「趋势线×(1+热度)」回归 25%
        长期漂移 = 每只 0.2%~0.5%/日（慢牛 · 由 id 稳定散列决定）
@@ -9,7 +9,7 @@
        热度     = 讨伐妖灵的永久加成（csh_bossrecord.minionHeat · 首破 +1.5%/重复 +0.3%）
      —— 趋势线 = BASE×(1+drift)^第几天：短期偏离会被拉回，长期一定向上（你打服的越多越贵）。
    ★ 躺赚：持仓日分红 = 持仓市值 × 1.5%/日（跨日结算 · 离线补算一次性到账）。
-   ★ 经济：买卖走 csh_wallet 单一账本（wallet.add/spend）；买卖各收 2% 手续费（回收口）。
+   ★ 经济：买卖走 csh_wallet 单一账本（余额与持仓检查点原子提交）；买卖各收 2% 手续费。
    ★ 参考谱系：Cookie Clicker 股市（挂机结构）/ 动森大头菜（每日节拍）/
      GTA V（事件驱动个股）/ Neopets（亏损无底线）——不重复造轮子。
    ============================================================ */
@@ -869,8 +869,12 @@ function blank() {
 }
 function read() {
 	let s = null;
-	try { s = lib.config[KEY]; } catch (e0) {}
+	const wallet = lib.cshWallet && lib.cshWallet.wallet;
+	const pending = wallet && wallet.marketPending && wallet.marketPending();
+	if (pending) s = pending.state;
+	try { if (!s) s = lib.config[KEY]; } catch (e0) {}
 	if (!s || typeof s !== "object") s = blank();
+	s = JSON.parse(JSON.stringify(s)); // 失败的计算不能提前改动内存真值。
 	if (typeof s.dayNo !== "number" || !isFinite(s.dayNo) || s.dayNo < 0) s.dayNo = 0;
 	if (!s.prices || typeof s.prices !== "object") s.prices = {};
 	if (!s.hold || typeof s.hold !== "object") s.hold = {};
@@ -881,33 +885,74 @@ function read() {
 	return s;
 }
 
-/* 钱包入账封装：返回 true = 已落账（含"钱包被上限截断"）；false = 钱包不可用/抛错。
-   ★ 2026-10-14 审计修复：原先「标记已发 + 发钱失败」会**永久吞掉**体验金与分红
-     （s.gift / s.day 已推进，下次不再补发）。现在一律"先确认入账再推进标记"。 */
-function pay(amount, reason) {
-	try {
-		/* v6.7：与 wallet.add 的 CBY 防护对齐 —— 来源必须是字符串，否则拒发（并让调用方
-		   通过返回值感知失败，而不是静默吞掉）。 */
-		if (typeof reason !== "string" || !reason) return false;
-		const wallet = lib.cshWallet && lib.cshWallet.wallet;
-		if (!wallet || typeof wallet.add !== "function") return false;
-		wallet.add(amount, reason);
-		return true;
-	} catch (e) { return false; }
-}
-/* 落盘。★ 2026-10-18（第二十二批审计）：改为**返回布尔**。
-   原来只 console.warn 就吞掉 —— 而 trade 的买入路径是「先扣钱包 → 改持仓 → 落盘」，
-   落盘失败时钱已经扣了、持仓只在内存里，重启就变成「钱没了、股也没了」。
-   现在把失败如实上抛给调用方，由它回滚（见 trade）。 */
-function write(s) {
-	try {
-		lib.config[KEY] = s;
-		if (game && typeof game.saveConfig === "function") game.saveConfig(KEY, s);
-		return true;
-	} catch (eW) {
-		console.warn("[池子魔将] 金鳞市存档写入异常", eW);
-		return false;
+/* 不 await saveConfig：本机宿主不返回其内部 Promise，putDB 也在 request 成功时
+   提前兑现。直接等 config 事务 complete/abort；无 IDB 时沿用宿主 config 的 LS 后端。 */
+function persistMarket(s) {
+	if (!lib.db) {
+		if (typeof lib.configprefix !== "string") return Promise.reject(new Error("宿主存储未就绪"));
+		try {
+			const key = lib.configprefix + "config";
+			const config = JSON.parse(localStorage.getItem(key) || "{}");
+			if (!config || typeof config !== "object" || Array.isArray(config)) throw new Error("宿主配置格式异常");
+			config[KEY] = s;
+			localStorage.setItem(key, JSON.stringify(config));
+			return Promise.resolve();
+		} catch (e) { return Promise.reject(e); }
 	}
+	return new Promise(function (resolve, reject) {
+		let tx, timer;
+		function finish(err) { clearTimeout(timer); if (err) reject(err); else resolve(); }
+		try {
+			tx = lib.db.transaction(["config"], "readwrite");
+			tx.oncomplete = function () { finish(); };
+			tx.onabort = function () { finish(tx.error || new Error("市场存档事务中止")); };
+			tx.onerror = function () { /* 默认错误会中止事务，由 onabort 处理。 */ };
+			tx.objectStore("config").put(s, KEY);
+			timer = setTimeout(function () {
+				finish(new Error("市场存档同步超时"));
+				try { tx.abort(); } catch (eAbort) {}
+			}, 5000);
+		} catch (e) { finish(e); try { if (tx) tx.abort(); } catch (eAbort2) {} }
+	});
+}
+let syncing = null, retryTimer = 0;
+let lastSaveError = "";
+export function syncPending() {
+	if (syncing) return syncing;
+	const wallet = lib.cshWallet && lib.cshWallet.wallet;
+	if (!wallet || !wallet.marketPending) return Promise.resolve(false);
+	if (!wallet.marketPending()) return Promise.resolve(true);
+	if (retryTimer) { clearTimeout(retryTimer); retryTimer = 0; }
+	syncing = Promise.resolve().then(async function () {
+		let pending;
+		while ((pending = wallet.marketPending())) {
+			await persistMarket(pending.state);
+			lib.config[KEY] = JSON.parse(JSON.stringify(pending.state));
+			if (!wallet.completeMarket(pending.id)) {
+				const latest = wallet.marketPending();
+				if (latest && latest.id === pending.id) return false;
+			}
+		}
+		return true;
+	}).catch(function (e) {
+		console.warn("[池子魔将] 金鳞市已保存，等待同步", e);
+		return false;
+	}).finally(function () {
+		syncing = null;
+		if (wallet.marketPending() && !retryTimer) retryTimer = setTimeout(function () {
+			retryTimer = 0; syncPending();
+		}, 5000);
+	});
+	return syncing;
+}
+function write(s, delta, reason) {
+	const wallet = lib.cshWallet && lib.cshWallet.wallet;
+	if (!wallet || !wallet.commitMarket) { lastSaveError = "钱包未就绪"; return { ok: false, msg: lastSaveError }; }
+	if (!delta && JSON.stringify(s) === JSON.stringify(read())) { lastSaveError = ""; syncPending(); return { ok: true }; }
+	const res = wallet.commitMarket(s, delta || 0, reason || "金鳞市日结");
+	lastSaveError = res.ok ? "" : res.msg;
+	if (res.ok) syncPending();
+	return res;
 }
 
 /* ---------- 每日结算（跨日首次访问时执行 · 离线补算） ----------
@@ -916,11 +961,12 @@ function write(s) {
 export function ensureDay() {
 	try {
 		const s = read();
+		let credit = 0;
 		/* 首开初始化（无论是否跨日都要执行一次）：体验金 + 价格铺底
 		   —— 2026-10-14 修复：原先放在跨日分支之后，被"同日 diff<=0 提前返回"跳过（首开不发钱）。
 		   ★ 二次修复：改为「入账成功才落 s.gift」——钱包未就绪/抛错时留待下次补发。 */
 		if (!s.gift) {
-			if (pay(WELCOME_GIFT, "金鳞市开户礼")) s.gift = true;
+			credit += WELCOME_GIFT; s.gift = true;
 		}
 		/* 欠付分红补发（钱包当时不可用 → 挂账，下次进市先补） */
 		if (s.pendingDiv > 0) {
@@ -928,11 +974,14 @@ export function ensureDay() {
 			   （一笔 0.3 币的挂账会一直挂着、每次进市都重试）。不足 1 币直接结清，不白留。 */
 			const gd = Math.round(s.pendingDiv);
 			if (gd <= 0) s.pendingDiv = 0;
-			else if (pay(gd, "金鳞市分红（补发）")) { s.earned += gd; s.pendingDiv = 0; }
+			else { credit += gd; s.earned += gd; s.pendingDiv = 0; }
 		}
 		for (const id of LISTED) if (typeof s.prices[id] !== "number") s.prices[id] = BASE_PRICE;
 		const diff = dayDiff(s.day, dayKey());
-		if (diff <= 0) { write(s); return { days: 0, dividend: 0 }; }
+		if (diff <= 0) {
+			const result = write(s, credit, "金鳞市开户礼/分红补发");
+			return { ok: result.ok, msg: result.msg, days: 0, dividend: 0 };
+		}
 		const days = Math.min(diff, MAX_CATCHUP_DAYS);
 		let dividend = 0;
 		for (let d = 0; d < days; d++) {
@@ -970,10 +1019,11 @@ export function ensureDay() {
 		s.day = dayKey();
 		if (dividend > 0) {
 			const gain = Math.round(dividend);
-			/* ★ 入账成功才计入 earned；失败挂 pendingDiv（下次补发）——绝不静默吞钱 */
-			if (pay(gain, "金鳞市分红")) s.earned += gain;
-			else s.pendingDiv += gain;
+			/* 日期、持仓与本次收入一起提交；失败不推进日界，下次可重试。 */
+			credit += gain; s.earned += gain;
 		}
+		const result = write(s, credit, "金鳞市开户礼/分红");
+		if (!result.ok) return { ok: false, msg: result.msg, days: 0, dividend: 0 };
 		/* v6.2 好感度：持仓过夜 → 她记你一份（+2 / 交易日 / 每只；模块缺失时零副作用）。
 		   放在分红之后：先算钱，再算情分——两件事互不干扰（好感度**不参与**价格模型）。 */
 		try {
@@ -981,8 +1031,7 @@ export function ensureDay() {
 				for (const id in s.hold) if ((s.hold[id] | 0) > 0) lib.cshAffection.noteHold(id);
 			}
 		} catch (eAH) {}
-		write(s);
-		return { days: days, dividend: Math.round(dividend) };
+		return { ok: true, days: days, dividend: Math.round(dividend) };
 	} catch (e) {
 		console.warn("[池子魔将] 金鳞市结算异常", e);
 		return { days: 0, dividend: 0 };
@@ -1027,6 +1076,7 @@ export function snapshot() {
 		}
 		return {
 			day: s.dayNo, pc: pc, marketValue: Math.round(marketValue),
+			saveError: lastSaveError,
 			cost: Math.round(costSum), earned: s.earned,
 			list: list, dayNo: s.dayNo,
 			tips: Array.isArray(s.tips) ? s.tips.slice(0, 8) : [],
@@ -1044,7 +1094,7 @@ export function trade(id, n, side) {
 	try {
 		if (LISTED.indexOf(id) < 0) return { ok: false, msg: "该标的未在金鳞市挂牌" };
 		n = Math.floor(Number(n) || 0);
-		if (n <= 0) return { ok: false, msg: "股数无效" };
+		if (!Number.isSafeInteger(n) || n <= 0) return { ok: false, msg: "股数无效" };
 		const s = read();
 		const price = (typeof s.prices[id] === "number" && s.prices[id] > 0) ? s.prices[id] : BASE_PRICE;
 		const wallet = lib.cshWallet && lib.cshWallet.wallet;
@@ -1056,43 +1106,24 @@ export function trade(id, n, side) {
 			if (typeof wallet.pc === "function" && wallet.pc() < total) {
 				return { ok: false, msg: "CBY 不足（需 " + Math.ceil(total) + "）" };
 			}
-			const done = wallet.spend ? wallet.spend(Math.round(total), "金鳞市买入:" + name) : false;
-			if (done !== true) return { ok: false, msg: "扣款失败" };
 			s.hold[id] = (s.hold[id] | 0) + n;
 			s.cost[id] = (s.cost[id] || 0) + total;
-			/* ★ 2026-10-18：落盘失败必须回滚扣款 —— 否则「钱扣了、持仓只在内存」，
-			   重启后变成钱和股都没了（静默亏钱，玩家只会觉得"我的股不见了"）。 */
-			if (!write(s)) {
-				s.hold[id] = Math.max(0, (s.hold[id] | 0) - n);
-				s.cost[id] = Math.max(0, (s.cost[id] || 0) - total);
-				if (s.hold[id] === 0) s.cost[id] = 0;
-				try {
-					const w2 = lib.cshWallet && lib.cshWallet.wallet;
-					if (w2 && typeof w2.add === "function") w2.add(Math.round(total), "金鳞市买入回滚:" + name);
-				} catch (eRb) {}
-				return { ok: false, msg: "存档写入失败，已退回 " + Math.round(total) + " CBY" };
-			}
+			const result = write(s, -Math.round(total), "金鳞市买入:" + name);
+			if (!result.ok) return result;
 			return { ok: true, msg: "买入 " + name + " ×" + n, price: Math.round(price), n: n };
 		}
 		if (side === "sell") {
 			const have = s.hold[id] | 0;
 			if (have < n) return { ok: false, msg: "持仓不足（持有 " + have + "）" };
 			const gain = price * n * (1 - feeRate);
-			/* ★ 先确认到账再扣持仓——否则钱包异常时玩家会"卖了却拿不到钱" */
-			if (!pay(Math.round(gain), "金鳞市卖出:" + name)) return { ok: false, msg: "入账失败，请稍后重试" };
 			/* 成本按比例冲减（便于算盈亏） */
 			const avg = have > 0 ? (s.cost[id] || 0) / have : 0;
 			const oldCost = s.cost[id] || 0;
 			s.cost[id] = Math.max(0, oldCost - avg * n);
 			s.hold[id] = have - n;
 			if (s.hold[id] <= 0) { s.hold[id] = 0; s.cost[id] = 0; }
-			/* 落盘失败：持仓还原 + 把刚打进来的钱收回（与买入同一套事务语义） */
-			if (!write(s)) {
-				s.hold[id] = have;
-				s.cost[id] = oldCost;
-				try { wallet.spend && wallet.spend(Math.round(gain), "金鳞市卖出回滚:" + name); } catch (eRb2) {}
-				return { ok: false, msg: "存档写入失败，本次卖出已撤销" };
-			}
+			const result = write(s, Math.round(gain), "金鳞市卖出:" + name);
+			if (!result.ok) return result;
 			return { ok: true, msg: "卖出 " + name + " ×" + n, price: Math.round(price), n: n };
 		}
 		return { ok: false, msg: "未知操作" };
@@ -1108,6 +1139,11 @@ export function installMarket() {
 		if (lib.cshMarket) return;
 		lib.cshMarket = {
 			KEY: KEY,
+			syncPending: syncPending,
+			pending: function () {
+				const wallet = lib.cshWallet && lib.cshWallet.wallet;
+				return !!(syncing || (wallet && wallet.marketPending && wallet.marketPending()));
+			},
 			ensureDay: ensureDay,
 			snapshot: snapshot,
 			trade: trade,
@@ -1125,6 +1161,7 @@ export function installMarket() {
 				WELCOME_GIFT: WELCOME_GIFT,
 			},
 		};
+		syncPending();
 		if (lib.cshDebug && typeof lib.cshDebug.info === "function") {
 			lib.cshDebug.info("market: 金鳞市就绪（" + LISTED.length + " 位挂牌 · 存档 " + KEY + "）");
 		}

@@ -1,0 +1,284 @@
+{
+  "date": "2026-10-21T09:36:16.914Z",
+  "source": "D:/noname/_backup/codex-20261021/kami-scroll-20261021/main/content.js",
+  "sha256": "c039785436815de2a42a061974037adc2b0119f8a2c6583712ebfd151d8d3b0e",
+  "scope": "actual faction-scroll functions + native engine CSS + Chromium; not game/Android validation",
+  "passed": 30,
+  "failed": 19,
+  "failures": [
+    {
+      "name": "disable restores host dialog styles",
+      "passed": false
+    },
+    {
+      "name": "disable preserves host button width never owned by patch",
+      "passed": false
+    },
+    {
+      "name": "disable preserves host padding never owned by patch",
+      "passed": false
+    },
+    {
+      "name": "disable respects newer host-owned style update",
+      "passed": false
+    },
+    {
+      "name": "observer finds dialog inside newly inserted wrapper",
+      "passed": false
+    },
+    {
+      "name": "reused dialog no longer classified as faction is released",
+      "passed": false
+    },
+    {
+      "name": "unrelated explanation mentioning factions is not captured",
+      "passed": false
+    },
+    {
+      "name": "ordinary faction-restricted hero selection is not captured",
+      "passed": false
+    },
+    {
+      "name": "newly registered faction names are recognized",
+      "passed": false
+    },
+    {
+      "name": "control disable restores original transform and maxWidth",
+      "passed": false
+    },
+    {
+      "name": "viewport resize recomputes caps on existing dialog",
+      "passed": false
+    },
+    {
+      "name": "740x360 transform 2: dialog rectangle stays within viewport",
+      "passed": false
+    },
+    {
+      "name": "740x360 transform 2: final faction receives pointer hit",
+      "passed": false
+    },
+    {
+      "name": "390x844 transform 1: control rectangle stays within viewport",
+      "passed": false
+    },
+    {
+      "name": "390x844 transform 1: final control faction receives pointer hit",
+      "passed": false
+    },
+    {
+      "name": "740x360 transform 2: control rectangle stays within viewport",
+      "passed": false
+    },
+    {
+      "name": "740x360 transform 2: final control faction receives pointer hit",
+      "passed": false
+    },
+    {
+      "name": "detached dialogs are cleaned",
+      "passed": false
+    },
+    {
+      "name": "host important priority is restored",
+      "passed": false
+    }
+  ],
+  "checks": [
+    {
+      "name": "missing config defaults off and leaves dialog alone",
+      "passed": true
+    },
+    {
+      "name": "disable restores host dialog styles",
+      "passed": false
+    },
+    {
+      "name": "disable preserves host button width never owned by patch",
+      "passed": false
+    },
+    {
+      "name": "disable preserves host padding never owned by patch",
+      "passed": false
+    },
+    {
+      "name": "disable respects newer host-owned style update",
+      "passed": false
+    },
+    {
+      "name": "observer finds dialog inside newly inserted wrapper",
+      "passed": false
+    },
+    {
+      "name": "reused dialog no longer classified as faction is released",
+      "passed": false
+    },
+    {
+      "name": "two-faction dialog is covered",
+      "passed": true
+    },
+    {
+      "name": "engine options menu is excluded even with faction cards",
+      "passed": true
+    },
+    {
+      "name": "unrelated explanation mentioning factions is not captured",
+      "passed": false
+    },
+    {
+      "name": "ordinary faction-restricted hero selection is not captured",
+      "passed": false
+    },
+    {
+      "name": "newly registered faction names are recognized",
+      "passed": false
+    },
+    {
+      "name": "control disable restores original transform and maxWidth",
+      "passed": false
+    },
+    {
+      "name": "normal host dialog and button widths stay unchanged",
+      "passed": true
+    },
+    {
+      "name": "over-wide host dialog is capped within viewport",
+      "passed": true
+    },
+    {
+      "name": "viewport resize recomputes caps on existing dialog",
+      "passed": false
+    },
+    {
+      "name": "text-node changes revalidate semantic classification",
+      "passed": true
+    },
+    {
+      "name": "1200x820 transform 1: dialog rectangle stays within viewport",
+      "passed": true
+    },
+    {
+      "name": "1200x820 transform 1: native vertical scroll reaches final button",
+      "passed": true
+    },
+    {
+      "name": "1200x820 transform 1: final faction receives pointer hit",
+      "passed": true
+    },
+    {
+      "name": "390x844 transform 1: dialog rectangle stays within viewport",
+      "passed": true
+    },
+    {
+      "name": "390x844 transform 1: native vertical scroll reaches final button",
+      "passed": true
+    },
+    {
+      "name": "390x844 transform 1: final faction receives pointer hit",
+      "passed": true
+    },
+    {
+      "name": "915x412 transform 0.4: dialog rectangle stays within viewport",
+      "passed": true
+    },
+    {
+      "name": "915x412 transform 0.4: native vertical scroll reaches final button",
+      "passed": true
+    },
+    {
+      "name": "915x412 transform 0.4: final faction receives pointer hit",
+      "passed": true
+    },
+    {
+      "name": "740x360 transform 2: dialog rectangle stays within viewport",
+      "passed": false
+    },
+    {
+      "name": "740x360 transform 2: native vertical scroll reaches final button",
+      "passed": true
+    },
+    {
+      "name": "740x360 transform 2: final faction receives pointer hit",
+      "passed": false
+    },
+    {
+      "name": "915x412 zoom 0.6: dialog rectangle stays within viewport",
+      "passed": true
+    },
+    {
+      "name": "915x412 zoom 0.6: native vertical scroll reaches final button",
+      "passed": true
+    },
+    {
+      "name": "915x412 zoom 0.6: final faction receives pointer hit",
+      "passed": true
+    },
+    {
+      "name": "native wheel scrolls the faction content",
+      "passed": true
+    },
+    {
+      "name": "long faction control stays within viewport",
+      "passed": true
+    },
+    {
+      "name": "native horizontal wheel scrolls faction control",
+      "passed": true
+    },
+    {
+      "name": "last faction in long control can be clicked",
+      "passed": true
+    },
+    {
+      "name": "1200x820 transform 1: control rectangle stays within viewport",
+      "passed": true
+    },
+    {
+      "name": "1200x820 transform 1: final control faction receives pointer hit",
+      "passed": true
+    },
+    {
+      "name": "390x844 transform 1: control rectangle stays within viewport",
+      "passed": false
+    },
+    {
+      "name": "390x844 transform 1: final control faction receives pointer hit",
+      "passed": false
+    },
+    {
+      "name": "915x412 transform 0.4: control rectangle stays within viewport",
+      "passed": true
+    },
+    {
+      "name": "915x412 transform 0.4: final control faction receives pointer hit",
+      "passed": true
+    },
+    {
+      "name": "740x360 transform 2: control rectangle stays within viewport",
+      "passed": false
+    },
+    {
+      "name": "740x360 transform 2: final control faction receives pointer hit",
+      "passed": false
+    },
+    {
+      "name": "915x412 zoom 0.6: control rectangle stays within viewport",
+      "passed": true
+    },
+    {
+      "name": "915x412 zoom 0.6: final control faction receives pointer hit",
+      "passed": true
+    },
+    {
+      "name": "detached dialogs are cleaned",
+      "passed": false
+    },
+    {
+      "name": "host important priority is restored",
+      "passed": false
+    },
+    {
+      "name": "disabled observer cannot restyle later dialogs",
+      "passed": true
+    }
+  ]
+}

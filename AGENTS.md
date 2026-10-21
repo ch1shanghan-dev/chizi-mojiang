@@ -70,6 +70,11 @@ node tools/simulate_world.js
 node tools/probe_pool_achv.mjs
 node tools/probe_fx_media.mjs
 node tools/probe_save_guards.mjs
+node tools/probe_market_persistence.mjs
+node tools/probe_market_browser.mjs
+node tools/probe_confirm_focus.mjs
+node tools/probe_kami.cjs
+node tools/probe_eg_scroll.mjs
 node tools/probe_first_batch.mjs
 node tools/probe_interact_audit.mjs
 node tools/probe_skill_ai.mjs

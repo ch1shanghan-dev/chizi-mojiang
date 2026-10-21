@@ -94,6 +94,7 @@ function makeDOM() {
         const events = {};
         return {
             tagName, children: [], parentNode: null, style: {}, textContent: "",
+            setAttribute(name, value) { this[name] = String(value); },
             appendChild(child) { this.children.push(child); child.parentNode = this; return child; },
             removeChild(child) { this.children = this.children.filter(x => x !== child); child.parentNode = null; },
             addEventListener(type, fn) { (events[type] ||= []).push(fn); },
@@ -197,7 +198,7 @@ ${uiCases.toString()}
 try{const result=uiCases(confirmBox,document,key=>document.dispatchEvent(new KeyboardEvent('keydown',{key,bubbles:true})),el=>el.click(),()=>handlers.size);document.getElementById('results').textContent=JSON.stringify(result);}
 catch(error){document.getElementById('results').textContent=JSON.stringify({error:String(error.stack)});}`;
         fs.writeFileSync(file, '<!doctype html><html><head><meta charset="utf-8"></head><body><pre id="results"></pre><script>' + browserCode.replace(/<\/script/gi, "<\\/script") + '</script></body></html>');
-        const html = execFileSync(browser, ["--headless=new", "--disable-gpu", "--no-first-run", "--no-default-browser-check", "--user-data-dir=" + path.join(dir, "profile"), "--dump-dom", pathToFileURL(file).href], { encoding: "utf8", timeout: 30000, windowsHide: true, stdio: ["ignore", "pipe", "pipe"], maxBuffer: 2 * 1024 * 1024 });
+        const html = execFileSync(browser, ["--headless=new", ...(args.includes("--no-browser-sandbox") ? ["--no-sandbox"] : []), "--disable-gpu", "--no-first-run", "--no-default-browser-check", "--user-data-dir=" + path.join(dir, "profile"), "--dump-dom", pathToFileURL(file).href], { encoding: "utf8", timeout: 30000, windowsHide: true, stdio: ["ignore", "pipe", "pipe"], maxBuffer: 2 * 1024 * 1024 });
         const match = html.match(/<pre id="results">([\s\S]*?)<\/pre>/);
         if (!match) throw new Error("Browser produced no report: " + dir);
         const report = JSON.parse(match[1].replace(/&quot;/g, '"').replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&"));

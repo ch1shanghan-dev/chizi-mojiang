@@ -461,6 +461,66 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 		return true;
 	}
 
+	/* 金鳞市跨后端提交：余额、持仓检查点和待写流水先在同一次 setItem 中提交。
+	   配置库只是异步同步目标；检查点未清理时，市场读取它并可在重启后继续同步。
+	   普通 add/spend 的防抖路径不变。此路径禁止使用会吞写盘异常的 lsPut。 */
+	var marketSeq = 0;
+	function marketPending() {
+		return wallet.marketPending ? JSON.parse(JSON.stringify(wallet.marketPending)) : null;
+	}
+	function flushMarketLedger() {
+		var pending = wallet.marketPending;
+		if (!pending || !pending.entry) return true;
+		try {
+			var list = JSON.parse(localStorage.getItem(K_LEDGER) || "[]");
+			if (!Array.isArray(list)) throw new Error("流水格式异常");
+			if (!list.some(function (e) { return e && e.marketTx === pending.id; })) {
+				list.unshift(pending.entry);
+				list.sort(function (a, b) { return b.t - a.t; });
+				localStorage.setItem(K_LEDGER, JSON.stringify(list.slice(0, LEDGER_MAX)));
+			}
+			return true;
+		} catch (e) { logError("金鳞市流水待恢复", e); return false; }
+	}
+	function commitMarket(state, delta, reason) {
+		if (!state || typeof state !== "object" || !Number.isSafeInteger(delta) ||
+			typeof reason !== "string" || !reason.trim() || delta > SINGLE_ADD_CAP) return { ok: false, msg: "交易金额无效" };
+		if (delta < 0 && wallet.pc < -delta) return { ok: false, msg: "CBY 不足" };
+		if (!flushMarketLedger()) return { ok: false, msg: "上笔交易正在恢复，请稍后重试" };
+		var before = wallet;
+		try {
+			wallet = JSON.parse(JSON.stringify(before));
+			var got = clampNum(wallet.pc + delta, 0, PC_CAP) - wallet.pc;
+			wallet.pc += got;
+			wallet.pcPeak = Math.max(wallet.pcPeak, wallet.pc);
+			if (got) appendChain(got);
+			var id = Date.now().toString(36) + "-" + wallet.chainSeq + "-" + (++marketSeq);
+			wallet.marketPending = { id: id, state: JSON.parse(JSON.stringify(state)), entry: got ? {
+				t: Date.now(), d: got, r: reason.slice(0, 40), c: catOf(reason), b: wallet.pc, marketTx: id,
+			} : null };
+			wallet._sig = sigOf(wallet);
+			localStorage.setItem(K_WALLET, JSON.stringify(wallet));
+		} catch (e) {
+			wallet = before;
+			logError("金鳞市提交失败", e);
+			return { ok: false, msg: "存档写入失败，本次操作未完成" };
+		}
+		flushMarketLedger();
+		snapshot();
+		return { ok: true, gained: got };
+	}
+	function completeMarket(id) {
+		if (!wallet.marketPending || wallet.marketPending.id !== id || !flushMarketLedger()) return false;
+		var before = wallet;
+		try {
+			wallet = JSON.parse(JSON.stringify(before));
+			delete wallet.marketPending;
+			wallet._sig = sigOf(wallet);
+			localStorage.setItem(K_WALLET, JSON.stringify(wallet));
+			return true;
+		} catch (e) { wallet = before; logError("金鳞市检查点待清理", e); return false; }
+	}
+
 	/* 门票折扣（§G.3）：按段给 */
 	function discountOf(rankLv) {
 		var seg = segOfRank(rankLv).seg;
@@ -1542,6 +1602,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 			pc: function () { return wallet.pc; },
 			peak: function () { return wallet.pcPeak; },
 			add: addPC, spend: spendPC, SINGLE_ADD_CAP: SINGLE_ADD_CAP,
+			commitMarket: commitMarket, marketPending: marketPending, completeMarket: completeMarket,
 			/* v6.2 账本（来源与去处） */
 			ledger: ledger, ledgerSummary: ledgerSummary, ledgerClear: ledgerClear,
 			catOf: catOf,

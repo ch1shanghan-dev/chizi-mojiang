@@ -57,11 +57,10 @@ export const cshConfig = {
                这里必须把两件事分清楚，否则设置页看名字会以为是一个功能：
                  · csh_kami_group        = 「弹不弹」（本项，上游）
                  · csh_eg_group_scroll   = 「弹出来之后，势力太多放不下时尺寸怎么管」（下游）
-               本项只被规则技的 filter 读一次（纯 early return），**不产生任何 DOM、不改样式**，
-               所以与美化类扩展没有可冲突的面；真正会打架的是「别的扩展也做同一件事 ⇒ 弹两次」，
-               那种情况由 csh_rules.js 的让位守卫兜住（player.group 已经不是 shen 就自动放弃）。
+               规则技在判定、执行和异步选择回来后复查；其他流程已处理时让位。
+               取消/失败释放本次预留标记，不修改武将元数据或共享技能。
                建议：**同步关掉引擎的「选择势力」也能达到同样效果**（本项尊重引擎那一项，任一关闭即不弹）。 */
-            "csh_kami_group":{"name":"神将补选势力","intro":"让神将在斗地主、对决等模式也能选势力；不开则以「神」开局。身份场由引擎自己弹，不受本项影响。","init":false,"onclick":function(bool){ try{ game.saveExtensionConfig("池子魔将","csh_kami_group",bool); }catch(e){} }},
+            "csh_kami_group":{"name":"神将补选势力","intro":"原有流程未处理时，补问神将势力；已被其他扩展处理就跳过。身份场通常由引擎完成。","init":false,"onclick":function(bool){ try{ game.saveExtensionConfig("池子魔将","csh_kami_group",bool); }catch(e){} }},
             /* ★ 2026-10-16 深夜四（作者：给滚动条「在扩展设置里加一个开关」）：
                本体兼容注入 C4 的开关。改动即时生效（onclick 传新状态给注入器），无需重启。
                ★ 2026-10-16 深夜八·修「关了他又自动打开」：引擎（optionsMenu.js:305 /
@@ -69,7 +68,7 @@ export const cshConfig = {
                `if (!cfg.onclick)` 时装），而本项 onclick 当时只调了注入器 —— 存值永远缺失 →
                每次重开设置页/重启都回落到默认 init:true。修法 = onclick 里自行落盘（与引擎
                默认回调同键同法：extension_池子魔将_csh_eg_group_scroll）。E45 已加断言防回退。 */
-            "csh_eg_group_scroll":{"name":"势力面板自适应","intro":"势力太多、面板放不下时，把宽度锁在屏幕内并纵向滚动。面板被切掉或滚不动才需要开。","init":false,"onclick":function(bool){ try{ game.saveExtensionConfig("池子魔将","csh_eg_group_scroll",bool); }catch(e){} try{ if(typeof lib.__cshEgScrollApply==="function") lib.__cshEgScrollApply(bool); }catch(e){} }},
+            "csh_eg_group_scroll":{"name":"势力面板自适应","intro":"面板被切掉或滚不动时再开：势力窗口纵向滚动，控制条横向滑动；关闭还原。","init":false,"onclick":function(bool){ try{ game.saveExtensionConfig("池子魔将","csh_eg_group_scroll",bool); }catch(e){} try{ if(typeof lib.__cshEgScrollApply==="function") lib.__cshEgScrollApply(bool); }catch(e){} }},
             /* 【2026-10-05】「开发者日志」设置项按需求移除；precontent 会把历史开启的存档一并复位。 */
             /* 【2026-10-05】联机手气卡：仅联机（connectMode）生效；实现见 main/precontent.js 的
                _csh_swReplaceHandCards 全局规则技。本功能为最高优先级：与懒人包/云中守望同类开局

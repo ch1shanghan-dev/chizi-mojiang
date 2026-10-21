@@ -44,6 +44,7 @@ try {
   function element(tagName) {
     return {
       tagName, children: [], parentNode: null, style: {},
+      setAttribute(name, value) { this[name] = String(value); },
       appendChild(child) { this.children.push(child); child.parentNode = this; return child; },
       removeChild(child) { this.children = this.children.filter(x => x !== child); child.parentNode = null; },
       addEventListener() {}, focus() {},
@@ -62,7 +63,7 @@ try {
     removeEventListener(type, handler) { if (type === 'keydown') listeners.delete(handler); },
   };
   const callbacks = [];
-  const ui = context({ document: doc, CF_ID: 'probe-confirm', ensureStyle() {}, setTimeout() {} }, uiSource, ['confirmBox']);
+  const ui = context({ document: doc, CF_ID: 'probe-confirm', _confirmBackground: [], _confirmReturnFocus: null, ensureStyle() {}, setTimeout() {} }, uiSource, ['confirmBox']);
   ui.confirmBox({ message: 'A' }, value => callbacks.push(['A', value]));
   ui.confirmBox({ message: 'B' }, value => callbacks.push(['B', value]));
   const before = listeners.size;

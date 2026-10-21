@@ -7,6 +7,14 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const at = process.argv.indexOf('--source');
 const file = at >= 0 ? process.argv[at + 1] : path.join(root, 'core/csh_interact.js');
 const raw = fs.readFileSync(file, 'utf8');
+const worldSource = fs.readFileSync(path.join(root, 'core/csh_world.js'), 'utf8');
+function extract(source, name) {
+  const start=new RegExp('function\\s+'+name+'\\s*\\(').exec(source);
+  if(!start)throw Error('Missing '+name);
+  for(let end=source.indexOf('\n',start.index);end>=0;end=source.indexOf('\n',end+1)) {
+    const candidate=source.slice(start.index,end);try{new vm.Script('('+candidate+'\n)');return candidate;}catch(error){if(!(error instanceof SyntaxError))throw error;}
+  }throw Error('Cannot extract '+name);
+}
 const results = [];
 function check(name, ok, detail) { results.push({ name, passed: !!ok, detail }); }
 function harness() {
@@ -26,12 +34,19 @@ function harness() {
     get: { attitude: () => 2, translation: p => p?.name || String(p) },
     setTimeout(fn, delay) { const id = ++next; tasks.set(id, { fn, delay }); return id; },
     clearTimeout(id) { if (tasks.has(id)) cancelled.push(tasks.get(id).fn); tasks.delete(id); } });
-  vm.runInContext('Array.prototype.randomGet = function(){ return this[0]; };', ctx);
-  const injection = '\n globalThis.probe = {riposte, chorus, queueBurst, queueEmoTriple, pairKey, recordEvent, lastEvent, saveCfg, ' +
+  vm.runInContext('game.players=Array.from(game.players);Array.prototype.randomGet = function(){ return this[0]; };', ctx);
+  const injection = '\n globalThis.probe = {riposte, chorus, queueBurst, queueEmoTriple, pairKey, recordEvent, lastEvent, saveCfg, addGrudge, grudgeOf, pickTarget, fire, ' +
     'pending: function(){return typeof sceneTimers === "undefined" ? null : sceneTimers.size;}};\n';
   const code = raw.replace(/^import .*?;\r?\n/gm, '').replace(/\}\)\(\);\s*$/, injection + '})();');
   vm.runInContext(code, ctx, { timeout: 1500 });
-  return { api: ctx.probe, interaction: lib.cshInteract, lib, game, status, speaker, other, friend, me, tasks, cancelled, chats, throws, stickers,
+  // Execute the real world API, including its default-to-player behavior.
+  vm.runInContext('var world={ai:["speaker","other","friend","me"].map(id=>({id,name:id,grudges:{}}))};'+
+    'var PLAYER_GRUDGE_KEY="player";function byId(id){return world.ai.find(a=>a.id===id);}' +
+    'function idInRoster(id){return !!byId(id);}function clampNum(n,a,b){return Math.max(a,Math.min(b,Number(n)||0));}' +
+    'function saveWorld(){}function pushHistory(){}'+
+    ['idOfPlayer','grudgeValue','addGrudge','grudge'].map(n=>extract(worldSource,n)).join('\n')+
+    ';lib.cshWorld={idOfPlayer,addGrudge,grudge,PLAYER_GRUDGE_KEY};globalThis.grudgeWorld=world;',ctx);
+  return { api: ctx.probe, interaction: lib.cshInteract, world: ctx.grudgeWorld, get: ctx.get, lib, game, status, speaker, other, friend, me, tasks, cancelled, chats, throws, stickers,
     random(values) { randoms = [...values]; }, advance() { now += 10000; },
     flush() { const todo = [...tasks.values()]; tasks.clear(); for (const task of todo) task.fn(); } };
 }
@@ -95,6 +110,45 @@ for (const [prior, category] of [[null, 'hitBack'], ['hit','memHitBack'], ['hitB
   h.interaction.reset(); scenarios.sticker(h);
   h.api.saveCfg(chatKey, false); h.flush(); check('chat toggle retains non-chat sticker effects', h.stickers.length === 2);
   check('completed tasks leave no pending timer handles', h.api.pending() === 0, h.api.pending());
+}
+{
+  const h=harness();h.random([0,0.99,0.99,0.99]);h.api.fire(h.speaker,h.other,'enemy',1);
+  check('actual throw records victim -> attacker',h.lib.cshWorld.grudge('other','speaker')===1);
+  check('actual throw does not add victim -> player debt',h.lib.cshWorld.grudge('other')===0);
+}
+{
+  const h=harness(),W=h.lib.cshWorld;
+  W.addGrudge('speaker',7); // Legacy default-to-player account must survive.
+  h.api.addGrudge(h.speaker,1,h.other);
+  check('AI pair writes owner -> opponent',W.grudge('speaker','other')===1);
+  check('AI pair leaves reverse and unrelated pairs alone',W.grudge('other','speaker')===0&&W.grudge('friend','other')===0);
+  check('AI pair preserves legacy player account',W.grudge('speaker')===7);
+  check('AI pair reads explicit direction',h.api.grudgeOf(h.speaker,h.other)===1&&h.api.grudgeOf(h.other,h.speaker)===0);
+  h.api.addGrudge(h.speaker,2,h.me);
+  check('human opponent uses legacy player key',W.grudge('speaker')===9&&W.grudge('speaker','me')===0);
+  h.other.controlled=true;h.api.addGrudge(h.speaker,1,h.other);
+  check('controlled opponent maps to human account',W.grudge('speaker')===10&&W.grudge('speaker','other')===1);
+  h.api.addGrudge(h.me,2,h.speaker);
+  check('human victim does not mutate NPC copy of chosen character',W.grudge('me','speaker')===0&&W.grudge('me')===0);
+  const unknown={...h.friend,name:'unknown',playerid:'unknown'};h.api.addGrudge(h.speaker,2,unknown);
+  check('unknown opponent is skipped rather than defaulting to player',W.grudge('speaker')===10);
+  h.api.addGrudge(h.speaker,2,h.speaker);
+  check('same roster identity does not create self grudge',W.grudge('speaker','speaker')===0);
+}
+{
+  const h=harness();h.lib.cshWorld.addGrudge('speaker',5,'other');
+  h.game.players.splice(0,h.game.players.length,h.speaker,h.other,h.friend);
+  // Reading direction is also checked at the weighted target-selection call site.
+  const reads=[],old=h.lib.cshWorld.grudge;h.lib.cshWorld.grudge=(owner,target)=>{reads.push([owner,target]);return old(owner,target);};
+  h.api.pickTarget(h.speaker,'ally');
+  check('target weighting reads actor resentment toward each candidate',reads.length===2&&reads.every(r=>r[0]==='speaker')&&reads.some(r=>r[1]==='other'));
+}
+{
+  const h=harness();h.speaker.side=1;h.other.side=2;h.friend.side=1;
+  h.get.attitude=(from,to)=>from.side===to.side?2:-2;
+  h.lib.cshWorld.addGrudge('other',6);h.interaction.onAllyDie(h.friend,h.other);
+  check('ally death records avenger -> killer',h.lib.cshWorld.grudge('speaker','other')===2);
+  check('ally death preserves killer -> player old account',h.lib.cshWorld.grudge('other')===6);
 }
 const failed = results.filter(r => !r.passed);
 console.log(JSON.stringify({ scope: 'actual module in VM; isolated timers/config/players, no real saves or game rendering', passed: results.length - failed.length, failed: failed.length, failures: failed }, null, 2));

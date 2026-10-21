@@ -1,0 +1,73 @@
+{
+  "date": "2026-10-21T09:41:19.866667+00:00",
+  "version": "4.0.9",
+  "installation": "D:\\noname\\resources\\app\\extension\\池子魔将",
+  "status": "applied locally, not published",
+  "checks": [
+    {
+      "kind": "kami",
+      "revision": "current",
+      "command": [
+        "node",
+        "tools/probe_kami.cjs"
+      ],
+      "exit_code": 0,
+      "passed": 61,
+      "failed": 0
+    },
+    {
+      "kind": "kami",
+      "revision": "before",
+      "command": [
+        "node",
+        "tools/probe_kami.cjs",
+        "--source",
+        "D:/noname/_backup/codex-20261021/kami-scroll-20261021/core/csh_rules.js"
+      ],
+      "exit_code": 1,
+      "passed": 43,
+      "failed": 18
+    },
+    {
+      "kind": "Chromium scroll",
+      "revision": "current",
+      "report": "eg-scroll-after.json",
+      "passed": 49,
+      "failed": 0
+    },
+    {
+      "kind": "Chromium scroll",
+      "revision": "before",
+      "report": "eg-scroll-before.json",
+      "passed": 30,
+      "failed": 19
+    },
+    {
+      "kind": "Chromium scroll",
+      "revision": "custom",
+      "report": "eg-scroll-custom.json",
+      "passed": 56,
+      "failed": 0
+    }
+  ],
+  "main_gate": {
+    "exit_code": 0,
+    "warnings": 2
+  },
+  "world": {
+    "passed": 188,
+    "failed": 0
+  },
+  "sources": {
+    "core/csh_rules.js": "c28eed9c55f76ede340d38245f5063a0eb1a74bfda62619cec45cf68cdf61a43",
+    "main/content.js": "293755763968dfd6860f293830f65a7bd3fa69b44159befc5f1396a68ee49b81",
+    "main/config.js": "f849b0fe8179ce2ccd4a5a70657df766bcbc682681cb952d30714e65e6317515",
+    "tools/probe_kami.cjs": "a8f6f852d04b1482e9c64ca8b9b9c7511e933b293c7453861ac98d91e296917b",
+    "tools/probe_eg_scroll.mjs": "e4737182ef93d78d08a0066856a86e60500cef9031fd0a1855e2cd3da4aec6b8"
+  },
+  "limits": [
+    "Not full Noname/decadeUI/Android/touch or multiplayer verification.",
+    "No unique external culprit identified.",
+    "No player save/config access."
+  ]
+}

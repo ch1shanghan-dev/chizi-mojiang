@@ -49,6 +49,8 @@ var _visible = [];
 var _pending = [];
 var _recent = {};
 var _seq = 0;
+var _confirmBackground = [];
+var _confirmReturnFocus = null;
 
 /* body 的实际缩放：优先实测（rect ÷ offset），拿不到退回 documentZoom。
    扩展里所有"要在引擎坐标系里算尺寸"的地方都该用这个，而不是 vh/vw。 */
@@ -127,6 +129,7 @@ function ensureStyle() {
         "#" + CF_ID + " div{position:static!important;display:block!important;}",
         "#" + CF_ID + " span{position:static!important;display:inline-block!important;}",
         "#" + CF_ID + " .csh-ui-cf-card{width:min(420px,92vw)!important;padding:18px 18px 14px!important;border-radius:16px!important;",
+        "max-height:100%!important;overflow:auto!important;",
         "background:linear-gradient(168deg,#1e1811,#120f0a 70%)!important;border:1px solid rgba(216,180,106,.55)!important;",
         "box-shadow:0 26px 70px rgba(0,0,0,.8)!important;color:#ece5d6!important;}",
         "#" + CF_ID + " .csh-ui-cf-title{font-size:var(--csh-lfs-xl,16px)!important;font-weight:700!important;letter-spacing:1.5px!important;color:#f6e5b6!important;margin:0 0 8px!important;}",
@@ -135,12 +138,14 @@ function ensureStyle() {
         "white-space:pre-line!important;word-break:break-word!important;margin:0 0 14px!important;}",
         "#" + CF_ID + " .csh-ui-cf-acts{display:flex!important;flex-wrap:wrap!important;justify-content:flex-end!important;gap:10px!important;}",
         "#" + CF_ID + " .csh-ui-cf-btn{display:inline-block!important;cursor:pointer!important;padding:11px 20px!important;min-height:44px!important;",
+        "position:static!important;width:auto!important;font-family:inherit!important;line-height:1.5!important;text-align:center!important;",
         "border-radius:999px!important;border:1px solid rgba(216,180,106,.32)!important;color:#e3d6b2!important;font-size:var(--csh-lfs-md2,13.5px)!important;",
         "background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.015))!important;}",
         "#" + CF_ID + " .csh-ui-cf-btn.ok{color:#221a0c!important;font-weight:700!important;border-color:rgba(216,180,106,.85)!important;",
         "background:linear-gradient(180deg,#f4dfa8,#cfa958)!important;}",
         "#" + CF_ID + " .csh-ui-cf-card.danger .csh-ui-cf-btn.ok{color:#2a1013!important;border-color:rgba(230,130,144,.85)!important;",
         "background:linear-gradient(180deg,#f0a3b0,#d66e7c)!important;}",
+        "#" + CF_ID + " .csh-ui-cf-btn:focus-visible{outline:2px solid #f6e5b6!important;outline-offset:3px!important;}",
     ].join("");
     (document.head || document.documentElement).appendChild(st);
 }
@@ -253,22 +258,31 @@ function confirmBox(opts, cb) {
     try {
         old = document.getElementById(CF_ID);
     } catch (e0) {}
+    var returnFocus = (old && old.__cshReturnFocus) || _confirmReturnFocus || document.activeElement;
     var layer = document.createElement("div");
     layer.id = CF_ID;
     var card = document.createElement("div");
     card.className = "csh-ui-cf-card" + (opts.danger ? " danger" : "");
+    card.setAttribute("role", "dialog");
+    card.setAttribute("aria-modal", "true");
+    card.setAttribute("aria-labelledby", CF_ID + "-title");
+    card.setAttribute("aria-describedby", CF_ID + "-message");
     var title = document.createElement("div");
     title.className = "csh-ui-cf-title";
+    title.id = CF_ID + "-title";
     title.textContent = String(opts.title || "请确认");
     var msg = document.createElement("div");
     msg.className = "csh-ui-cf-msg";
+    msg.id = CF_ID + "-message";
     msg.textContent = String(opts.message == null ? "" : opts.message);
     var acts = document.createElement("div");
     acts.className = "csh-ui-cf-acts";
-    var cancel = document.createElement("span");
+    var cancel = document.createElement("button");
+    cancel.type = "button";
     cancel.className = "csh-ui-cf-btn";
     cancel.textContent = String(opts.cancel || "取消");
-    var ok = document.createElement("span");
+    var ok = document.createElement("button");
+    ok.type = "button";
     ok.className = "csh-ui-cf-btn ok";
     ok.textContent = String(opts.ok || "确定");
     acts.appendChild(cancel);
@@ -278,25 +292,84 @@ function confirmBox(opts, cb) {
     card.appendChild(acts);
     layer.appendChild(card);
     (document.documentElement || document.body).appendChild(layer);
+    layer.__cshReturnFocus = returnFocus;
+    /* 共用背景锁，替换/取消回调重入时不提前解锁；保留宿主原有 inert 状态。
+       高于确认框的系统浮层仍可取得焦点和 Esc。 */
+    var siblings = (document.documentElement || document.body).children;
+    for (var i = 0; i < siblings.length; i++) {
+        var node = siblings[i];
+        if (node === layer || node.id === CF_ID || /^(HEAD|STYLE|SCRIPT|LINK)$/i.test(node.tagName)) continue;
+        if (_confirmBackground.some(function (item) { return item.node === node; })) continue;
+        try {
+            if (typeof window !== "undefined" && window.getComputedStyle && Number(window.getComputedStyle(node).zIndex) > CSH_Z.modal) continue;
+        } catch (eZ) {}
+        _confirmBackground.push({ node: node, inert: !!node.inert });
+        node.inert = true;
+    }
 
     var done = false;
     var focusTimer = 0;
     function fin(v) {
         if (done) return;
+        var restoreAllowed = isTop();
         done = true;
         try { if (focusTimer) clearTimeout(focusTimer); } catch (eT) {}
         try { document.removeEventListener("keydown", onKey, true); } catch (eK) {}
+        try { if (typeof window !== "undefined") window.removeEventListener("keydown", onKey, true); } catch (eW) {}
+        try { document.removeEventListener("focusin", onFocus, true); } catch (eFocus) {}
         try { if (layer.parentNode) layer.parentNode.removeChild(layer); } catch (eR) {}
+        if (!document.getElementById(CF_ID)) {
+            _confirmBackground.forEach(function (item) { item.node.inert = item.inert; });
+            _confirmBackground = [];
+        }
+        var closingFocus = _confirmReturnFocus;
+        _confirmReturnFocus = returnFocus;
         try { if (typeof cb === "function") cb(!!v); } catch (eC) {}
+        _confirmReturnFocus = closingFocus;
+        if (restoreAllowed && !document.getElementById(CF_ID) && returnFocus && returnFocus.isConnected && typeof returnFocus.focus === "function") {
+            try { returnFocus.focus({ preventScroll: true }); } catch (eBack) {}
+        }
+    }
+    function isTop() {
+        if (done || document.getElementById(CF_ID) !== layer) return false;
+        try {
+            var active = document.activeElement;
+            if (active && !layer.contains(active)) {
+                for (var parent = active; parent && parent !== document.documentElement; parent = parent.parentElement) {
+                    if (Number(window.getComputedStyle(parent).zIndex) > CSH_Z.modal) return false;
+                }
+            }
+            var rect = card.getBoundingClientRect();
+            var top = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+            return !top || layer.contains(top);
+        } catch (eRect) { return true; }
+    }
+    function focusDefault() { try { (opts.danger ? cancel : ok).focus(); } catch (eF) {} }
+    function onFocus(e) {
+        if (isTop() && !layer.contains(e.target)) focusDefault();
+    }
+    function consume(e) {
+        e.preventDefault(); e.stopPropagation();
+        if (e.stopImmediatePropagation) e.stopImmediatePropagation();
     }
     function onKey(e) {
-        if (done || document.getElementById(CF_ID) !== layer) return;
-        if (e.key === "Escape" || e.keyCode === 27) { try { e.preventDefault(); e.stopPropagation(); } catch (eP) {} fin(false); }
-        else if (e.key === "Enter" || e.keyCode === 13) { try { e.preventDefault(); e.stopPropagation(); } catch (eP2) {} fin(true); }
+        if (!isTop() || e.isComposing || e.keyCode === 229 || e.ctrlKey || e.altKey || e.metaKey) return;
+        if (e.key === "Tab" || e.keyCode === 9) {
+            consume(e);
+            var active = document.activeElement;
+            try { (active === cancel ? ok : active === ok ? cancel : e.shiftKey ? ok : cancel).focus(); } catch (eTab) {}
+        } else if (e.key === "Escape" || e.keyCode === 27) { consume(e); fin(false); }
+        else if (e.key === "Enter" || e.keyCode === 13 || e.key === " " || e.keyCode === 32) {
+            consume(e);
+            if (e.repeat) return;
+            fin(document.activeElement === ok || (document.activeElement !== cancel && !opts.danger));
+        }
     }
     var handle = { el: layer, close: function () { fin(false); } };
     layer.__cshClose = handle.close;
     document.addEventListener("keydown", onKey, true);
+    document.addEventListener("focusin", onFocus, true);
+    try { if (typeof window !== "undefined") window.addEventListener("keydown", onKey, true); } catch (eWK) {}
     layer.addEventListener("click", function (e) { if (e.target === layer) fin(false); }, false);
     cancel.addEventListener("click", function (e) { try { e.stopPropagation(); } catch (eS) {} fin(false); }, false);
     ok.addEventListener("click", function (e) { try { e.stopPropagation(); } catch (eS) {} fin(true); }, false);
@@ -307,8 +380,7 @@ function confirmBox(opts, cb) {
         else if (old && old.parentNode) old.parentNode.removeChild(old);
     } catch (eOld) {}
     if (!done) focusTimer = setTimeout(function () {
-        if (done || document.getElementById(CF_ID) !== layer) return;
-        try { ok.focus(); } catch (eF) {}
+        if (isTop()) focusDefault();
     }, 30);
     return handle;
 }

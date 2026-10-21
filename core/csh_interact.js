@@ -737,7 +737,7 @@ import GEN_LINES from "./csh_interact_lines_gen.js";
 		/* 恩怨 ≥ 5 的目标权重 ×3（§4.2）：被记恨的人更容易被 AI 盯上 */
 		var weighted = [];
 		for (var i = 0; i < list.length; i++) {
-			var times = grudgeOf(list[i]) >= 5 ? 3 : 1;
+			var times = grudgeOf(player, list[i]) >= 5 ? 3 : 1;
 			for (var t = 0; t < times; t++) weighted.push(list[i]);
 		}
 		return weighted.randomGet();
@@ -754,19 +754,29 @@ import GEN_LINES from "./csh_interact_lines_gen.js";
 	}
 	/* 恩怨账本接线（2026-10-01）：把互动的「动作」接上世界的「记账」。
 	   lib.cshWorld 不可用时静默跳过，二者互不阻塞。 */
-	function addGrudge(target, n) {
+	function grudgeTarget(other) {
+		if (!other) return null;
+		var world = lib.cshWorld;
+		if (other === game.me || (typeof other.isUnderControl === "function" && other.isUnderControl())) {
+			return world.PLAYER_GRUDGE_KEY || "player";
+		}
+		return world.idOfPlayer(other);
+	}
+	function addGrudge(owner, n, other) {
 		try {
+			if (!isAI(owner)) return;
 			if (lib.cshWorld && lib.cshWorld.idOfPlayer && lib.cshWorld.addGrudge) {
-				var id = lib.cshWorld.idOfPlayer(target);
-				if (id) lib.cshWorld.addGrudge(id, n);
+				var id = lib.cshWorld.idOfPlayer(owner), targetKey = grudgeTarget(other);
+				if (id && targetKey && id !== targetKey) lib.cshWorld.addGrudge(id, n, targetKey);
 			}
 		} catch (e) {}
 	}
-	function grudgeOf(target) {
+	function grudgeOf(owner, other) {
 		try {
+			if (!isAI(owner)) return 0;
 			if (lib.cshWorld && lib.cshWorld.idOfPlayer && lib.cshWorld.grudge) {
-				var id = lib.cshWorld.idOfPlayer(target);
-				return id ? lib.cshWorld.grudge(id) : 0;
+				var id = lib.cshWorld.idOfPlayer(owner), targetKey = grudgeTarget(other);
+				return id && targetKey && id !== targetKey ? lib.cshWorld.grudge(id, targetKey) : 0;
 			}
 		} catch (e) {}
 		return 0;
@@ -1020,7 +1030,7 @@ import GEN_LINES from "./csh_interact_lines_gen.js";
 		/* 反思（第三批）+ 二级反思·印象（T1）：计数 ≥3 或 印象"克星"（重要度累计 ≤−16，
 		   被救之恩的负向折算也计入）都算固化宿敌；世界恩怨 ≥8 仍最高优先 */
 		if ((isNemesis(target, player) || impressionOf(target, player) === "克星") && LINES.grudge && LINES.grudge.length) sayName = "grudge";
-		if (grudgeOf(target) >= 8 && LINES.grudge && LINES.grudge.length) sayName = "grudge";
+		if (grudgeOf(player, target) >= 8 && LINES.grudge && LINES.grudge.length) sayName = "grudge";
 		mark(player);
 		pairTimes.set(pairKey(player, target), pairCount(player, target) + 1);
 		var threwEntity = false;
@@ -1045,7 +1055,7 @@ import GEN_LINES from "./csh_interact_lines_gen.js";
 		}
 		/* 砸蛋/砸鞋命中 → 恩怨 +1（§4.2；连击追加抛掷在 queueBurst 内，不重复计数） */
 		if (threwEntity && (name === "egg" || name === "shoe")) {
-			addGrudge(target, 1);
+			addGrudge(target, 1, player);
 			recordEvent(player, target, "hit");
 		}
 		riposte(target, name, player);
@@ -1255,7 +1265,6 @@ import GEN_LINES from "./csh_interact_lines_gen.js";
 		},
 		onAllyDie: function (dead, killer) {
 			if (!usable(killer) || killer === dead) return;
-			addGrudge(killer, 2);   // 凶手恩怨 +2（§4.2 队友阵亡）
 			recordEvent(killer, dead, "killed");   // 记忆记账（2026-10-06 第二批）
 			var avenger = game.players
 				.filter(function (p) {
@@ -1263,6 +1272,7 @@ import GEN_LINES from "./csh_interact_lines_gen.js";
 				})
 				.randomGet();
 			if (!avenger) return;
+			addGrudge(avenger, 2, killer); // 复仇者对凶手记账，不写成凶手对玩家的旧账。
 			fire(avenger, killer, "enemy", BASE.allyDie);
 			/* 帮腔（2026-10-06 第二批）：死者的另一位盟友再补一句，葬礼也有观众 */
 			chorus(dead, killer, "assistHit");

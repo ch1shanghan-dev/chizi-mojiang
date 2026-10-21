@@ -1,0 +1,77 @@
+{
+  "date": "2026-10-21",
+  "version": "4.0.9",
+  "base": "8b2a76d",
+  "delivery_status": "Applied to actual D: installation on 2026-10-21 17:20 Asia/Shanghai after user enabled access; skill synchronized; main gate passed with 2 warnings and world 188/0.",
+  "checks": [
+    {
+      "command": "node tools/check.js",
+      "exit_code": 0,
+      "warnings": 2
+    },
+    {
+      "command": "node tools/simulate_world.js",
+      "passed": 188,
+      "failed": 0
+    },
+    {
+      "command": "node tools/probe_market_persistence.mjs",
+      "passed": 52,
+      "failed": 0
+    },
+    {
+      "command": "node tools/probe_market_browser.mjs",
+      "passed": 12,
+      "failed": 0
+    },
+    {
+      "command": "node tools/probe_interact_audit.mjs",
+      "passed": 113,
+      "failed": 0
+    },
+    {
+      "command": "node tools/probe_confirm_focus.mjs",
+      "passed": 35,
+      "failed": 0
+    },
+    {
+      "command": "node tools/probe_first_batch.mjs --browser <Chrome> --no-browser-sandbox",
+      "passed": 71,
+      "failed": 0
+    },
+    {
+      "command": "node tools/probe_save_guards.mjs",
+      "passed": 12,
+      "failed": 0
+    },
+    {
+      "command": "node docs/skills/chizi-mojiang-maintenance/scripts/probe_noncharacter.cjs --root .",
+      "passed": 8,
+      "failed": 0
+    }
+  ],
+  "negative_controls": [
+    {
+      "scope": "old market: config failure and reload loses purchased stock",
+      "passed": 2,
+      "failed": 1
+    },
+    {
+      "scope": "old interaction with new direction checks",
+      "passed": 101,
+      "failed": 12
+    },
+    {
+      "scope": "old confirm focus baseline subset",
+      "passed": 0,
+      "failed": 7
+    }
+  ],
+  "limits": [
+    "Not Noname/Android/decadeUI or OS crash/power-loss verification.",
+    "No player save access.",
+    "No publish, version bump or remote changes."
+  ],
+  "initial_delivery_status": "Verified in isolated checkout; installed D: directory unchanged because it is outside writable sandbox.",
+  "application_backup": "C:/Users/Chishanghan/AppData/Local/Temp/chizi-maintenance-20261021/deliverables/backups/20261021_172004_748224"
+}

@@ -54,6 +54,7 @@ import { lib, game, get } from "../../../noname.js";
 
 var SKILL = "_csh_kami_choice";
 var _installed = false;
+var _kamiPending = new WeakMap();
 
 /* 诊断：最后一次判定为什么没通过。挂在 lib 上，调试面板可读 ——
    前几版"弹不出来"时只能靠猜，这一版让原因自己说话。 */
@@ -77,8 +78,8 @@ function why(reason, player) {
          设置页的 `init:false` 只在**打开过设置页**时才写进 lib.config，
          老存档 / 刚装都没这个键 ⇒ 若写成"只认显式 false 才关"，缺键会被判成开，
          等于"名义上默认关、实际默认开"。所以必须反过来：缺键 = 关。
-   ★ 这个开关只被 filter 读一次、纯 early return —— 不产生 DOM、不改样式、不动别人的东西，
-     所以它本身**不会**和任何美化扩展冲突。 */
+   filter、content 入口及选择完成后都检查开关和宿主状态；关闭时不进入补选流程。
+   补选与面板滚动独立，兼容性以实际触发条件和异步让位守卫判断。 */
 function kamiEnabled() {
     try {
         return lib.config["extension_池子魔将_csh_kami_group"] === true;
@@ -89,11 +90,13 @@ function kamiEnabled() {
 
 /* 该不该问这个玩家选势力。返回 "" = 不问；"shen" = 要问。
    判定条件与引擎 kami 分支等价，但：显式、缺键按开、只认 shen。 */
-function verdict(player) {
+function verdict(player, ownPending) {
     if (!player) return why("no-player", player);
     /* ① 扩展开关（最便宜，关掉就完全不参与，连 character 都不用查） */
     if (!kamiEnabled()) return why("ext-config-off", player);
-    if (player._groupChosen) return why("already-chosen", player);
+    var pending = _kamiPending.get(player);
+    if (pending && pending !== ownPending) return why("choice-pending", player);
+    if (player._groupChosen && !(pending === ownPending && ownPending && player._groupChosen === "shen")) return why("already-chosen", player);
     var name = player.name1 || player.name || "";
     if (!name) return why("no-name", player);
     var info = null;
@@ -102,7 +105,7 @@ function verdict(player) {
     /* ② 只认 shen —— devil 是本扩展的魔王/小怪全家，碰了 BOSS 模式就废 */
     if (info.group !== "shen") return why("group-not-shen:" + info.group, player);
     /* ③ 让位守卫：势力已经不是 shen，说明**别人已经处理过了**
-       （十周年UI 的 _slyh priority 是 Infinity，会抢在前面；别的扩展同理）。
+       （例如先执行的其他扩展；本机十周年UI 的 _slyh 只接未注册势力，通常不处理 shen）。
        这是防"弹两次"的：谁先改成功就归谁，后来者自动放弃。
        放在 shen 判定之后 —— 只有"本来该问的角色"才需要检查这个问题，
        也让 devil/shu 的拒绝原因码保持原样（不然它们会变成 player-group-changed）。 */
@@ -125,6 +128,8 @@ function verdict(player) {
     try {
         if (get.config("choose_group") === false) return why("config-off", player);
     } catch (e2) {}
+    try { if (get.mode() === "guozhan") return why("guozhan", player); } catch (eMode) {}
+    why("eligible", player);
     return "shen";
 }
 
@@ -167,22 +172,42 @@ export function installKamiChoice() {
                 return true;
             },
             content: async function (event, trigger, player) {
+                /* filter 之后到实际执行、以及 await 期间都可能被别的扩展接管。 */
+                if (verdict(player) !== "shen") return;
                 var gs = [];
                 try { gs = choices(); } catch (e0) { gs = []; }
                 if (!gs || !gs.length) return;
-                player._groupChosen = "shen";   /* 先落标记再问：任何异步重入都不会二次弹窗 */
-                var result = null;
+                var hadChosen = Object.prototype.hasOwnProperty.call(player, "_groupChosen");
+                var previousChosen = player._groupChosen;
+                var pending = { name: player.name1 || player.name || "" };
+                var committed = false;
+                _kamiPending.set(player, pending);
+                player._groupChosen = "shen"; // 只在本次选择进行中预留，失败/取消须释放。
                 try {
-                    result = await player
+                    var result = await player
                         .chooseButton(["请选择你的势力", [gs.map(function (g) { return ["", "", "group_" + g]; }), "vcard"]], true)
                         .set("direct", true)
                         .forResult();
-                } catch (eC) { result = null; }
-                if (result && result.bool && result.links && result.links.length) {
+                    if (!result || !result.bool || !result.links || !result.links.length) { why("choice-cancelled", player); return; }
+                    if (_kamiPending.get(player) !== pending || player._groupChosen !== "shen" ||
+                        (player.name1 || player.name || "") !== pending.name) { why("choice-superseded", player); return; }
+                    if (verdict(player, pending) !== "shen") return;
                     var link = result.links[0];
                     var gid = String(link && link[2] != null ? link[2] : "");
-                    if (gid.indexOf("group_") === 0) {
-                        try { await player.changeGroup(gid.slice(6), false, false); } catch (eCh) {}
+                    if (gid.indexOf("group_") !== 0 || !gs.includes(gid.slice(6)) || !choices().includes(gid.slice(6))) {
+                        why("choice-invalid", player); return;
+                    }
+                    await player.changeGroup(gid.slice(6), false);
+                    committed = true;
+                    why("chosen:" + gid.slice(6), player);
+                } catch (eC) {
+                    why("choice-error", player);
+                    try { if (lib.cshDebug && typeof lib.cshDebug.error === "function") lib.cshDebug.error("kami: 补选未完成", eC); } catch (eLog) {}
+                } finally {
+                    if (_kamiPending.get(player) === pending) _kamiPending.delete(player);
+                    if (!committed && player._groupChosen === "shen") {
+                        if (hadChosen) player._groupChosen = previousChosen;
+                        else delete player._groupChosen;
                     }
                 }
             },

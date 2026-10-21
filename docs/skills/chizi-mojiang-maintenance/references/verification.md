@@ -4,6 +4,7 @@
 
 项目根运行 `node tools/check.js`；涉及世界、结算或 HTML 时运行 `node tools/simulate_world.js`。
 按范围使用 pool-achv、fx-media、save-guards、rank、egwidth 等已有工具，先读依赖/用途。
+势力兼容使用 `node tools/probe_kami.cjs` **61/0** 和 `node tools/probe_eg_scroll.mjs` **49/0**；二者支持 `--source <改前模块路径>`，本轮改前为43/18及30/19。旧egwidth/egnoflash已委托真实源码专项，位置参数转自定义case；覆盖transform/zoom五档、滚轮/末项点击、动态面板/关闭还原。使用临时profile，不接真实存档，不代替完整游戏/安卓触摸。来源归因须有当前本机证据。
 门禁既有技能译名与开发资料未入分发两类告警，不为消告警改本轮无关技能。
 
 本 skill 的 `scripts/probe_noncharacter.cjs --root <项目>` 初始 3 PASS/5 FAIL。
@@ -19,6 +20,8 @@
 `--root <改前备份>` 可验证同一套断言的负例（本次 47/24），不加载真实引擎或玩家存档。
 
 ## 与本次改动有关的行为
+
+第三批补丁验证：`tools/probe_market_persistence.mjs` **52/0**，`probe_market_browser.mjs` **12/0**（真实隔离 Chromium 存储），`probe_interact_audit.mjs` **113/0**，`probe_confirm_focus.mjs` **35/0**。原确认链/战绩浏览器回归 **71/0**；受限 Windows 启动 Chromium 可显式加 `--no-browser-sandbox`。这些不等于无名杀/安卓实机，补丁安装状态见项目 `docs/audit/THIRD_BATCH_20261021.md`。
 
 | 范围 | 输入/顺序 | 可观察结果 |
 | --- | --- | --- |
