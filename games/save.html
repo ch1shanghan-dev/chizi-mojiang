@@ -106,6 +106,7 @@ textarea:focus{outline:none;border-color:var(--line)}
 .btn.danger{border-color:rgba(193,85,74,.5);background:rgba(193,85,74,.14);color:#e59a90}
 .btn.danger:hover{background:rgba(193,85,74,.22)}
 .btn[disabled]{opacity:.45;cursor:default;transform:none}
+#b-recover{min-height:44px}
 .rowbtn{display:flex;flex-wrap:wrap;gap:8px;margin-top:9px}
 .rowbtn:first-child{margin-top:0}
 
@@ -182,7 +183,7 @@ textarea:focus{outline:none;border-color:var(--line)}
         <button class="btn" id="b-unpack" type="button"></button>
       </div>
       <div class="diff" id="diff"></div>
-      <div class="msg" id="msg"></div>
+      <div class="msg" id="msg" role="status" aria-live="polite"></div>
     </div>
 
     <!-- ③ 备份与回滚 -->
@@ -191,6 +192,7 @@ textarea:focus{outline:none;border-color:var(--line)}
       <div id="bklist"></div>
       <div class="rowbtn">
         <button class="btn ghost" id="b-bk" type="button"></button>
+        <button class="btn ghost" id="b-recover" type="button"></button>
       </div>
       <div class="note" id="bknote"></div>
     </div>
@@ -235,6 +237,7 @@ var T = {
     wallet: "池子币", rank: "功勋", winrate: "战绩", world: "AI 世界",
     bossKill: "讨伐录", bossAsBoss: "扮演魔王", affection: "羁绊", goldfish: "金鳞市",
     dailyTask: "每日任务", achv: "成就", cdkUsed: "兑换码", cdkLifetime: "兑换累计",
+    playerInteract: "道具互动", rankHigh: "历史最高", poolAchv: "池子成就", poolAchvPay: "成就奖励", storeResume: "下载进度", bounty: "指定讨伐",
     ledger: "账本", walletHist: "兑换台账", walletSnap: "余额快照",
     texasBest: "德州纪录", bjBest: "廿一点纪录", sniperBest: "神弩手纪录",
     names: "各处留名", panelSkin: "面板皮肤", bgmVolume: "音乐音量", bgmOn: "音乐开关",
@@ -263,7 +266,7 @@ var T = {
   msgCheckAgain: "这份家当是好的。再点一次「倒进来」就装进这一身。",
   msgUnpacked: "已倒进来 · 备份戳 {stamp}。若数值没变，退出游戏重进一次即刷新。",
   msgEmpty: "框里是空的。",
-  msgPackFail: "没收成，稍后再试一次。",
+  msgPackFail: "没收成：{err}",
   msgCheckFail: "这份家当读不出来：{err}",
   msgUnpackFail: "倒不进来：{err}",
   msgOffline: "没连上宿主（不影响游戏）。",
@@ -273,12 +276,17 @@ var T = {
   dkKill: "已击破魔王", dkGirls: "羁绊人数",
   /* 备份 */
   hBk: "备份与回滚", hBkSub: "每次倒入前都会自动留一份",
-  bBk: "读取备份", bBkRoll: "回滚",
+  bBk: "读取备份", bBkRoll: "回滚", bRecover: "恢复未完成操作",
   bkNone: "这台机器上还没有备份（倒过一次家当之后就有了）。",
   bkNote: "只留最近三份，更早的会被挤掉。",
   bkCell: "{pc} 池子币 · {ai} 位世界角色",
   msgRolled: "已回滚到 {t}。",
-  msgRollFail: "回滚没成功。",
+  msgRollFail: "回滚没成功：{err}",
+  msgRecovered: "原存档已恢复，可以继续操作。",
+  msgRecoverFail: "恢复尚未完成：{err}",
+  msgRecoveryNeeded: "上次存档操作尚未恢复完成。请先点击“恢复未完成操作”，恢复后再继续使用其他功能。",
+  msgRecoveryFirst: "请先恢复原存档，恢复后再继续使用其他功能。",
+  msgPending: "暂未收到完成结果，请稍后点击“恢复未完成操作”确认，恢复后再继续使用其他功能。",
   /* 重置 */
   hReset: "推倒重来", hResetSub: "不可撤销",
   resetNote: "清空全部家当，回到刚装好扩展的样子（2000 池子币 / 平民）。请先「收进行囊」留一份，再动手。",
@@ -318,7 +326,7 @@ var STATE = { inv: [], excluded: [], version: 0, pending: null, backups: [] };
 /* ---------- 桥（与 Game Shell 通信）----------
    ★ 与 rank.html 同款：本页没有自关逻辑，关闭由壳的 ✕ 负责 ⇒ 不传 closeName。 */
 var Bridge = (typeof CSHPage !== "undefined" && CSHPage && CSHPage.transport)
-  ? CSHPage.transport({ timeout: 6000 })
+  ? CSHPage.transport({ timeout: 20000 })
   : null;
 function bridged() { return !!(Bridge && Bridge.active); }
 function call(name, payload, cb) {
@@ -332,6 +340,11 @@ function setMsg(s, cls) {
   if (!e) return;
   e.textContent = s == null ? "" : String(s);
   e.className = "msg" + (cls ? " " + cls : "");
+}
+function setFailure(key, result) {
+  var text = tt(key, { err: (result && result.err) || T.msgPending });
+  if (result && result.recovery) text += " " + T.msgRecoveryFirst;
+  setMsg(text, "bad");
 }
 
 /* ---------- 静态文案落位（独立于 boot：离线冒烟也会跑到） ---------- */
@@ -354,7 +367,7 @@ function applyStaticCopy() {
     }
   }
   var btns = [["b-pack", "bPack"], ["b-copy", "bCopy"], ["b-check", "bCheck"],
-    ["b-unpack", "bUnpack"], ["b-bk", "bBk"], ["b-reset", "bReset"]];
+    ["b-unpack", "bUnpack"], ["b-bk", "bBk"], ["b-recover", "bRecover"], ["b-reset", "bReset"]];
   for (var j = 0; j < btns.length; j++) { var bb = el(btns[j][0]); if (bb) bb.textContent = T[btns[j][1]]; }
   var nn = el("invnote"); if (nn) nn.textContent = T.invNote;
   var bn = el("bknote"); if (bn) bn.textContent = T.bkNote;
@@ -382,6 +395,9 @@ function valueOf(it) {
     case "dailyTask": case "achv": return { v: n + " " + T.unitItem, d: "" };
     case "cdkUsed": return { v: n + " " + T.unitCd, d: "" };
     case "cdkLifetime": return { v: n + " " + T.unitTimes, d: tt("fmtGained", { v: big((x.gained || 0)) }) };
+    case "playerInteract": return { v: n + " " + T.unitTimes, d: "" };
+    case "rankHigh": return { v: big(n) + " " + T.uPc, d: big(x.merit || 0) + " " + T.uMerit };
+    case "poolAchv": case "poolAchvPay": case "storeResume": case "bounty": return { v: n + " " + T.unitItem, d: "" };
     case "ledger": return { v: n + " " + T.unitPen, d: "" };
     case "walletHist": return { v: n + " " + T.unitEntry, d: "" };
     case "names": return { v: n + " " + T.unitItem, d: "" };
@@ -475,9 +491,9 @@ function renderBackups(list) {
       x.addEventListener("click", function () {
         var st = x.getAttribute("data-roll");
         ask(T.msgRolled.split("{t}")[0] + stampText(st) + "？", function () {
-          call("shell-mig-rollback", { stamp: st }, function (ok) {
+          call("shell-mig-rollback", { stamp: st }, function (ok, r) {
             if (ok) { setMsg(tt("msgRolled", { t: stampText(st) }), "ok"); loadAll(); }
-            else setMsg(T.msgRollFail, "bad");
+            else setFailure("msgRollFail", r);
           });
         });
       }, false);
@@ -489,7 +505,7 @@ function renderBackups(list) {
 function doPack() {
   setMsg("", "");
   call("shell-mig-export", null, function (ok, d) {
-    if (!ok || !d || !d.code) { setMsg(T.msgPackFail, "bad"); return; }
+    if (!ok || !d || !d.code) { setMsg(tt("msgPackFail", { err: (d && d.err) || T.msgPending }), "bad"); return; }
     var ta = el("code");
     if (ta) { ta.value = d.code; try { ta.select(); } catch (e) {} }
     STATE.pending = null;
@@ -562,7 +578,7 @@ function doUnpack() {
   if (STATE.pending !== code) { doCheck(T.msgCheckAgain); return; }
   ask(T.diffTitle + "。\n\n" + T.bUnpack + "？", function () {
     call("shell-mig-import", { code: code }, function (ok, r) {
-      if (!ok || !r || !r.ok) { setMsg(tt("msgUnpackFail", { err: (r && r.err) || "?" }), "bad"); return; }
+      if (!ok || !r || !r.ok) { setFailure("msgUnpackFail", r); return; }
       STATE.pending = null;
       setMsg(tt("msgUnpacked", { stamp: (r && r.backup) || "—" }), "ok");
       hideDiff();
@@ -581,9 +597,15 @@ function doReset() {
             try { window.parent.location.reload(); }
             catch (e) { try { location.reload(); } catch (e2) {} }
           }, 600);
-        } else setMsg(tt("msgResetFail", { err: (r && r.err) || "?" }), "bad");
+        } else setFailure("msgResetFail", r);
       });
     });
+  });
+}
+function doRecover() {
+  call("shell-mig-recover", null, function (ok, r) {
+    if (ok && r && r.ok) { setMsg(T.msgRecovered, "ok"); loadAll(); }
+    else setFailure("msgRecoverFail", r);
   });
 }
 function loadBackups() {
@@ -595,6 +617,7 @@ function loadAll() {
       STATE.inv = d.list || [];
       STATE.excluded = d.excluded || [];
       STATE.version = d.version || 0;
+      if (d.recovery && d.recovery.pending) setMsg(d.recovery.err || T.msgRecoveryNeeded, "warn");
     }
     renderInv(); renderEdge();
   });
@@ -613,7 +636,7 @@ function loadAll() {
   } catch (e0) { real = false; }
   if (!real) return;
   var bind = [["b-pack", doPack], ["b-copy", doCopy], ["b-check", doCheck],
-    ["b-unpack", doUnpack], ["b-bk", loadBackups], ["b-reset", doReset]];
+    ["b-unpack", doUnpack], ["b-bk", loadBackups], ["b-recover", doRecover], ["b-reset", doReset]];
   /* ★ 必须包一层再挂：直接把函数当监听器会把 **事件对象** 当第一个实参传进去，
      而 doCheck(hint) 的第一个形参正是"提示语" ⇒ 页面上会出现 [object PointerEvent]。
      （这条是实测截图抓出来的，不是想出来的。） */

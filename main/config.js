@@ -53,22 +53,7 @@ export const cshConfig = {
             /* 【2026-10-15 作者指令】改回**默认开启**（调试期需要随时看状态；联机仍一律禁用，
                见 csh_debug.js 的 canShow）。老存档若手动关过，仍以玩家保存值为准。 */
             "csh_debug_menu":{"name":"启用池子调试（悬浮球）","intro":"单机对局显示悬浮球，短按打开调试面板（F1 同效）。联机不可用。","init":true},
-            /* ★ 2026-10-18 · 作者：非身份场选势力要单独一个开关（怕和别的扩展/美化冲突）。
-               这里必须把两件事分清楚，否则设置页看名字会以为是一个功能：
-                 · csh_kami_group        = 「弹不弹」（本项，上游）
-                 · csh_eg_group_scroll   = 「弹出来之后，势力太多放不下时尺寸怎么管」（下游）
-               规则技在判定、执行和异步选择回来后复查；其他流程已处理时让位。
-               取消/失败释放本次预留标记，不修改武将元数据或共享技能。
-               建议：**同步关掉引擎的「选择势力」也能达到同样效果**（本项尊重引擎那一项，任一关闭即不弹）。 */
-            "csh_kami_group":{"name":"神将补选势力","intro":"原有流程未处理时，补问神将势力；已被其他扩展处理就跳过。身份场通常由引擎完成。","init":false,"onclick":function(bool){ try{ game.saveExtensionConfig("池子魔将","csh_kami_group",bool); }catch(e){} }},
-            /* ★ 2026-10-16 深夜四（作者：给滚动条「在扩展设置里加一个开关」）：
-               本体兼容注入 C4 的开关。改动即时生效（onclick 传新状态给注入器），无需重启。
-               ★ 2026-10-16 深夜八·修「关了他又自动打开」：引擎（optionsMenu.js:305 /
-               exetensionMenu.js:135）对**有自定义 onclick 的选项不代存**（默认保存回调只在
-               `if (!cfg.onclick)` 时装），而本项 onclick 当时只调了注入器 —— 存值永远缺失 →
-               每次重开设置页/重启都回落到默认 init:true。修法 = onclick 里自行落盘（与引擎
-               默认回调同键同法：extension_池子魔将_csh_eg_group_scroll）。E45 已加断言防回退。 */
-            "csh_eg_group_scroll":{"name":"势力面板自适应","intro":"面板被切掉或滚不动时再开：势力窗口纵向滚动，控制条横向滑动；关闭还原。","init":false,"onclick":function(bool){ try{ game.saveExtensionConfig("池子魔将","csh_eg_group_scroll",bool); }catch(e){} try{ if(typeof lib.__cshEgScrollApply==="function") lib.__cshEgScrollApply(bool); }catch(e){} }},
+            /* Retired by author: faction compatibility options are hidden and disabled. */
             /* 【2026-10-05】「开发者日志」设置项按需求移除；precontent 会把历史开启的存档一并复位。 */
             /* 【2026-10-05】联机手气卡：仅联机（connectMode）生效；实现见 main/precontent.js 的
                _csh_swReplaceHandCards 全局规则技。本功能为最高优先级：与懒人包/云中守望同类开局

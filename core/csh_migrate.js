@@ -7,9 +7,10 @@ import { lib, game } from "../../../noname.js";
  * 对外接口（lib.cshMigrate / window.CSH.migrate）：
  *   CM.export()                  → "CSHMIG1.<base64url>" 字符串
  *   CM.inspect(code)             → { ok, err?, meta?, data?, summary? } 只读解析
- *   CM.import(code, opts)        → { ok, err?, applied?, diff? } 执行覆盖（含自动备份）
+ *   CM.import(code, opts)        → Promise<{ ok, err?, applied?, diff? }> 执行覆盖（含自动备份）
  *   CM.backups()                 → 最近 3 份备份列表
- *   CM.rollback(stamp)           → 回滚到指定备份
+ *   CM.rollback(stamp)           → Promise<结果> 回滚到指定备份（busy 可同步拒绝）
+ *   CM.reset() / CM.recover()    → Promise<结果> 清空 / 恢复未完成操作
  *   CM.inventory()               → 家当清点（每域"有没有 / 多少"），给「行囊」页展示
  *   CM.selftest()                → 自检
  *
@@ -35,6 +36,7 @@ import { lib, game } from "../../../noname.js";
 	var VERSION = 3;
 	var PREFIX = "CSHMIG1.";
 	var K_BACKUP_PREFIX = "csh_mig_backup_";
+	var K_RECOVERY = "csh_migrate_recovery";
 	var MAX_BACKUPS = 3;
 
 	/* ---------- 本机身份类键（**故意不带** 的边界） ----------
@@ -51,25 +53,13 @@ import { lib, game } from "../../../noname.js";
 	var K_RANK_CACHE = "csh_rank_cache_v1";                   /* 天下榜榜单快照（2026-10-18） */
 	var K_RANK_PEND = "csh_rank_submit_pending";              /* 天下榜「最高值待送达」标记（2026-10-18） */
 
-	/* 白名单键（§J.2 / §J.4#3 · 2026-10-01 由 6 项扩到 19 项）
-	   6 原有：winrate/wallet/rank/world/cdkUsed/meta
-	   + 6 必须补：dailyTask/achv/texasBest/bjBest/sniperBest/cdkLifetime
-	   + 7 建议补：panelSkin/bgmVolume/bgmOn/sfxVolume/texasSet/bjSet/dbgPresets
-	   + 2026-10-15 v3 补 9 项：affection/bossKill/bossAsBoss/goldfish/ledger/
-	     walletHist/walletSnap/uiSeen/names（合计 28 项，覆盖全部玩家数据） */
-	var WHITELIST = ["winrate", "wallet", "rank", "world", "cdkUsed", "meta",
-		"dailyTask", "achv", "texasBest", "bjBest", "sniperBest", "cdkLifetime",
-		"panelSkin", "bgmVolume", "bgmOn", "sfxVolume", "texasSet", "bjSet", "dbgPresets",
-		"affection", "bossKill", "bossAsBoss", "goldfish", "ledger",
-		"walletHist", "walletSnap", "uiSeen", "names",
-		/* 2026-10-18 · 天下榜「历史最高」：这是玩家**挣到过**的成绩，
-		   花池子币不会把它抹掉，换机也必须带走（否则新机器上报的是变低后的余额）。
-		   排在最后，不动前面已发版键的下标。 */
-		"rankHigh"];
+	/* 白名单稍后从实际 KEY_DEFS 生成，导出/解析/家当清点共用同一份域注册。 */
+	var WHITELIST = [];
 
 	/* 故意不带（边界清单 · 页面会如实展示给玩家）：
 	     · 键名             —— 为什么 */
 	var EXCLUDED = [
+		[K_RECOVERY, "本机未完成的存档恢复凭据（恢复完成前保留，不随行囊迁移）"],
 		[K_DEVICE_ID, "本机设备 ID（CDK 设备绑定的凭据，跨设备带走等于两台机器共用一个身份）"],
 		[K_DEV_BIND, "CDK 序号 ↔ 设备 ID 绑定表（同上，属安全边界，不是玩家资产）"],
 		[K_NET_UID, "天下榜本机身份（换机后由服务端按机器指纹/网络重新认领，带过去会撞号）"],
@@ -84,34 +74,75 @@ import { lib, game } from "../../../noname.js";
 
 
 	function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
-	function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
-	function lsDel(k) { try { localStorage.removeItem(k); } catch (e) {} }
 	function lsJSON(k, d) {
 		var s = lsGet(k);
 		if (!s) return d;
 		try { var o = JSON.parse(s); return (o == null) ? d : o; } catch (e) { return d; }
 	}
-	function lsPut(k, o) { try { lsSet(k, JSON.stringify(o)); } catch (e) {} }
 	/* ---------- lib.config 后端（v3 新增） ----------
 	   `lib.config[X]` 存的是**对象真值**（noname 的 game.saveConfig 范式），
-	   不是 JSON 文本 —— 所以这里不能借用 lsJSON/lsPut。
+	   不是 JSON 文本 —— 所以这里不能借用 lsJSON。
 	   读取：lib.config 优先（真值），localStorage 兜底（兼容 v1/v2 老串与将来的镜像）。
-	   写入：lib.config + game.saveConfig（持久化由引擎负责），**不写 localStorage 镜像**
+	   写入：确认宿主真实配置后端后更新 lib.config，**不写 localStorage 镜像**
 	   —— 两份副本必然漂移，本项目已经在"同一事实多份副本"上反复栽跟头。 */
-	function cfgGet(key) {
+	function cfgGet(key, strict) {
 		var v = null;
-		try { if (lib && lib.config && lib.config[key] !== undefined) v = lib.config[key]; } catch (e0) {}
+		try { if (lib && lib.config && lib.config[key] !== undefined) v = lib.config[key]; } catch (e0) { if (strict) throw e0; }
 		if (v === undefined || v === null) {
-			var s = lsJSON(key, null);           /* 兜底：任何把同键写进 localStorage 的旧实现 */
+			var s = collectJSON(key, strict);    /* 兜底：任何把同键写进 localStorage 的旧实现 */
 			if (s !== null) return s;
 		}
 		return (v === undefined) ? null : v;
 	}
-	function cfgSet(key, val) {
-		try { if (lib && lib.config) lib.config[key] = val; } catch (e1) {}
-		try {
-			if (game && typeof game.saveConfig === "function") game.saveConfig(key, val);
-		} catch (e2) {}
+	/* 不使用 saveConfig 的返回值判断完成：本机宿主返回 undefined，且 putDB
+	   的 request success 早于事务 complete。下面的迁移事务直接确认真实后端。 */
+	function copyValue(value) { return value === undefined ? undefined : JSON.parse(JSON.stringify(value)); }
+	function strictSet(key, value) {
+		if (value === null) localStorage.removeItem(key);
+		else localStorage.setItem(key, value);
+		if (localStorage.getItem(key) !== value) throw new Error("存档写入未确认：" + key);
+	}
+	var activeConfigTransactions = 0;
+	function configTransaction(entries, read) {
+		if (!entries.length) return Promise.resolve([]);
+		return new Promise(function (resolve, reject) {
+			var tx, timer, settled = false, terminal = false, values = [];
+			function finish(error) {
+				if (settled) return;
+				settled = true; clearTimeout(timer);
+				if (error) reject(error); else resolve(values);
+			}
+			function ended(error) {
+				if (!terminal) { terminal = true; activeConfigTransactions--; }
+				finish(error);
+			}
+			try {
+				tx = lib.db.transaction(["config"], read ? "readonly" : "readwrite");
+				activeConfigTransactions++;
+				tx.oncomplete = function () { ended(); };
+				tx.onabort = function () { ended(tx.error || new Error("宿主配置事务中止")); };
+				tx.onerror = function () { /* 默认错误会中止整批事务；等待 onabort。 */ };
+				var store = tx.objectStore("config");
+				entries.forEach(function (entry, i) {
+					if (read) {
+						var req = store.get(entry.key);
+						req.onsuccess = function () {
+							values[i] = { key: entry.key, exists: req.result !== undefined, value: copyValue(req.result) };
+						};
+					} else if (entry.exists) store.put(copyValue(entry.value), entry.key);
+					else store.delete(entry.key);
+				});
+				timer = setTimeout(function () {
+					/* abort 可能尚未送达，也可能已经无法取消。没有终态之前保持
+					   active 锁和恢复凭据，不能拿超时当作“事务没有写入”。 */
+					try { tx.abort(); } catch (abortError) {}
+					finish(new Error("暂未确认宿主配置结果，请稍后重试恢复"));
+				}, 5000);
+			} catch (error) {
+				if (tx) { try { tx.abort(); } catch (abortError2) {} }
+				finish(error);
+			}
+		});
 	}
 
 
@@ -141,6 +172,8 @@ import { lib, game } from "../../../noname.js";
 	/* 2026-10-20 · 池子成就发奖台账：只增不删，页面级「重置成就进度」不清它，
 	   防清档刷奖（见 core/csh_pool_achv.js §5b）。全部重置时随钱包一起清。 */
 	var K_POOL_ACHV_PAY = "csh_pool_achv_pay";
+	var K_PLAYER_INTERACT = "csh_player_interact";
+	var K_RANK_HIGH = "csh_rank_high";
 	/* 2026-10-20 · 其他扩展下载断点（csh_debug.js 续传清单）。
 	   跨机导入无意义（半成品 buffer 不随存档走），导入后由 resumeLoad 的
 	   name/repo/dir 三重校验自然失效；登记只为满足 E41 全键覆盖纪律。 */
@@ -299,6 +332,7 @@ import { lib, game } from "../../../noname.js";
 			lastSign: clampStr(o.lastSign, 20),
 			streak: clampNum(o.streak, 0, 9999),
 			reliefDate: clampStr(o.reliefDate, 20),
+			careerClaims: cleanAchv(o.careerClaims) || {},
 		};
 	}
 	function cleanRank(o) {
@@ -472,9 +506,21 @@ import { lib, game } from "../../../noname.js";
 				drew: clampNum(a.drew, 0, 9999999),
 				skillPlay: clampF(a.skillPlay, 0, 99999999, 0),
 				everTier3: !!a.everTier3,
+				withPlayer: cleanPlayerTable(a.withPlayer),
 			});
 		}
 		return out;
+	}
+	function cleanPlayerTable(raw) {
+		if (!raw || typeof raw !== "object") return null;
+		var p = { hands: clampNum(raw.hands, 0, 9999999), wins: clampNum(raw.wins, 0, 9999999),
+			losses: clampNum(raw.losses, 0, 9999999), draws: clampNum(raw.draws, 0, 9999999),
+			skillTop: clampF(raw.skillTop, 0, 1, 0), revenge: !!raw.revenge };
+		p.wins = Math.min(p.wins, p.hands); p.losses = Math.min(p.losses, p.hands - p.wins); p.draws = Math.min(p.draws, p.hands - p.wins - p.losses);
+		p.revenge = p.revenge && p.wins > 0 && p.losses > 0;
+		p.lowestFund = p.wins > 0 && typeof raw.lowestFund === "number" && isFinite(raw.lowestFund) && raw.lowestFund >= 0
+			? clampNum(raw.lowestFund, 0, AI_FUND_CAP()) : null;
+		return p;
 	}
 	function cleanCdk(o) {
 		/* cdkUsed：只读携带的已核销序号集合 */
@@ -546,6 +592,15 @@ import { lib, game } from "../../../noname.js";
 		var n = Number(o);
 		if (!isFinite(n)) return null;
 		return clampNum(n, 0, 10000000000);
+	}
+	function cleanPlayerInteract(o) {
+		if (!o || typeof o !== "object" || Array.isArray(o)) return null;
+		return { v: 1, total: clampNum(o.total, 0, 1000000000) };
+	}
+	function cleanRankHigh(o) {
+		if (!o || typeof o !== "object" || Array.isArray(o)) return null;
+		return { cby: clampNum(o.cby, 0, PC_CAP()), merit: clampNum(o.merit, 0, 1000000000),
+			seg: clampStr(o.seg, 12), t: isPastStamp(o.t) };
 	}
 	function cleanStr(o) {           // 字符串键（面板皮肤）
 		if (o == null || o === "") return null;
@@ -645,14 +700,14 @@ import { lib, game } from "../../../noname.js";
 		for (var i = 0; i < d.length; i++) out.done.push(clampStr(String(d[i] || ""), 200));
 		return out;
 	}
-	/* bgmOn 是「一主键 + N 后缀键」通配族（csh_bgm.js onKey()），导出合并为对象 */	function collectBgmOn() {
+	/* bgmOn 是「一主键 + N 后缀键」通配族（csh_bgm.js onKey()），导出合并为对象 */	function collectBgmOn(strict) {
 		var out = {};
 		try {
 			for (var i = 0; i < localStorage.length; i++) {
 				var k = localStorage.key(i);
-				if (k && k.indexOf(K_BGM_ON) === 0) out[k] = lsGet(k);
+				if (k && k.indexOf(K_BGM_ON) === 0) out[k] = strict ? localStorage.getItem(k) : lsGet(k);
 			}
-		} catch (e) {}
+		} catch (e) { if (strict) throw e; }
 		return Object.keys(out).length ? out : null;
 	}
 	function cleanBgmOn(o) {
@@ -876,8 +931,8 @@ import { lib, game } from "../../../noname.js";
 
 	/* ---------- 采集 / 应用 ---------- */
 	/* 键注册表（逻辑名 → localStorage 键 + 清洗器 + 存储类型）。
-	   存储类型：0 = localStorage JSON（lsPut）
-	             1 = localStorage 字符串（lsSet）
+	   存储类型：0 = localStorage JSON
+	             1 = localStorage 字符串
 	             2 = 通配族（bgmOn：一主键 + N 后缀键）
 	             3 = **lib.config**（game.saveConfig 范式 · v3 新增 · 读时 localStorage 兜底）
 	             4 = **多键合成一族**（v3 新增 · 表的取值见 GROUP_*）
@@ -892,6 +947,8 @@ import { lib, game } from "../../../noname.js";
 		["achv", K_ACHV, cleanAchv, 0],
 		["poolAchv", K_POOL_ACHV, cleanPoolAchv, 0],
 		["poolAchvPay", K_POOL_ACHV_PAY, cleanPoolAchvPay, 0],
+		["playerInteract", K_PLAYER_INTERACT, cleanPlayerInteract, 0],
+		["rankHigh", K_RANK_HIGH, cleanRankHigh, 0],
 		["storeResume", K_STORE_RESUME, cleanStoreResume, 0],
 		["texasBest", K_TEXAS_BEST, cleanObj, 0],
 		["bjBest", K_BJ_BEST, cleanObj, 0],
@@ -919,41 +976,42 @@ import { lib, game } from "../../../noname.js";
 		["uiSeen", "uiSeen", cleanUiSeen, 4],
 		["names", "names", cleanNames, 4],
 	];
+	/* 导出、解析、重置和显示共用实际键表，不能只在说明白名单里登记。 */
+	WHITELIST = KEY_DEFS.map(function (def) { return def[0]; }).concat(["meta"]);
 	/* 键族成员（类型 4）：[逻辑子键, localStorage 键] */
 	var GROUP_MEMBERS = { uiSeen: GROUP_UI_SEEN, names: GROUP_NAMES };
-	function groupCollect(name) {
+	function groupCollect(name, strict) {
 		var mem = GROUP_MEMBERS[name] || [], out = {}, n = 0;
 		for (var i = 0; i < mem.length; i++) {
-			var v = lsGet(mem[i][1]);
+			var v = strict ? localStorage.getItem(mem[i][1]) : lsGet(mem[i][1]);
 			if (v === null || v === "") continue;
 			out[mem[i][0]] = v; n++;
 		}
 		return n ? out : null;
 	}
-	function groupApply(name, val) {
-		if (!val || typeof val !== "object") return;
-		var mem = GROUP_MEMBERS[name] || [];
-		for (var i = 0; i < mem.length; i++) {
-			if (Object.prototype.hasOwnProperty.call(val, mem[i][0])) lsSet(mem[i][1], clampStr(val[mem[i][0]], 40));
-		}
+	function collectJSON(key, strict) {
+		if (!strict) return lsJSON(key, null);
+		var raw = localStorage.getItem(key);
+		return raw === null ? null : JSON.parse(raw);
 	}
-
-	function collect() {
+	function collect(strict) {
 		var body = {};
 		for (var i = 0; i < KEY_DEFS.length; i++) {
 			var def = KEY_DEFS[i];
 			var k = def[0], lsKey = def[1], store = def[3];
 			if (k === "world") {
 				/* world 优先取内存真值（CSH.world.raw()），避免读盘得到过期快照 */
-				body[k] = (CSH && CSH.world && CSH.world.raw) ? CSH.world.raw() : lsJSON(lsKey, null);
+				body[k] = (CSH && CSH.world && CSH.world.raw) ? CSH.world.raw() : collectJSON(lsKey, strict);
 			} else if (store === 2) {
-				body[k] = collectBgmOn();
+				body[k] = collectBgmOn(strict);
 			} else if (store === 3) {
-				body[k] = cfgGet(lsKey);
+				body[k] = cfgGet(lsKey, strict);
 			} else if (store === 4) {
-				body[k] = groupCollect(k);
+				body[k] = groupCollect(k, strict);
+			} else if (store === 1) {
+				body[k] = strict ? localStorage.getItem(lsKey) : lsGet(lsKey);
 			} else {
-				body[k] = lsJSON(lsKey, null);
+				body[k] = collectJSON(lsKey, strict);
 			}
 		}
 		/* 市场检查点已经与余额共同落盘，不能导出仍旧的 config 持仓。
@@ -967,32 +1025,44 @@ import { lib, game } from "../../../noname.js";
 				body.ledger = list;
 			}
 		}
+		/* 生涯奖励原子凭据随余额迁移，并并入旧版领奖集合；待补流水扁平化。
+		   导入不带本机待执行任务，旧版本也能识别已经兑现的奖励。 */
+		var career = body.wallet && body.wallet.careerClaims;
+		if (career && typeof career === "object") body.achv = Object.assign({}, body.achv || {}, career);
+		var careerPending = body.wallet && body.wallet.careerPending;
+		if (careerPending && careerPending.entry) {
+			var careerList = Array.isArray(body.ledger) ? body.ledger.slice() : [];
+			if (!careerList.some(function (e) { return e && e.careerTx === careerPending.key; })) careerList.unshift(careerPending.entry);
+			body.ledger = careerList;
+		}
 		return body;
 	}
 
 	/* 备份：保留最近 MAX_BACKUPS 份 */
 	function pushBackup() {
+		flushForMigration();
 		var stamp = String(Date.now());
-		lsPut(K_BACKUP_PREFIX + stamp, collect());
+		while (localStorage.getItem(K_BACKUP_PREFIX + stamp) !== null) stamp = String(Number(stamp) + 1);
+		strictSet(K_BACKUP_PREFIX + stamp, JSON.stringify(collect(true)));
 		pruneBackups();
 		return stamp;
 	}
-	function backupKeys() {
+	function backupKeys(strict) {
 		var out = [];
 		try {
 			for (var i = 0; i < localStorage.length; i++) {
 				var k = localStorage.key(i);
 				if (k && k.indexOf(K_BACKUP_PREFIX) === 0) out.push(k);
 			}
-		} catch (e) {}
+		} catch (e) { if (strict) throw e; }
 		out.sort(function (a, b) {
 			return Number(b.slice(K_BACKUP_PREFIX.length)) - Number(a.slice(K_BACKUP_PREFIX.length));
 		});
 		return out;
 	}
 	function pruneBackups() {
-		var keys = backupKeys();
-		for (var i = MAX_BACKUPS; i < keys.length; i++) lsDel(keys[i]);
+		var keys = backupKeys(true);
+		for (var i = MAX_BACKUPS; i < keys.length; i++) strictSet(keys[i], null);
 	}
 	function backups() {
 		return backupKeys().map(function (k) {
@@ -1004,11 +1074,12 @@ import { lib, game } from "../../../noname.js";
 	}
 	function rollback(stamp) {
 		if (marketBusy()) return { ok: false, err: "市场存档正在同步，请稍后重试" };
-		var k = K_BACKUP_PREFIX + stamp;
-		var d = lsJSON(k, null);
-		if (!d) return { ok: false, err: "备份不存在" };
-		applyAll(d, false);
-		return { ok: true, stamp: stamp };
+		return mutation(async function () {
+			var d = lsJSON(K_BACKUP_PREFIX + stamp, null);
+			if (!d) return { ok: false, err: "备份不存在" };
+			await applyAll(d, true);
+			return { ok: true, stamp: stamp };
+		});
 	}
 
 	/* ---------- 重置存档（出厂初始态 · 分享前 / 推倒重来） ----------
@@ -1024,7 +1095,7 @@ import { lib, game } from "../../../noname.js";
 	var RESET_KEYS = [
 		K_WALLET, K_WALLET_SNAP, K_WALLET_HIST, K_CDK_LIFETIME,
 		K_RANK, K_WORLD, K_CDK, "csh_cdk_used_n", K_DEVICE_ID, K_DEV_BIND,
-		K_DAILY_TASK, K_ACHV, K_POOL_ACHV, K_POOL_ACHV_PAY, K_STORE_RESUME,
+		K_DAILY_TASK, K_ACHV, K_POOL_ACHV, K_POOL_ACHV_PAY, K_STORE_RESUME, K_PLAYER_INTERACT, K_RANK_HIGH,
 		K_TEXAS_BEST, K_SNIPER_BEST, K_BJ_BEST,
 		"csh_texas_bank", "csh_texas_bank_legacy", K_MIG_FLAG,
 		K_WINRATE,
@@ -1036,42 +1107,29 @@ import { lib, game } from "../../../noname.js";
 	];
 	function reset() {
 		if (marketBusy()) return { ok: false, err: "市场存档正在同步，请稍后重试" };
-		var cleared = [];
-		var i, k;
-		for (i = 0; i < RESET_KEYS.length; i++) {
-			k = RESET_KEYS[i];
-			/* lib.config 域：清键 + 走一遍 saveConfig（否则内存里还留着旧对象，
-			   页面刷新前的任何读取都还是旧值） */
-			if (k === K_CFG_BOSSKILL || k === K_CFG_BOSSASBOSS || k === K_CFG_GOLDFISH || k === K_WINRATE) {
-				try { if (lib && lib.config) delete lib.config[k]; } catch (eD) {}
-				try { if (game && typeof game.saveConfig === "function") game.saveConfig(k, null); } catch (eS) {}
-			} else {
-				lsDel(k);
-			}
-			cleared.push(k);
-		}
-		var bks = backupKeys();
-		for (i = 0; i < bks.length; i++) {
-			lsDel(bks[i]);
-			cleared.push(bks[i]);
-		}
-		return { ok: true, cleared: cleared.length, keys: cleared.slice() };
+		return mutation(async function () {
+			var plan = { local: {}, config: [] }, keys = RESET_KEYS.slice();
+			/* 重置与导出共用注册表，包含以前漏掉的设置、通配族与 bounty。 */
+			KEY_DEFS.forEach(function (def) {
+				if (def[3] === 3) plan.config.push({ key: def[1], exists: false });
+				else if (def[3] === 4) (GROUP_MEMBERS[def[0]] || []).forEach(function (m) { keys.push(m[1]); });
+				else if (def[3] !== 2) keys.push(def[1]);
+			});
+			keys = keys.concat(Object.keys(collectBgmOn(true) || {}), backupKeys(true));
+			keys.forEach(function (key) { plan.local[key] = null; });
+			await commitPlan(plan);
+			return { ok: true, cleared: Object.keys(plan.local).length + plan.config.length, keys: Object.keys(plan.local).concat(plan.config.map(function (e) { return e.key; })) };
+		});
 	}
 
-	/* 应用（覆盖）—— 备份开关由调用方决定 */
-	function applyAll(body, doBackup) {
-		if (doBackup !== false) pushBackup();
+	/* 先构造写入计划，不调用可能吞掉落盘失败的 world.importRaw。 */
+	async function applyAll(body, replaceMissing) {
+		var plan = { local: {}, config: [] };
 		for (var i = 0; i < KEY_DEFS.length; i++) {
 			var def = KEY_DEFS[i];
 			var k = def[0], lsKey = def[1], store = def[3];
 			var v = body[k];
-			if (k === "world") {
-				if (v && CSH && CSH.world && CSH.world.importRaw) {
-					try { CSH.world.importRaw(v); } catch (e) { lsPut(lsKey, v); }
-				} else if (v) {
-					lsPut(lsKey, v);
-				}
-			} else if (k === "cdkUsed") {
+			if (k === "cdkUsed") {
 				/* §J.4#7 CDK 只并集，不覆盖 */
 				if (v && v.length) {
 					var cur = cleanCdk(lsJSON(K_CDK, null));
@@ -1079,31 +1137,171 @@ import { lib, game } from "../../../noname.js";
 					var j;
 					for (j = 0; j < cur.length; j++) set[cur[j]] = 1;
 					for (j = 0; j < v.length; j++) set[v[j]] = 1;
-					lsPut(K_CDK, Object.keys(set));
+					plan.local[K_CDK] = JSON.stringify(Object.keys(set));
 				}
 			} else if (store === 2) {
-				/* bgmOn 通配族：逐个键写回 */
+				if (replaceMissing) Object.keys(collectBgmOn(true) || {}).forEach(function (key) { plan.local[key] = null; });
 				if (v && typeof v === "object") {
 					for (var wk in v) {
-						if (Object.prototype.hasOwnProperty.call(v, wk)) lsSet(wk, v[wk]);
+						if (Object.prototype.hasOwnProperty.call(v, wk)) plan.local[wk] = String(v[wk]);
 					}
 				}
 			} else if (store === 3) {
-				/* lib.config 域：写 lib.config + saveConfig（引擎负责持久化） */
-				if (v !== null && v !== undefined) cfgSet(lsKey, v);
+				if (v != null || replaceMissing) {
+					plan.config.push({ key: lsKey, exists: v != null, value: copyValue(v) });
+					/* 去掉旧实现同键 LS 镜像，防止删除 config 后又被 cfgGet 复活。 */
+					plan.local[lsKey] = null;
+				}
 			} else if (store === 4) {
-				groupApply(k, v);
+				(GROUP_MEMBERS[k] || []).forEach(function (m) {
+					if (v && Object.prototype.hasOwnProperty.call(v, m[0])) plan.local[m[1]] = clampStr(v[m[0]], 40);
+					else if (replaceMissing) plan.local[m[1]] = null;
+				});
 			} else if (store === 1) {
-				if (v != null) lsSet(lsKey, v);
-			} else if (v !== null && v !== undefined) {
-				lsPut(lsKey, v);
+				if (v != null || replaceMissing) plan.local[lsKey] = v == null ? null : String(v);
+			} else if (v != null || replaceMissing) {
+				plan.local[lsKey] = v == null ? null : JSON.stringify(v);
 			}
 		}
+		await commitPlan(plan);
+	}
+
+	/* LS 多键与宿主 config 无法组成同一数据库事务。写前保存原始值（包括
+	   “不存在”），确认两边完成后才删除凭据；任何失败都恢复原值。恢复本身
+	   失败时留下凭据，下一次恢复先完成，禁止继续覆盖半套存档。 */
+	function flushForMigration() {
+		if (lib.cshWallet && lib.cshWallet.flushSave && lib.cshWallet.flushSave({ migration: true }) === false) {
+			throw new Error("钱包尚未保存，请先恢复未完成操作或腾出存储空间后重试");
+		}
+		var W = lib.cshWallet && lib.cshWallet.wallet;
+		if (W && typeof W.pc === "function") {
+			var raw = JSON.parse(localStorage.getItem(K_WALLET) || "null");
+			if (!raw || raw.pc !== W.pc()) throw new Error("钱包尚未保存，请腾出存储空间后重试");
+		}
+	}
+	function configMemory(entries) {
+		return entries.map(function (entry) {
+			return { key: entry.key, exists: Object.prototype.hasOwnProperty.call(lib.config, entry.key), value: copyValue(lib.config[entry.key]) };
+		});
+	}
+	function applyConfigMemory(entries) {
+		entries.forEach(function (entry) {
+			if (entry.exists) lib.config[entry.key] = copyValue(entry.value);
+			else delete lib.config[entry.key];
+		});
+	}
+	function configFallback(plan) {
+		if (!plan.config.length) return;
+		if (typeof lib.configprefix !== "string") throw new Error("宿主存储未就绪");
+		var key = lib.configprefix + "config";
+		var raw = localStorage.getItem(key);
+		var config = raw === null ? {} : JSON.parse(raw);
+		if (!config || typeof config !== "object" || Array.isArray(config)) throw new Error("宿主配置格式异常");
+		plan.config.forEach(function (entry) {
+			if (entry.exists) config[entry.key] = copyValue(entry.value);
+			else delete config[entry.key];
+		});
+		plan.local[key] = JSON.stringify(config);
+	}
+	async function restoreJournal(journal) {
+		if (activeConfigTransactions) throw new Error("宿主配置结果尚未确认，请稍后重试恢复");
+		if (!journal || journal.v !== 1 || !journal.local || !Array.isArray(journal.config) || !Array.isArray(journal.memory)) throw new Error("存档恢复凭据损坏，请保留本机数据并从备份恢复");
+		var errors = [];
+		if (journal.config.length) {
+			try {
+				if (!lib.db) throw new Error("原宿主配置后端尚未就绪，请稍后重试恢复");
+				await configTransaction(journal.config, false);
+			} catch (configError) { errors.push(configError); }
+		}
+		Object.keys(journal.local).forEach(function (key) {
+			try { strictSet(key, journal.local[key]); } catch (error) { errors.push(error); }
+		});
+		if (errors.length) throw errors[0];
+		applyConfigMemory(journal.memory);
+		reloadModules();
+		strictSet(K_RECOVERY, null);
+	}
+	async function recoverPending() {
+		var raw = localStorage.getItem(K_RECOVERY);
+		if (raw === null) return false;
+		var journal = JSON.parse(raw);
+		await restoreJournal(journal);
+		return true;
+	}
+	async function commitPlan(plan) {
+		flushForMigration();
+		if (activeConfigTransactions) throw new Error("宿主配置结果尚未确认，请稍后重试恢复");
+		var journal = { v: 1, local: {}, config: [], memory: configMemory(plan.config) };
+		if (lib.db) journal.config = await configTransaction(plan.config, true);
+		else configFallback(plan);
+		Object.keys(plan.local).forEach(function (key) { journal.local[key] = localStorage.getItem(key); });
+		strictSet(K_RECOVERY, JSON.stringify(journal));
+		try {
+			Object.keys(plan.local).forEach(function (key) { strictSet(key, plan.local[key]); });
+			if (lib.db) await configTransaction(plan.config, false);
+			applyConfigMemory(plan.config);
+			reloadModules();
+			strictSet(K_RECOVERY, null);
+		} catch (error) {
+			try {
+				await restoreJournal(journal);
+				throw Object.assign(new Error("存档未应用，已恢复原存档：" + String(error && error.message || error)), { restored: true });
+			} catch (recoveryError) {
+				if (recoveryError.restored) throw recoveryError;
+				throw new Error("存档恢复尚未完成，请点击“恢复未完成操作”重试：" + String(recoveryError && recoveryError.message || recoveryError));
+			}
+		}
+	}
+	function reloadModules() {
+		/* 先严格读齐必要域，再采用同一批对象。任何读失败都不能留下成功
+		   ACK 和旧内存，也不能由 reload 内部容错把“读失败”当新装默认。 */
+		var snapshot = { wallet: collectJSON(K_WALLET, true), rank: collectJSON(K_RANK, true), dailyTask: collectJSON(K_DAILY_TASK, true) };
+		var worldValue = collectJSON(K_WORLD, true), W = lib.cshWallet;
+		var world = lib.cshWorld || (CSH && CSH.world);
+		if (W && typeof W.reloadSave === "function") {
+			var result = W.reloadSave(snapshot, { memoryOnly: true });
+			if (!result || !result.ok) throw new Error("钱包未能采用新存档");
+		}
+		if (world) {
+			if (typeof world.reloadSave !== "function" || !world.reloadSave(worldValue)) throw new Error("AI 世界未能采用新存档");
+		}
+	}
+	var mutating = false;
+	function redemptionBusy() {
+		return !!(lib.cshWallet && lib.cshWallet.cdk && lib.cshWallet.cdk.busy && lib.cshWallet.cdk.busy());
+	}
+	async function mutation(work) {
+		if (mutating) return { ok: false, err: "存档操作正在进行，请稍后重试" };
+		/* CDK 验签跨异步边界；等其完成后再取快照，避免旧回调核销到新存档。 */
+		if (redemptionBusy()) {
+			return { ok: false, err: "兑换码正在验证，请完成后再操作存档" };
+		}
+		mutating = true;
+		try {
+			await recoverPending();
+			if (marketBusy()) return { ok: false, err: "市场存档正在同步，请稍后重试" };
+			return await work();
+		} catch (error) {
+			var pending = true;
+			try { pending = localStorage.getItem(K_RECOVERY) !== null; } catch (readError) {}
+			logMsg("存档操作失败：" + String(error && error.message || error));
+			return { ok: false, err: String(error && error.message || error), recovery: pending };
+		} finally { mutating = false; }
+	}
+	function recover() {
+		return mutation(async function () { return { ok: true, recovered: true }; });
+	}
+	function recoveryState() {
+		try { return { pending: localStorage.getItem(K_RECOVERY) !== null, busy: mutating || activeConfigTransactions > 0 }; }
+		catch (error) { return { pending: true, busy: mutating, err: "暂时无法读取存档恢复凭据" }; }
 	}
 
 	/* ---------- 导出 ---------- */
 	async function exportCode() {
-		var raw = collect();
+		if (mutating || localStorage.getItem(K_RECOVERY) !== null) throw new Error("请先完成未完成的存档恢复，再导出");
+		if (redemptionBusy()) throw new Error("兑换码正在验证，请完成后再导出存档");
+		flushForMigration();
+		var raw = collect(true);
 		/* 【2026-10-01 真机实测修复】此前 body 硬编码 5 键，批次 1 的 19 键扩展只接了
 		   collect()/inspect()/applyAll()，唯独漏了这里 —— 导出的串实际永远只有 6 键，
 		   语义门绿但功能是坏的（B15 教训第二次应验）。改为遍历 KEY_DEFS 全量导出，
@@ -1274,6 +1472,17 @@ import { lib, game } from "../../../noname.js";
 		add("bjSet", !!body.bjSet, 0, null);
 		add("dbgPresets", !!(body.dbgPresets && body.dbgPresets.length), body.dbgPresets ? body.dbgPresets.length : 0, null);
 		add("uiSeen", !!body.uiSeen, 0, null);
+		var playerInteract = cleanPlayerInteract(body.playerInteract);
+		add("playerInteract", !!playerInteract, playerInteract ? playerInteract.total : 0, null);
+		var high = cleanRankHigh(body.rankHigh);
+		add("rankHigh", !!high, high ? high.cby : 0, high ? { merit: high.merit } : null);
+		var pool = cleanPoolAchv(body.poolAchv);
+		add("poolAchv", !!pool, pool ? Object.keys(pool.got).length : 0, null);
+		var pay = cleanPoolAchvPay(body.poolAchvPay);
+		add("poolAchvPay", !!pay, pay ? Object.keys(pay.paid).length : 0, null);
+		var resume = cleanStoreResume(body.storeResume);
+		add("storeResume", !!resume, resume ? resume.done.length : 0, null);
+		add("bounty", !!body.bounty, body.bounty ? 1 : 0, null);
 		return rows;
 	}
 	/* 计数：清洗后的对象里"真值"的个数（每日任务用 {done:true} 之类，
@@ -1319,6 +1528,9 @@ import { lib, game } from "../../../noname.js";
 	   余额要重启才生效。现改为依次尝试 `CSH.wallet.integrity` → `CSH.integrity`。 */
 	function reloadWallet() {
 		try {
+			if (lib.cshWallet && typeof lib.cshWallet.reloadSave === "function") {
+				lib.cshWallet.reloadSave(); return true;
+			}
 			var I = (CSH && CSH.wallet && CSH.wallet.integrity) || (CSH && CSH.integrity) || null;
 			if (I && typeof I.check === "function") { I.check(); return true; }
 		} catch (e) {}
@@ -1340,12 +1552,13 @@ import { lib, game } from "../../../noname.js";
 		var diff = diffOf(ins.data);
 		if (opts.dryRun) return { ok: true, dryRun: true, diff: diff, summary: ins.summary };
 		if (marketBusy()) return { ok: false, err: "市场存档正在同步，请稍后重试" };
-		var stamp = pushBackup();
-		applyAll(ins.data, false);
-		/* 通知各模块重载（2026-09-29：改走 reloadWallet，此前引用不存在的字段） */
-		var reloaded = reloadWallet();
-		logMsg("导入已应用（备份 " + stamp + "，钱包重载 " + (reloaded ? "成功" : "已跳过") + "）");
-		return { ok: true, applied: true, backup: stamp, diff: diff, summary: ins.summary, reloaded: reloaded };
+		return mutation(async function () {
+			var stamp = pushBackup();
+			await applyAll(ins.data, false);
+			var reloaded = true; // commitPlan 已确认必要模块采用同一批存档。
+			logMsg("导入已应用（备份 " + stamp + "，钱包重载 " + (reloaded ? "成功" : "已跳过") + "）");
+			return { ok: true, applied: true, backup: stamp, diff: diff, summary: ins.summary, reloaded: reloaded };
+		});
 	}
 	function marketBusy() {
 		var market = lib.cshMarket;
@@ -1478,17 +1691,17 @@ import { lib, game } from "../../../noname.js";
 		ok("UI 已阅：短字符串表", (function () { var m = cleanUiSeen({ bossbookSeen: "1" }); return m && m.bossbookSeen === "1"; })());
 		ok("名字表：超长截断", (function () { var m = cleanNames({ netSig: new Array(80).join("字") }); return m && m.netSig.length <= 24; })());
 
-		/* ⑦ 后端：lib.config 读优先、写回读得到（用临时键，测完清掉） */
+		/* ⑦ 仅验证内存映射，不向真实宿主写自检临时数据。后端失败另有隔离探针。 */
 		var TMP = "csh_mig_selftest_tmp";
-		cfgSet(TMP, { hello: 1 });
+		var beforeTmp = configMemory([{ key: TMP }]);
+		applyConfigMemory([{ key: TMP, exists: true, value: { hello: 1 } }]);
 		ok("lib.config 后端：写入后读取一致", (function () { var v = cfgGet(TMP); return v && v.hello === 1; })());
-		try { if (lib && lib.config) delete lib.config[TMP]; } catch (eT) {}
-		lsDel(TMP);
+		applyConfigMemory(beforeTmp);
 
 		/* ⑧ 覆盖度：白名单 = KEY_DEFS + meta（导出/解析同表，不可能一边多一边少）
 		   ★ 数数：6 原 + 6 必须 + 7 建议 = 19 项（含 meta）⇒ KEY_DEFS 18 条；
 		     v3 再补 9 条 ⇒ KEY_DEFS 27 条 / 白名单 28 项。 */
-		ok("键表 27 条（18 + v3 的 9）", KEY_DEFS.length === 27);
+		ok("键表无重复逻辑域", new Set(KEY_DEFS.map(function (d) { return d[0]; })).size === KEY_DEFS.length);
 		ok("白名单与键表一致（+meta）", WHITELIST.length === KEY_DEFS.length + 1 &&
 			KEY_DEFS.every(function (d) { return WHITELIST.indexOf(d[0]) >= 0; }));
 
@@ -1531,6 +1744,8 @@ import { lib, game } from "../../../noname.js";
 		backups: backups,
 		rollback: rollback,
 		reset: reset,
+		recover: recover,
+		recoveryState: recoveryState,
 		summary: summaryOf,
 		diff: diffOf,
 		inventory: inventory,

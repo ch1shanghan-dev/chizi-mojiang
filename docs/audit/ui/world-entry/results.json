@@ -1,0 +1,473 @@
+{
+  "scope": "actual UI in Chromium with isolated data, not Noname game",
+  "cases": [
+    {
+      "case": {
+        "name": "desktop",
+        "w": 1200,
+        "h": 820,
+        "scale": 1
+      },
+      "checks": [
+        {
+          "name": "world opens with developer tools disabled",
+          "passed": true
+        },
+        {
+          "name": "player title is world",
+          "passed": true
+        },
+        {
+          "name": "player subtitle survives world rendering",
+          "passed": true
+        },
+        {
+          "name": "no developer operation tabs in player entry",
+          "passed": true
+        },
+        {
+          "name": "world has dialog semantics",
+          "passed": true
+        },
+        {
+          "name": "all eleven current page/game entries remain available",
+          "passed": true,
+          "detail": [
+            "生涯大厅总览在场 149 人 · 桌面资金 10.00 万战绩 / 官阶 / 成就 / AI 世界",
+            "讨伐录手记魔王的击破实录",
+            "天下榜联机尚未留名天下英雄的池子币与功勋",
+            "行囊存档一身家当，随身可带",
+            "池子成就成就你在对局里打出过的操作",
+            "德州扑克牌桌真实 AI 同桌 · 带入制",
+            "斗地主牌桌1 对 2 · 带入制",
+            "廿一点牌桌真庄家 · 台面零和",
+            "UNO纸牌你 vs 1~3 个人机",
+            "金鳞市市集五十位妖灵挂牌 · 持仓吃分红",
+            "妖灵图鉴档案五十位妖灵的大图档案"
+          ]
+        },
+        {
+          "name": "real career entry routes to existing shell",
+          "passed": true
+        },
+        {
+          "name": "panel inside viewport",
+          "passed": true,
+          "detail": {
+            "x": 0,
+            "y": 0,
+            "width": 1200,
+            "height": 820,
+            "top": 0,
+            "right": 1200,
+            "bottom": 820,
+            "left": 0
+          }
+        },
+        {
+          "name": "content has vertical scrolling",
+          "passed": true
+        },
+        {
+          "name": "close is reachable",
+          "passed": true
+        },
+        {
+          "name": "Shift+Tab wraps to last playable entry",
+          "passed": true
+        },
+        {
+          "name": "Tab wraps to first world control",
+          "passed": true
+        },
+        {
+          "name": "child confirmation closes without closing world",
+          "passed": true
+        },
+        {
+          "name": "Escape closes player world",
+          "passed": true
+        },
+        {
+          "name": "close restores opener focus",
+          "passed": true
+        },
+        {
+          "name": "developer tools still require their own setting",
+          "passed": true
+        },
+        {
+          "name": "developer entry still has operation tabs",
+          "passed": true
+        },
+        {
+          "name": "world keeps online restriction",
+          "passed": true
+        },
+        {
+          "name": "developer floating button is hidden over player view",
+          "passed": true
+        },
+        {
+          "name": "developer floating button is restored after leaving world",
+          "passed": true
+        },
+        {
+          "name": "reopening world keeps one BGM stylesheet",
+          "passed": true
+        }
+      ]
+    },
+    {
+      "case": {
+        "name": "portrait",
+        "w": 390,
+        "h": 844,
+        "scale": 1
+      },
+      "checks": [
+        {
+          "name": "world opens with developer tools disabled",
+          "passed": true
+        },
+        {
+          "name": "player title is world",
+          "passed": true
+        },
+        {
+          "name": "player subtitle survives world rendering",
+          "passed": true
+        },
+        {
+          "name": "no developer operation tabs in player entry",
+          "passed": true
+        },
+        {
+          "name": "world has dialog semantics",
+          "passed": true
+        },
+        {
+          "name": "all eleven current page/game entries remain available",
+          "passed": true,
+          "detail": [
+            "生涯大厅总览在场 149 人 · 桌面资金 10.00 万战绩 / 官阶 / 成就 / AI 世界",
+            "讨伐录手记魔王的击破实录",
+            "天下榜联机尚未留名天下英雄的池子币与功勋",
+            "行囊存档一身家当，随身可带",
+            "池子成就成就你在对局里打出过的操作",
+            "德州扑克牌桌真实 AI 同桌 · 带入制",
+            "斗地主牌桌1 对 2 · 带入制",
+            "廿一点牌桌真庄家 · 台面零和",
+            "UNO纸牌你 vs 1~3 个人机",
+            "金鳞市市集五十位妖灵挂牌 · 持仓吃分红",
+            "妖灵图鉴档案五十位妖灵的大图档案"
+          ]
+        },
+        {
+          "name": "real career entry routes to existing shell",
+          "passed": true
+        },
+        {
+          "name": "panel inside viewport",
+          "passed": true,
+          "detail": {
+            "x": 0,
+            "y": 0,
+            "width": 390,
+            "height": 844,
+            "top": 0,
+            "right": 390,
+            "bottom": 844,
+            "left": 0
+          }
+        },
+        {
+          "name": "content has vertical scrolling",
+          "passed": true
+        },
+        {
+          "name": "close is reachable",
+          "passed": true
+        },
+        {
+          "name": "Shift+Tab wraps to last playable entry",
+          "passed": true
+        },
+        {
+          "name": "Tab wraps to first world control",
+          "passed": true
+        },
+        {
+          "name": "child confirmation closes without closing world",
+          "passed": true
+        },
+        {
+          "name": "Escape closes player world",
+          "passed": true
+        },
+        {
+          "name": "close restores opener focus",
+          "passed": true
+        },
+        {
+          "name": "developer tools still require their own setting",
+          "passed": true
+        },
+        {
+          "name": "developer entry still has operation tabs",
+          "passed": true
+        },
+        {
+          "name": "world keeps online restriction",
+          "passed": true
+        },
+        {
+          "name": "developer floating button is hidden over player view",
+          "passed": true
+        },
+        {
+          "name": "developer floating button is restored after leaving world",
+          "passed": true
+        },
+        {
+          "name": "reopening world keeps one BGM stylesheet",
+          "passed": true
+        }
+      ]
+    },
+    {
+      "case": {
+        "name": "landscape",
+        "w": 915,
+        "h": 412,
+        "scale": 0.6
+      },
+      "checks": [
+        {
+          "name": "world opens with developer tools disabled",
+          "passed": true
+        },
+        {
+          "name": "player title is world",
+          "passed": true
+        },
+        {
+          "name": "player subtitle survives world rendering",
+          "passed": true
+        },
+        {
+          "name": "no developer operation tabs in player entry",
+          "passed": true
+        },
+        {
+          "name": "world has dialog semantics",
+          "passed": true
+        },
+        {
+          "name": "all eleven current page/game entries remain available",
+          "passed": true,
+          "detail": [
+            "生涯大厅总览在场 149 人 · 桌面资金 10.00 万战绩 / 官阶 / 成就 / AI 世界",
+            "讨伐录手记魔王的击破实录",
+            "天下榜联机尚未留名天下英雄的池子币与功勋",
+            "行囊存档一身家当，随身可带",
+            "池子成就成就你在对局里打出过的操作",
+            "德州扑克牌桌真实 AI 同桌 · 带入制",
+            "斗地主牌桌1 对 2 · 带入制",
+            "廿一点牌桌真庄家 · 台面零和",
+            "UNO纸牌你 vs 1~3 个人机",
+            "金鳞市市集五十位妖灵挂牌 · 持仓吃分红",
+            "妖灵图鉴档案五十位妖灵的大图档案"
+          ]
+        },
+        {
+          "name": "real career entry routes to existing shell",
+          "passed": true
+        },
+        {
+          "name": "panel inside viewport",
+          "passed": true,
+          "detail": {
+            "x": 0,
+            "y": 0,
+            "width": 915,
+            "height": 412,
+            "top": 0,
+            "right": 915,
+            "bottom": 412,
+            "left": 0
+          }
+        },
+        {
+          "name": "content has vertical scrolling",
+          "passed": true
+        },
+        {
+          "name": "close is reachable",
+          "passed": true
+        },
+        {
+          "name": "Shift+Tab wraps to last playable entry",
+          "passed": true
+        },
+        {
+          "name": "Tab wraps to first world control",
+          "passed": true
+        },
+        {
+          "name": "child confirmation closes without closing world",
+          "passed": true
+        },
+        {
+          "name": "Escape closes player world",
+          "passed": true
+        },
+        {
+          "name": "close restores opener focus",
+          "passed": true
+        },
+        {
+          "name": "developer tools still require their own setting",
+          "passed": true
+        },
+        {
+          "name": "developer entry still has operation tabs",
+          "passed": true
+        },
+        {
+          "name": "world keeps online restriction",
+          "passed": true
+        },
+        {
+          "name": "developer floating button is hidden over player view",
+          "passed": true
+        },
+        {
+          "name": "developer floating button is restored after leaving world",
+          "passed": true
+        },
+        {
+          "name": "reopening world keeps one BGM stylesheet",
+          "passed": true
+        }
+      ]
+    },
+    {
+      "case": {
+        "name": "zoom",
+        "w": 720,
+        "h": 600,
+        "scale": 1.5
+      },
+      "checks": [
+        {
+          "name": "world opens with developer tools disabled",
+          "passed": true
+        },
+        {
+          "name": "player title is world",
+          "passed": true
+        },
+        {
+          "name": "player subtitle survives world rendering",
+          "passed": true
+        },
+        {
+          "name": "no developer operation tabs in player entry",
+          "passed": true
+        },
+        {
+          "name": "world has dialog semantics",
+          "passed": true
+        },
+        {
+          "name": "all eleven current page/game entries remain available",
+          "passed": true,
+          "detail": [
+            "生涯大厅总览在场 149 人 · 桌面资金 10.00 万战绩 / 官阶 / 成就 / AI 世界",
+            "讨伐录手记魔王的击破实录",
+            "天下榜联机尚未留名天下英雄的池子币与功勋",
+            "行囊存档一身家当，随身可带",
+            "池子成就成就你在对局里打出过的操作",
+            "德州扑克牌桌真实 AI 同桌 · 带入制",
+            "斗地主牌桌1 对 2 · 带入制",
+            "廿一点牌桌真庄家 · 台面零和",
+            "UNO纸牌你 vs 1~3 个人机",
+            "金鳞市市集五十位妖灵挂牌 · 持仓吃分红",
+            "妖灵图鉴档案五十位妖灵的大图档案"
+          ]
+        },
+        {
+          "name": "real career entry routes to existing shell",
+          "passed": true
+        },
+        {
+          "name": "panel inside viewport",
+          "passed": true,
+          "detail": {
+            "x": 0,
+            "y": 0,
+            "width": 720,
+            "height": 600,
+            "top": 0,
+            "right": 720,
+            "bottom": 600,
+            "left": 0
+          }
+        },
+        {
+          "name": "content has vertical scrolling",
+          "passed": true
+        },
+        {
+          "name": "close is reachable",
+          "passed": true
+        },
+        {
+          "name": "Shift+Tab wraps to last playable entry",
+          "passed": true
+        },
+        {
+          "name": "Tab wraps to first world control",
+          "passed": true
+        },
+        {
+          "name": "child confirmation closes without closing world",
+          "passed": true
+        },
+        {
+          "name": "Escape closes player world",
+          "passed": true
+        },
+        {
+          "name": "close restores opener focus",
+          "passed": true
+        },
+        {
+          "name": "developer tools still require their own setting",
+          "passed": true
+        },
+        {
+          "name": "developer entry still has operation tabs",
+          "passed": true
+        },
+        {
+          "name": "world keeps online restriction",
+          "passed": true
+        },
+        {
+          "name": "developer floating button is hidden over player view",
+          "passed": true
+        },
+        {
+          "name": "developer floating button is restored after leaving world",
+          "passed": true
+        },
+        {
+          "name": "reopening world keeps one BGM stylesheet",
+          "passed": true
+        }
+      ]
+    }
+  ]
+}

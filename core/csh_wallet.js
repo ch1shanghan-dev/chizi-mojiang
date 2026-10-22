@@ -237,7 +237,22 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 	function isYesterday(last, t) { return dayDiff(last, t) === 1; }
 
 	function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
-	function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+	/* 恢复凭据跨重启有效；迁移模块可能尚未加载，不能只依赖内存标志。
+	   读失败同样暂停写入。只读查询继续可用，恢复本身使用独立严格写入通道。 */
+	var SAVE_BLOCK_REASON = "存档操作尚未完成，请先在行囊恢复后再继续";
+	function saveBlocked(ignoreBusy) {
+		try {
+			if (localStorage.getItem("csh_migrate_recovery") !== null) return true;
+			var M = lib.cshMigrate;
+			if (!ignoreBusy && M && typeof M.recoveryState === "function") {
+				var state = M.recoveryState();
+				if (state.pending || state.busy) return true;
+			}
+			return false;
+		} catch (e) { return true; }
+	}
+	function saveRefused() { return { ok: false, reason: SAVE_BLOCK_REASON, msg: SAVE_BLOCK_REASON, recovery: true }; }
+	function lsSet(k, v) { if (saveBlocked()) return false; try { localStorage.setItem(k, v); return true; } catch (e) { return false; } }
 	function lsJSON(k, def) {
 		try {
 			var s = lsGet(k);
@@ -398,6 +413,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 	function saveWallet() { syncSave(); }
 	/* 合并落盘：热点路径调用，至多每 SAVE_DEBOUNCE_MS 落盘一次 */
 	function scheduleSave() {
+		if (saveBlocked()) return;
 		if (typeof setTimeout !== "function") { syncSave(); return; }
 		if (_saveTimer) return;                 // 已有待落盘的批次，复用即可
 		_saveTimer = setTimeout(function () {
@@ -406,30 +422,36 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 		}, SAVE_DEBOUNCE_MS);
 	}
 	/* 强制落盘：关壳/页面卸载时调用，确保最后一拍不丢 */
-	function flushSave() {
+	function flushSave(options) {
 		if (_saveTimer) { clearTimeout(_saveTimer); _saveTimer = 0; }
-		syncSave();
+		/* 迁移只可在尚无恢复凭据时刷新旧钱包；busy 标志不能令它自锁。 */
+		return syncSave(!!(options && options.migration));
 	}
-	function syncSave() {
+	function syncSave(forMigration) {
+		if (saveBlocked(forMigration)) return false;
 		try {
 			wallet.pc = clampNum(wallet.pc, 0, PC_CAP);
 			/* 生涯峰值：只增不减（真实可核，成就/大厅用它替代已删除的死字段 bank） */
 			if (!(wallet.pcPeak >= wallet.pc)) wallet.pcPeak = wallet.pc;
 			wallet._sig = sigOf(wallet);
-			lsPut(K_WALLET, wallet);
-			snapshot();
+			localStorage.setItem(K_WALLET, JSON.stringify(wallet));
+			snapshot(forMigration);
+			return true;
 		} catch (e) { logError("saveWallet 失败", e); }
+		return false;
 	}
-	function snapshot() {
+	function snapshot(forMigration) {
+		if (saveBlocked(forMigration)) return false;
 		try {
 			var s = { pc: wallet.pc, streak: wallet.streak, lastSign: wallet.lastSign, t: today() };
 			s._sig = sigOf(s);
-			lsPut(K_SNAP, s);
+			localStorage.setItem(K_SNAP, JSON.stringify(s));
 		} catch (e) {}
 	}
 
 	/* 入账：受 PC_CAP 上限钳制（§4.5.3），返回实得 */
 	function addPC(n, reason) {
+		if (saveBlocked()) return 0;
 		n = Math.floor(Number(n) || 0);
 		if (n <= 0) return 0;
 		if (typeof reason !== "string" || !reason.trim()) {
@@ -450,6 +472,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 	}
 	/* 出账：不足则拒绝 */
 	function spendPC(n, reason) {
+		if (saveBlocked()) return false;
 		n = Math.floor(Number(n) || 0);
 		if (n <= 0) return true;
 		if (wallet.pc < n) return false;
@@ -469,6 +492,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 		return wallet.marketPending ? JSON.parse(JSON.stringify(wallet.marketPending)) : null;
 	}
 	function flushMarketLedger() {
+		if (saveBlocked()) return false;
 		var pending = wallet.marketPending;
 		if (!pending || !pending.entry) return true;
 		try {
@@ -483,6 +507,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 		} catch (e) { logError("金鳞市流水待恢复", e); return false; }
 	}
 	function commitMarket(state, delta, reason) {
+		if (saveBlocked()) return saveRefused();
 		if (!state || typeof state !== "object" || !Number.isSafeInteger(delta) ||
 			typeof reason !== "string" || !reason.trim() || delta > SINGLE_ADD_CAP) return { ok: false, msg: "交易金额无效" };
 		if (delta < 0 && wallet.pc < -delta) return { ok: false, msg: "CBY 不足" };
@@ -510,6 +535,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 		return { ok: true, gained: got };
 	}
 	function completeMarket(id) {
+		if (saveBlocked()) return false;
 		if (!wallet.marketPending || wallet.marketPending.id !== id || !flushMarketLedger()) return false;
 		var before = wallet;
 		try {
@@ -519,6 +545,64 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 			localStorage.setItem(K_WALLET, JSON.stringify(wallet));
 			return true;
 		} catch (e) { wallet = before; logError("金鳞市检查点待清理", e); return false; }
+	}
+
+	/* 生涯成就：余额和一次性领奖凭据共用一个原子钱包写入。
+	   旧的 csh_career_achv 仍作兼容镜像；镜像失败不能重新发奖。
+	   流水随凭据留下待恢复项，避免奖励已入账但账本写失败后永久漏记。 */
+	function flushCareerLedger() {
+		if (saveBlocked()) return false;
+		var pending = wallet.careerPending;
+		if (!pending || !pending.entry) return true;
+		var before = wallet;
+		try {
+			var list = JSON.parse(localStorage.getItem(K_LEDGER) || "[]");
+			if (!Array.isArray(list)) throw new Error("流水格式异常");
+			if (!list.some(function (e) { return e && e.careerTx === pending.key; })) {
+				list.unshift(pending.entry);
+				list.sort(function (a, b) { return b.t - a.t; });
+				localStorage.setItem(K_LEDGER, JSON.stringify(list.slice(0, LEDGER_MAX)));
+			}
+			wallet = JSON.parse(JSON.stringify(before));
+			delete wallet.careerPending;
+			wallet._sig = sigOf(wallet);
+			localStorage.setItem(K_WALLET, JSON.stringify(wallet));
+			return true;
+		} catch (e) { wallet = before; logError("成就流水待恢复", e); return false; }
+	}
+	function claimCareer(key, amount, label) {
+		if (saveBlocked()) return saveRefused();
+		if (typeof key !== "string" || !/^[a-zA-Z0-9_]{1,60}$/.test(key) ||
+			!Number.isSafeInteger(amount) || amount <= 0 || amount > SINGLE_ADD_CAP ||
+			typeof label !== "string" || !label.trim()) return { ok: false, reason: "成就奖励无效" };
+		var claims = wallet.careerClaims;
+		var legacy = lsJSON("csh_career_achv", {});
+		if ((claims && Object.prototype.hasOwnProperty.call(claims, key) && claims[key]) ||
+			(legacy && Object.prototype.hasOwnProperty.call(legacy, key) && legacy[key])) {
+			flushCareerLedger();
+			return { ok: true, already: true, gained: 0, balance: wallet.pc };
+		}
+		if (wallet.pc + amount > PC_CAP) return { ok: false, reason: "余额空间不足，请消费后再领取" };
+		if (!flushCareerLedger()) return { ok: false, reason: "上笔成就流水正在恢复，请稍后重试" };
+		var before = wallet;
+		try {
+			wallet = JSON.parse(JSON.stringify(before));
+			wallet.pc += amount;
+			wallet.pcPeak = Math.max(wallet.pcPeak, wallet.pc);
+			appendChain(amount);
+			if (!wallet.careerClaims || typeof wallet.careerClaims !== "object" || Array.isArray(wallet.careerClaims)) wallet.careerClaims = {};
+			wallet.careerClaims[key] = 1;
+			var reason = "成就:" + label;
+			wallet.careerPending = { key: key, entry: { t: Date.now(), d: amount, r: reason.slice(0, 40),
+				c: catOf(reason), b: wallet.pc, careerTx: key } };
+			wallet._sig = sigOf(wallet);
+			localStorage.setItem(K_WALLET, JSON.stringify(wallet));
+		} catch (e) {
+			wallet = before; logError("成就奖励提交失败", e);
+			return { ok: false, reason: "存档写入失败，本次领取未完成" };
+		}
+		flushCareerLedger(); snapshot();
+		return { ok: true, gained: amount, balance: wallet.pc };
 	}
 
 	/* 门票折扣（§G.3）：按段给 */
@@ -536,6 +620,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 	}
 	/* 支付门票：内部按官阶打折（§G.6.4） */
 	function payTicket(gameKey) {
+		if (saveBlocked()) return saveRefused();
 		var price = ticketOf(gameKey);
 		if (price === 0) return { ok: true, paid: 0, price: 0 };
 		if (wallet.pc < price) return { ok: false, paid: 0, price: price, reason: "余额不足" };
@@ -634,6 +719,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 	   钱只在这里动 —— csh_shell 退化为纯展示层（文案 / 提示音 / 事件），
 	   不再自己 addPC，也就不可能再出现「同一局两条路径入账金额不同」。 */
 	function settleRun(gameKey, opts) {
+		if (saveBlocked()) return Object.assign(saveRefused(), { credited: 0, balance: wallet.pc });
 		opts = opts || {};
 		var r = settle(gameKey, opts.buyIn, opts.netWin, opts.aiStakeTotal, opts.players);
 		var credited = r.payout > 0 ? addPC(r.payout, "结算/" + gameKey) : 0;
@@ -669,7 +755,10 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 	taskData.bigPot = Math.max(0, Math.floor(taskData.bigPot || 0));
 	if (!Array.isArray(taskData.claimed)) taskData.claimed = [];
 
-	function saveTask() { try { lsPut(K_TASK, taskData); } catch (e) {} }
+	function saveTask() {
+		if (saveBlocked()) return;
+		try { lsPut(K_TASK, taskData); } catch (e) {}
+	}
 	function taskTier() { return rankData.rank >= 30 ? 2 : (rankData.rank >= 10 ? 1 : 0); }
 	function taskDefs() {
 		var t = taskTier();
@@ -681,6 +770,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 	}
 	/* 日刷新：跨天清零（回拨时 today < day → 不重置，防刷） */
 	function taskEnsureDay(t) {
+		if (saveBlocked()) return false;
 		t = t || today();
 		if (taskData.day === t) return false;
 		if (taskData.day && t < taskData.day) return false;   // 时间被回拨
@@ -697,6 +787,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 	}
 	/* 上报进度：返回本次新完成（并已入账）的任务列表 */
 	function taskAdd(kind, n) {
+		if (saveBlocked()) return [];
 		taskEnsureDay();
 		n = Math.floor(Number(n) || 0);
 		if (n <= 0) return [];
@@ -748,6 +839,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 	}
 	/* 签到：一天一次，全扩展共用（§G.6.4） */
 	function sign() {
+		if (saveBlocked()) return saveRefused();
 		var t = today();
 		if (!canSign()) return { ok: false, reason: "今日已签到" };
 		var last = wallet.lastSign;
@@ -772,6 +864,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 	}
 	/* 破产救济（§F.4）：每日 1 次，仅当 PC < 最低门票 */
 	function relief() {
+		if (saveBlocked()) return saveRefused();
 		var t = today();
 		if (wallet.pc >= RELIEF_THRESHOLD) return { ok: false, reason: "余额充足，无需救济" };
 		if (wallet.reliefDate === t) return { ok: false, reason: "今日已领取救济" };
@@ -819,6 +912,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 	}
 
 	function saveRank() {
+		if (saveBlocked()) return;
 		try {
 			rankData.rank = rankOfMerit(rankData.merit);
 			lsPut(K_RANK, rankData);
@@ -831,6 +925,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 	}
 	/* 加功勋（统一入口 · §G.6.2）：软上限 + 40级后×0.6 + 不可购买，全部内部实现 */
 	function addMerit(n, reason) {
+		if (saveBlocked()) return saveRefused();
 		n = Number(n) || 0;
 		if (n <= 0) return { ok: false, gained: 0 };
 
@@ -1036,6 +1131,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 	/* 并发占位（§4.5.6）：以 -1 标记"验签中"，避免同码并发双入账。
 	   验签失败时 releaseSeq 回滚，不污染已用表。 */
 	function claimSeq(seq) {
+		if (saveBlocked()) return false;
 		var k = seqHash(seq);
 		var t = usedTable();
 		if (t[k]) return false;
@@ -1044,6 +1140,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 		return true;
 	}
 	function releaseSeq(seq) {
+		if (saveBlocked()) return;
 		var k = seqHash(seq);
 		var t = usedTable();
 		if (t[k] === -1) { delete t[k]; lsPut(K_USED, t); }
@@ -1370,6 +1467,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 		return { inc: inc, out: outc, net: inc - outc, n: all.length, cats: catList, daily: axis, first: first };
 	}
 	function ledgerClear() {
+		if (saveBlocked()) return false;
 		try { lsPut(K_LEDGER, []); return true; } catch (e) { return false; }
 	}
 
@@ -1391,7 +1489,10 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 		return { count: 0, gained: 0 };
 	}
 
+	var activeRedemptions = 0;
 	function redeem(code) {
+		if (saveBlocked()) return Promise.resolve(saveRefused());
+		activeRedemptions++;
 		return new Promise(function (resolve) {
 			var parsed = parseCode(code);
 			if (!parsed) { resolve({ ok: false, reason: "格式错误" }); return; }
@@ -1419,6 +1520,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 			if (!claimed) { resolve({ ok: false, reason: "此码已使用" }); return; }
 
 			verifyAsync(parsed, CSH_PUBKEYS).then(function (v) {
+				if (saveBlocked()) { resolve(saveRefused()); return; }
 				if (!v.ok) { releaseSeq(payload.seq); resolve({ ok: false, reason: v.reason }); return; }
 
 			// 核销 + 入账（占位已写在 claimSeq，这里补设备绑定）
@@ -1437,7 +1539,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 					exp: expDateOf(payload.expDay), seq: payload.seq,
 				});
 			});
-		});
+		}).finally(function () { activeRedemptions--; });
 	}
 	/* 自查用：只验签不核销 */
 	function verifyOnly(code) {
@@ -1458,6 +1560,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 	   7. 存档完整性检查与回滚（§4.5.6）
 	   ============================================================ */
 	function integrityCheck() {
+		if (saveBlocked()) return saveRefused();
 		var raw = lsJSON(K_WALLET, null);
 		if (!raw) return { ok: true, action: "none" };
 		// 首次升级 / 老版本写入：无 _sig 视为"未签名"，直接采纳并补签名，
@@ -1507,6 +1610,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 	}
 	/* 交叉校验（§4.5.10 #5）：已用表"凭空变少"而余额异常增长 → 判定异常 */
 	function crossCheck() {
+		if (saveBlocked()) return saveRefused();
 		var n = usedCount();
 		var lastN = clampNum(lsJSON("csh_cdk_used_n", { n: n }).n, 0, 999999);
 		if (n < lastN) {
@@ -1520,11 +1624,45 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 		lsPut("csh_cdk_used_n", { n: n });
 		return { ok: true, action: "none" };
 	}
+	/* 迁移完成后先采用存储中的新对象，再做校验；仅调用 integrityCheck
+	   会在导入的无签名钱包上把旧内存重新写回，丢掉新余额和领奖凭据。 */
+	function reloadSave(snapshot, options) {
+		if (!(snapshot && options && options.memoryOnly) && saveBlocked()) return saveRefused();
+		var supplied = snapshot && typeof snapshot === "object";
+		var memoryOnly = supplied && options && options.memoryOnly;
+		if (_saveTimer) { clearTimeout(_saveTimer); _saveTimer = 0; }
+		var raw = supplied ? snapshot.wallet : lsJSON(K_WALLET, null);
+		wallet = raw && typeof raw === "object" && !Array.isArray(raw) ? raw : walletDef();
+		wallet.pc = clampNum(wallet.pc, 0, PC_CAP);
+		wallet.pcPeak = clampNum(Math.max(Number(wallet.pcPeak) || 0, wallet.pc), 0, PC_CAP);
+		wallet.streak = clampNum(wallet.streak, 0, 9999);
+		if (typeof wallet.lastSign !== "string") wallet.lastSign = "";
+		if (typeof wallet.reliefDate !== "string") wallet.reliefDate = "";
+		if (!Array.isArray(wallet.chain) || typeof wallet.chainBal !== "number") seedChain("reload");
+		var rd = supplied ? snapshot.rank : lsJSON(K_RANK, null);
+		rankData = rd && typeof rd === "object" && !Array.isArray(rd) ? rd : rankDef();
+		rankData.rank = clampNum(rankData.rank, 0, 50);
+		rankData.merit = clampNum(rankData.merit, 0, 999999999);
+		rankData.meritToday = clampNum(rankData.meritToday, 0, 999999999);
+		if (typeof rankData.meritDate !== "string") rankData.meritDate = "";
+		var td = supplied ? snapshot.dailyTask : lsJSON(K_TASK, null);
+		taskData = td && typeof td === "object" && !Array.isArray(td) ? td : DEFAULT_TASK();
+		if (typeof taskData.day !== "string") taskData.day = "";
+		["hands", "wins", "bigPot"].forEach(function (key) { taskData[key] = clampNum(taskData[key], 0, 999999999); });
+		if (!Array.isArray(taskData.claimed)) taskData.claimed = [];
+		/* 迁移事务已经严格读取并保存恢复凭据。只采用这一批原值，不再二次
+		   容错读盘，也不在确认前补签名/补流水；之后正常保存会签名新对象。 */
+		if (memoryOnly) return { ok: true, action: "adopt-memory", pc: wallet.pc };
+		var result = integrityCheck();
+		flushCareerLedger();
+		return result;
+	}
 
 	/* ============================================================
 	   8. 旧键迁移（§G.6.1 / §5.1 #4）
 	   ============================================================ */
 	function legacyMigrate() {
+		if (saveBlocked()) return saveRefused();
 		var flag = lsGet("csh_wallet_migrated");
 		if (flag === "1") return { ok: true, already: true };
 
@@ -1553,6 +1691,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 	/* 已用表里历史遗留的 dev_ 前缀行 → 迁到 csh_cdk_devbind 并从已用表剔除
 	   （用于修正旧版 usedCount 被设备行虚增的问题） */
 	function splitLegacyDeviceRows() {
+		if (saveBlocked()) return;
 		var t = usedTable(), moved = 0, hit = false;
 		var dt = devTable();
 		for (var k in t) {
@@ -1571,6 +1710,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 	   ============================================================ */
 	var CSH = {
 		version: "1.1.0",
+		saveGuard: { blocked: function () { return saveBlocked(); }, reason: SAVE_BLOCK_REASON },
 		/* 存储键名唯一真值（§5.5.3）。csh_migrate 的导入导出由此取键名，
 		   不再各自另写一份（2026-10-01 收敛）。 */
 		KEYS: {
@@ -1602,6 +1742,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 			pc: function () { return wallet.pc; },
 			peak: function () { return wallet.pcPeak; },
 			add: addPC, spend: spendPC, SINGLE_ADD_CAP: SINGLE_ADD_CAP,
+			claimCareer: claimCareer,
 			commitMarket: commitMarket, marketPending: marketPending, completeMarket: completeMarket,
 			/* v6.2 账本（来源与去处） */
 			ledger: ledger, ledgerSummary: ledgerSummary, ledgerClear: ledgerClear,
@@ -1640,11 +1781,12 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 			redeem: redeem, verify: verifyOnly, parse: parseCode,
 			usedCount: usedCount, recent: recent,
 			pendingCount: pendingCount, claimSeq: claimSeq, releaseSeq: releaseSeq,
+			busy: function () { return activeRedemptions > 0; },
 			devBoundTo: devBoundTo, devCount: function () { return Object.keys(devTable()).length; },
 			pubkeys: function () { return CSH_PUBKEYS.slice(); },
 			setPubkeys: function (arr) { CSH_PUBKEYS = Array.isArray(arr) ? arr : []; },
 		},
-	sign, flushSave,
+	sign, flushSave, reloadSave,
 	integrity: { check: integrityCheck, crossCheck: crossCheck },
 		migrate: { legacy: legacyMigrate },
 	_sig: { sign: sigOf, verify: verifySig, fnv1a: fnv1a, verifyRSA: verifyPKCS1v15, sha256: _sha256 },
@@ -1688,6 +1830,7 @@ lib.cshWallet = CSH;
 		integrityCheck();
 		crossCheck();
 		taskEnsureDay();
+		flushCareerLedger();
 	} catch (e) { logError("启动自检失败", e); }
 
 	logInfo("钱包模块已加载：PC=" + wallet.pc + " 峰值=" + wallet.pcPeak +

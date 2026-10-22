@@ -278,12 +278,27 @@ html,body{width:100%;height:100%;background:var(--ink-0);color:var(--text);-webk
    一处机制一处实现（避免"两种两档写法并存"这种下次必然出错的债）。 */
 
 /* ---------- 成就网格 ---------- */
-.agrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:8px}
+.agrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,200px),1fr));gap:8px}
 .ach{background:var(--ink-1);border:1px solid var(--line);border-radius:var(--r-sm);
-  padding:10px 6px;text-align:center;cursor:pointer}
+  padding:10px;text-align:left;min-width:0}
 .ach.on{border-color:var(--gold-line);background:var(--gold-fill)}
 .ach .ico{font-size:var(--fs-icon);line-height:1;margin-bottom:6px;filter:grayscale(1) opacity(.45)}
 .ach.on .ico{filter:none}
+.ach .adetail{display:block;width:100%;border:0;background:transparent;color:var(--text);
+  font:inherit;text-align:left;cursor:pointer;padding:0;min-height:44px}
+.ach .adetail strong{display:block;font-size:var(--fs-sm);line-height:1.5;overflow-wrap:anywhere}
+.ach .adesc{font-size:var(--fs-xs);line-height:1.6;color:var(--text-dim);margin:5px 0;overflow-wrap:anywhere}
+.ach-controls{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
+.ach-controls label{display:flex;align-items:center;gap:6px;min-width:0;font-size:var(--fs-xs);color:var(--text-dim)}
+.ach-controls .ach-search{flex:1 1 240px}
+.ach-controls input,.ach-controls select{min-width:0;min-height:40px;background:var(--ink-1);
+  border:1px solid var(--line);border-radius:var(--r-sm);color:var(--text);font:inherit;padding:6px 8px}
+.ach-controls input{flex:1;width:100%}
+.ach-controls option{background:var(--ink-1);color:var(--text)}
+#p-ach button:focus-visible,#p-ach input:focus-visible,#p-ach select:focus-visible{outline:2px solid var(--gold-hi);outline-offset:2px}
+#ach-more{display:block;margin:12px auto}
+#ach-more[hidden]{display:none}
+#ach-empty{padding:20px 8px;text-align:center}
 .ach span{font-size:var(--fs-cap);color:var(--text-dim)}
 .ach.on span{color:var(--text)}
 /* 2026-09-28 成就墙扩展：进度条 / 分类筛选 / 领取按钮 / 池子币大字 */
@@ -297,6 +312,18 @@ html,body{width:100%;height:100%;background:var(--ink-0);color:var(--text);-webk
 .ach .aclaim{margin-top:4px;font-size:var(--fs-cap);padding:3px 10px;border-radius:10px;cursor:pointer;
   border:1px solid var(--gold-line);color:#1a130a;background:var(--gold-line);font-weight:700;user-select:none}
 .ach .aclaim.got{background:transparent;color:var(--text-dim);border-color:var(--line);font-weight:400}
+.ach .aclaim:not(.got){background:var(--gold);border-color:var(--gold);min-height:36px}
+.ach .aclaim:disabled{cursor:default}
+@media (max-width:600px){
+  #app{flex-direction:column}
+  #tabs{flex:0 0 auto;flex-direction:row;padding:46px 6px 0;border-right:0;border-bottom:1px solid var(--line);
+    overflow-x:auto;min-height:108px}
+  .tab{flex:1 0 60px;flex-direction:column;flex-wrap:nowrap;justify-content:center;gap:4px;
+    min-height:60px;padding:8px 4px;font-size:var(--fs-md);letter-spacing:0;transform:none!important;text-align:center}
+  .tab::before{display:none}
+  .tab.on::after{top:auto;left:0;bottom:0;width:100%;height:2px}
+  .tab .tm{font-size:var(--fs-xs);max-width:60px}
+}
 .pc-big{display:flex;align-items:baseline;justify-content:center;gap:8px;margin-top:8px;flex-wrap:nowrap}
 .pc-big span{font-size:var(--fs-display);font-family:var(--ff-title);font-weight:900;color:var(--gold-hi);letter-spacing:.02em;
   font-variant-numeric:tabular-nums;text-shadow:0 2px 14px rgba(216,180,106,.35)}
@@ -576,9 +603,18 @@ html,body{width:100%;height:100%;background:var(--ink-0);color:var(--text);-webk
     <div class="page" id="p-ach">
       <div class="sect"><h3 id="ach-title">成就墙</h3>
         <div class="diffbox" id="ach-summary">成就统计载入中…</div>
+        <div class="ach-controls">
+          <label class="ach-search">查找<input id="ach-search" type="search" placeholder="名称、条件或分类" aria-label="查找成就"></label>
+          <label>状态<select id="ach-state"><option value="all">全部状态</option><option value="ready">可领取</option><option value="todo">未完成</option><option value="claimed">已领取</option></select></label>
+          <label>排序<select id="ach-sort"><option value="near">推荐目标</option><option value="catalog">图鉴顺序</option></select></label>
+          <button class="btn ghost" id="ach-reset" type="button">重置筛选</button>
+        </div>
         <div class="catchips" id="ach-cats"></div>
+        <div class="diffbox" id="ach-results" role="status" aria-live="polite"></div>
         <div class="agrid" id="ach-grid"></div>
-        <div class="diffbox" id="ach-note">点击查看条件；达成的成就点「领取」入账。</div>
+        <div class="diffbox" id="ach-empty" hidden>没有符合条件的成就，试试其他关键词或重置筛选。</div>
+        <button class="btn ghost" id="ach-more" type="button" hidden>继续查看</button>
+        <div class="diffbox" id="ach-note" role="status">点击查看进度；达成的成就点「领取」入账。</div>
       </div>
     </div>
 
@@ -1129,6 +1165,8 @@ function loadTasks() {
    ============================================================ */
 var achCat = "全部";           /* 当前筛选分类 */
 var achRows = [];              /* 最近一次 evalAll 结果 */
+var achQuery = "", achState = "all", achSort = "near", achLimit = 60, achRequest = 0;
+var achPending = Object.create(null);
 /* 本地兜底统计（仅在快照尚未到达时使用；权威版本由宿主 shell-stats 聚合）。
    全部取自真实快照字段，不含任何占位值。 */
 function achStats() {
@@ -1155,11 +1193,9 @@ function renderAch() {
   var box = $("#ach-grid");
   if (!box) return;
   if (!AC) { box.innerHTML = ""; $("#ach-summary").textContent = "成就引擎未加载（core/csh_achv.js）"; return; }
-  /* 页签数据槽回填（2026-10-07）：成就进度概览 */
-  var st = achStats();
-  /* 快照未到时先用兜底渲染一次，桥回来后再刷 */
-  var useBridge = !!State.snap;
+  var request = ++achRequest;
   var paint = function (rows) {
+    if (request !== achRequest) return; /* 迟到的旧快照不得覆盖新结果 */
     achRows = rows;
     var done = 0, claimedN = 0, claimable = 0;
     for (var i = 0; i < rows.length; i++) {
@@ -1180,57 +1216,112 @@ function renderAch() {
     for (var key in cats) {
       if (!Object.prototype.hasOwnProperty.call(cats, key)) continue;
       (function (k) {
-        var chip = el("span", "chip" + (k === achCat ? " on" : ""), k);
-        chip.addEventListener("click", function () { achCat = k; renderAch(); }, false);
+        var chip = el("button", "chip" + (k === achCat ? " on" : ""), k);
+        chip.type = "button";
+        chip.setAttribute("aria-pressed", String(k === achCat));
+        chip.addEventListener("click", function () {
+          achCat = k; achLimit = 60;
+          var chips = chipBox.querySelectorAll("button");
+          for (var n = 0; n < chips.length; n++) {
+            var on = chips[n] === chip;
+            chips[n].classList.toggle("on", on); chips[n].setAttribute("aria-pressed", String(on));
+          }
+          paintAchGrid();
+        }, false);
         chipBox.appendChild(chip);
       })(key);
     }
-    /* 网格 */
-    box.innerHTML = "";
-    for (var i2 = 0; i2 < rows.length; i2++) {
-      (function (r) {
-        if (achCat !== "全部" && r.cat !== achCat) return;
-        var c = el("div", "ach" + (r.done ? " on" : ""));
-        c.appendChild(el("div", "ico", r.ico));
-        c.appendChild(el("span", "", r.label));
-        var bar = el("div", "abar"); var fill = el("i");
-        fill.style.width = Math.min(100, Math.round((r.cur / r.goal) * 100)) + "%";
-        bar.appendChild(fill); c.appendChild(bar);
-        c.appendChild(el("div", "alab", (r.done ? ("已完成 +" + fmt(r.reward)) : (fmt(r.cur) + " / " + fmt(r.goal))) + (r.retired ? " · 绝版" : "")));
-        if (r.done) {
-          var btn = el("button", "aclaim" + (r.claimed ? " got" : ""), r.claimed ? "已领取" : "领取 +" + fmt(r.reward));
-          btn.type = "button";
-          btn.addEventListener("click", function (e) {
-            e.stopPropagation();
-            if (r.claimed) return;
-            Bridge.call("shell-ach-claim", { key: r.key }, function (ok2, res2) {
-              if (ok2 && res2 && res2.ok) {
-                r.claimed = true;
-                /* 双弹去重（2026-10-07）：壳侧 shell-ach-claim 已发唯一成就 toast，本页不再重复 */
-                renderAch();
-                loadWalletSnap(2);     /* 余额刷新 */
-              } else {
-                toast((res2 && res2.reason) ? "领取失败：" + res2.reason : "领取失败");
-              }
-            });
-          }, false);
-          c.appendChild(btn);
-        }
-        c.addEventListener("click", function () {
-          $("#ach-note").innerHTML = "<b>" + r.label + "</b>（" + r.cat + (r.retired ? " · 绝版" : "") + "）：" + r.desc +
-            " · 奖励 +" + fmt(r.reward) + " CBY · " +
-            (r.claimed ? "已领取" : (r.done ? "可领取" : "进度 " + fmt(r.cur) + " / " + fmt(r.goal)));
-        }, false);
-        box.appendChild(c);
-      })(rows[i2]);
-    }
+    paintAchGrid();
   };
-  if (!useBridge) {
+  if (!State.snap) {
     paint(AC.evalAll(achStats()));
     return;
   }
   Bridge.call("shell-stats", null, function (ok3, st3) {
     paint(AC.evalAll(ok3 && st3 ? st3 : achStats()));
+  });
+}
+/* 筛选和展开仅消费最近快照，不因输入关键词重拉宿主或改成就定义。 */
+function paintAchGrid() {
+  var query = achQuery.trim().toLocaleLowerCase();
+  var rows = achRows.filter(function (r) {
+    return (achCat === "全部" || r.cat === achCat) &&
+      (!query || (r.label + " " + r.desc + " " + r.cat).toLocaleLowerCase().indexOf(query) >= 0) &&
+      (achState === "all" || (achState === "ready" && r.done && !r.claimed) ||
+        (achState === "todo" && !r.done && !r.claimed) || (achState === "claimed" && r.claimed));
+  });
+  if (achSort === "near") {
+    rows.sort(function (a, b) {
+      var group = function (r) { return r.claimed ? 2 : r.done ? 0 : 1; };
+      return group(a) - group(b) ||
+        ((a.done || a.claimed) ? 0 : (b.cur / b.goal - a.cur / a.goal)) ||
+        achRows.indexOf(a) - achRows.indexOf(b);
+    });
+  }
+  var box = $("#ach-grid"), count = Math.min(rows.length, achLimit);
+  box.innerHTML = "";
+  $("#ach-results").textContent = "匹配 " + rows.length + " 枚 · 已显示 " + count + " 枚 / 全部 " + achRows.length + " 枚";
+  $("#ach-empty").hidden = rows.length > 0;
+  var more = $("#ach-more"); more.hidden = count >= rows.length;
+  more.textContent = "继续查看 · 还有 " + (rows.length - count) + " 枚";
+  for (var i = 0; i < count; i++) {
+    (function (r) {
+      var c = el("article", "ach" + (r.done || r.claimed ? " on" : ""));
+      c.setAttribute("data-key", r.key);
+      var detail = el("button", "adetail"); detail.type = "button";
+      var icon = el("div", "ico", r.ico); icon.setAttribute("aria-hidden", "true"); detail.appendChild(icon);
+      detail.appendChild(el("strong", "", r.label)); c.appendChild(detail);
+      c.appendChild(el("div", "adesc", r.desc));
+      var bar = el("div", "abar"), fill = el("i");
+      fill.style.width = Math.max(0, Math.min(100, Math.round((r.cur / r.goal) * 100))) + "%";
+      bar.setAttribute("aria-hidden", "true"); bar.appendChild(fill); c.appendChild(bar);
+      c.appendChild(el("div", "alab", (r.claimed ? "已领取" : r.done ? "可领取" : achProgress(r.cur) + " / " + achProgress(r.goal)) +
+        " · +" + fmt(r.reward) + " CBY" + (r.retired ? " · 绝版" : "")));
+      if (r.done || r.claimed) {
+        var btn = el("button", "aclaim" + (r.claimed ? " got" : ""), r.claimed ? "已领取" : achPending[r.key] ? "领取中…" : "领取 +" + fmt(r.reward));
+        btn.type = "button"; btn.disabled = r.claimed || !!achPending[r.key];
+        btn.setAttribute("aria-label", r.label + " · " + btn.textContent);
+        btn.addEventListener("click", function () {
+          if (r.claimed || achPending[r.key]) return;
+          achPending[r.key] = true; btn.disabled = true; btn.textContent = "领取中…";
+          Bridge.call("shell-ach-claim", { key: r.key }, function (ok, res) {
+            delete achPending[r.key];
+            if (ok && res && res.ok) {
+              r.claimed = true;
+              paintAchGrid(); renderAch(); loadWalletSnap(2);
+            } else {
+              paintAchGrid(); toast(res && res.reason ? "领取失败：" + res.reason : "领取失败");
+            }
+          });
+        }, false); c.appendChild(btn);
+      }
+      detail.addEventListener("click", function () {
+        $("#ach-note").textContent = r.label + "（" + r.cat + "）：" + r.desc + " · 奖励 +" + fmt(r.reward) +
+          " CBY · " + (r.claimed ? "已领取" : r.done ? "可领取" : "进度 " + achProgress(r.cur) + " / " + achProgress(r.goal));
+      }, false);
+      box.appendChild(c);
+    })(rows[i]);
+  }
+}
+function achProgress(value) {
+  return value === Math.floor(value) ? fmt(value) : String(Number(value.toFixed(2)));
+}
+function bindAchFilters() {
+  $("#ach-search").addEventListener("input", function () { achQuery = this.value; achLimit = 60; paintAchGrid(); });
+  $("#ach-state").addEventListener("change", function () { achState = this.value; achLimit = 60; paintAchGrid(); });
+  $("#ach-sort").addEventListener("change", function () { achSort = this.value; achLimit = 60; paintAchGrid(); });
+  $("#ach-more").addEventListener("click", function () {
+    var old = achLimit; achLimit += 60; paintAchGrid();
+    var next = $("#ach-grid").children[old]; if (next) next.querySelector(".adetail").focus();
+  });
+  $("#ach-reset").addEventListener("click", function () {
+    achCat = "全部"; achQuery = ""; achState = "all"; achSort = "near"; achLimit = 60;
+    $("#ach-search").value = ""; $("#ach-state").value = "all"; $("#ach-sort").value = "near";
+    var chips = $("#ach-cats").querySelectorAll("button");
+    for (var i = 0; i < chips.length; i++) {
+      var on = chips[i].textContent === "全部"; chips[i].classList.toggle("on", on); chips[i].setAttribute("aria-pressed", String(on));
+    }
+    paintAchGrid();
   });
 }
 
@@ -1444,6 +1535,12 @@ function renderNarrative() {
     rowOf("打过的局数", function () {
       return st.matches ? fmt(st.matches) + " 局 · 在场 " + Math.max(0, (ws.chars || 0) - (ws.retired || 0)) + " 人" : "";
     });
+    rowOf("你的牌桌", function () {
+      return ws.playerOpponents ? "结识 " + fmt(ws.playerOpponents) + " 位牌友 · 同桌 " + fmt(ws.playerHands || 0) + " 人次" : "尚无同桌记录，找位牌友开一场吧";
+    });
+    rowOf("再战破局", function () {
+      return ws.playerRevenge ? "曾输过、又赢回来的对手有 " + fmt(ws.playerRevenge) + " 位" : "";
+    });
   }
 }
 function minFund(ai) { var m = Infinity; for (var i = 0; i < ai.length; i++) if ((ai[i].fund || 0) < m) m = ai[i].fund || 0; return m === Infinity ? 0 : m; }
@@ -1634,6 +1731,7 @@ bindPcLink();
   $("#md-close").addEventListener("click", function () { $("#modal").className = ""; }, false);
 
 bindActions();
+bindAchFilters();
 renderTasksInto($("#ov-tasks"));
 renderTasksInto($("#tk-list"));
 renderAch();

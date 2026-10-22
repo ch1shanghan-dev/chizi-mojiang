@@ -81,11 +81,8 @@ function why(reason, player) {
    filter、content 入口及选择完成后都检查开关和宿主状态；关闭时不进入补选流程。
    补选与面板滚动独立，兼容性以实际触发条件和异步让位守卫判断。 */
 function kamiEnabled() {
-    try {
-        return lib.config["extension_池子魔将_csh_kami_group"] === true;
-    } catch (e0) {
-        return false;
-    }
+    /* 作者决定将该兼容功能停用并从设置页隐藏；忽略旧存档中的 true。 */
+    return false;
 }
 
 /* 该不该问这个玩家选势力。返回 "" = 不问；"shen" = 要问。

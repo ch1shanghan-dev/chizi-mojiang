@@ -1619,7 +1619,7 @@ async function runBossChecks() {
 	else ok("BOSS/妖灵 ID 与名册零冲突");
 	const leak = [...need].filter(s => rosterSkills.has(s));
 	if (leak.length) fail("名册角色引用了 BOSS 技：" + leak.join("、"));
-	else ok("名册 99 人零引用 BOSS 技（隔离成立）");
+	else ok("普通武将名册零引用 BOSS 技（隔离成立）");
 
 	/* E9（filter 禁 trigger · v4 实机报错根因）：filter(event, player) 的参数是 event/player，
 	   trigger 仅 content 内由引擎注入——filter 内引用 trigger = ReferenceError（实机 556 行）。
@@ -2495,43 +2495,13 @@ async function runBossChecks() {
 		const cb45 = fs.readFileSync(path.join(ROOT, "character", "boss.js"), "utf8");
 		const i45 = ct45.indexOf("_inject: function");
 		const fx45 = i45 >= 0 ? ct45.slice(i45, i45 + 3200) : "";
-		if (!/function cshEgScrollApply\s*\(/.test(ct45)) fail("执行级 E45：缺 cshEgScrollApply（本体兼容注入）");
-		else if (!/cshEgScrollApply\(\);/.test(ct45)) fail("执行级 E45：cshEgScrollApply 未在 content 加载时调用");
-		else if (fx45.indexOf(":has(.card.button)") >= 0) fail("执行级 E45：选将滚动条又挂回击杀特效懒注入块（要等第一次特效才生效）");
-		else if (ct45.indexOf(".buttons:has(.card.button){max-height:54vh") >= 0) fail("执行级 E45：滚动退回 .buttons 截断（实机会塌缩成固定小段）");
-		else if (/\.dialog:not\(\.fullheight\):has\(\.card\.button\)/.test(ct45)) fail("执行级 E45：全局 :has(.card.button) 封顶回归（会把主菜单/卡牌图鉴一起压扁）");
-		else if (!/cshEgIsMenuDialog/.test(ct45) || !/classList\.contains\("menu"\)/.test(ct45)) fail("执行级 E45：打标器缺主菜单排除（选项菜单会被误判成势力面板）");
-		else if (!/function cshEgCapPx\s*\(/.test(ct45) || !/documentZoom/.test(ct45)) fail("执行级 E45：封顶未按 body 缩放换算 px（手机端只剩 28% 屏幕）");
-		/* ★ 2026-10-18 第二修（作者实机录像：装了很多扩展的用户，势力 20+ 个，右侧整列出屏）
-		   根因 = .buttons 宽度跟着不受控的父容器走。headless 实测：父宽 1400 时
-		   .buttons 被撑到 1392，一行 9 个，最后一列在 x=1392 而屏幕只有 884。
-		   当前修法 = dialog 的 max-width + .buttons 的 max-width:100%，不主动写 width。 */
-		else if (!/function cshEgCapW\s*\(/.test(ct45)) fail("执行级 E45：缺宽度上界 cshEgCapW（势力多时会横向出屏）");
-		/* ★ 2026-10-18 第三修（作者：「每次出现这个自适应窗口会这样一下」）：
-		   宽度上界只能靠 dialog 自己的 max-width —— 那是**被动**属性，只在超屏时生效，
-		   正常面板一个像素都不动。**禁止**给 .buttons 设 width：
-		   它会覆盖引擎的 `.content > div:not(.pointerdiv){width:calc(100% - 8px)}`
-		   （layout.css:1857），等于主动把按钮墙改宽 8px；旧实现同时还给内容区加
-		   padding-right:10px（窄 10px）。两个方向一起动 ⇒ 列数压在临界值上来回跳。
-		   反向也要守：谁再把 width / padding-right 加回来，这一条立刻红。 */
-		else if (/\.csh-egsc \.csh-egdlg \.buttons\{[^}]*(?<!max-)width:/.test(ct45)) fail("执行级 E45：.buttons 又主动设 width 了（会与引擎 calc(100%-8px) 冲突、列数跳变）");
-		else if (!/\.csh-egsc \.csh-egdlg \.buttons\{max-width:100%/.test(ct45)) fail("执行级 E45：.buttons 缺 max-width:100% 兜底");
-		else if (/setProperty\("width",\s*"min\(100%,/.test(ct45)) fail("执行级 E45：内联又给 .buttons 设 width 了（同上）");
-		else if (/c\.style\.paddingRight\s*=\s*Math\.round/.test(ct45)) fail("执行级 E45：又给内容区加 padding-right（内容变窄 → 列数跳变）");
-		else if (!/cshEgWrite\(dlg, dlg, "max-width", capW \+ "px"\)/.test(ct45)) fail("执行级 E45：缺 dialog 自身的 max-width（宽度上界失去依托）");
-		else if (!/cshEgWrite\(dlg, c, "overflow-x", "hidden"\)/.test(ct45)) fail("执行级 E45：横向滚动未关（会多出一条压在按钮上的横条）");
-		else if (!/cshEgWrite\(dlg, dlg, "max-height", cap \+ "px"\)/.test(ct45) || !/cshEgWrite\(dlg, c, "overflow-y", "auto"\)/.test(ct45) || !/content-container/.test(ct45)) fail("执行级 E45：缺对话框封顶 / 原生滚动容器接管");
-		else if (!/function cshEgRestore/.test(ct45) || !/current !== item.written/.test(ct45) || !/cshEgRelease\(dlg, "csh-egdlg"\)/.test(ct45)) fail("执行级 E45：缺有归属的样式还原（不得清空宿主原有或后写样式）");
-		else if (/cshEgWrite\([^\n]*, "(?:width|padding-right)"/.test(ct45)) fail("执行级 E45：滚动辅助主动改 width/padding-right（会改变正常按钮列数）");
-		else if (!/cshEgIsGroupControl/.test(ct45) || !/cshEgStyleGroupControl/.test(ct45)) fail("执行级 E45：缺控制条形态（2v2 冷/暖方势力走 chooseControl，不处理 = 只有身份场生效）");
-		else if (!/csh_eg_group_scroll/.test(cf45) || !/__cshEgScrollApply/.test(cf45)) fail("执行级 E45：设置开关未接线（csh_eg_group_scroll → __cshEgScrollApply）");
-		/* ★ 深夜八·修「关了他又自动打开」：引擎（optionsMenu.js:305 / exetensionMenu.js:135）
-		   对**有自定义 onclick 的选项不代存**（默认保存回调只在 `if (!cfg.onclick)` 时装）——
-		   本项 onclick 必须自行落盘，否则存值永远缺失、每次回落到默认 init:true。 */
-		else if (!/csh_eg_group_scroll[\s\S]{0,420}saveExtensionConfig/.test(cf45)) fail("执行级 E45：滚动条开关又没落盘（有自定义 onclick 的选项引擎不代存——会「关掉又自动打开」）");
+		if (/(?:\"csh_eg_group_scroll\"|__cshEgScrollApply)/.test(cf45)) fail("E45: retired scroll option must stay out of settings");
+		else if (!/function cshEgScrollApply\(\) \{ return false; \}/.test(ct45)) fail("E45: retired scroll compatibility must remain a no-op");
+		else if (/installKamiChoice|kamiStatus/.test(ct45)) fail("E45: retired kami choice must not be wired into content");
+		else if (fx45.indexOf(":has(.card.button)") >= 0) fail("E45: scroll compatibility leaked into kill-fx lazy block");
 		else if (!/export function cshBossSelfLoad\s*\(/.test(cb45)) fail("执行级 E45：缺 cshBossSelfLoad（懒人包自愈补载）");
 		else if (!/cshBossSelfLoad/.test(bm45)) fail("执行级 E45：bossmode 未接自愈补载");
-		else ok("执行级 E45：本体兼容注入在位（加载即注入 + 原生容器接管 + 设置开关 + 懒人包自愈补载 · 击杀块无残留）");
+		else ok("执行级 E45：势力兼容项已隐藏并停用 + 懒人包自愈补载在位");
 	}
 
 	/* E46（2026-10-17 · 在线更新自动化 + 池子休闲框体分层）：
@@ -2569,14 +2539,7 @@ async function runBossChecks() {
 		if (!/GAMECLASS\[g\.key\]/.test(db46)) e46.push("games.forEach 未按 key 挂框体类（只加 CSS 不会生效）");
 		if (!/gb-career/.test(db46) || !/gb-bossbook/.test(db46) || !/gb-rank/.test(db46) || !/gb-save/.test(db46))
 			e46.push("既有四张特色卡（生涯大厅/讨伐录/天下榜/行囊）的类被误删");
-		/* ③ 势力面板「第二形态」通道（2026-10-17 · 作者实机：斗地主也有势力面板，
-		      旧选择器 :has(.card.button) 只认卡牌形 ⇒ 按钮形面板漏掉 = BUG）。 */
-		const ct46 = fs.readFileSync(path.join(ROOT, "main", "content.js"), "utf8");
-		if (!/csh-egdlg/.test(ct46)) e46.push("缺 .csh-egdlg 通道（按钮形势力面板会漏，斗地主的 BUG 会复发）");
-		else if (!/function cshEgGroupObserve\s*\(/.test(ct46) || !/MutationObserver/.test(ct46))
-			e46.push("势力面板打标器未接线（无 MutationObserver 则打不上标记、样式命不中）");
-		else if (!/cshEgGroupObserve\(on\)/.test(ct46)) e46.push("cshEgScrollApply 未随开关启用/停用打标器");
-		else if (!/group_"\s*\)\s*===\s*0|indexOf\("group_"\)/.test(ct46)) e46.push("打标器缺 link=group_* 兜底判据（标题措辞一变就漏）");
+		/* 势力面板适配已退役；停用状态由 E45/E49 检查，不再要求观察器接线。 */
 		/* ④ 礼物价格字号（作者：价格数字字太小了）
 		   2026-10-20 字号收编后：字面量变成了 var(--pfs-*)，断言改为「解析出实际数值」——
 		   先抓 font-size 声明（字面 px 或 var 引用），var 引用回页内 :root 定义求真值。
@@ -2593,8 +2556,8 @@ async function runBossChecks() {
 			const cost46 = resolveFs46(cx46, ".affgifts .affbtn .cost");
 			if (cost46 == null || cost46 < 12.5) e46.push(f46 + " 礼物价格 .cost 字号过小（现 " + (cost46 == null ? "无法解析" : cost46 + "px") + "，应 ≥12.5px）");
 		}
-		if (e46.length) fail("执行级 E46：在线更新自动化 + 框体分层 + 势力面板第二形态 + 价格字号（" + e46.slice(0, 4).join("；") + "）");
-		else ok("执行级 E46：更新已自动化（内置源 · 检查→确认→逐文件下载→重启）＋ 框体分层在位（牌桌四款统一 gb-table · 金鳞市/妖灵图鉴各具特色）＋ 势力面板两形态全覆盖（.csh-egdlg 打标器）＋ 礼物价格字号达标");
+		if (e46.length) fail("执行级 E46：在线更新自动化 + 框体分层 + 价格字号（" + e46.slice(0, 4).join("；") + "）");
+		else ok("执行级 E46：更新已自动化（内置源 · 检查→确认→逐文件下载→重启）＋ 框体分层在位（牌桌四款统一 gb-table · 金鳞市/妖灵图鉴各具特色）＋ 礼物价格字号达标");
 	}
 
 	/* E47（2026-10-17 · 指定讨伐令 A 方案：1000 CBY 指定一只未讨伐妖灵出战）：
@@ -2754,65 +2717,23 @@ async function runBossChecks() {
 	     ⑧ 必须有诊断通道（why(...)），弹不出来时能说出原因，而不是靠猜。 */
 	{
 		const e49 = [];
-		const rp49 = path.join(ROOT, "core", "csh_rules.js");
-		if (!fs.existsSync(rp49)) e49.push("缺 core/csh_rules.js");
-		else {
-			const r49 = fs.readFileSync(rp49, "utf8");
-			if (!/export function installKamiChoice\s*\(/.test(r49)) e49.push("缺 installKamiChoice 导出");
-			else if (!/game\.addGlobalSkill\s*\(/.test(r49)) e49.push("未走 game.addGlobalSkill");
-			else if (!/global:\s*"gameStart"/.test(r49) || !/player:\s*"enterGame"/.test(r49)) e49.push("触发点未与 _doublegroup_choice 对齐");
-			else if (!/\.chooseButton\s*\(/.test(r49) || !/"vcard"/.test(r49)) e49.push("未用原生 chooseButton(vcard)");
-			else if (!/player\.changeGroup\s*\(/.test(r49)) e49.push("未用原生 changeGroup 落地势力");
-			else if (!/group\s*!==\s*"shen"/.test(r49)) e49.push("没有「只认 shen」守卫（devil 是 BOSS 全家）");
-			/* 两条死路：不许再走 */
-			if (/info\.doubleGroup\s*=/.test(r49)) e49.push("又给角色补 doubleGroup 了（会被选将界面逐个画出来）");
-			if (/initGroup\s*=/.test(r49) && !/typeof si\.initGroup/.test(r49)) e49.push("又给技能补 initGroup 了（共享技能会波及普通武将）");
-			if (/player\.isUnseen\s*\(/.test(r49)) e49.push("又用了 player.isUnseen（DOM 状态）");
-			if (!/get\.config\("choose_group"\)\s*===\s*false/.test(r49)) e49.push("choose_group 未写成「只认显式 false」");
-			if (!/_priority/.test(r49)) e49.push("未补 _priority");
-			if (!/function why\s*\(/.test(r49)) e49.push("缺诊断通道 why()（弹不出来只能靠猜）");
-			if (/get\.selectGroup\s*=\s*[^=]/.test(r49)) e49.push("禁止覆盖 get.selectGroup");
-			if (/lib\.skill\._doublegroup_choice/.test(r49)) e49.push("禁止触碰引擎 _doublegroup_choice");
-			/* 2026-10-18 · 作者要求：非身份场选势力必须有**独立开关**（怕与别的扩展冲突）。
-			     开关只被 filter 读一次、纯 early return ⇒ 不产生 DOM、不改样式，
-			     所以它本身与美化扩展零冲突；真正防冲突的是下面那条让位守卫。 */
-			if (!/function kamiEnabled\s*\(/.test(r49)) e49.push("缺 kamiEnabled()：没有独立开关，关不掉");
-			/* 本项**默认关闭**，所以判据必须反过来：只认显式 true 才算开。
-			   若写成"只认显式 false 才关"，缺键（老存档/刚装）会被判成开 ——
-			   名义上默认关、实际默认开。 */
-			else if (!/csh_kami_group"\]\s*===\s*true/.test(r49)) e49.push("扩展开关未写成「只认显式 true 才算开」（默认关必须靠这个方向）");
-			/* 让位守卫：别的扩展（如十周年UI 的 _slyh，priority Infinity）先把势力改了，我们就放弃 */
-			if (!/player\.group\s*&&\s*player\.group\s*!==\s*"shen"/.test(r49)) e49.push("缺让位守卫（player.group 已非 shen 时会让玩家被问两次）");
-		}
-		/* 设置页必须有这一项，否则玩家无从关闭（作者原话：要能单独关掉） */
+		const r49 = fs.readFileSync(path.join(ROOT, "core", "csh_rules.js"), "utf8");
 		const cfg49 = fs.readFileSync(path.join(ROOT, "main", "config.js"), "utf8");
-		if (!/"csh_kami_group"\s*:\s*\{/.test(cfg49)) e49.push("设置页缺「神将选势力」开关");
-		else if (!/"csh_kami_group"\s*:\s*\{[^}]*"init"\s*:\s*false/.test(cfg49)) e49.push("「神将选势力」默认值不是 false（作者定案：默认关闭）");
-		else if (!/"csh_kami_group"\s*:\s*\{[^}]*saveExtensionConfig\("池子魔将",\s*"csh_kami_group"/.test(cfg49)) e49.push("开关 onclick 未落盘（引擎对自定义 onclick 不代存，会每次回落到默认值）");
-		/* 下游项的文案必须让人看出「它只管尺寸、不管弹不弹」。
-		   2026-10-19 起不再要求字面写「不是弹不弹」—— 作者要求玩家说明文案精简，
-		   改判「有没有尺寸语义」（放不下 / 滚动 / 宽度），语义对了就够了。 */
-		else if (!/csh_eg_group_scroll[^}]*放不下/.test(cfg49) || !/csh_eg_group_scroll[^}]*滚动/.test(cfg49)) e49.push("下游项（尺寸自适应）文案未体现「只管放得下 / 滚得动」（会让人以为关了就不弹）");
 		const ct49 = fs.readFileSync(path.join(ROOT, "main", "content.js"), "utf8");
-		if (!/installKamiChoice\(\)/.test(ct49)) e49.push("content 未调用 installKamiChoice");
-		else if (!/import\s*\{[^}]*installKamiChoice[^}]*\}\s*from\s*"\.\.\/core\/csh_rules\.js"/.test(ct49)) e49.push("content 未从 core/csh_rules.js 引入");
-		if (e49.length) fail("执行级 E49：神武将选势力（" + e49.slice(0, 4).join("；") + "）");
-		else ok("执行级 E49：神武将选势力在位（自写规则技 · 只认 shen · 有独立开关与让位守卫 · 不碰 doubleGroup/initGroup · 有诊断）");
+		if (/"csh_kami_group"\s*:/.test(cfg49) || /"csh_eg_group_scroll"\s*:/.test(cfg49)) e49.push("retired compatibility settings must remain hidden");
+		if (!/function kamiEnabled\(\) \{[\s\S]*?return false;/.test(r49)) e49.push("kami choice must remain disabled regardless of saved config");
+		if (/installKamiChoice|kamiStatus/.test(ct49)) e49.push("kami choice must not be installed from content");
+		if (!/function cshEgScrollApply\(\) \{ return false; \}/.test(ct49)) e49.push("faction panel adaptation must remain a no-op");
+		if (e49.length) fail("E49: retired faction compatibility policy (" + e49.join("; ") + ")");
+		else ok("E49: faction compatibility features are hidden and disabled");
+	}
 
-		/* ------------------------------------------------------------------ *
-		 * E50（2026-10-19 · 作者截图：设置页文字太长，压到右边的开关上）
-		 * ------------------------------------------------------------------
-		 * 问题类：**文案长度不受控，而容器宽度是引擎定死的**。
-		 * 引擎的配置行（createConfig）= 单行 line-height:25px + 右侧 60px 绝对定位开关，
-		 * 文字超宽既不换行也不省略，直接盖在开关上 —— 本次截图就是这么坏的。
-		 * 这里只锁「已经查证过的四处」，不用模糊启发式（启发式误报会让门禁失去可信度）：
-		 *   ① 设置项名长度（超了就把括号里的解释挪进 intro）；
-		 *   ② .csh-dock 必须可横向滚动（否则窄屏上超出的按钮被整颗切掉，功能直接消失）；
-		 *   ③ ④ 状态行/玩家行/顶栏的省略号兜底，防止半截字露在相邻项边上。 */
+	{
+		const cfg50 = fs.readFileSync(path.join(ROOT, "main", "config.js"), "utf8");
 		const e50 = [];
 		const WIDTH_BUDGET = 28;   /* 28 半角宽 = 14 个汉字 */
 		const INTRO_BUDGET = 120;  /* 120 半角宽 = 60 汉字：提示框只有 170px 宽，再长就成一条竖着的长条 */
-		for (const line of cfg49.split(/\r?\n/)) {
+		for (const line of cfg50.split(/\r?\n/)) {
 			const k = line.match(/"([A-Za-z0-9_]+)"\s*:\s*\{/);
 			const n = line.match(/"name"\s*:\s*"((?:[^"\\]|\\.)*)"/);
 			if (!k || !n) continue;

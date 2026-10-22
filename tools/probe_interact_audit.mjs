@@ -35,9 +35,10 @@ function harness() {
     setTimeout(fn, delay) { const id = ++next; tasks.set(id, { fn, delay }); return id; },
     clearTimeout(id) { if (tasks.has(id)) cancelled.push(tasks.get(id).fn); tasks.delete(id); } });
   vm.runInContext('game.players=Array.from(game.players);Array.prototype.randomGet = function(){ return this[0]; };', ctx);
-  const injection = '\n globalThis.probe = {riposte, chorus, queueBurst, queueEmoTriple, pairKey, recordEvent, lastEvent, saveCfg, addGrudge, grudgeOf, pickTarget, fire, ' +
+  const injection = '\n globalThis.probe = {riposte, chorus, queueBurst, queueEmoTriple, pairKey, pairTimes, recordEvent, lastEvent, saveCfg, addGrudge, grudgeOf, pickTarget, fire, ' +
     'pending: function(){return typeof sceneTimers === "undefined" ? null : sceneTimers.size;}};\n';
-  const code = raw.replace(/^import .*?;\r?\n/gm, '').replace(/\}\)\(\);\s*$/, injection + '})();');
+  const code = raw.replace(/^import .*?;\r?\n/gm, '').replace('var recency = ', 'var recency = globalThis.observedRecency = ')
+    .replace(/\}\)\(\);\s*$/, injection + '})();');
   vm.runInContext(code, ctx, { timeout: 1500 });
   // Execute the real world API, including its default-to-player behavior.
   vm.runInContext('var world={ai:["speaker","other","friend","me"].map(id=>({id,name:id,grudges:{}}))};'+
@@ -47,7 +48,7 @@ function harness() {
     ['idOfPlayer','grudgeValue','addGrudge','grudge'].map(n=>extract(worldSource,n)).join('\n')+
     ';lib.cshWorld={idOfPlayer,addGrudge,grudge,PLAYER_GRUDGE_KEY};globalThis.grudgeWorld=world;',ctx);
   return { api: ctx.probe, interaction: lib.cshInteract, world: ctx.grudgeWorld, get: ctx.get, lib, game, status, speaker, other, friend, me, tasks, cancelled, chats, throws, stickers,
-    random(values) { randoms = [...values]; }, advance() { now += 10000; },
+    random(values) { randoms = [...values]; }, advance() { now += 10000; }, recency() { return ctx.observedRecency; },
     flush() { const todo = [...tasks.values()]; tasks.clear(); for (const task of todo) task.fn(); } };
 }
 const chatKey = 'extension_池子魔将_csh_interact_chat';
@@ -149,6 +150,40 @@ for (const [prior, category] of [[null, 'hitBack'], ['hit','memHitBack'], ['hitB
   h.lib.cshWorld.addGrudge('other',6);h.interaction.onAllyDie(h.friend,h.other);
   check('ally death records avenger -> killer',h.lib.cshWorld.grudge('speaker','other')===2);
   check('ally death preserves killer -> player old account',h.lib.cshWorld.grudge('other')===6);
+}
+// Observe the actual recency expression used by fire, for old and new source.
+function retrieve(h) { h.random([0,0.99,0.99,0.99,0.99]); h.api.fire(h.speaker,h.other,'enemy',1); return h.recency(); }
+{
+  const h=harness();h.api.pairTimes.set('other|speaker',60);h.api.recordEvent(h.other,h.speaker,'hit');
+  check('fresh memory remains fresh after frequent past interactions',retrieve(h)===1);
+}
+{
+  const h=harness();h.api.recordEvent(h.other,h.speaker,'hit');
+  for(let i=0;i<20;i++)h.api.recordEvent(h.friend,h.me,'saved');
+  check('memory ages when subsequent world interaction events occur',Math.abs(retrieve(h)-Math.pow(0.99,20))<1e-12);
+}
+{
+  const h=harness();h.api.recordEvent(h.other,h.speaker,'hit');
+  for(let i=0;i<20;i++)h.api.recordEvent(h.friend,h.me,'saved');
+  h.api.recordEvent(h.other,h.speaker,'hit');check('new event refreshes the same directed pair',retrieve(h)===1);
+}
+{
+  const h=harness();h.api.recordEvent(h.other,h.speaker,'hit');h.api.recordEvent(h.speaker,h.other,'hitBack');
+  check('opposite-direction event does not refresh original memory',Math.abs(retrieve(h)-0.99)<1e-12);
+}
+{
+  const h=harness();h.api.recordEvent(h.other,h.speaker,'hit');
+  for(let i=0;i<100;i++)h.api.recordEvent(h.friend,h.me,'saved');
+  check('recency retains existing bounded decay floor',Math.abs(retrieve(h)-Math.pow(0.99,50))<1e-12);
+}
+{
+  const h=harness();h.api.recordEvent(h.other,h.speaker,'hit');for(let i=0;i<100;i++)h.advance();
+  check('pause without interaction events does not age memory',retrieve(h)===1);
+}
+for(const reset of ['reset','claimGameStart']){
+  const h=harness();h.api.recordEvent(h.other,h.speaker,'hit');for(let i=0;i<60;i++)h.api.recordEvent(h.friend,h.me,'saved');
+  h.interaction[reset]();h.api.recordEvent(h.other,h.speaker,'hit');
+  check('memory event age restarts after '+reset,retrieve(h)===1);
 }
 const failed = results.filter(r => !r.passed);
 console.log(JSON.stringify({ scope: 'actual module in VM; isolated timers/config/players, no real saves or game rendering', passed: results.length - failed.length, failed: failed.length, failures: failed }, null, 2));

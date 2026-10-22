@@ -991,6 +991,16 @@ export default {
                 dieAudios: ["ext:池子魔将/audio/die/csh_zywoo.mp3"],
             },
 
+            "csh_haozhao": {
+                sex: "male",
+                group: "wei",
+                hp: 2,
+                maxHp: 3,
+                hujia: 1,
+                skills: ["csh_juwei", "csh_chonglei"],
+                img: "extension/池子魔将/image/csh_haozhao.jpg",
+                dieAudios: ["haozhao"],
+            },
             "csh_pingfan": {
                 sex: "male",
                 group: "shu",
@@ -1015,6 +1025,8 @@ export default {
         },
         translate: {
             ...cshVoices,
+            "csh_haozhao": "郝昭",
+            "csh_haozhao_prefix": "池",
             "csh_theshy": "姜大哥",
             "csh_zywoo": "载物",
             "csh_pingfan": "平凡之人",
@@ -1258,6 +1270,7 @@ export default {
            锁定未动的 28 条：作者点名的方圣帝君/卡尔/司马懿等 24 个 + 奎桑提/神曹植/神诸葛果。
            两处定制：csh_sunshangxiang「弓腰姬」x-bow（弓弧）、csh_diaochan「巧施连环计」x-chain（双环）。 */
         characterTitle: {
+            "csh_haozhao": "<span class='ct c-cf f4 s3 a1'>孤城不摧</span>",
             "csh_huaman": "<b class='ct c-zt f1 s1'><i>南中蛮裔</i><i>象阵嬉战</i></b>",
             "csh_xingganning": "<b class='ct c-zt f2 s4'><i>锦帆破浪</i><i>铃影穿涛</i></b>",
             "csh_guohuai": "<b class='ct c-zt f1 s4'><i>雍凉干城</i><i>料敌机先</i></b>",
@@ -1364,7 +1377,7 @@ export default {
                 "csh_fulan": ["csh_chengyu","csh_youhabahe","csh_weizheng","csh_lr","csh_xushu","csh_qw","csh_xurong","csh_mzj","csh_zhangbao","csh_yy","csh_wy","csh_diaochan"],
                 "csh_huichuan": ["csh_zhouchu","csh_ngwt","csh_shamoke","csh_vxs","csh_bzt","csh_zhugeqing","csh_ls","csh_yujin","csh_feibijiubi","csh_karl"],
                 "csh_fuguang": ["csh_huangyueying","csh_gaogan","csh_zhangning","csh_daaixianzun","csh_jieluji","csh_shanyuezhiyin","csh_caiyan","csh_caoang","csh_lifeng","csh_simahui"],
-                "csh_jinhuo": ["csh_dz","csh_wn","csh_lamosi","csh_zhuzhi","csh_gdsn","csh_dongzhuo","csh_kuisangti"],
+                "csh_jinhuo": ["csh_dz","csh_wn","csh_lamosi","csh_zhuzhi","csh_gdsn","csh_dongzhuo","csh_kuisangti","csh_haozhao"],
                 "csh_zhoutian": ["csh_mingrixiang","csh_bin","csh_yuangubafei","csh_xingganning","csh_liximing","csh_sunshangxiang","csh_guansuo","csh_lvlingqi","csh_realityfanghao","csh_dengai","csh_guohuai","csh_mlm","csh_nailong_juexing","csh_modekaisa","csh_yangjian","csh_shenzhugeguo","csh_szc","csh_sj","csh_misida","csh_ae","csh_zhaoxiang","csh_msmy","csh_zhonghui","csh_sq","csh_zuozhu","csh_moteng","csh_huaman"],
                 "csh_qunyou_lunwai": ["csh_pingfan"],
                 "csh_pingxing_shang": ["csh_m_shen_caopi","csh_m_shen_xunyu","csh_m_mb_caomao","csh_m_pot_dongzhao","csh_m_pot_yuji","csh_m_pot_weiyan","csh_m_pot_taishici","csh_m_peixiu","csh_m_star_dongzhuo","csh_m_yangbiao","csh_m_chenshi","csh_m_sb_diaochan","csh_m_sb_liubei","csh_m_ol_sb_jiangwei","csh_m_shen_sunce","csh_m_shen_guojia","csh_m_shen_ganning","csh_m_shen_lusu","csh_m_sb_fazheng","csh_m_sb_caocao","csh_m_star_zhangchunhua","csh_m_star_sunjian","csh_m_star_fazheng","csh_m_pot_zhouyu","csh_m_pot_xinxianying","csh_m_mb_simazhao","csh_m_sunsháo","csh_m_sp_duyu","csh_m_shen_taishici","csh_m_shen_huatuo","csh_m_dc_sb_huanggai","csh_m_sb_huanggai","csh_m_sb_yuanshao","csh_m_clan_zhonghui","csh_m_mb_shen_jiangwei","csh_m_liuyan","csh_m_guoyuan","csh_m_cy_lingju","csh_m_re_xiahoudun","csh_m_shichangshi","csh_m_xizhicai","csh_m_sb_caopi","csh_m_zhanglu","csh_m_mb_zhangfen","csh_m_yanghuiyu","csh_m_sp_caosong","csh_m_fuqian","csh_m_yanxiang","csh_m_sp_yanxiang","csh_m_zhugejing","csh_m_mb_sp_guanqiujian","csh_m_ol_guanhai","csh_m_dc_sunhuan","csh_m_ol_puyuan","csh_m_tw_wenyang","csh_m_mb_wenyang","csh_m_puyuan"],

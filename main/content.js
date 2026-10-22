@@ -5,7 +5,6 @@ import { installBossRecord } from "../core/csh_bossrecord.js";
 import { installMarket } from "../core/csh_market.js";
 import { installAffection } from "../core/csh_affection.js";
 import { installUIKit } from "../core/csh_uikit.js";
-import { installKamiChoice, kamiStatus } from "../core/csh_rules.js";
 import { cshBossPackHide } from "../character/boss.js";
 
 /* ============================================================
@@ -33,7 +32,7 @@ import { cshBossPackHide } from "../character/boss.js";
         ⑤ 不再截断 .buttons，滚动整条交还原生 .content-container（滚动阴影 / 细滚动条
            样式随它走）—— 滚轮在卡片上与面板空白处行为一致，从头到尾一条滚动条。
    ★ 两个必须：① **在 content 加载时立即注入**（面板在开局选将时就出现，不能等任何懒加载）；
-   ② 挂 class 门控（`html.csh-egsc`）→ 设置项 `csh_eg_group_scroll` 可即时开关。
+   Retired by author: old config values do not activate the compatibility styling or observers.
    初版教训（2026-10-16 晚）：误注入到 cshShoushaFx 的懒注入块里 —— 要等第一次击杀
    特效播放才生效，等于没装。E45 门禁已锚定"两处不得混居"。 */
 /* ★ 2026-10-17 · 势力面板「第二形态」识别（作者实机：斗地主也有势力面板，滚动条却没生效 = BUG）
@@ -380,89 +379,15 @@ function cshEgSchedule(node) {
 function cshEgResize() {
     _cshEgTracked.forEach(cshEgSchedule);
 }
-function cshEgScrollApply(force) {
-    try {
-        /* 2026-10-18 第二十二批：默认值改为**关闭**（作者定案）。
-           旧判断 `!== false` 在「从未设置过」（undefined）时会判定为开启 —— 那正是默认开启。
-           现在要求显式 === true 才生效：没配置过 = 关，玩家主动打开才算数。
-           同时注意：本开关只影响「本扩展额外加的滚动条与限宽限高」，
-           引擎自己的 `.content-container{overflow:scroll}` 始终在（我们关掉的是**我们在上面加的**那层样式）。 */
-        var on = (force === undefined)
-            ? (lib.config["extension_池子魔将_csh_eg_group_scroll"] === true)
-            : !!force;
-        if (!document.getElementById("csh_eg_scroll_css")) {
-            var st = document.createElement("style");
-            st.id = "csh_eg_scroll_css";
-            /* 滚动阴影（local 随内容滚 + scroll 固定两层）：随 .content-container 走 */
-            var scbg = "background:linear-gradient(rgba(0,0,0,.22),rgba(0,0,0,0)) 0 0/100% 14px no-repeat local,"
-                + "linear-gradient(rgba(0,0,0,0),rgba(0,0,0,.22)) 0 100%/100% 14px no-repeat local,"
-                + "radial-gradient(farthest-side at 50% 0,rgba(0,0,0,.30),rgba(0,0,0,0)) 0 0/100% 7px no-repeat scroll,"
-                + "radial-gradient(farthest-side at 50% 100%,rgba(0,0,0,.30),rgba(0,0,0,0)) 0 100%/100% 7px no-repeat scroll";
-            st.textContent = [
-                /* ★ 唯一选择器 = JS 内容判定后打上的 .csh-egdlg。
-                   【2026-10-18 事故】旧规则用 `.dialog:not(.fullheight)` 加 `:has(.card.button)`，
-                   而引擎主菜单本身就是 `.main.menu.dialog`（ui/create/menu/index.js:135），
-                   切到「卡牌 / 武将」页即含 .card.button ⇒ 整个选项菜单被压成 70vh、
-                   overflow:hidden 裁掉下半截，还多出一条滚动条。`:has()` 区分不了
-                   「选势力」和「看图鉴」，这条全局规则永久废弃，禁止回归。
-                   max-height 由图内联写入 px（按 body 真实缩放换算），CSS 不再写 vh。 */
-                ".csh-egsc .csh-egdlg{overflow:hidden;overscroll-behavior:contain}",
-                /* 原生滚动容器接管：**只留纵向一条**。
-                   2026-10-18 第二修：横向改成 hidden —— 宽度已由下面的 min() 钳住并换行，
-                   再留 auto 只会多出一条压在按钮中间的横条（录像里那条橙色线就是它）。 */
-                ".csh-egsc .csh-egdlg .content-container{overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;box-sizing:border-box;"
-                + "scrollbar-color:rgba(255,255,255,.45) rgba(0,0,0,.22);" + scbg + "}",
-                /* ★ 按钮墙：**只封顶，不设宽**（2026-10-18 第三修 · 作者："每次出现会自动一下"）
-                   ------------------------------------------------------------------
-                   第二修写的是 `width: min(100%, --csh-egw)`，那是**主动参与布局**：
-                   引擎本来给 `.buttons` 的是 `.content > div:not(.pointerdiv){width:calc(100% - 8px)}`
-                   （layout.css:1857-1860），被覆盖成 `100%` ⇒ **宽了 8px**；
-                   同一次处理里又给 `.content-container` 加了 `padding-right:10px` ⇒ **窄了 10px**。
-                   两个方向同时动，按钮列数就落在临界值上来回跳（实机：4 列 → 5 列）。
-                   ⇒ 现在的纪律：**任何"会让布局变化的属性"都不许主动写**。
-                     宽度上界只靠 dialog 自己的 `max-width`（被动，只在超屏时生效），
-                     `.buttons` 只留 `max-width:100%` 兜底 —— 父宽正常时**一个像素都不动**。 */
-                ".csh-egsc .csh-egdlg .buttons{max-width:100%;box-sizing:border-box}",
-                /* 右缘防裁：卡牌按钮宽度不得超出容器（窄屏把右侧势力裁掉的根因之一） */
-                ".csh-egsc .csh-egdlg .content-container .buttons>.card{max-width:100%;box-sizing:border-box}",
-                ".csh-egsc .csh-egdlg .content-container::-webkit-scrollbar{width:8px;height:0}",
-                ".csh-egsc .csh-egdlg .content-container::-webkit-scrollbar-track{background:rgba(0,0,0,.22);border-radius:5px}",
-                ".csh-egsc .csh-egdlg .content-container::-webkit-scrollbar-thumb{background:rgba(255,255,255,.45);border-radius:5px}",
-                ".csh-egsc .csh-egdlg .content-container::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.68)}",
-                /* 控制条形态（2v2 冷/暖方势力）：限宽是内联 px（JS 按缩放算），这里只画滚动条 */
-                ".csh-egsc .csh-egctrl::-webkit-scrollbar{height:8px}",
-                ".csh-egsc .csh-egctrl::-webkit-scrollbar-track{background:rgba(0,0,0,.18);border-radius:4px}",
-                ".csh-egsc .csh-egctrl::-webkit-scrollbar-thumb{background:rgba(255,255,255,.42);border-radius:4px}",
-                ".csh-egsc .csh-egctrl::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.66)}",
-            ].join("");
-            document.head.appendChild(st);
-        }
-        document.documentElement.classList.toggle("csh-egsc", on);
-        cshEgGroupObserve(on);
-        try { lib.__cshEgScrollApply = cshEgScrollApply; } catch (eL) {}
-    } catch (e) { /* 兼容注入失败绝不阻断 content */ }
-}
+/* Retired by author; legacy configuration cannot enable the feature. */
+function cshEgScrollApply() { return false; }
 
 export function cshContent(config, pack) { try {
     /* ★ 界面基座（2026-10-18）：提示/确认框的唯一实现，必须在任何会弹提示的模块之前装好
        （小游戏结算、成就、签到、讨伐奖励都在 content 之后才可能触发）。
        非关键 UI：装不上也不能拖垮 content 的其它注入（与红线的"非关键 UI 允许兜底"一致）。 */
     try { installUIKit(); } catch (eUI) {}
-    /* ★ 神武将选势力（2026-10-18 · 第四版）
-       前三次全部作废：补 doubleGroup 会被选将界面逐个画出来（ui/create/index.js:3191-3197），
-       补 initGroup 会污染共享技能；而引擎**没有**为非身份场提供标准入口
-       （identity.js:1505 那套是模式私有的）。所以只能自写，但这次写对了三处判定。
-       详见 core/csh_rules.js 文件头。 */
-    try {
-        var _kamiOk = installKamiChoice();
-        if (_kamiOk && lib.config && lib.config.extension_池子魔将_csh_dev_log) {
-            var _ks = kamiStatus();
-            console.log("[池子魔将] 神将补选势力已装：" + (_ks.enabled ? "开关=开" : "开关=关（设置页「神将补选势力」）")
-                + " · 可选 " + _ks.choices.join("/")
-                + " · _priority=" + _ks.priority
-                + (_ks.peerSlyh ? " · 检测到十周年UI 的 _slyh（接自定义势力，与 shen 不重叠）" : ""));
-        }
-    } catch (eRule) {}
+    /* 神将补选势力已按作者决定停用，不安装规则技。 */
     /* 讨伐记录层（2026-10-13 · 批次 4a）：常驻挂 lib.cshBossRecord（对局写入/快照聚合/
        bossbook 展示三处共用；install 幂等） */
     installBossRecord();
@@ -504,9 +429,7 @@ export function cshContent(config, pack) { try {
        其它模式此调用零执行（§4 零污染）；内部自带幂等守卫与异常兜底。
        ★pack（扩展包原始对象）随参数保留（bossdata 的纯构造入口同签名，便于未来扩展）。 */
     cshBossModeInstall(config, pack);
-    /* ★ 本体兼容：选将势力面板滚动条（engine-compat C4）——必须在此即执行（不能等任何懒加载）。
-       开关 = 设置项 csh_eg_group_scroll（默认关 · 改动即时生效，见 config.js 的 onclick）。 */
-    cshEgScrollApply();
+    /* The faction panel compatibility option is retired; retained legacy settings are ignored. */
     if (typeof cshVoices === "object" && cshVoices) Object.assign(lib.translate, cshVoices);
     try {
         if (lib.cshInteract && typeof lib.cshInteract.install === "function") {
@@ -2547,6 +2470,7 @@ export function cshContent(config, pack) { try {
     };
     // [Grok修改] 条件执行 rarity 添加，避免 lib.rank 不存在时报错
     if(lib.rank && lib.rank.rarity){
+        if (lib.rank.rarity.legend) lib.rank.rarity.legend.addArray(["csh_haozhao"]);
 //精品
 if(lib.rank.rarity.rare) lib.rank.rarity.rare.addArray(["csh_yuangubafei","csh_guanyinping","csh_ae","csh_misida","csh_wlk","csh_zhangbao","csh_zhuzhi","csh_handang","csh_lidian","csh_weizheng","csh_ngwt","csh_caiyan","csh_zhaoxiang","csh_lukang","csh_lifeng","csh_pingfan"]);
 //史诗

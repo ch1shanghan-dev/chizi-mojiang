@@ -43,6 +43,38 @@ import GEN_LINES from "./csh_interact_lines_gen.js";
 		online: "extension_池子魔将_csh_interact_online",
 		custom: "extension_池子魔将_csh_interact_custom",
 	};
+	var K_PLAYER_INTERACT = "csh_player_interact";
+	var playerThrowHooked = false;
+	var skipPlayerThrow = 0;
+	function playerThrowTotal() {
+		try {
+			var data = JSON.parse(localStorage.getItem(K_PLAYER_INTERACT) || "null");
+			return data && typeof data.total === "number" && Number.isFinite(data.total)
+				? Math.max(0, Math.min(1000000000, Math.floor(data.total))) : 0;
+		} catch (e) { return 0; }
+	}
+	function recordPlayerThrow(from, to, emotion) {
+		if (skipPlayerThrow || from !== game.me || !usable(from) || !isAI(to)) return;
+		if (!["flower", "wine", "egg", "shoe"].includes(emotion)) return;
+		if (!_status.gameStarted || _status.video || _status.over || _status.connectMode || game.online || game.observe) return;
+		if (!game.players || game.players.indexOf(to) < 0 || game.players.indexOf(from) < 0) return;
+		try {
+			/* 同步落盘后才进入成就快照；不从 AI 场景次数回填历史。 */
+			localStorage.setItem(K_PLAYER_INTERACT, JSON.stringify({ v: 1, total: Math.min(1000000000, playerThrowTotal() + 1) }));
+		} catch (e) { logError("玩家道具计数未保存", e); }
+	}
+	function hookPlayerThrow() {
+		if (playerThrowHooked) return;
+		var proto = lib.element && (lib.element.Player ? lib.element.Player.prototype : lib.element.player);
+		if (!proto || typeof proto.throwEmotion !== "function") return;
+		var original = proto.throwEmotion;
+		proto.throwEmotion = function (target, emotion) {
+			var result = original.apply(this, arguments);
+			try { recordPlayerThrow(this, target, emotion); } catch (e) { logError("玩家道具计数", e); }
+			return result;
+		};
+		playerThrowHooked = true;
+	}
 
 	// ---------- 参数 ----------
 	// 频率档位：phase 触发概率 / 其他触发器的基础概率系数
@@ -481,6 +513,14 @@ import GEN_LINES from "./csh_interact_lines_gen.js";
 	   互动时查"对方对**我**"的最近动作，命中就优先说引用旧账的台词——
 	   「上次那颗蛋，现在还你了」。只记一局内，claimGameStart 清。 */
 	var lastEvent = new Map();
+	/* 事件序号记录年龄，配对互动次数只负责连砸/关系强度，不再冒充新鲜度。 */
+	var memoryClock = 0;
+	var lastEventAt = new Map();
+	function memoryRecency(from, to) {
+		var at = lastEventAt.get(pairKey(from, to));
+		if (at === undefined) return 0;
+		return Math.pow(0.99, Math.min(50, Math.max(0, memoryClock - at)));
+	}
 	/* 检索打分账本（2026-10-06 第三批）：key = from→to，值 = {hit,hitBack,saved,killed} 计数 */
 	var pairStats = new Map();
 	/* 印象账本（2026-10-07 T1 二级反思）：key = from→to，值 = 重要度加权累计
@@ -489,6 +529,7 @@ import GEN_LINES from "./csh_interact_lines_gen.js";
 	function recordEvent(from, to, kind) {
 		if (!from || !to) return;
 		lastEvent.set(pairKey(from, to), kind);
+		lastEventAt.set(pairKey(from, to), ++memoryClock);
 		/* 检索打分（2026-10-06 第三批·方案 §16-2）：事件不只记"最近一条"，
 		   还按 (方向, 类别) 累计次数 —— memHit 的触发概率随被砸次数上升（检索加权），
 		   累计 ≥3 次敌意事件触发**反思**：这对关系固化为"宿敌"（nemesis），
@@ -1014,13 +1055,13 @@ import GEN_LINES from "./csh_interact_lines_gen.js";
 		     score = recency_w*recency*gw[0] + relevance_w*relevance*gw[1] + importance_w*importance*gw[2]
 		     生产权重 gw=[0.5, 3, 2]（相关性权重最高）；recency = decay^i 指数衰减。
 		   本地化（零 LLM / 零 embedding）：
-		     · recency    = 0.99 ^ 距上次事件的互动次数（配对计数近似衰减）
+		     · recency    = 0.99 ^ 距该配对最近事件之后发生的事件数（最多衰减 50 步）
 		     · importance = 固定重要度表（killed 10 / saved 8 / hit 3 / hitBack 2，替代 LLM 打分）
 		     · relevance  = 正在互动的对手即检索目标 = 1.0（该场景恒定）
 		   score 归一化后映射 memHit 触发概率 [0.2, 0.62]。 */
 		var mem = lastEvent.get(pairKey(target, player));
 		var memS = statOf(target, player);
-		var recency = Math.pow(0.99, Math.min(50, pairCount(target, player)));
+		var recency = memoryRecency(target, player);
 		var impT = { killed: 10, saved: 8, hit: 3, hitBack: 2 };
 		var importance = (impT[mem] || 2) / 10;
 		var score3 = 0.5 * recency + 3 * 1.0 + 2 * importance;   /* gw=[0.5,3,2]，relevance=1 */
@@ -1109,12 +1150,13 @@ import GEN_LINES from "./csh_interact_lines_gen.js";
 		// 手动抛一个，方便调试或在具体技能里调用
 		throw: function (player, target, name) {
 			if (!usable(player) || !usable(target)) return false;
-			playEmotion(player, target, name || "egg");
+			skipPlayerThrow++;
+			try { playEmotion(player, target, name || "egg"); } finally { skipPlayerThrow--; }
 			return true;
 		},
 		fire: fire,
 		stats: function () {
-			return { total: total, round: roundState.round, roundCount: roundState.count };
+			return { total: total, playerThrows: playerThrowTotal(), round: roundState.round, roundCount: roundState.count };
 		},
 		reset: function () {
 			clearSceneTasks();
@@ -1128,6 +1170,8 @@ import GEN_LINES from "./csh_interact_lines_gen.js";
 			RECENT.length = 0;
 			pairTimes.clear();
 			lastEvent.clear();
+			lastEventAt.clear();
+			memoryClock = 0;
 			pairImp.clear();
 			pairStats.clear();
 			lastSticker.clear();
@@ -1144,6 +1188,8 @@ import GEN_LINES from "./csh_interact_lines_gen.js";
 			RECENT.length = 0;
 			pairTimes.clear();
 			lastEvent.clear();
+			lastEventAt.clear();
+			memoryClock = 0;
 			pairImp.clear();
 			pairStats.clear();
 			lastSticker.clear();
@@ -1370,6 +1416,7 @@ import GEN_LINES from "./csh_interact_lines_gen.js";
 			logError("install 失败：lib.skill 尚未就绪");
 			return false;
 		}
+		hookPlayerThrow();
 
 		// 开局问候。global 触发器会对全桌每名角色各判一次，用 claimGameStart 保证只执行一轮。
 		define("_csh_interact_start", {

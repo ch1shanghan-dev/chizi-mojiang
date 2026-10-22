@@ -859,7 +859,8 @@ export function buildBossEntries(chars, trans, titles, bounty) {
 
 /* ---------- Node 侧自检（tools/check.js runBossChecks 直接调用） ---------- */
 /* v4：作者定案移出魔王池的武将（仍在名册，可当挑战者） */
-export const BOSS_EXCLUDED = ["csh_diaochan", "csh_youhabahe", "csh_gjs", "csh_shencaozhi", "csh_shenzhugeguo", "csh_zhuran"];
+// 郝昭本次仅新增普通武将，尚无获授权的魔王档位/专属技设计。
+export const BOSS_EXCLUDED = ["csh_diaochan", "csh_youhabahe", "csh_gjs", "csh_shencaozhi", "csh_shenzhugeguo", "csh_zhuran", "csh_haozhao"];
 
 export function selfCheck(rosterIds) {
 	const errs = [];

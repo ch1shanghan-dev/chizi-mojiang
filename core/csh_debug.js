@@ -1350,13 +1350,13 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                 return true;
             } catch (e) { return true; }
         }
-        function canShow() {
+        function canShow(playerView) {
             try {
                 if (typeof _status !== "undefined" && (_status.video || _status.connectMode)) return false;
                 if (typeof game !== "undefined" && game.online) return false;
                 if (typeof get !== "undefined" && get.is && typeof get.is.online === "function" && get.is.online()) return false;
             } catch (e) {}
-            return isEnabled();
+            return !!playerView || isEnabled();
         }
         /* 音效（§4.7.1 统一总线）。拿不到总线就静默：音效永远不是功能依赖。 */
         function sfx(name, opt) {
@@ -1560,6 +1560,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
         }
 
         function closePanel() {
+            document.documentElement.classList.remove("csh-world-view");
             try { console.log("[池子调试] closePanel"); } catch (e0) {}
             /* 面板关闭 → 池子配乐停、无名杀本体音乐还原（2026-09-30） */
             try { if (lib.cshBgm) lib.cshBgm.stop(); } catch (eBgm) {}
@@ -1579,7 +1580,12 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                 if (pick && typeof pick.__close === "function") pick.__close();
             } catch (ePick) {}
             var el = document.getElementById("csh-dbg-overlay");
+            if (el && el.__onKey) document.removeEventListener("keydown", el.__onKey, true);
+            var focusBack = el && el.__focusBack;
             if (el && el.parentNode) el.parentNode.removeChild(el);
+            if (focusBack && focusBack.isConnected && typeof focusBack.focus === "function") {
+                try { focusBack.focus({ preventScroll: true }); } catch (eFocus) {}
+            }
             try {
                 if (typeof _status !== "undefined") {
                     _status.cshDebugPanel = null;
@@ -1760,6 +1766,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                 "#csh-dbg-close:hover{border-color:rgba(var(--csh-bg-rgb),.22)!important;background:var(--csh-paper2)!important;color:var(--csh-bg)!important;transform:rotate(90deg)!important;}",
                 /* ---------- 主区：两栏（桌面） / 单栏（手机） ---------- */
                 "#csh-dbg-main{display:flex!important;flex-direction:column!important;flex:1 1 auto!important;min-height:0!important;position:static!important;}",
+                "html.csh-world-view #csh-dbg-float-btn{display:none!important;}",
                 /* 页签容器：手机放底部（拇指热区，§E.1）
                    flex-flow 而非 grid：页签数会随功能增长（现 12 个），写死列数必然被挤爆。
                    宽度不足时按 min-width 自动折行，永不溢出。 */
@@ -6284,21 +6291,23 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
         }
 
         lib.cshDebugMenu = {
-            open: function () {
+            open: function (options) {
+                var playerView = !!(options && options.lobby);
+                if (playerView) TAB = "games";
                 try {
                     console.log("[池子调试] open() 被调用");
-                    if (typeof game !== "undefined" && game.print) game.print("池子调试：打开面板");
+                    if (typeof game !== "undefined" && game.print) game.print((playerView ? "池子世界" : "池子调试") + "：打开面板");
                 } catch (eLog) {}
-                if (!canShow()) {
+                if (!canShow(playerView)) {
                     var reason = "仅限单机可用";
                     try {
-                        if (typeof _status !== "undefined" && _status.connectMode) reason = "联机模式已禁用池子调试";
-                        else if (typeof game !== "undefined" && game.online) reason = "联机状态已禁用池子调试";
+                        if (typeof _status !== "undefined" && _status.connectMode) reason = "联机模式已禁用" + (playerView ? "池子世界" : "池子调试");
+                        else if (typeof game !== "undefined" && game.online) reason = "联机状态已禁用" + (playerView ? "池子世界" : "池子调试");
                         else if (isEnabled() === false) reason = "池子调试已在设置中关闭";
                     } catch (eR) {}
                     toast(reason);
                     try { console.warn("[池子调试] open 被拒绝:", reason); } catch (e2) {}
-                    return;
+                    return false;
                 }
                 // 分段执行：任一步抛异常时，日志会精确指出停在哪一环
                 function step(name, fn) {
@@ -6310,14 +6319,20 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                 }
                 step("closePanel", closePanel);
                 step("ensureStyle", ensureStyle);
+                if (playerView) document.documentElement.classList.add("csh-world-view");
                 var overlay = document.createElement("div");
                 overlay.id = "csh-dbg-overlay";
+                overlay.__focusBack = document.activeElement;
                 overlay.addEventListener("click", function (e) {
                     if (e.target === overlay) closePanel();
                 }, true);
 
                 var panel = document.createElement("div");
                 panel.id = "csh-dbg-panel";
+                panel.setAttribute("role", "dialog");
+                panel.setAttribute("aria-modal", "true");
+                panel.setAttribute("aria-labelledby", "csh-dbg-title");
+                panel.setAttribute("data-view", playerView ? "world" : "developer");
                 // 禁止在捕获阶段 stopPropagation：否则子按钮永远收不到 click（面板全失效的根因）
                 // 仅阻止冒泡到 overlay，避免点面板空白处被当成点遮罩关闭
                 panel.addEventListener("click", function (e) {
@@ -6330,11 +6345,11 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 
                 var title = document.createElement("div");
                 title.id = "csh-dbg-title";
-                title.textContent = "池子调试";
+                title.textContent = playerView ? "池子世界" : "池子调试";
 
                 var sub = document.createElement("div");
                 sub.id = "csh-dbg-sub";
-                sub.textContent = step("playerLine", function () { return playerLine(me()); });
+                sub.textContent = playerView ? "生涯、成就、牌桌与 AI 世界" : step("playerLine", function () { return playerLine(me()); });
 
                 var head = document.createElement("div");
                 head.id = "csh-dbg-head";
@@ -6423,12 +6438,16 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                 bgmW.appendChild(bgmLab); bgmW.appendChild(bgmRd); bgmW.appendChild(bgmPct);
                 head.appendChild(bgmW);
                 try {
-                    var bgmSt = document.createElement("style");
+                    var bgmSt = document.getElementById("csh-dbg-bgm-css");
+                    if (!bgmSt) {
+                    bgmSt = document.createElement("style");
+                    bgmSt.id = "csh-dbg-bgm-css";
                     bgmSt.textContent = "#csh-dbg-bgm{display:inline-flex!important;align-items:center!important;gap:8px!important;margin-right:6px!important;}" +
-                        "#csh-dbg-bgm label{font-size:var(--csh-lfs-cap2,11.5px)!important;color:var(--csh-gray-soft)!important;letter-spacing:.08em!important;}" +
+                        "#csh-dbg-bgm label{font-size:var(--csh-lfs-sm,12px)!important;color:var(--csh-gray-soft)!important;letter-spacing:.08em!important;}" +
                         "#csh-dbg-bgm input[type=range]{width:96px!important;accent-color:var(--csh-accent)!important;height:22px!important;cursor:pointer!important;}" +
-                        "#csh-dbg-bgm b{font-size:var(--csh-lfs-cap,11px)!important;color:var(--csh-gray-soft)!important;min-width:34px!important;text-align:right!important;font-variant-numeric:tabular-nums!important;}";
+                        "#csh-dbg-bgm b{font-size:var(--csh-lfs-sm,12px)!important;color:var(--csh-gray-soft)!important;min-width:34px!important;text-align:right!important;font-variant-numeric:tabular-nums!important;}";
                     (document.head || document.documentElement).appendChild(bgmSt);
+                    }
                 } catch (eB2) {}
                 head.appendChild(skinBtn);
                         /* skinRow 不在此追加 —— 必须晚于 close（见下方 head.appendChild(close) 之后），
@@ -6523,7 +6542,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                         console.error(e);
                     }
                     // 刷新状态行
-                    sub.textContent = playerLine(me());
+                    sub.textContent = playerView ? "生涯、成就、牌桌与 AI 世界" : playerLine(me());
                 }
                 /* —— 彩蛋（§4.5.7）：2.5 秒内连续点「池子休闲」页签满 10 次 → CDK 兑换面板。
                       计数器闭包在此，不碰任何全局；点其他页签或停顿超时即清零。
@@ -6532,6 +6551,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                       用户反馈「狂点没弹出来」时无法区分是没数上还是根本没触发，给自证。 —— */
                 var eggCount = 0, eggTimer = null;
                 tabDefs.forEach(function (td) {
+                    if (playerView && td.id !== "games") return;
                     var t = document.createElement("div");
                     t.className = "csh-dbg-tab" + (td.cls ? " " + td.cls : "") + (td.id === TAB ? " on" : "");
                     t.setAttribute("data-tab", td.id);
@@ -6566,8 +6586,10 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                         setTab(td.id);
                     }, true);
                     tabs.appendChild(t);
+                    /* 保留原有连点彩蛋；玩家视图无需显示开发页签栏。 */
+                    if (playerView) title.addEventListener("click", function () { t.click(); }, false);
                 });
-                main.appendChild(tabs);
+                if (!playerView) main.appendChild(tabs);
                 main.appendChild(body);
                 panel.appendChild(main);
                 step("setTab", function () { setTab(TAB); });
@@ -6588,6 +6610,35 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 
                 overlay.appendChild(panel);
                 step("appendChild", function () { uiHost().appendChild(overlay); });
+                function isTopPanel() {
+                    if (!overlay.isConnected) return false;
+                    var active = document.activeElement;
+                    if (active && !overlay.contains(active)) {
+                        for (var parent = active; parent && parent !== document.documentElement; parent = parent.parentElement) {
+                            if (Number(window.getComputedStyle(parent).zIndex) > Number(window.getComputedStyle(overlay).zIndex)) return false;
+                        }
+                    }
+                    var rect = panel.getBoundingClientRect();
+                    var top = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+                    return !top || overlay.contains(top);
+                }
+                overlay.__onKey = function (e) {
+                    if (!isTopPanel() || e.isComposing || e.ctrlKey || e.altKey || e.metaKey) return;
+                    if (e.key === "Escape" || e.keyCode === 27) {
+                        e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
+                        closePanel();
+                    } else if (e.key === "Tab") {
+                        var stops = Array.from(panel.querySelectorAll('button,input,select,textarea,a[href],[tabindex="0"]')).filter(function (node) {
+                            return !node.disabled && node.getClientRects().length;
+                        });
+                        var first = stops[0] || close, last = stops[stops.length - 1] || close;
+                        if (!panel.contains(document.activeElement) || (e.shiftKey && document.activeElement === first) || (!e.shiftKey && document.activeElement === last)) {
+                            e.preventDefault(); (e.shiftKey ? last : first).focus();
+                        }
+                    }
+                };
+                document.addEventListener("keydown", overlay.__onKey, true);
+                try { close.focus({ preventScroll: true }); } catch (eFocusOpen) {}
                 /* 隐藏自检（?selftest=1 · §12#1/#3/#4）：面板已进 DOM 后再扫，
                    且**只扫 #csh-dbg-overlay**——扫 document.body 会把 noname 本体页面
                    当成被检对象，必然满屏误报。自检自身异常一律吞掉，绝不影响面板。 */
@@ -6628,6 +6679,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                     if (typeof _status !== "undefined") _status.cshDebugPanel = overlay;
                 } catch (eSt) {}
                 try { console.log("[池子调试] 面板已挂到 DOM"); } catch (eL) {}
+                return true;
             },
         };
 
@@ -6652,9 +6704,9 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                 TAB = "games";
                 var existing = document.getElementById("csh-dbg-overlay");
                 if (existing) closePanel();      // 先关掉旧实例，保证按新 TAB 重建
-                lib.cshDebugMenu.open();
-                return true;
+                return lib.cshDebugMenu.open({ lobby: true }) !== false;
             } catch (e) {
+                try { closePanel(); } catch (eCleanup) {}
                 try { console.error("[池子世界] 打开失败", e); } catch (e2) {}
                 try { toast("打开失败: " + ((e && e.message) || e)); } catch (e3) {}
                 return false;

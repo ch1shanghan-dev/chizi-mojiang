@@ -1,5 +1,7 @@
 # 验证：行为、界面与宿主
 
+2026-10-22郝昭新增：`tools/probe_haozhao.mjs` 执行隔离的本机GameEvent/编译器/用牌结算/changeHp，`tools/probe_haozhao_ui.mjs` 验证官方poptip与立绘预览。完整游戏、联机及真实选将UI仍待实机；不继续旧将AI优化。报告按本次任务书例外放根目录HAOZHAO_IMPLEMENTATION_REPORT.md。
+
 ## 门禁与探针
 
 项目根运行 `node tools/check.js`；涉及世界、结算或 HTML 时运行 `node tools/simulate_world.js`。
@@ -53,3 +55,9 @@ DOM/VM 不验证 CSS；独立 HTML 不完整覆盖 Noname 全局样式/缩放；
 
 明确升版时同步三处 version 和当前展示，运行 `node tools/sync_size.js`、`node tools/release.js`（无 --push）再门禁。
 这些工具写元数据，不用于只读研究。结果说明实际变更、验证层级、仍存缺陷及远端动作；本地准备好不等于已发布。
+
+项目新增专项：`node tools/probe_player_interactions.mjs`（34/0，原生道具/累计/迁移）、`node tools/probe_world_entry.mjs`（84/0，真实世界入口）、`node tools/probe_career_achievements.mjs`（130/0，真实生涯成就HTML与引擎、隔离宿主传输）。页面领奖ACK桩不证明真实钱包持久化。
+
+2026-10-22并行审核批：新增花鬘/星星甘宁/远古八废实际AI选择链，累计7/99、另8人部分结论，实战未做。三专项67/0、34/0、34/0；交叉审核补真实VCard/实体去重、不屈错误救援与公开不可获得牌。世界生命周期67/0，修UNO多轮去重/离场亲历/零分摊与只读快照采用；迁移故障56/0+Chromium存储9/0+恢复页3/0，严格后端确认、原始恢复凭据、真实卸载防旧钱包复活、跨iframe迟到回包隔离、严格备份读取、钱包/世界内存采用确认。主门禁、世界188/0和既有市场/领奖/互动链通过。原始成就保留、版本4.0.9未发布；世界软存储和迁移恢复期间全局写锁仍待继续。详情见项目docs/audit/HUAMAN_AI_20261022.md、AI审查记录.md、WORLD_LIFECYCLE_20261022.md、MIGRATION_FAILURES_20261022.md。
+
+2026-10-22后续并行批：李曦明仙途→煌元/丹→谒天46/0，明日香22定义/实际形态链51/0，黄盖苦肉/诈降/恢复31/0，累计10/99源码选择链、另8人部分结论，89人及全部实战未完成。交叉审核补朗枪真实次数/距离窗口、黄盖禁止回复时假救援和多点致命失体力，AST签名允许纯AI新增且保留底层事件参数；丹全卡文件只豁免自身ai。恢复守卫67/0（改前9/58）已覆盖钱包/官阶/任务/领奖/市场/世界及壳变更消息，修改内存前拒绝、失败ACK不占GUARD、持久凭据读失败/启动/异步CDK/卸载/微任务均受保护；迁移自身只越busy不能越持久凭据。affection/interact/poolAchv/winrate/bossrecord及页面直接键族仍需后续接入，不称全扩展冻结。共享139/0、原技能45/0、领奖29/0、生命周期67/0、主门禁及世界188/0通过。专题见项目docs/audit/XIANTU_AI_20261022.md、TONGBU_AI_20261022.md、AI审查记录.md、RECOVERY_GUARD_20261022.md。版本4.0.9未发布，原成就/规则/存档结构保留。

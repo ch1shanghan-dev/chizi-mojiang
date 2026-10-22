@@ -453,6 +453,7 @@ import { MINIONS } from "./csh_bossdata.js";
 			   「打穿世界首富」统计（stats.billionaireBroke）此前借用 retireCount（退隐次数），
 			   口径完全不对 —— 详见 stats() 处说明。 */
 			everTier3: r.fund >= TIER3_FUND,
+			withPlayer: playerTable(),
 		};
 	}
 	/* 关系网：rivalry[id][otherId] = 竞争热度（0~N）。
@@ -476,6 +477,16 @@ import { MINIONS } from "./csh_bossdata.js";
 		};
 	}
 
+	/* 入口先暂停，不能仅在 saveWorld 拒绝时留下已经变化的内存。 */
+	function saveBlocked() {
+		try {
+			var W = lib.cshWallet;
+			if (W && W.saveGuard) return W.saveGuard.blocked();
+			if (localStorage.getItem("csh_migrate_recovery") !== null) return true;
+			var M = lib.cshMigrate, state = M && M.recoveryState && M.recoveryState();
+			return !!(state && (state.pending || state.busy));
+		} catch (e) { return true; }
+	}
 	var world = lsJSON(K_WORLD, null);
 	if (!world || typeof world !== "object" || !Array.isArray(world.ai)) world = defaultWorld();
 	if (!world.gambles || typeof world.gambles !== "object") world.gambles = freshGambles();
@@ -485,6 +496,7 @@ import { MINIONS } from "./csh_bossdata.js";
 	   判定为白名单式：只有「命中名册的字符串 id」才视为合法新档，其余（数字 id /
 	   脏字符串 id）一律重建，避免误把导入的 0 号 id 当合法档。 */
 	function migrateLegacyWorld() {
+		if (saveBlocked()) return false;
 		if (!world || !Array.isArray(world.ai) || !world.ai.length) return false;
 		/* 【P1-7 修（2026-10-06）】判定从"只看第一条 id"改为"任一 id 命中名册"——
 		   此前第一条恰好损坏（脏 id）而其余条目完好时，整档资金/战绩被无谓清零重建。
@@ -511,7 +523,7 @@ import { MINIONS } from "./csh_bossdata.js";
 	   （publicOf 里 PERSONAS[a.persona].name 会当场抛异常，面板整个渲染不出来）。
 	   现在三条入口（启动读取 / 存档导入 / 旧档迁移）共用同一条真值链。
 	   返回是否发生过修正（便于调用方决定是否回写）。 */
-	function normalizeWorld() {
+	function normalizeWorld(persist) {
 		var _normChanged = false;
 		/* 统一写法：**只有真的发生变更才置位**（2026-10-03 二次复核）。
 		   此前一部分 clamp（fund / mood / fatigue / retireDay / last / 心跳字段）
@@ -576,6 +588,8 @@ import { MINIONS } from "./csh_bossdata.js";
 			var skBefore = cur.skill, evBefore = cur.everTier3;
 			refreshSkill(cur);
 			if (cur.skill !== skBefore || cur.everTier3 !== evBefore) _normChanged = true;
+			var encounter = playerTable(cur.withPlayer);
+			if (JSON.stringify(cur.withPlayer) !== JSON.stringify(encounter)) setIf(cur, "withPlayer", encounter);
 			out.push(cur);
 		}
 		world.ai = out;
@@ -622,10 +636,29 @@ import { MINIONS } from "./csh_bossdata.js";
 			}
 			if (kept.length !== world.history.length) world.history = kept;
 		}
-		if (_normChanged) saveWorld();
+		if (_normChanged && persist !== false) saveWorld();
 		return _normChanged;
 	}
 	normalizeWorld();
+	/* 迁移/重置后采用磁盘真值，不能让旧内存把已删除的世界重新写回。
+	   只规整内存；恢复流程自己负责持久化，不能在这里推进心跳或补写存档。 */
+	function reloadSave(snapshot) {
+		var stored, next = null;
+		if (arguments.length) {
+			/* 迁移事务已严格预读；采用其 parsed object/null，避免再次读盘失败
+			   后旧内存覆盖刚导入的世界。复制后规整，不修改调用方的快照。 */
+			try { next = snapshot == null ? null : JSON.parse(JSON.stringify(snapshot)); }
+			catch (eS) { logError("采用世界快照失败", eS); return false; }
+		} else {
+			try { stored = localStorage.getItem(K_WORLD); }
+			catch (e) { logError("重载世界失败", e); return false; }
+			try { next = stored ? JSON.parse(stored) : null; } catch (eP) {}
+		}
+		var before = world;
+		world = next && typeof next === "object" && Array.isArray(next.ai) ? next : defaultWorld();
+		try { normalizeWorld(false); return true; }
+		catch (eN) { world = before; logError("规整重载世界失败", eN); return false; }
+	}
 	/* 有效牌技：资金派生的 skill + 实战经验（最多 +0.15）。
 	   这样「打了很久的穷牌手」也能慢慢变强，世界不再只由资金决定强弱。 */
 	function effectiveSkill(a) {
@@ -669,6 +702,7 @@ import { MINIONS } from "./csh_bossdata.js";
 	/* 状态推进：每打一局更新心态 / 手感 / 疲劳。
 	   won: true 胜 / false 负 / null 和局。 */
 	function advanceState(a, won, stake) {
+		if (saveBlocked()) return;
 		if (!a) return;
 		var P = PERSONAS[a.persona] || { variance: 0.2 };
 		a.hands = (a.hands || 0) + 1;
@@ -697,8 +731,33 @@ import { MINIONS } from "./csh_bossdata.js";
 
 
 	function saveWorld() {
+		if (saveBlocked()) return false;
 		try { lsSet(K_WORLD, JSON.stringify(world)); }
 		catch (e) { logError("saveWorld 失败", e); }
+	}
+	/* 玩家亲历与全世界自动演化分开；不从旧的AI总手数推断玩家历史。 */
+	function playerTable(raw) {
+		raw = raw && typeof raw === "object" ? raw : {};
+		var p = { hands: clampNum(raw.hands, 0, 9999999), wins: clampNum(raw.wins, 0, 9999999),
+			losses: clampNum(raw.losses, 0, 9999999), draws: clampNum(raw.draws, 0, 9999999),
+			skillTop: typeof raw.skillTop === "number" && isFinite(raw.skillTop) ? Math.max(0, Math.min(1, raw.skillTop)) : 0, revenge: !!raw.revenge };
+		p.wins = Math.min(p.wins, p.hands); p.losses = Math.min(p.losses, p.hands - p.wins); p.draws = Math.min(p.draws, p.hands - p.wins - p.losses);
+		p.revenge = p.revenge && p.wins > 0 && p.losses > 0;
+		p.lowestFund = p.wins > 0 && typeof raw.lowestFund === "number" && isFinite(raw.lowestFund) && raw.lowestFund >= 0
+			? clampNum(raw.lowestFund, 0, AI_FUND_CAP) : null;
+		return p;
+	}
+	function notePlayerTable(a, won) {
+		var p = a.withPlayer = playerTable(a.withPlayer);
+		p.hands = Math.min(9999999, p.hands + 1);
+		p.skillTop = Math.max(p.skillTop, a.skill || 0);
+		if (won === true) {
+			if (p.losses > 0 && !p.revenge) { p.revenge = true; pushHistory({kind: "playerrevenge", n: a.name}); }
+			p.wins = Math.min(p.hands, p.wins + 1);
+		}
+		else if (won === false) p.losses = Math.min(p.hands, p.losses + 1);
+		else if (won === null) p.draws = Math.min(p.hands, p.draws + 1);
+		if ([10, 40, 150].indexOf(p.hands) >= 0) pushHistory({kind: "oldfriend", n: a.name, c: p.hands});
 	}
 	function byId(id) {
 		for (var i = 0; i < world.ai.length; i++) if (world.ai[i].id === id) return world.ai[i];
@@ -755,9 +814,11 @@ import { MINIONS } from "./csh_bossdata.js";
 	}
 	/* AI 赢下底池：资金 +（净赢 × 0.95） */
 	function settleWin(id, netWin) {
+		if (saveBlocked()) return null;
 		var a = byId(id);
 		if (!a) return null;
 		netWin = Math.max(0, Math.floor(Number(netWin) || 0));
+		if (netWin > 0) notePlayerTable(a, false);
 		var before = a.fund;
 		var gain = Math.floor(netWin * AI_WIN_RATE);
 		a.fund = clampNum(a.fund + gain, 0, AI_FUND_CAP);
@@ -779,11 +840,14 @@ import { MINIONS } from "./csh_bossdata.js";
 	}
 	/* AI 输掉底池：资金 −（净输） */
 	function settleLose(id, netLoss) {
+		if (saveBlocked()) return null;
 		var a = byId(id);
 		if (!a) return null;
 		netLoss = Math.max(0, Math.floor(Number(netLoss) || 0));
+		if (netLoss > 0) notePlayerTable(a, true);
 		var before = a.fund;
 		a.fund = clampNum(a.fund - netLoss, 0, AI_FUND_CAP);
+		if (netLoss > 0) a.withPlayer.lowestFund = a.withPlayer.lowestFund == null ? a.fund : Math.min(a.withPlayer.lowestFund, a.fund);
 		a.hands += 1;
 		a.streak = 0;
 		a.last = Date.now();
@@ -800,8 +864,10 @@ import { MINIONS } from "./csh_bossdata.js";
 	   否则同一个"张飞"在德州里会破产、在 UNO 桌上却是木头人（同一世界两套人格）。
 	   won: true 胜 / false 负 / null 和局（三分支都走 advanceState）。 */
 	function settleResult(id, won) {
+		if (saveBlocked()) return null;
 		var a = byId(id);
 		if (!a) return null;
+		notePlayerTable(a, won === true ? false : won === false ? true : null);
 		advanceState(a, (won === true) ? true : (won === false ? false : null), 0);
 		a.last = Date.now();
 		saveWorld();
@@ -812,8 +878,10 @@ import { MINIONS } from "./csh_bossdata.js";
 	   壳的会话结算在 profit === 0 时传 true（"平局补记"，见 csh_shell）——
 	   在此之前那条路径只加 hands，"平局数"这个对外字段永远显示 0。 */
 	function settlePlay(id, isDraw) {
+		if (saveBlocked()) return null;
 		var a = byId(id);
 		if (!a) return null;
+		notePlayerTable(a, isDraw ? null : undefined);
 		if (isDraw) {
 			advanceState(a, null, 0);       // 和局：hands+1 / drew+1 / form 向中值回归 / 经验 +0.35
 		} else {
@@ -854,6 +922,7 @@ import { MINIONS } from "./csh_bossdata.js";
 	     使"钱往聪明人手里集中"成为世界的自然规律 —— 这也是豪赌席能长期存在的机制解释。
 	   ============================================================ */
 	function tick() {
+		if (saveBlocked()) return { days: 0, rounds: 0, changed: false, blocked: true };
 		var today = dayIndex();
 		var days = today - world.lastTick;
 		if (days <= 0) {
@@ -918,6 +987,7 @@ import { MINIONS } from "./csh_bossdata.js";
 	   （playOne 成功一次计 1，738 行），键名沿用旧称；调用方（心跳配额 / 日报"共 X 桌"）
        都按桌数理解。 */
 	function playRounds(roundsWanted, maxTables) {
+		if (saveBlocked()) return { rounds: 0, bust: 0, blocked: true };
 		var rounds = 0, bust = 0;
 		var budget = (typeof maxTables === "number" && isFinite(maxTables) && maxTables > 0)
 			? Math.floor(maxTables) : Infinity;
@@ -1268,6 +1338,14 @@ import { MINIONS } from "./csh_bossdata.js";
 				"牌桌今天很热闹：" + mTxt + pTxt,
 			]);
 		}
+		if (ev.kind === "playerrevenge") return pickBy(seed, [
+			"你终于从 " + ev.n + " 那里扳回一局，旧账翻到了新的一页",
+			ev.n + " 记得上次赢过你；这回，牌桌笑到了你这边",
+		]);
+		if (ev.kind === "oldfriend") return pickBy(seed, [
+			"你和 " + ev.n + " 已同桌 " + ev.c + " 场，彼此的牌风都快认熟了",
+			"桌边又见 " + ev.n + "，这是你们的第 " + ev.c + " 次交锋",
+		]);
 		if (ev.kind === "streak") {
 			return pickBy(seed, [
 				ev.n + " 连赢 " + ev.c + " 局，手风顺得不像话",
@@ -1423,6 +1501,7 @@ import { MINIONS } from "./csh_bossdata.js";
 	}
 	/* 记录一次豪赌桌出战（玩家视角）：profit 为玩家本局净收益（可为负） */
 	function noteGamble(profit) {
+		if (saveBlocked()) return null;
 		if (!world.gambles) world.gambles = freshGambles();
 		var g = world.gambles;
 		profit = Math.floor(Number(profit) || 0);
@@ -1466,6 +1545,7 @@ import { MINIONS } from "./csh_bossdata.js";
 			winrate: a.hands ? (a.wins / a.hands) : 0,
 			biggestPot: a.biggestPot, bestStreak: a.bestStreak,
 			retired: a.retired, grudge: grudgeToPlayer(a),
+			withPlayer: playerTable(a.withPlayer),
 		};
 		if (full) o.mult = multOf(a.fund);
 		return o;
@@ -1477,14 +1557,24 @@ import { MINIONS } from "./csh_bossdata.js";
 	function stats() {
 		var out = {
 			chars: 0, hands: 0, wins: 0, retired: 0,
+			playerHands: 0, playerOpponents: 0, playerFamiliar: 0, playerRevenge: 0, playerBalanced: 0, playerSkillTop: 0,
+			playerFundMin: 0, playerFundWitness: 0,
 			fundMin: 0, fundMax: 0, fundSum: 0, skillTop: 0, skillAvg: 0,
 			richestId: 0, richestName: "", richestFund: 0,
 			poorestFund: 0, tier3: 0, tier2: 0, billionaireBroke: 0,
 		};
-		var minF = Infinity, maxF = 0, sum = 0, sumSk = 0, broke = 0;
+		var minF = Infinity, maxF = 0, sum = 0, sumSk = 0, broke = 0, playerMin = Infinity;
 		for (var i = 0; i < world.ai.length; i++) {
 			var a = world.ai[i];
 			out.chars++;
+			var p = playerTable(a.withPlayer);
+			out.playerHands += p.hands;
+			if (p.hands > 0) out.playerOpponents++;
+			out.playerFamiliar = Math.max(out.playerFamiliar, p.hands);
+			out.playerBalanced = Math.max(out.playerBalanced, Math.min(p.wins, p.losses));
+			out.playerSkillTop = Math.max(out.playerSkillTop, p.hands > 0 ? p.skillTop : 0);
+			if (p.revenge) out.playerRevenge++;
+			if (p.lowestFund != null) { playerMin = Math.min(playerMin, p.lowestFund); out.playerFundWitness++; }
 			out.hands += a.hands || 0;
 			out.wins += a.wins || 0;
 			if (a.retired) out.retired++;
@@ -1509,6 +1599,7 @@ import { MINIONS } from "./csh_bossdata.js";
 		out.fundSum = sum;
 		out.skillAvg = out.chars ? (sumSk / out.chars) : 0;
 		out.billionaireBroke = broke;
+		out.playerFundMin = playerMin === Infinity ? 0 : playerMin;
 		/* 成就计数（2026-10-03 新增）：世界动态的累计值，供成就引擎读取 */
 		var ft = (world.feats && typeof world.feats === "object") ? world.feats : {};
 		out.recordsSeen = ft.records || 0;      // 亲历世界纪录被打破
@@ -1525,6 +1616,7 @@ import { MINIONS } from "./csh_bossdata.js";
 	   入参 targetKey 缺省 = 玩家本人（历史上唯一的写入方就是玩家互动）。
 	   保留旧的双参 API；互动桥显式传对方键，避免 AI 互相攻击误记到玩家。 */
 	function addGrudge(id, n, targetKey) {
+		if (saveBlocked()) return null;
 		var a = byId(id);
 		if (!a) return null;
 		if (!a.grudges || typeof a.grudges !== "object") a.grudges = {};
@@ -1610,7 +1702,9 @@ import { MINIONS } from "./csh_bossdata.js";
 		addGrudge: addGrudge, grudge: grudge, idOfPlayer: idOfPlayer,
 		avatar: avatar,
 		raw: function () { return JSON.parse(JSON.stringify(world)); },
+		reloadSave: reloadSave,
 		importRaw: function (obj) {
+			if (saveBlocked()) return false;
 			if (!obj || !Array.isArray(obj.ai)) return false;
 			world = obj;
 			/* ★ 2026-10-03：与启动读取走**同一条**规整链（补缺角色 / 清非法 persona /

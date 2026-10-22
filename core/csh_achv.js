@@ -31,13 +31,24 @@
 	var CLAIM_KEY = "csh_career_achv";
 	var memClaim = {};                       /* localStorage 不可用时的内存兜底（vm 自检） */
 	function lsGet() {
+		var map = memClaim;
 		try {
 			if (typeof localStorage === "undefined") return memClaim;
 			var raw = localStorage.getItem(CLAIM_KEY);
-			if (!raw) return memClaim;
-			var v = JSON.parse(raw);
-			return (v && typeof v === "object") ? v : memClaim;
-		} catch (e) { return memClaim; }
+			var v = raw ? JSON.parse(raw) : {};
+			map = (v && typeof v === "object" && !Array.isArray(v)) ? v : {};
+		} catch (e) {}
+		/* 奖励与钱包同写的凭据是真值之一；旧领奖集合写失败也不会重复兑现。
+		   每次直读，支持刷新/其他文档与导入后的新状态。 */
+		try {
+			var w = JSON.parse(localStorage.getItem("csh_wallet") || "{}");
+			var paid = w && w.careerClaims;
+			if (paid && typeof paid === "object" && !Array.isArray(paid)) {
+				map = Object.assign({}, map);
+				Object.keys(paid).forEach(function (key) { if (paid[key]) map[key] = 1; });
+			}
+		} catch (eWallet) {}
+		return map;
 	}
 	function lsPut(map) {
 		memClaim = map;
@@ -201,7 +212,7 @@
 	               富豪人数 5 / 首富被打穷 10 / 牌技上限 8 / 退隐数 10 = 72）
 	   ★ 全部来自 csh_world 的真实世界档案
 	   ============================================================ */
-	tier({ key: "hands", cat: "AI世界", ico: "🀄" }, "同桌 · {n} 手", "与 AI 世界同桌对局达到 {n} 手",
+	tier({ key: "hands", cat: "AI世界", ico: "🀄" }, "同桌 · {n} 人次", "与 AI 同桌累计 {n} 人次（每位对手每场记一次）",
 		[1, 10, 30, 60, 120, 250, 500, 1000, 2000, 3500, 5500, 8000, 12000, 18000, 26000, 40000],
 		function (v) { return statProg("worldHands", v); },
 		function (v) { return Math.max(60, Math.round(v / 4)); });
@@ -212,10 +223,10 @@
 		function (v) { return 100 + v * 20; });
 	tier({ key: "poorai", cat: "AI世界", ico: "🥊" }, "打穷它 · {n}", "把任意一位 AI 打到资金不超过 {n}（打穷它）",
 		[10000, 5000, 2000, 1000, 500, 200, 100, 10],
-		function (v) { return atMostAfter("worldFundMin", v, "worldHands", 1); },
+		function (v) { return atMostAfter("playerFundMin", v, "playerFundWitness", 1); },
 		function (v) { return Math.max(120, Math.round(20000 / v)); });
 	/* 「打穿首富」：世界最高资金被压到某个量级以下 —— 标志着你把金字塔尖拽下来了 */
-	tier({ key: "topdown", cat: "AI世界", ico: "⛏" }, "打穿首富 · {n}", "世界最高资金被压到 {n} 以下（把首富拉下马）",
+	tier({ key: "topdown", cat: "AI世界", ico: "⛏" }, "首富缩水 · {n}", "同桌游戏后，世界最高资金已降到 {n} 以下",
 		[10000000, 5000000, 2000000, 1000000, 500000, 200000, 100000, 50000, 20000, 5000],
 		function (v) { return atMostAfter("worldTopFund", v, "worldHands", 1); },
 		function (v) { return Math.max(150, Math.round(5000000 / v)); });
@@ -238,20 +249,33 @@
 		[0.70, 0.80, 0.85, 0.90, 0.95, 0.98, 0.99, 1.00],
 		function (v) { return statProg("worldSkillTop", v); },
 		function (v) { return Math.round(100 + v * 800); });
+	/* 玩家亲历主题：四种不同的经历，长期阶梯不删旧目标、不补造历史。 */
+	tier({ key: "tablefriends", cat: "AI世界", ico: "🤝" }, "牌友 · {n} 名", "与 {n} 名不同的 AI 完成过同桌游戏",
+		[1, 3, 5, 10, 20, 40, 60, 80, 99], function (v) { return statProg("playerOpponents", v); },
+		function (v) { return 150 + v * 25; });
+	tier({ key: "oldfriend", cat: "AI世界", ico: "🍵" }, "熟面孔 · {n} 回", "与同一名 AI 累计完成 {n} 场同桌游戏",
+		[3, 5, 10, 20, 40, 80, 150, 300], function (v) { return statProg("playerFamiliar", v); },
+		function (v) { return 150 + v * 8; });
+	tier({ key: "revengefriend", cat: "AI世界", ico: "♟" }, "再战破局 · {n} 位", "先输给某位 AI，再于之后战胜他；对 {n} 位不同对手完成逆转",
+		[1, 3, 5, 10, 20, 40], function (v) { return statProg("playerRevenge", v); },
+		function (v) { return 250 + v * 80; });
+	tier({ key: "balancedfriend", cat: "AI世界", ico: "⚖" }, "互有胜负 · 各 {n} 回", "你与同一名 AI 互有胜负，双方各至少取胜 {n} 次",
+		[1, 3, 5, 10, 20], function (v) { return statProg("playerBalanced", v); },
+		function (v) { return 200 + v * 60; });
 	/* ---------- 世界动态成就（2026-10-03 新增） ----------
 	   数据来自 csh_world 的成就计数（world.feats）→ shell buildStats → 这里 statProg。
 	   这批成就的共同点：**奖励"看见世界在动"**，而不是"刷数值" —— 纪录被破、有人破产、
 	   有人复出、宿敌交手、你把人打落档、你被记恨，都是世界真实发生的事。
 	   阈值与奖励参照同分类既有档位，避免出现"最难的那条给的钱最少"这种倒挂。 */
-	tier({ key: "worldrec", cat: "AI世界", ico: "📈" }, "世界纪录 · 亲历 {n} 次", "亲眼见证世界纪录被打破 {n} 次",
+	tier({ key: "worldrec", cat: "AI世界", ico: "📈" }, "世界纪录 · 改写 {n} 次", "世界纪录累计被打破 {n} 次（包含世界自行演化）",
 		[1, 3, 8, 15, 25],
 		function (v) { return statProg("recordsSeen", v); },
 		function (v) { return Math.round(200 + v * 150); });
-	tier({ key: "tierdown", cat: "AI世界", ico: "⚔" }, "打落一档 · {n} 人", "把 {n} 位 AI 从更高的档位打落到下一档",
+	tier({ key: "tierdown", cat: "AI世界", ico: "⚔" }, "打落一档 · {n} 人次", "累计 {n} 人次 AI 在与你的牌桌游戏中从高档位跌到下一档",
 		[1, 2, 5, 10, 20],
 		function (v) { return statProg("tierDown", v); },
 		function (v) { return Math.round(300 + v * 200); });
-	tier({ key: "comebacksee", cat: "AI世界", ico: "🌱" }, "见证复出 · {n} 人", "看着 {n} 位输光退隐的牌手重新坐回牌桌",
+	tier({ key: "comebacksee", cat: "AI世界", ico: "🌱" }, "牌手归来 · {n} 人次", "世界累计 {n} 人次牌手输光退隐后重新坐回牌桌",
 		[1, 3, 8, 15],
 		function (v) { return statProg("comebacks", v); },
 		function (v) { return Math.round(150 + v * 120); });

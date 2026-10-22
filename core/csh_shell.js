@@ -144,6 +144,7 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 	   修法：onMessage 进入时记下本次真实 req，ackToGame 回显它。
 	   **23 个 ackToGame 调用点一行都不用改。** */
 	var CUR_REQ = null;
+	var SHELL_GENERATION = 0;
 	/* 会话级结算守卫（2026-09-29 新增；2026-09-29 二审归一）：
 	   一次入场只结算一次。key 由 guardKey() 生成（**与命令族无关**），
 	   value = 首次结算的结果对象。
@@ -202,7 +203,57 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 	     · 好处：四款小游戏（德州 / 斗地主 / UNO / 廿一点）**零改动、全覆盖**
 	       （UNO 没有结算通道，靠关壳这一刀也能吃到）。 */
 	var TABLE_AFF = { minions: [], awarded: false };
+	/* 世界战果使用独立的真实轮次，不复用一次入场的经济 GUARD。
+	   选座不算开局；只有 UNO 成功开局登记后，离场才补未分胜负的人次。 */
+	var TABLE_WORLD = null;
+	var TABLE_SERIAL = 0;
+	function cshWorldTableFinish() {
+		if (persistenceBlocked()) return false;
+		var t = TABLE_WORLD, r = t && t.round;
+		if (!r) return;
+		cshTableAward(); // 壳直接关闭/同帧换桌也要收尾已真实开局的同桌好感
+		var W = lib.cshWorld;
+		Object.keys(t.ids).forEach(function (id) {
+			if (Object.prototype.hasOwnProperty.call(r.results, id)) return;
+			try {
+				var out = W && W.settlePlay ? W.settlePlay(id, false) : null;
+				if (out) r.results[id] = out;
+				else logError("未完成牌桌亲历未能补记（" + id + "）");
+			} catch (e) { logError("未完成牌桌亲历补记失败（" + id + "）", e); }
+		});
+		t.round = null;
+	}
+	function cshWorldTableBegin(table, round) {
+		if (persistenceBlocked()) return false;
+		var t = TABLE_WORLD;
+		if (current !== "uno" || !t || table !== t.token ||
+			typeof round !== "number" || !isFinite(round) || round < 1 ||
+			round > 1000000000 || Math.floor(round) !== round) return false;
+		if (t.round && t.round.n === round) return true; // 开局重试
+		if (round !== t.lastRound + 1) return false;
+		cshWorldTableFinish();
+		t.lastRound = round;
+		t.round = { n: round, results: Object.create(null) };
+		return true;
+	}
+	function cshWorldTableResult(table, round, id, won) {
+		if (persistenceBlocked()) return false;
+		var t = TABLE_WORLD, r = t && t.round;
+		if (current !== "uno" || !t || table !== t.token || !r || r.n !== round ||
+			typeof id !== "string" || !Object.prototype.hasOwnProperty.call(t.ids, id) ||
+			(won !== true && won !== false && won !== null)) return null;
+		if (Object.prototype.hasOwnProperty.call(r.results, id)) return r.results[id];
+		var W = lib.cshWorld;
+		var out = W && W.settleResult ? W.settleResult(id, won === true ? true : won === false ? false : null) : null;
+		/* 只有成功才占用，错误/暂未加载后重试仍可补记。 */
+		if (out) r.results[id] = out;
+		return out;
+	}
 	function cshTableRecord(seats) {
+		cshWorldTableFinish();
+		var ids = Object.create(null);
+		(seats || []).forEach(function (s) { if (s && typeof s.id === "string") ids[s.id] = true; });
+		TABLE_WORLD = { token: "table-" + (++TABLE_SERIAL), ids: ids, lastRound: 0, round: null };
 		try {
 			TABLE_AFF.minions = (seats || []).map(function (s2) { return s2 && s2.id; })
 				.filter(function (id) { return typeof id === "string" && id.indexOf("csh_boss_minion_") === 0; });
@@ -210,7 +261,9 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 		} catch (e0) { TABLE_AFF.minions = []; TABLE_AFF.awarded = false; }
 	}
 	function cshTableAward() {
+		if (persistenceBlocked()) return 0;
 		try {
+			if (current === "uno" && (!TABLE_WORLD || TABLE_WORLD.lastRound < 1)) return 0;
 			if (TABLE_AFF.awarded || !TABLE_AFF.minions.length) return 0;
 			TABLE_AFF.awarded = true;
 			var A = lib.cshAffection;
@@ -251,6 +304,20 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 	function emit(ev, arg) {
 		var arr = listeners[ev] || [];
 		for (var i = 0; i < arr.length; i++) { try { arr[i](arg); } catch (e) {} }
+	}
+	function persistenceBlocked() {
+		try {
+			var W = lib.cshWallet;
+			if (W && W.saveGuard) return W.saveGuard.blocked();
+			if (localStorage.getItem("csh_migrate_recovery") !== null) return true;
+			var M = lib.cshMigrate, state = M && M.recoveryState && M.recoveryState();
+			return !!(state && (state.pending || state.busy));
+		} catch (e) { return true; }
+	}
+	function persistenceRefused() {
+		var W = lib.cshWallet;
+		var msg = W && W.saveGuard ? W.saveGuard.reason : "存档操作尚未完成，请先在行囊恢复后再继续";
+		return { ok: false, reason: msg, msg: msg, recovery: true };
 	}
 	function wallet() { try { return lib.cshWallet || null; } catch (e) { return null; } }
 	/* ticketOf / buyInTiers 已在文件头定义（委托 csh_wallet，唯一门票表） */
@@ -495,6 +562,7 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 		if (!m) { toast("未知小游戏: " + key); return; }
 		/* 生涯大厅等非游戏页面：免门票、直接开壳（§4.1.6） */
 		if (m.lobby) { currentBuyIn = 0; openShell(key, { buyIn: 0 }); return; }
+		if (persistenceBlocked()) { toast(persistenceRefused().reason); return false; }
 		closeFee();
 		ensureStyle();
 
@@ -680,6 +748,7 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 	}
 
 	function doCharge(key, tk, buyIn) {
+		if (persistenceBlocked()) { toast(persistenceRefused().reason); return false; }
 		var W = wallet();
 		if (!W) { toast("钱包未加载，无法收费"); closeFee(); return false; }
 		var total = tk + buyIn;
@@ -869,24 +938,25 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 		try {
 			var wl = (lib.cshWorld && lib.cshWorld.list) ? lib.cshWorld.list() : [];
 			s.worldChars = wl.length;
-			var fundMin = Infinity, fundMax = 0, skillTop = 0;
+			var fundMin = Infinity, fundMax = 0;
 			for (var i = 0; i < wl.length; i++) {
-				s.worldHands += wl[i].hands || 0;
 				if (wl[i].retired) s.worldRetired++;
 				if (wl[i].fund != null) {
 					if (wl[i].fund < fundMin) fundMin = wl[i].fund;
 					if (wl[i].fund > fundMax) fundMax = wl[i].fund;
 				}
-				if ((wl[i].skill || 0) > skillTop) skillTop = wl[i].skill || 0;
 			}
 			s.worldFundMin = fundMin === Infinity ? 0 : fundMin;
 			s.worldFundMax = fundMax;
 			s.worldTopFund = fundMax;
-			s.worldSkillTop = skillTop;
 			/* 豪赌席人数 / 曾被玩家打穿的首富数（真实计数，成就数据源） */
 			try {
 				var wst = (lib.cshWorld && lib.cshWorld.stats) ? lib.cshWorld.stats() : null;
 				if (wst) {
+					s.worldHands = wst.playerHands || 0; s.worldSkillTop = wst.playerSkillTop || 0;
+					s.playerOpponents = wst.playerOpponents || 0; s.playerFamiliar = wst.playerFamiliar || 0;
+					s.playerRevenge = wst.playerRevenge || 0; s.playerBalanced = wst.playerBalanced || 0;
+					s.playerFundMin = wst.playerFundMin || 0; s.playerFundWitness = wst.playerFundWitness || 0;
 					s.billionaires = wst.tier3 || 0; s.billionaireBroke = wst.billionaireBroke || 0;
 					/* 世界动态的累计计数（2026-10-03）：成就引擎直接读这几个字段 */
 					s.recordsSeen = wst.recordsSeen || 0; s.tierDown = wst.tierDown || 0;
@@ -901,7 +971,7 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 			}
 		} catch (e4) {}
 		try {
-			if (lib.cshInteract && lib.cshInteract.stats) s.interactTotal = lib.cshInteract.stats().total || 0;
+			if (lib.cshInteract && lib.cshInteract.stats) s.interactTotal = lib.cshInteract.stats().playerThrows || 0;
 		} catch (e5) {}
 		/* BOSS 讨伐（2026-10-13 · 批次 4a）：s.boss 复合体（bossbook 页渲染用）+
 		   扁平 5 字段 + s.bossSeries（成就「挑战」16 条判定用，csh_achv statProg 语法） */
@@ -967,6 +1037,7 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 	   · 净赢为负 → 按比例把输掉的钱记入各 AI 资金（世界真实回血）
 	   两侧零和：玩家赢多少，世界就少多少（回收率部分视为"台费"，蒸发）。 */
 	function settleSession(key, data) {
+		if (persistenceBlocked()) return persistenceRefused();
 		data = data || {};
 		var k = data.key || current || "texas";
 		var buyIn = Math.max(0, Math.floor(Number(data.buyIn) || 0));
@@ -978,7 +1049,7 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 
 		/* 玩家侧：金额 + 入账 + 提示 + 事件，全部在 settle 内完成 */
 		var res = settle(k, { buyIn: buyIn, chips: chips, aiStakeTotal: aiTotal });
-		if (!res) return null;
+		if (!res || res.ok === false) return res;
 		var profit = res.profit || 0;
 		var credited = res.credited || 0;
 
@@ -988,6 +1059,7 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 		   差额会凭空蒸发（玩家没拿到、AI 却被扣了，账不平）。 */
 		var world = lib.cshWorld;
 		var settled = [];
+		var encountered = Object.create(null);
 		if (world && aiTotal > 0 && seats.length && profit !== 0) {
 			var realGain = profit >= 0 ? Math.max(0, credited - buyIn) : 0;
 			var moved = profit >= 0
@@ -1001,6 +1073,7 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 				var share = (i === seats.length - 1) ? left : Math.floor(moved * st / aiTotal);
 				if (share <= 0) continue;
 				left -= share;
+				encountered[s.id] = true; // 已尝试世界结算；失败仍如实报告，不在补记分支重试
 				var wr = null, wErr = null;
 				try {
 					wr = (profit >= 0) ? world.settleLose(s.id, share) : world.settleWin(s.id, share);
@@ -1024,8 +1097,24 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 			for (i = 0; i < seats.length; i++) {
 				var s0 = seats[i] || {};
 				if (!s0.id) continue;
-				try { world.settlePlay(s0.id, true); settled.push({ id: s0.id, delta: 0, asked: 0 }); }
+				if (encountered[s0.id]) continue;
+				try { if (world.settlePlay(s0.id, true)) { settled.push({ id: s0.id, delta: 0, asked: 0 }); encountered[s0.id] = true; } }
 				catch (eP) { logError("平局补记失败（" + s0.id + "）", eP); }
+			}
+		}
+		/* 资金封顶、取整或零带入的同桌也确实参加了这场游戏。
+		   没有资金分摊，无法推断该对手的输赢：仅记相遇，不编造胜负/平局。
+		   未开局退款传 seats:[]，不会因为预取过座位而获得亲历。 */
+		if (world && world.settlePlay) {
+			for (i = 0; i < seats.length; i++) {
+				var se = seats[i] || {};
+				if (!se.id || encountered[se.id]) continue;
+				try {
+					if (world.settlePlay(se.id, false)) {
+						encountered[se.id] = true;
+						settled.push({ id: se.id, delta: 0, asked: 0, outcome: "unresolved" });
+					}
+				} catch (eE) { logError("同桌亲历补记失败（" + se.id + "）", eE); }
 			}
 		}
 
@@ -1219,7 +1308,11 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 	}
 
 	function closeShell(silent) {
+		SHELL_GENERATION++;
 		cancelSelfClose();      /* 壳真要拆了：清掉委托关窗的兜底定时器与状态 */
+		cshWorldTableFinish();
+		TABLE_WORLD = null;
+		TABLE_AFF = { minions: [], awarded: false };
 		var ov = document.getElementById(OV_ID);
 		if (!ov) { current = null; return false; }
 		removeLeave();
@@ -1287,6 +1380,20 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 			if (fr && fr.contentWindow) fr.contentWindow.postMessage(msg, "*");
 		} catch (e) {}
 	}
+	/* 异步存档完成不能应答给后来打开的行囊（它的请求序号会重新从 1 开始）。
+	   捕获原窗口、iframe 与壳世代；同源页自身刷新也按 document 身份失效。 */
+	function captureMigReply(event, request) {
+		var frame = document.getElementById("csh-shell-frame"), source = event && event.source;
+		var generation = SHELL_GENERATION, originalDocument = null;
+		try { originalDocument = frame && frame.contentDocument; } catch (readError) {}
+		return function (command, ok, data) {
+			try {
+				if (generation !== SHELL_GENERATION || !frame || frame !== document.getElementById("csh-shell-frame") || !source || source !== frame.contentWindow) return;
+				if (originalDocument && originalDocument !== frame.contentDocument) return;
+				ackToGame(command, ok, data, request);
+			} catch (replyError) { /* 原页面已离开时只丢弃通知；存档事务仍正常完成。 */ }
+		};
+	}
 
 	/* ---------- 消息 / Esc / 失焦（§E.4） ---------- */
 	function onMessage(e) {
@@ -1299,6 +1406,15 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 			/* 记下本次真实请求 ID：后续所有 ackToGame 回显它（P0-0 修复） */
 			CUR_REQ = (typeof d.req === "string" && d.req) ? d.req : null;
 			var req0 = CUR_REQ;
+			var migReply = typeof cmd === "string" && cmd.indexOf("shell-mig-") === 0 ? captureMigReply(e, req0) : null;
+			/* 这些命令包含进度写入；先拒绝，不能让下层空结果变成成功 ACK。
+			   只读查询、关闭和行囊恢复入口仍可使用。 */
+			var mutatesSave = ["shell-settle", "shell-settle-session", "shell-task-add", "shell-merit",
+				"shell-sign", "shell-relief", "shell-ach-claim", "shell-trade", "shell-goldfish",
+				"shell-aff-do", "shell-cheer", "shell-bounty", "shell-seat", "shell-world-round",
+				"shell-world-result"].indexOf(cmd) >= 0 || (cmd === "shell-open" && !(META[d.key] && META[d.key].lobby));
+			if (mutatesSave && persistenceBlocked()) { ackToGame(cmd, false, persistenceRefused()); return; }
+
 			// 子页面关闭协议（2026-09-29 修正）
 			/* ⚠ 真 bug：此前旧协议正则 `/-close$/` 写在最前面，而 `shell-close` 同样
 			   以 `-close` 结尾 ⇒ 被它先捕获，剥出前缀 "shell" 与 current 不相等
@@ -1317,6 +1433,7 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 				var r1 = settle(current, d.data || {});
 				/* ★ 2026-09-29 P0：应答必须带 ok —— 此前 res 里没有 ok 字段，
 				   子页面若校验 data.ok 会把成功结算误判为失败（德州「实得 0」谎报的根因之一）。 */
+				if (!r1 || r1.ok === false) { ackToGame(cmd, false, r1 || persistenceRefused()); return; }
 				r1.ok = true;
 				GUARD[gk1] = r1;
 				cshTableAward();
@@ -1424,12 +1541,15 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 						if (!stOK) rA.reason = "条件未达成";
 						else {
 							var WA2 = wallet();
-							var gotA = WA2 ? WA2.wallet.add(defA.reward || 0, "成就:" + defA.label) : 0;
-							AC.markClaimed(d.key);
-							rA.ok = true; rA.reward = defA.reward || 0; rA.gained = gotA;
-							rA.balance = WA2 ? WA2.wallet.pc() : 0;
-							shellToast("成就达成「" + defA.label + "」 +" + fmt(defA.reward || 0) + " CBY");
-							paintPc();
+							rA = WA2 && WA2.wallet && WA2.wallet.claimCareer
+								? WA2.wallet.claimCareer(d.key, defA.reward, defA.label)
+								: { ok: false, reason: "钱包尚未就绪，请稍后重试" };
+							if (rA.ok) {
+								AC.markClaimed(d.key); /* 旧格式兼容镜像；原子凭据已在钱包中 */
+								rA.reward = defA.reward;
+								if (!rA.already) shellToast("成就达成「" + defA.label + "」 +" + fmt(rA.gained) + " CBY");
+								paintPc();
+							}
 						}
 					}
 				} catch (eAC) { rA.reason = String(eAC && eAC.message || eAC); }
@@ -1469,11 +1589,14 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 		}
 			/* 名次制牌桌的"只记战果不动钱"（2026-10-03）：UNO 同桌 AI 的手数/胜负/心态回报。
 		   金额一律不参与 —— 记账口径由宿主统一，客户端只报"谁赢谁输"。 */
+		if (cmd === "shell-world-round") {
+			ackToGame("shell-world-round", cshWorldTableBegin(d.table, d.round), null);
+			return;
+		}
 		if (cmd === "shell-world-result") {
-			var WR = lib.cshWorld;
 			var rr = null;
 			try {
-				rr = (WR && WR.settleResult && d.id) ? WR.settleResult(d.id, d.won === true ? true : (d.won === false ? false : null)) : null;
+				rr = cshWorldTableResult(d.table, d.round, d.id, d.won);
 			} catch (eWR) { logError("世界战果回报失败（" + d.id + "）", eWR); }
 			ackToGame("shell-world-result", !!rr, rr);
 			return;
@@ -1485,9 +1608,9 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 				try {
 					seats = (WSe && WSe.seat) ? WSe.seat(d.n, d.buyIn, { tier: d.tier }) : null;
 				} catch (eSe) {}
-				ackToGame("shell-seat", !!(seats && seats.length), { seats: seats || [] });
 				/* v6.7：记下本次同桌的妖灵（关壳 / 结算时给她们各 +1 好感） */
 				cshTableRecord(seats);
+				ackToGame("shell-seat", !!(seats && seats.length), { seats: seats || [], table: TABLE_WORLD.token });
 				return;
 			}
 			/* 本场结算（2026-09-29 新增 · 德州用）：
@@ -1505,6 +1628,7 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 				/* ★ 2026-09-29 P0：应答必须带 ok —— 德州 endSession 校验 data.ok，
 				   此前恒 undefined ⇒ 每次成功结算都被当成失败（横幅谎报「实得 0」、
 				   toast 谎报「本局未入账」，而钱包其实已正确入账）。 */
+				if (!r2 || r2.ok === false) { ackToGame(cmd, false, r2 || persistenceRefused()); return; }
 				r2.ok = true;
 				GUARD[gk2] = r2;
 				cshTableAward();
@@ -1684,17 +1808,17 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 				if (!MM) { ackToGame("shell-mig-export", false, null, req0); return; }
 				try {
 					Promise.resolve(MM.export()).then(function (code) {
-						ackToGame("shell-mig-export", true, { code: code }, req0);
-					}, function (e) { ackToGame("shell-mig-export", false, { err: String(e && e.message || e) }, req0); });
-				} catch (e) { ackToGame("shell-mig-export", false, null, req0); }
+						migReply("shell-mig-export", true, { code: code });
+					}, function (e) { migReply("shell-mig-export", false, { err: String(e && e.message || e) }); });
+				} catch (e) { migReply("shell-mig-export", false, null); }
 				return;
 			}
 			if (cmd === "shell-mig-import") {
 				var MI = migMod();
 				if (!MI) { ackToGame("shell-mig-import", false, null, req0); return; }
 				Promise.resolve(MI.import(d.code, { dryRun: !!d.dryRun })).then(function (r) {
-					ackToGame("shell-mig-import", !!r.ok, r, req0);
-				}, function (e) { ackToGame("shell-mig-import", false, { err: String(e && e.message || e) }, req0); });
+					migReply("shell-mig-import", !!r.ok, r);
+				}, function (e) { migReply("shell-mig-import", false, { err: String(e && e.message || e) }); });
 				return;
 			}
 			if (cmd === "shell-mig-backups") {
@@ -1704,8 +1828,9 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 			}
 			if (cmd === "shell-mig-rollback") {
 				var MR = migMod();
-				var rr = MR ? MR.rollback(d.stamp) : null;
-				ackToGame("shell-mig-rollback", !!(rr && rr.ok), rr);
+				Promise.resolve(MR ? MR.rollback(d.stamp) : null).then(function (rr) {
+					migReply("shell-mig-rollback", !!(rr && rr.ok), rr);
+				}, function (error) { migReply("shell-mig-rollback", false, { err: String(error && error.message || error) }); });
 				return;
 			}
 			if (cmd === "shell-mig-reset") {
@@ -1713,8 +1838,16 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 				   清空后数据需页面刷新才重新初始化，故这里只做清空，
 				   刷新动作由调用方（行囊页）在确认后触发。 */
 				var MX = migMod();
-				var rx = MX && typeof MX.reset === "function" ? MX.reset() : null;
-				ackToGame("shell-mig-reset", !!(rx && rx.ok), rx);
+				Promise.resolve(MX && typeof MX.reset === "function" ? MX.reset() : null).then(function (rx) {
+					migReply("shell-mig-reset", !!(rx && rx.ok), rx);
+				}, function (error) { migReply("shell-mig-reset", false, { err: String(error && error.message || error) }); });
+				return;
+			}
+			if (cmd === "shell-mig-recover") {
+				var MC = migMod();
+				Promise.resolve(MC && typeof MC.recover === "function" ? MC.recover() : null).then(function (rc) {
+					migReply("shell-mig-recover", !!(rc && rc.ok), rc);
+				}, function (error) { migReply("shell-mig-recover", false, { err: String(error && error.message || error) }); });
 				return;
 			}
 			/* 家当清点（v3 · 2026-10-15）：给「行囊」页一张"这次到底带走了什么"的清单。
@@ -1729,6 +1862,7 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 					version: MV ? MV.VERSION : 0,
 					list: inv || [],
 					excluded: excl,
+					recovery: MV && typeof MV.recoveryState === "function" ? MV.recoveryState() : null,
 				});
 				return;
 			}
@@ -1856,6 +1990,7 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 		return Math.max(1, Math.floor(n));
 	}
 	function settle(key, data) {
+		if (persistenceBlocked()) return persistenceRefused();
 		data = data || {};
 		var W = wallet();
 		var m = META[key];

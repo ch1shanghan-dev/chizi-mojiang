@@ -1,0 +1,860 @@
+[
+  {
+    "viewport": "desktop",
+    "name": "real HTML script booted",
+    "passed": true
+  },
+  {
+    "viewport": "desktop",
+    "name": "world page distinguishes actual player encounters",
+    "passed": true
+  },
+  {
+    "viewport": "desktop",
+    "name": "world page shows chronological revenge summary",
+    "passed": true
+  },
+  {
+    "viewport": "desktop",
+    "name": "all 493 existing and new definitions retained",
+    "passed": true
+  },
+  {
+    "viewport": "desktop",
+    "name": "initial render limited to 60 cards",
+    "passed": true
+  },
+  {
+    "viewport": "desktop",
+    "name": "default recommends claimable before other states",
+    "passed": true
+  },
+  {
+    "viewport": "desktop",
+    "name": "show more visible while undisplayed targets remain",
+    "passed": true
+  },
+  {
+    "viewport": "desktop",
+    "name": "next batch appended without duplicate keys",
+    "passed": true
+  },
+  {
+    "viewport": "desktop",
+    "name": "show more moves keyboard focus to first new target",
+    "passed": true
+  },
+  {
+    "viewport": "desktop",
+    "name": "every definition remains reachable through batches",
+    "passed": true
+  },
+  {
+    "viewport": "desktop",
+    "name": "show more hidden when exhausted",
+    "passed": true
+  },
+  {
+    "viewport": "desktop",
+    "name": "search matches real conditions across 20 tiers",
+    "passed": true
+  },
+  {
+    "viewport": "desktop",
+    "name": "filtering does not request new host statistics",
+    "passed": true
+  },
+  {
+    "viewport": "desktop",
+    "name": "combined state and keyword excludes incomplete tiers",
+    "passed": true
+  },
+  {
+    "viewport": "desktop",
+    "name": "claimed state includes historical claim",
+    "passed": true
+  },
+  {
+    "viewport": "desktop",
+    "name": "claimed button disabled",
+    "passed": true
+  },
+  {
+    "viewport": "desktop",
+    "name": "unfinished excludes claimed and ready",
+    "passed": true
+  },
+  {
+    "viewport": "desktop",
+    "name": "empty search explains recovery",
+    "passed": true
+  },
+  {
+    "viewport": "desktop",
+    "name": "reset restores inputs and default batch",
+    "passed": true
+  },
+  {
+    "viewport": "desktop",
+    "name": "category uses native pressed button and real subset",
+    "passed": true
+  },
+  {
+    "viewport": "desktop",
+    "name": "fractional progress remains legible",
+    "passed": true
+  },
+  {
+    "viewport": "desktop",
+    "name": "catalog order matches complete engine order",
+    "passed": true
+  },
+  {
+    "viewport": "desktop",
+    "name": "detail button shows actual condition",
+    "passed": true
+  },
+  {
+    "viewport": "desktop",
+    "name": "all card details are native keyboard buttons",
+    "passed": true
+  },
+  {
+    "viewport": "desktop",
+    "name": "double claim sends one request and stays pending",
+    "passed": true
+  },
+  {
+    "viewport": "desktop",
+    "name": "pending request does not mark claimed",
+    "passed": true
+  },
+  {
+    "viewport": "desktop",
+    "name": "failed ACK releases claim for retry",
+    "passed": true
+  },
+  {
+    "viewport": "desktop",
+    "name": "retry uses same real key",
+    "passed": true
+  },
+  {
+    "viewport": "desktop",
+    "name": "successful ACK removes claim from ready filter",
+    "passed": true
+  },
+  {
+    "viewport": "desktop",
+    "name": "filters survive wallet refresh",
+    "passed": true
+  },
+  {
+    "viewport": "desktop",
+    "name": "late old statistics cannot replace newer progress",
+    "passed": true
+  },
+  {
+    "viewport": "desktop",
+    "name": "controls remain within viewport",
+    "passed": true,
+    "detail": [
+      {
+        "x": 241,
+        "y": 72.6875,
+        "width": 598,
+        "height": 40,
+        "top": 72.6875,
+        "right": 839,
+        "bottom": 112.6875,
+        "left": 241
+      },
+      {
+        "x": 876,
+        "y": 72.6875,
+        "width": 84,
+        "height": 40,
+        "top": 72.6875,
+        "right": 960,
+        "bottom": 112.6875,
+        "left": 876
+      },
+      {
+        "x": 997,
+        "y": 72.6875,
+        "width": 84,
+        "height": 40,
+        "top": 72.6875,
+        "right": 1081,
+        "bottom": 112.6875,
+        "left": 997
+      },
+      {
+        "x": 1089,
+        "y": 70.6875,
+        "width": 84,
+        "height": 44,
+        "top": 70.6875,
+        "right": 1173,
+        "bottom": 114.6875,
+        "left": 1089
+      }
+    ]
+  },
+  {
+    "viewport": "desktop",
+    "name": "no horizontal page overflow",
+    "passed": true
+  },
+  {
+    "viewport": "desktop",
+    "name": "current cards contain complete readable conditions",
+    "passed": true
+  },
+  {
+    "viewport": "portrait",
+    "name": "real HTML script booted",
+    "passed": true
+  },
+  {
+    "viewport": "portrait",
+    "name": "world page distinguishes actual player encounters",
+    "passed": true
+  },
+  {
+    "viewport": "portrait",
+    "name": "world page shows chronological revenge summary",
+    "passed": true
+  },
+  {
+    "viewport": "portrait",
+    "name": "all 493 existing and new definitions retained",
+    "passed": true
+  },
+  {
+    "viewport": "portrait",
+    "name": "initial render limited to 60 cards",
+    "passed": true
+  },
+  {
+    "viewport": "portrait",
+    "name": "default recommends claimable before other states",
+    "passed": true
+  },
+  {
+    "viewport": "portrait",
+    "name": "show more visible while undisplayed targets remain",
+    "passed": true
+  },
+  {
+    "viewport": "portrait",
+    "name": "next batch appended without duplicate keys",
+    "passed": true
+  },
+  {
+    "viewport": "portrait",
+    "name": "show more moves keyboard focus to first new target",
+    "passed": true
+  },
+  {
+    "viewport": "portrait",
+    "name": "every definition remains reachable through batches",
+    "passed": true
+  },
+  {
+    "viewport": "portrait",
+    "name": "show more hidden when exhausted",
+    "passed": true
+  },
+  {
+    "viewport": "portrait",
+    "name": "search matches real conditions across 20 tiers",
+    "passed": true
+  },
+  {
+    "viewport": "portrait",
+    "name": "filtering does not request new host statistics",
+    "passed": true
+  },
+  {
+    "viewport": "portrait",
+    "name": "combined state and keyword excludes incomplete tiers",
+    "passed": true
+  },
+  {
+    "viewport": "portrait",
+    "name": "claimed state includes historical claim",
+    "passed": true
+  },
+  {
+    "viewport": "portrait",
+    "name": "claimed button disabled",
+    "passed": true
+  },
+  {
+    "viewport": "portrait",
+    "name": "unfinished excludes claimed and ready",
+    "passed": true
+  },
+  {
+    "viewport": "portrait",
+    "name": "empty search explains recovery",
+    "passed": true
+  },
+  {
+    "viewport": "portrait",
+    "name": "reset restores inputs and default batch",
+    "passed": true
+  },
+  {
+    "viewport": "portrait",
+    "name": "category uses native pressed button and real subset",
+    "passed": true
+  },
+  {
+    "viewport": "portrait",
+    "name": "fractional progress remains legible",
+    "passed": true
+  },
+  {
+    "viewport": "portrait",
+    "name": "catalog order matches complete engine order",
+    "passed": true
+  },
+  {
+    "viewport": "portrait",
+    "name": "detail button shows actual condition",
+    "passed": true
+  },
+  {
+    "viewport": "portrait",
+    "name": "all card details are native keyboard buttons",
+    "passed": true
+  },
+  {
+    "viewport": "portrait",
+    "name": "double claim sends one request and stays pending",
+    "passed": true
+  },
+  {
+    "viewport": "portrait",
+    "name": "pending request does not mark claimed",
+    "passed": true
+  },
+  {
+    "viewport": "portrait",
+    "name": "failed ACK releases claim for retry",
+    "passed": true
+  },
+  {
+    "viewport": "portrait",
+    "name": "retry uses same real key",
+    "passed": true
+  },
+  {
+    "viewport": "portrait",
+    "name": "successful ACK removes claim from ready filter",
+    "passed": true
+  },
+  {
+    "viewport": "portrait",
+    "name": "filters survive wallet refresh",
+    "passed": true
+  },
+  {
+    "viewport": "portrait",
+    "name": "late old statistics cannot replace newer progress",
+    "passed": true
+  },
+  {
+    "viewport": "portrait",
+    "name": "controls remain within viewport",
+    "passed": true,
+    "detail": [
+      {
+        "x": 39,
+        "y": 176.6875,
+        "width": 326,
+        "height": 40,
+        "top": 176.6875,
+        "right": 365,
+        "bottom": 216.6875,
+        "left": 39
+      },
+      {
+        "x": 39,
+        "y": 226.6875,
+        "width": 84,
+        "height": 40,
+        "top": 226.6875,
+        "right": 123,
+        "bottom": 266.6875,
+        "left": 39
+      },
+      {
+        "x": 160,
+        "y": 226.6875,
+        "width": 84,
+        "height": 40,
+        "top": 226.6875,
+        "right": 244,
+        "bottom": 266.6875,
+        "left": 160
+      },
+      {
+        "x": 252,
+        "y": 224.6875,
+        "width": 84,
+        "height": 44,
+        "top": 224.6875,
+        "right": 336,
+        "bottom": 268.6875,
+        "left": 252
+      }
+    ]
+  },
+  {
+    "viewport": "portrait",
+    "name": "no horizontal page overflow",
+    "passed": true
+  },
+  {
+    "viewport": "portrait",
+    "name": "portrait navigation preserves content width",
+    "passed": true
+  },
+  {
+    "viewport": "portrait",
+    "name": "current cards contain complete readable conditions",
+    "passed": true
+  },
+  {
+    "viewport": "landscape",
+    "name": "real HTML script booted",
+    "passed": true
+  },
+  {
+    "viewport": "landscape",
+    "name": "world page distinguishes actual player encounters",
+    "passed": true
+  },
+  {
+    "viewport": "landscape",
+    "name": "world page shows chronological revenge summary",
+    "passed": true
+  },
+  {
+    "viewport": "landscape",
+    "name": "all 493 existing and new definitions retained",
+    "passed": true
+  },
+  {
+    "viewport": "landscape",
+    "name": "initial render limited to 60 cards",
+    "passed": true
+  },
+  {
+    "viewport": "landscape",
+    "name": "default recommends claimable before other states",
+    "passed": true
+  },
+  {
+    "viewport": "landscape",
+    "name": "show more visible while undisplayed targets remain",
+    "passed": true
+  },
+  {
+    "viewport": "landscape",
+    "name": "next batch appended without duplicate keys",
+    "passed": true
+  },
+  {
+    "viewport": "landscape",
+    "name": "show more moves keyboard focus to first new target",
+    "passed": true
+  },
+  {
+    "viewport": "landscape",
+    "name": "every definition remains reachable through batches",
+    "passed": true
+  },
+  {
+    "viewport": "landscape",
+    "name": "show more hidden when exhausted",
+    "passed": true
+  },
+  {
+    "viewport": "landscape",
+    "name": "search matches real conditions across 20 tiers",
+    "passed": true
+  },
+  {
+    "viewport": "landscape",
+    "name": "filtering does not request new host statistics",
+    "passed": true
+  },
+  {
+    "viewport": "landscape",
+    "name": "combined state and keyword excludes incomplete tiers",
+    "passed": true
+  },
+  {
+    "viewport": "landscape",
+    "name": "claimed state includes historical claim",
+    "passed": true
+  },
+  {
+    "viewport": "landscape",
+    "name": "claimed button disabled",
+    "passed": true
+  },
+  {
+    "viewport": "landscape",
+    "name": "unfinished excludes claimed and ready",
+    "passed": true
+  },
+  {
+    "viewport": "landscape",
+    "name": "empty search explains recovery",
+    "passed": true
+  },
+  {
+    "viewport": "landscape",
+    "name": "reset restores inputs and default batch",
+    "passed": true
+  },
+  {
+    "viewport": "landscape",
+    "name": "category uses native pressed button and real subset",
+    "passed": true
+  },
+  {
+    "viewport": "landscape",
+    "name": "fractional progress remains legible",
+    "passed": true
+  },
+  {
+    "viewport": "landscape",
+    "name": "catalog order matches complete engine order",
+    "passed": true
+  },
+  {
+    "viewport": "landscape",
+    "name": "detail button shows actual condition",
+    "passed": true
+  },
+  {
+    "viewport": "landscape",
+    "name": "all card details are native keyboard buttons",
+    "passed": true
+  },
+  {
+    "viewport": "landscape",
+    "name": "double claim sends one request and stays pending",
+    "passed": true
+  },
+  {
+    "viewport": "landscape",
+    "name": "pending request does not mark claimed",
+    "passed": true
+  },
+  {
+    "viewport": "landscape",
+    "name": "failed ACK releases claim for retry",
+    "passed": true
+  },
+  {
+    "viewport": "landscape",
+    "name": "retry uses same real key",
+    "passed": true
+  },
+  {
+    "viewport": "landscape",
+    "name": "successful ACK removes claim from ready filter",
+    "passed": true
+  },
+  {
+    "viewport": "landscape",
+    "name": "filters survive wallet refresh",
+    "passed": true
+  },
+  {
+    "viewport": "landscape",
+    "name": "late old statistics cannot replace newer progress",
+    "passed": true
+  },
+  {
+    "viewport": "landscape",
+    "name": "controls remain within viewport",
+    "passed": true,
+    "detail": [
+      {
+        "x": 207,
+        "y": 70.6875,
+        "width": 349,
+        "height": 40,
+        "top": 70.6875,
+        "right": 556,
+        "bottom": 110.6875,
+        "left": 207
+      },
+      {
+        "x": 593,
+        "y": 70.6875,
+        "width": 84,
+        "height": 40,
+        "top": 70.6875,
+        "right": 677,
+        "bottom": 110.6875,
+        "left": 593
+      },
+      {
+        "x": 714,
+        "y": 70.6875,
+        "width": 84,
+        "height": 40,
+        "top": 70.6875,
+        "right": 798,
+        "bottom": 110.6875,
+        "left": 714
+      },
+      {
+        "x": 806,
+        "y": 68.6875,
+        "width": 84,
+        "height": 44,
+        "top": 68.6875,
+        "right": 890,
+        "bottom": 112.6875,
+        "left": 806
+      }
+    ]
+  },
+  {
+    "viewport": "landscape",
+    "name": "no horizontal page overflow",
+    "passed": true
+  },
+  {
+    "viewport": "landscape",
+    "name": "current cards contain complete readable conditions",
+    "passed": true
+  },
+  {
+    "viewport": "zoom",
+    "name": "real HTML script booted",
+    "passed": true
+  },
+  {
+    "viewport": "zoom",
+    "name": "world page distinguishes actual player encounters",
+    "passed": true
+  },
+  {
+    "viewport": "zoom",
+    "name": "world page shows chronological revenge summary",
+    "passed": true
+  },
+  {
+    "viewport": "zoom",
+    "name": "all 493 existing and new definitions retained",
+    "passed": true
+  },
+  {
+    "viewport": "zoom",
+    "name": "initial render limited to 60 cards",
+    "passed": true
+  },
+  {
+    "viewport": "zoom",
+    "name": "default recommends claimable before other states",
+    "passed": true
+  },
+  {
+    "viewport": "zoom",
+    "name": "show more visible while undisplayed targets remain",
+    "passed": true
+  },
+  {
+    "viewport": "zoom",
+    "name": "next batch appended without duplicate keys",
+    "passed": true
+  },
+  {
+    "viewport": "zoom",
+    "name": "show more moves keyboard focus to first new target",
+    "passed": true
+  },
+  {
+    "viewport": "zoom",
+    "name": "every definition remains reachable through batches",
+    "passed": true
+  },
+  {
+    "viewport": "zoom",
+    "name": "show more hidden when exhausted",
+    "passed": true
+  },
+  {
+    "viewport": "zoom",
+    "name": "search matches real conditions across 20 tiers",
+    "passed": true
+  },
+  {
+    "viewport": "zoom",
+    "name": "filtering does not request new host statistics",
+    "passed": true
+  },
+  {
+    "viewport": "zoom",
+    "name": "combined state and keyword excludes incomplete tiers",
+    "passed": true
+  },
+  {
+    "viewport": "zoom",
+    "name": "claimed state includes historical claim",
+    "passed": true
+  },
+  {
+    "viewport": "zoom",
+    "name": "claimed button disabled",
+    "passed": true
+  },
+  {
+    "viewport": "zoom",
+    "name": "unfinished excludes claimed and ready",
+    "passed": true
+  },
+  {
+    "viewport": "zoom",
+    "name": "empty search explains recovery",
+    "passed": true
+  },
+  {
+    "viewport": "zoom",
+    "name": "reset restores inputs and default batch",
+    "passed": true
+  },
+  {
+    "viewport": "zoom",
+    "name": "category uses native pressed button and real subset",
+    "passed": true
+  },
+  {
+    "viewport": "zoom",
+    "name": "fractional progress remains legible",
+    "passed": true
+  },
+  {
+    "viewport": "zoom",
+    "name": "catalog order matches complete engine order",
+    "passed": true
+  },
+  {
+    "viewport": "zoom",
+    "name": "detail button shows actual condition",
+    "passed": true
+  },
+  {
+    "viewport": "zoom",
+    "name": "all card details are native keyboard buttons",
+    "passed": true
+  },
+  {
+    "viewport": "zoom",
+    "name": "double claim sends one request and stays pending",
+    "passed": true
+  },
+  {
+    "viewport": "zoom",
+    "name": "pending request does not mark claimed",
+    "passed": true
+  },
+  {
+    "viewport": "zoom",
+    "name": "failed ACK releases claim for retry",
+    "passed": true
+  },
+  {
+    "viewport": "zoom",
+    "name": "retry uses same real key",
+    "passed": true
+  },
+  {
+    "viewport": "zoom",
+    "name": "successful ACK removes claim from ready filter",
+    "passed": true
+  },
+  {
+    "viewport": "zoom",
+    "name": "filters survive wallet refresh",
+    "passed": true
+  },
+  {
+    "viewport": "zoom",
+    "name": "late old statistics cannot replace newer progress",
+    "passed": true
+  },
+  {
+    "viewport": "zoom",
+    "name": "controls remain within viewport",
+    "passed": true,
+    "detail": [
+      {
+        "x": 39,
+        "y": -1381.3125,
+        "width": 295,
+        "height": 40,
+        "top": -1381.3125,
+        "right": 334,
+        "bottom": -1341.3125,
+        "left": 39
+      },
+      {
+        "x": 371,
+        "y": -1381.3125,
+        "width": 84,
+        "height": 40,
+        "top": -1381.3125,
+        "right": 455,
+        "bottom": -1341.3125,
+        "left": 371
+      },
+      {
+        "x": 39,
+        "y": -1331.3125,
+        "width": 84,
+        "height": 40,
+        "top": -1331.3125,
+        "right": 123,
+        "bottom": -1291.3125,
+        "left": 39
+      },
+      {
+        "x": 131,
+        "y": -1333.3125,
+        "width": 84,
+        "height": 44,
+        "top": -1333.3125,
+        "right": 215,
+        "bottom": -1289.3125,
+        "left": 131
+      }
+    ]
+  },
+  {
+    "viewport": "zoom",
+    "name": "no horizontal page overflow",
+    "passed": true
+  },
+  {
+    "viewport": "zoom",
+    "name": "portrait navigation preserves content width",
+    "passed": true
+  },
+  {
+    "viewport": "zoom",
+    "name": "current cards contain complete readable conditions",
+    "passed": true
+  }
+]

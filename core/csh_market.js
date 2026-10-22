@@ -864,6 +864,16 @@ function affTip(id) {
 }
 
 /* ---------- 存档读写 ---------- */
+const RECOVERY_MESSAGE = "存档操作尚未完成，请先在行囊恢复后再继续";
+function saveBlocked() {
+	try {
+		const W = lib.cshWallet;
+		if (W && W.saveGuard) return W.saveGuard.blocked();
+		if (localStorage.getItem("csh_migrate_recovery") !== null) return true;
+		const M = lib.cshMigrate, state = M && M.recoveryState && M.recoveryState();
+		return !!(state && (state.pending || state.busy));
+	} catch (e) { return true; }
+}
 function blank() {
 	return { v: 1, day: dayKey(), dayNo: 0, prices: {}, hold: {}, cost: {}, gift: false, earned: 0, pendingDiv: 0, tips: [] };
 }
@@ -918,6 +928,7 @@ function persistMarket(s) {
 let syncing = null, retryTimer = 0;
 let lastSaveError = "";
 export function syncPending() {
+	if (saveBlocked()) return Promise.resolve(false);
 	if (syncing) return syncing;
 	const wallet = lib.cshWallet && lib.cshWallet.wallet;
 	if (!wallet || !wallet.marketPending) return Promise.resolve(false);
@@ -926,7 +937,9 @@ export function syncPending() {
 	syncing = Promise.resolve().then(async function () {
 		let pending;
 		while ((pending = wallet.marketPending())) {
+			if (saveBlocked()) return false;
 			await persistMarket(pending.state);
+			if (saveBlocked()) return false;
 			lib.config[KEY] = JSON.parse(JSON.stringify(pending.state));
 			if (!wallet.completeMarket(pending.id)) {
 				const latest = wallet.marketPending();
@@ -939,13 +952,14 @@ export function syncPending() {
 		return false;
 	}).finally(function () {
 		syncing = null;
-		if (wallet.marketPending() && !retryTimer) retryTimer = setTimeout(function () {
+		if (!saveBlocked() && wallet.marketPending() && !retryTimer) retryTimer = setTimeout(function () {
 			retryTimer = 0; syncPending();
 		}, 5000);
 	});
 	return syncing;
 }
 function write(s, delta, reason) {
+	if (saveBlocked()) { lastSaveError = RECOVERY_MESSAGE; return { ok: false, msg: lastSaveError, recovery: true }; }
 	const wallet = lib.cshWallet && lib.cshWallet.wallet;
 	if (!wallet || !wallet.commitMarket) { lastSaveError = "钱包未就绪"; return { ok: false, msg: lastSaveError }; }
 	if (!delta && JSON.stringify(s) === JSON.stringify(read())) { lastSaveError = ""; syncPending(); return { ok: true }; }
@@ -959,6 +973,7 @@ function write(s, delta, reason) {
    每天：①价格 = 现价×(1+漂移+噪声) 再向趋势线×(1+热度) 回归；
         ②持仓分红 = 持仓 × 当日价 × 1.5% → 钱包（离线多天一次性补发）。 */
 export function ensureDay() {
+	if (saveBlocked()) return { ok: false, msg: RECOVERY_MESSAGE, recovery: true, days: 0, dividend: 0 };
 	try {
 		const s = read();
 		let credit = 0;
@@ -1091,6 +1106,7 @@ export function snapshot() {
 /* ---------- 交易（买/卖 · 走钱包单一账本） ----------
    side: "buy" | "sell"；n = 股数（正整数）。返回 {ok, msg, ...}。 */
 export function trade(id, n, side) {
+	if (saveBlocked()) return { ok: false, msg: RECOVERY_MESSAGE, recovery: true };
 	try {
 		if (LISTED.indexOf(id) < 0) return { ok: false, msg: "该标的未在金鳞市挂牌" };
 		n = Math.floor(Number(n) || 0);

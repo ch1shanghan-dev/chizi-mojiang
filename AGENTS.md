@@ -18,6 +18,8 @@
 
 ## 开始工作
 
+当前优先级（作者2026-10-22调整）：暂停既有武将AI优化，先完成桌面郝昭任务书与其他系统优化，再恢复武将AI。新增郝昭所需基础AI属于该任务；普通名册现为100人。避免全历史上下文并行、反复全文读取或无变化重复回归，按本次变更运行必要检查。
+
 1. 先看 `git status --short`，保留已有改动。
 2. 阅读 `README.md`、`docs/dev-rules.md`、`docs/first-principles.md`。
 3. 查当前任务对应模块，再读对应专题文档。计划看 `docs/plan.md`，历史看 `docs/CHANGELOG.md`、`docs/postmortems.md`。
@@ -45,6 +47,7 @@
 
 - 技能先核对描述、触发、filter/cost/content/mod、AI、storage 和联动；新增异步逻辑优先 `async content`。技能 ID、武将引用、译名与 `_info` 一起核对。
 - AI 只使用公开信息；决策留在技能自身，不用全局 Hook 代替技能 AI。
+- 作者最新方向：AI 审查主线为99普通武将及其实际获得/派生/响应技能；妖灵不计覆盖。UI 必要时可重塑；AI 世界持续推进。成就要有意义且量大管饱，不按旧R1提案减量或批量退休。
 - 跨模块搬代码必须补齐本模块自己的 import；不要依赖另一个模块的局部变量。保留 ESM 与零 import 双载脚本的边界。
 - 游戏清单、门票和回收率从 registry 派生；经济写入走钱包。结算成功 ACK 后才标记完成，失败释放认领；宿主共享会话守卫防重复结算。
 - 新持久化字段核对 `csh_migrate.js` 的键表、清洗器和真实存储后端。`localStorage` 与 `lib.config/game.saveConfig` 不能混为一谈。
@@ -77,8 +80,14 @@ node tools/probe_kami.cjs
 node tools/probe_eg_scroll.mjs
 node tools/probe_first_batch.mjs
 node tools/probe_interact_audit.mjs
+node tools/probe_world_encounters.mjs
+node tools/probe_career_rewards.mjs
+node tools/probe_player_interactions.mjs
+node tools/probe_career_achievements.mjs
+node tools/probe_world_entry.mjs
 node tools/probe_skill_ai.mjs
 node tools/probe_skill_ai_decisions.mjs
+node tools/probe_boss_ai.mjs
 node tools/probe_winrate_ui.mjs
 ```
 

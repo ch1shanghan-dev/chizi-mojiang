@@ -89,6 +89,9 @@ for (const file of ['skills/index.js', 'skills/boss.js', 'card/index.js']) {
       if (n.type === 'CallExpression' && n.callee.type === 'MemberExpression' && n.callee.property.name === 'set' && ['ai', 'ai1', 'ai2', 'processAI'].includes(n.arguments[0]?.value)) {
         callbacks.push({ kind: '.set(' + n.arguments[0].value + ')', line: n.loc.start.line, code: textOf(source, n.arguments[1]) }); ranges.push(n.range);
       }
+      if (n.type === 'AssignmentExpression' && n.left.type === 'MemberExpression' && n.left.property.name === 'ai' && ['FunctionExpression', 'ArrowFunctionExpression'].includes(n.right.type)) {
+        callbacks.push({ kind: '.ai=', line: n.loc.start.line, code: textOf(source, n.right) }); ranges.push(n.right.range);
+      }
     });
     const aiHelpers = props(value).filter(p => String(keyOf(p)).startsWith('_') && /FunctionExpression|ArrowFunctionExpression/.test(p.value?.type) && callbacks.some(c => c.code.includes('.' + keyOf(p) + '(')))
       .map(p => ({ name: keyOf(p), line: p.loc.start.line, code: textOf(source, p.value) }));

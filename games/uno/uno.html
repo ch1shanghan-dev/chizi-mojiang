@@ -598,7 +598,7 @@ var Bridge = (function () {
      注册点必须在 Bridge 内 —— T 是本闭包私有变量，注册在外层会 ReferenceError。 */
   T.onCloseSelf(function () { closePage(); });
   var call = T.call;
-  var ready = false, buyIn = 0, lastSnap = null;
+  var ready = false, buyIn = 0, lastSnap = null, worldTable = null, seatRequest = 0;
 
   return {
     active: T.active,
@@ -636,9 +636,14 @@ var Bridge = (function () {
     },
     /* 世界同桌（2026-10-03）：抽真实 AI 座位 —— 名字 / 性格 / 恩怨 / 头像种子都来自世界。
        buyIn 只用于宿主侧"谁坐得起这张桌子"的筛选（UNO 是门票制，不用带入额结算）。 */
-    seats: function (n, cb) { call('shell-seat', { n: n, buyIn: Math.max(200, buyIn) }, cb); },
+    seats: function (n, cb) { var request = ++seatRequest; call('shell-seat', { n: n, buyIn: Math.max(200, buyIn) }, function (ok, d) {
+      if (request !== seatRequest) return;
+      worldTable = ok && d ? d.table : null;
+      if (cb) cb(ok, d);
+    }); },
+    round: function (n, cb) { call('shell-world-round', { table: worldTable, round: n }, cb); },
     /* 战果回报（只记胜负、不动钱）：让同桌 AI 的手数 / 胜负 / 心态随对局演化。 */
-    result: function (id, won, cb) { call('shell-world-result', { id: id, won: won }, cb); },
+    result: function (id, won, round, cb) { call('shell-world-result', { table: worldTable, round: round, id: id, won: won }, cb); },
     isSettled: T.isSettled,
   };
 })();
@@ -790,6 +795,7 @@ function Room(id, net) {
   this.current = 0;
   this.direction = 1;
   this.state = 'waiting';   /* waiting | playing | ended */
+  this.round = 0;           /* 同一房间可再来一局；宿主世界战绩与经济结算分别去重 */
   this.winner = null;
   this.turnHasDrawn = false;
   this.drawnCardId = null;
@@ -974,6 +980,8 @@ Room.prototype.start = function () {
   this.topCard = first;
   this.activeColor = first.color;
   this.state = 'playing';
+  this.round += 1;
+  if (Bridge.active) Bridge.round(this.round);
   sfx.deal();
   this.pushLog('游戏开始！');
   this.scheduleBot(); /* 首位玩家若是人机，立即排程其行动 */
@@ -1262,6 +1270,7 @@ Room.prototype.viewFor = function (pid) {
     room: {
       id: this.id,
       state: this.state,
+      round: this.round,
       winner: this.winner,
       direction: this.direction,
       current: this.current,
@@ -1755,7 +1764,7 @@ function reportBots(myLeft) {
       if (!s || !s.id) continue;
       var left = leftOf(s.name);
       if (left == null) continue;
-      Bridge.result(s.id, left < myLeft);   /* 谁先出完谁赢 —— 逐个同桌记一笔胜负 */
+      Bridge.result(s.id, left < myLeft, view.round); /* 与 rankOf 一致：真人固定先手，同牌数时排在后座之前 */
     }
   } catch (eR) {}
 }
@@ -1776,7 +1785,9 @@ function startGame() {
   /* 【2026-10-03】同桌换成**真实世界 AI**：先拉座位（异步），拿到就按座位建机器人再开局；
      拉不到（不在壳内 / 世界无人）立刻退回内置名字池 —— 开局绝不被桥超时阻塞。 */
   botSeats = [];
+  var startingRoom = room;
   Bridge.seats(botCount, function (ok, d) {
+    if (!alive || room !== startingRoom) return; // 旧选座回包不能替新房间开局
     botSeats = (ok && d && d.seats && d.seats.length) ? d.seats : [];
     for (var i = 0; i < botCount; i++) room.addBot(botSeats[i] || null);
     var rs = room.start();
@@ -1803,6 +1814,11 @@ function closePage() {
   alive = false;              /* 先掐断机器人定时器递归 */
   clearAllTimers();
   if (room) { try { room.destroy(); } catch (e) {} room = null; }
+  /* 战果与金额分别确认；重复回报由宿主按桌/轮/对手回放，补结束时失败的回报。 */
+  if (Bridge.active && view && view.state === 'ended') {
+    var finalLeft = (view.players[youIdx] || {}).count;
+    reportBots(finalLeft == null ? myHand.length : (Number(finalLeft) || 0));
+  }
   /* 兜底：若对局已结束但尚未结算（如直接关窗），按当前结果补一次（幂等） */
   if (Bridge.active && !Bridge.isSettled() && view && view.state === 'ended') {
     var myName2 = (view.players[youIdx] || {}).name;

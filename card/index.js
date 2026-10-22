@@ -1204,14 +1204,11 @@ export default {
                     result: {
                         target(player, target) {
                             if (!target) return 0;
-                            const att = get.attitude(player, target);
                             if (typeof target.isDead === "function" && target.isDead()) {
-                                if (att <= 0) return -15;
-                                if (target.identity === "nei") return 0.5;
-                                return 6 + (target.isZhu || target.identity === "zhu" ? 4 : 0);
+                                // target 是受益者视角，敌我态度由宿主随后相乘；不读隐藏身份。
+                                return 6 + (target.isZhu ? 4 : 0);
                             }
                             if (target !== player) {
-                                if (att <= 0) return -6;
                                 let v = 1.5;
                                 if (target.hp <= 1) v += 2.5;
                                 if (target.hp < target.maxHp) v += 1;
