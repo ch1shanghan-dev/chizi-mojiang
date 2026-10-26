@@ -12,8 +12,10 @@ const matchUntilOver = process.argv.includes('--match-until-over');
 const matchMode = opt('--match-mode','identity');
 const rewardOnly = process.argv.includes('--reward-only');
 const spiritMode=process.argv.includes('--spirit');
+const spiritSeats=Number(opt('--spirit-seats','2'));
 const challengeMode=process.argv.includes('--challenge-smoke');
 const matchConfig = {identity:{player_number_mode_config_identity:'2'},versus:{versus_mode_mode_config_versus:'two'},doudizhu:{doudizhu_mode_mode_config_doudizhu:'normal'}};
+if(spiritMode)matchConfig.identity.player_number_mode_config_identity=String(spiritSeats);
 if(matchUntilOver && !Object.hasOwn(matchConfig,matchMode))throw Error('Natural-mode probe currently supports identity/versus/doudizhu only; no guessed host configuration');
 const out = path.resolve(opt('--out', 'D:/noname-audit-backups/chizi-mojiang/20261022-art-rebuild/host-smoke-' + new Date().toISOString().replace(/[:.]/g, '-')));
 fs.mkdirSync(out, { recursive: true });
@@ -154,6 +156,33 @@ async function clickElement(expression, inFrame = false, allowDisabled = false) 
   await page.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: point.x, y: point.y, button: 'left', clickCount: 1 });
   await delay(250);
 }
+async function smokeExperience(){
+ await page.evaluate('(async()=>{await lib.__cshLoadDebug();lib.cshWallet.wallet.add(250000,"isolated UI test funding");lib.cshWallet.flushSave();return lib.cshDebug.openLobby();})()');
+ await until('!!document.querySelector(".csh-world-hero")&&!!document.getElementById("csh-experience-css")?.sheet','new world design and stylesheet');
+ check('world hero and real invitation cards exist',await page.evaluate('document.querySelectorAll(".csh-world-digest article").length===3&&!!document.querySelector(".csh-world-start")'));
+ await delay(450);stage('world-experience',{screenshot:await snap('experience-world-desktop')});
+ await page.send('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:false});await delay(350);
+ const narrow=await page.evaluate(`(()=>{const p=document.getElementById('csh-dbg-panel'),r=p.getBoundingClientRect(),hero=document.querySelector('.csh-world-hero').getBoundingClientRect(),d=document.querySelector('.csh-world-digest');return {panel:{x:r.x,w:r.width},hero:{x:hero.x,w:hero.width},viewport:innerWidth,digestScroll:d.scrollWidth>d.clientWidth};})()`);
+ check('world narrow layout fits and stories scroll horizontally',narrow.panel.x>=-1&&narrow.panel.x+narrow.panel.w<=narrow.viewport+1&&narrow.hero.x+narrow.hero.w<=narrow.viewport+1&&narrow.digestScroll,narrow);stage('world-experience-phone',{screenshot:await snap('experience-world-phone')});if(process.argv.includes('--preview-only'))return;
+ await page.send('Emulation.setDeviceMetricsOverride',{width:1365,height:900,deviceScaleFactor:1,mobile:false});
+ await clickElement('[...document.querySelectorAll("button.csh-dbg-gamebtn")].find(b=>b.querySelector(".gb-name")?.textContent==="生涯大厅")');
+ await until('!!document.getElementById("csh-shell-frame")?.contentDocument?.getElementById("ach-claim-all")','career actual page');
+ await clickElement('document.getElementById("csh-shell-frame").contentDocument.querySelector("button[data-p=ach]")',true);
+ await until('!document.getElementById("csh-shell-frame").contentDocument.getElementById("ach-claim-all").disabled','career claimable snapshot');
+ const before=await page.evaluate('({pc:lib.cshWallet.wallet.pc(),claims:Object.keys(JSON.parse(localStorage.getItem("csh_wallet")).careerClaims||{}).length})');
+ stage('career-before-bulk',{screenshot:await snap('experience-career-before')});
+ await clickElement('document.getElementById("csh-shell-frame").contentDocument.getElementById("ach-claim-all")',true);
+ await until('Object.keys(JSON.parse(localStorage.getItem("csh_wallet")).careerClaims||{}).length>'+before.claims,'actual bulk receipts');await delay(500);
+ const after=await page.evaluate('({pc:lib.cshWallet.wallet.pc(),claims:Object.keys(JSON.parse(localStorage.getItem("csh_wallet")).careerClaims||{}).length,disabled:document.getElementById("csh-shell-frame").contentDocument.getElementById("ach-claim-all").disabled,button:document.getElementById("csh-shell-frame").contentDocument.getElementById("ach-claim-all").textContent})');
+ check('native pointer batch claim credits durable wallet and multiple receipts',after.pc>before.pc&&after.claims>before.claims+1,{before,after});check('one batch includes newly unlocked claims and leaves none ready',after.disabled,{after});stage('career-after-bulk',{screenshot:await snap('experience-career-after')});
+ await clickElement('document.getElementById("csh-shell-close")');
+ if(await page.evaluate('!!document.getElementById("csh-dbg-close")'))await clickElement('document.getElementById("csh-dbg-close")');
+ if(await page.evaluate("[...document.querySelectorAll('.control')].some(n=>n.textContent==='确定')"))await clickElement("[...document.querySelectorAll('.control')].find(n=>n.textContent==='确定')");if(!await page.evaluate('!!_status.auto'))await clickElement('ui.auto');await until('!!_status.gameStarted','debug actor initialized',20000);await page.evaluate('lib.cshDebugMenu.open()');await clickElement("[...document.querySelectorAll('#csh-dbg-tabs .csh-dbg-tab')].find(n=>n.textContent==='资源')");await until('!!document.querySelector("#csh-dbg-panel .csh-art-primary")','developer debug actions');await delay(350);
+ const align=await page.evaluate(`(()=>{const ps=[...document.querySelectorAll('#csh-dbg-panel .csh-art-primary,#csh-dbg-panel .csh-art-compact')].filter(b=>b.getBoundingClientRect().width>0);return ps.map(b=>({text:b.textContent,align:getComputedStyle(b).alignItems,justify:getComputedStyle(b).justifyContent}));})()`);
+ check('debug actions and actor tabs use centered content',align.length>5&&align.every(r=>r.align==='center'&&r.justify==='center'),align);
+ stage('debug-centered',{screenshot:await snap('experience-debug')});
+ const errors=await page.evaluate('({errors:__hostSmoke.errors,rejections:__hostSmoke.rejections})');check('experience flow has no runtime errors',!errors.errors.length&&!errors.rejections.length,errors);
+}
 async function smokeChallenge(){
  if(await page.evaluate("[...document.querySelectorAll('.control')].some(n=>n.textContent==='确定')"))await clickElement("[...document.querySelectorAll('.control')].find(n=>n.textContent==='确定')");
  if(!await page.evaluate('!!_status.auto'))await clickElement('ui.auto');
@@ -277,12 +306,19 @@ async function smokeNaturalMatch() {
   let sample = await page.evaluate(observe);
   const openingBalance = sample.wallet.pc;
   stage('natural-match-config', { state: sample, budgetMs: maxMs, sources: { speed: 'noname/library/index.js:1052 and noname/get/index.js:1443', players: 'noname/library/index.js:6091 and noname/get/index.js:1507', storageKey: 'noname/init/index.js:767-770 (_mode_config parser)' } });
-  const expectedPlayers = {identity:2,versus:4,doudizhu:3}[matchMode];
+  const expectedPlayers = {identity:spiritMode?spiritSeats:2,versus:4,doudizhu:3}[matchMode];
   check('natural-match configuration uses real supported '+matchMode+' and vvfast', sample.mode === matchMode && sample.speed === 'vvfast' && sample.players.length === expectedPlayers, {expectedPlayers,mode:sample.mode,speed:sample.speed,players:sample.players.length});
   if (sample.mode !== matchMode || sample.players.length !== expectedPlayers || sample.speed !== 'vvfast') throw Error('Actual supported test configuration was not applied');
   if (await page.evaluate("[...document.querySelectorAll('.control')].some(n=>n.textContent==='确定')")) await clickElement("[...document.querySelectorAll('.control')].find(n=>n.textContent==='确定')");
   if (!await page.evaluate('!!_status.auto')) await clickElement('ui.auto');
-  if(spiritMode){await until('!!_status.gameStarted && !!lib.cshAuxSpirit.current()','assisted gameStart injection',20000);check('real gameStart adds a complete independent lower seat',await page.evaluate('game.players.length===3 && game.me.next===lib.cshAuxSpirit.current().spirit && lib.cshAuxSpirit.current().spirit.identityShown'));}
+  if(spiritMode){await until('!!_status.gameStarted && !!lib.cshAuxSpirit.current()?.spirit','owner preparation injection',spiritSeats>2?120000:20000);check('real gameStart adds a complete independent lower seat',await page.evaluate('game.players.concat(game.dead).length==='+String(spiritSeats+1)+' && game.me.next===lib.cshAuxSpirit.current().spirit && lib.cshAuxSpirit.current().spirit.identityShown'));}
+  if(process.argv.includes('--spirit-seat-smoke')){
+    await delay(500);const seating=await page.evaluate(`(()=>{const r=lib.cshAuxSpirit.current();return {number:ui.arena.dataset.number,count:game.players.concat(game.dead).length,cause:r.summonedAt,hand:r.spirit.countCards('h'),position:r.spirit.dataset.position,rects:game.players.map(p=>{const a=p.getBoundingClientRect();return {name:p.name,x:a.x,y:a.y,width:a.width,height:a.height};}),size:{w:innerWidth,h:innerHeight},errors:__hostSmoke.errors,rejections:__hostSmoke.rejections};})()`);
+    check('real owner preparation summons ninth seat with initial hand',seating.count===spiritSeats+1&&seating.cause.trigger==='phaseZhunbeiBegin'&&seating.cause.owner&&seating.hand===4,seating);
+    check('native extra-seat layout stays inside viewport',seating.rects.every(r=>r.x>=-2&&r.y>=-2&&r.x+r.width<=seating.size.w+2&&r.y+r.height<=seating.size.h+2),seating);
+    await until('!!lib.cshAuxSpirit.current().spirit.storage.cshAuxAid','new guardian own preparation phase',90000);check('ninth participant takes native turn and aids only owner',await page.evaluate('lib.cshAuxSpirit.current().spirit.storage.cshAuxAid>=1'));
+    check('extra-seat initial event chain has no script errors',!seating.errors.length&&!seating.rejections.length,seating);stage('extra-seat-smoke',{seating,screenshot:await snap('extra-seat')});return;
+  }
   const started = Date.now(); let observedLocalCards = false, observedLocalDamage = false;
   while (Date.now() - started < maxMs) {
     sample = await page.evaluate(observe);
@@ -396,7 +432,8 @@ try {
   check('unmodified host entry is controlled by real service worker', current?.serviceWorker);
   check('actual engine created arena and loaded extension/registered Haozhao', current?.arena && current?.extensionLoaded && current?.character);
   if (current?.arena && current?.extensionLoaded && current?.character) {
-    if(challengeMode) await smokeChallenge();
+    if(process.argv.includes('--experience-smoke'))await smokeExperience();
+    else if(challengeMode) await smokeChallenge();
     else if (matchUntilOver) await smokeNaturalMatch();
     else if (process.argv.includes('--match-only')) await smokeIdentityMatch();
     else await smokeInterfaces();

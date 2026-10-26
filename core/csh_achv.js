@@ -60,7 +60,7 @@
 	/* ---------- 定义工具 ---------- */
 	var defs = [];
 	function push(key, cat, ico, label, desc, prog, reward) {
-		defs.push({ key: key, cat: cat, ico: ico, label: label, desc: desc, prog: prog, reward: reward });
+		defs.push({ key: key, cat: cat, ico: ico, label: label, desc: desc, prog: prog, reward: Math.max(500,Math.ceil(reward*5/50)*50) });
 	}
 	/* 阶梯生成：tier(def{key,cat,ico}, 名称模板, 描述模板, 阈值数组, prog 工厂, 奖励工厂) */
 	function tier(def, labelTpl, descTpl, arr, progOf, rewardOf) {

@@ -798,8 +798,8 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 			/* 门票额：门票制游戏的入场费（含官阶折扣）。
 			   带入制游戏（德州 / 斗地主 / 廿一点）门票为 0，真实成本是带入。 */
 			ticket: current ? ticketOf(current) : 0,
-			/* 最低非零门票 = 破产救济门槛（§F.4）。此前 career.html 自己硬编码 150，
-			   与钱包里的 RELIEF_THRESHOLD 是两份副本。 */
+			/* 门票展示与回桌援助独立；后者由钱包reliefState给出。 */
+			relief: W.wallet.reliefState ? W.wallet.reliefState() : null,
 			minTicket: (REG && typeof REG.minTicket === "function") ? REG.minTicket() : 150,
 			/* 2026-09-29：删除 quota / bank（死字段），改为真实字段 */
 			tiers: buyInTiers(), gamble: isGambleBuyIn(currentBuyIn),
@@ -1431,7 +1431,7 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 			/* 这些命令包含进度写入；先拒绝，不能让下层空结果变成成功 ACK。
 			   只读查询、关闭和行囊恢复入口仍可使用。 */
 			var mutatesSave = ["shell-settle", "shell-settle-session", "shell-task-add", "shell-merit",
-				"shell-sign", "shell-relief", "shell-ach-claim", "shell-pool-ach-claim", "shell-trade", "shell-goldfish", "shell-market-new",
+				"shell-sign", "shell-relief", "shell-ach-claim", "shell-ach-claim-all", "shell-pool-ach-claim", "shell-trade", "shell-goldfish", "shell-market-new",
 				"shell-aff-do", "shell-cheer", "shell-bounty", "shell-seat", "shell-world-round",
 				"shell-world-result"].indexOf(cmd) >= 0 || (cmd === "shell-open" && !(META[d.key] && META[d.key].lobby));
 			// postMessage 可能在导入前发出、导入后才处理；仍须在宿主拒绝旧壳写入。
@@ -1564,6 +1564,16 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 			}
 			/* 成就领奖：服务端（宿主侧）复核条件 → 入账 → 标记已领。
 			   复核用 window.CSH_ACHV（本档文档里的同一份引擎），防伪造桥消息刷奖励。 */
+            if(cmd==="shell-ach-claim-all"){
+                var AC=window.CSH_ACHV,W=wallet(),result={ok:false,count:0,gained:0,remaining:0};
+                try{if(!AC||!W||!W.wallet.claimCareer)throw Error("成就或钱包尚未就绪");
+                    var processed=Object.create(null),budget=Math.min(1000,AC.defs.length),stop=false;
+                    while(budget>0&&!stop){var ready=AC.evalAll(buildStats()).filter(function(r){return r.done&&!r.claimed&&!processed[r.key];});if(!ready.length)break;
+                        for(var n=0;n<ready.length&&budget>0;n++,budget--){var row=ready[n],paid=W.wallet.claimCareer(row.key,row.reward,row.label);if(!paid.ok){result.reason=paid.reason;stop=true;break;}processed[row.key]=true;AC.markClaimed(row.key);if(!paid.already){result.count++;result.gained+=paid.gained;}}
+                    }
+                    result.remaining=AC.evalAll(buildStats()).filter(function(r){return r.done&&!r.claimed;}).length;result.ok=result.count>0||result.remaining===0;paintPc();
+                }catch(e){result.reason=String(e.message||e);}ackToGame(cmd,result.ok,result);return;
+            }
 			if (cmd === "shell-ach-claim") {
 				var AC = (typeof window !== "undefined" && window.CSH_ACHV) || null;
 				var rA = { ok: false };
@@ -1637,7 +1647,7 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 			try { story = (lib.cshWorld && lib.cshWorld.worldStory) ? lib.cshWorld.worldStory() : null; } catch (eS) {}
 			try { wnews = (lib.cshWorld && lib.cshWorld.news) ? lib.cshWorld.news(10) : null; } catch (eN) {}
 			try { wstats = (lib.cshWorld && lib.cshWorld.stats) ? lib.cshWorld.stats() : null; } catch (eT) {}
-			ackToGame("shell-world", true, { leaderboard: wl, ai: ai, story: story, news: wnews, stats: wstats });
+			ackToGame("shell-world", true, { leaderboard: wl, ai: ai, storylines:lib.cshWorld&&lib.cshWorld.storylines?lib.cshWorld.storylines(3):[], story: story, news: wnews, stats: wstats });
 			return;
 		}
 			/* 名次制牌桌的"只记战果不动钱"（2026-10-03）：UNO 同桌 AI 的手数/胜负/心态回报。

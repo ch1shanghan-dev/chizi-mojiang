@@ -513,8 +513,9 @@ button:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid
 @media(max-width:600px) and (min-height:441px){#app{flex-direction:column}#tabs{flex:0 0 auto;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));padding:48px 6px 6px;gap:4px;overflow:visible}.tab{min-width:0;min-height:44px;padding:6px;font-size:var(--fs-sm);gap:2px}.tab .tm{max-width:100%;font-size:var(--fs-cap)}#body{padding:12px}.tab.on::after{height:2px;width:100%;top:auto;bottom:0}#rankFocus .name{font-size:var(--fs-menu)}}
 @media(max-height:440px) and (min-width:481px){#app{flex-direction:row}#tabs{display:flex;flex-direction:column;flex-basis:120px;padding:8px 0;overflow-y:auto}.tab{min-height:46px;padding:8px 12px}#body{padding-top:48px}.world-tools{margin-bottom:8px}}
 </style>
+<link rel="stylesheet" href="../core/csh_experience.css">
 </head>
-<body>
+<body class="csh-experience">
 <div id="app">
   <div id="tabs">
     <button class="tab on" data-p="overview">总览<i class="tm" id="tm-overview"></i></button>
@@ -630,6 +631,7 @@ button:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid
     <!-- 成就 -->
     <div class="page" id="p-ach">
       <div class="sect"><h3 id="ach-title">成就墙</h3>
+        <button class="btn" id="ach-claim-all" type="button" disabled>一键领取</button>
         <div class="diffbox" id="ach-summary">成就统计载入中…</div>
         <div class="ach-controls">
           <label class="ach-search">查找<input id="ach-search" type="search" placeholder="名称、条件或分类" aria-label="查找成就"></label>
@@ -1081,11 +1083,10 @@ function renderToday() {
   }
   var reliefBtn = $("#ov-relief");
   if (reliefBtn) {
-    /* 救济门槛 = 全扩展最低非零门票（registry.minTicket，经 shell-wallet 下发）。
-       此前这里硬编码 150，与钱包侧 RELIEF_THRESHOLD 是两份副本。 */
-    var poor = (s.pc || 0) < (s.minTicket || 150);
-    reliefBtn.disabled = !poor;
-    reliefBtn.textContent = poor ? "领取救济 +800" : "余额充足 · 无需救济";
+    /* 援助资格和金额以宿主钱包快照为准。 */
+    var help=s.relief||{available:(s.pc||0)<2000,gained:3000-(s.pc||0),reason:"余额不足2000时可领"};
+    reliefBtn.disabled=!help.available;reliefBtn.textContent=help.available?"回桌援助 +"+fmt(help.gained):help.reason;
+
   }
 }
 function nextThreshold(cur, ranks) {
@@ -1244,6 +1245,8 @@ function renderAch() {
     $("#ach-summary").innerHTML = "已达成 <b>" + done + "</b> / " + rows.length +
       " · 已领取 <b>" + claimedN + "</b>" +
       (claimable ? " · <b style='color:var(--gold-hi)'>" + claimable + " 枚可领取</b>" : "");
+    var total=rows.filter(function(r){return r.done&&!r.claimed;}).reduce(function(n,r){return n+r.reward;},0),allBtn=$("#ach-claim-all");
+    allBtn.disabled=!!window.__careerClaimAllBusy||!claimable;allBtn.textContent=window.__careerClaimAllBusy?"领取中…":"一键领取"+(claimable?" · "+claimable+"枚 / +"+fmt(total):"");
     var tmA = document.querySelector("#tm-ach"); if (tmA) tmA.textContent = done + "/" + rows.length;
     /* 分类条 */
     var cats = { "全部": 1 };
@@ -1344,6 +1347,9 @@ function achProgress(value) {
   return value === Math.floor(value) ? fmt(value) : String(Number(value.toFixed(2)));
 }
 function bindAchFilters() {
+  $("#ach-claim-all").addEventListener("click",function(){if(window.__careerClaimAllBusy)return;window.__careerClaimAllBusy=true;this.disabled=true;this.textContent="领取中…";
+    Bridge.call("shell-ach-claim-all",null,function(ok,r){window.__careerClaimAllBusy=false;toast(r&&r.count?"已领取 "+r.count+" 枚，实际到账 +"+fmt(r.gained)+" CBY"+(r.remaining?"；仍有 "+r.remaining+" 枚待领"+(r.reason?"（"+r.reason+"）":""):""):r&&r.reason||"暂无可领取奖励");renderAch();loadWalletSnap(2);});
+  });
   $("#ach-search").addEventListener("input", function () { achQuery = this.value; achLimit = 60; paintAchGrid(); });
   $("#ach-state").addEventListener("change", function () { achState = this.value; achLimit = 60; paintAchGrid(); });
   $("#ach-sort").addEventListener("change", function () { achSort = this.value; achLimit = 60; paintAchGrid(); });
@@ -1522,7 +1528,7 @@ function renderNarrative() {
   var w = State.world || {};
   var names = ((w.ai || []).map(function (a) { return a.name; })).filter(Boolean);
   names.sort(function (a, b) { return b.length - a.length; });   /* 长名优先，避免被短名截断 */
-  var news = Array.isArray(w.news) ? w.news : [];
+  var news = (w.storylines||[]).map(function(r){return {when:r.title,text:r.text};}).concat(Array.isArray(w.news)?w.news:[]);
   var box = $("#bd-news");
   if (box) {
     box.innerHTML = "";
@@ -1664,7 +1670,7 @@ function fallbackSnap() {
       var g = W.wallet.get();
       var r = W.rank ? W.rank.get() : null;
       snap = {
-        pc: g.pc || 0, pcPeak: g.pcPeak || 0, streak: g.streak || 0, signedToday: !!g.signedToday,
+        relief:W.wallet.reliefState?W.wallet.reliefState():null, pc: g.pc || 0, pcPeak: g.pcPeak || 0, streak: g.streak || 0, signedToday: !!g.signedToday,
         rank: r ? { rank: r.rank, merit: r.merit, meritToday: r.meritToday, softCap: r.softCap, seg: r.seg } : { rank: 0, merit: 0 },
         buyIn: 0, key: "career", ticket: 0,
         tiers: (W.tiers ? W.tiers() : [200, 2000, 20000, 200000]),

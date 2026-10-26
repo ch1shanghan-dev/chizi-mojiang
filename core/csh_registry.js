@@ -241,8 +241,9 @@
 	function texasRake(value) {
 		var rate = Number(value);
 		if ([0,50,100,200].indexOf(rate) < 0 || value == null) rate = 100;
-		return { rateBps: rate, cap: 20, noFlopNoDrop: true };
+		return { rateBps: rate, cap: null, noFlopNoDrop: true };
 	}
+	function matchRewards(mode) { var values={identity:{win:300,lose:100},versus:{win:250,lose:80},doudizhu:{win:300,lose:100},guozhan:{win:400,lose:120},boss:{win:150,lose:50}}; return mode?Object.assign({},values[mode]||{win:250,lose:80}):JSON.parse(JSON.stringify(values)); }
 	var API = {
 		version: "1.0.0",
 		ORDER: ORDER.slice(),
@@ -253,7 +254,7 @@
 		isLobby: isLobby, settleOf: settleOf, needBuyIn: needBuyIn, isLandscape: isLandscape,
 		titleOf: titleOf, dirOf: dirOf,
 		tickets: tickets, decays: decays, minTicket: minTicket, settlePlan: settlePlan,
-		selfTest: selfTest, texasRake: texasRake,
+		matchRewards:matchRewards, selfTest: selfTest, texasRake: texasRake,
 	};
 	root.CSH.registry = API;
 	/* 兼容：非 ESM 环境（noname 本体把 lib 挂在全局） */

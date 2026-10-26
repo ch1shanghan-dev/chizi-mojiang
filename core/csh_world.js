@@ -643,6 +643,7 @@ import { MINIONS } from "./csh_bossdata.js";
 	/* 迁移/重置后采用磁盘真值，不能让旧内存把已删除的世界重新写回。
 	   只规整内存；恢复流程自己负责持久化，不能在这里推进心跳或补写存档。 */
 	function reloadSave(snapshot) {
+        invitedId=null;
 		var stored, next = null;
 		if (arguments.length) {
 			/* 迁移事务已严格预读；采用其 parsed object/null，避免再次读盘失败
@@ -1412,6 +1413,16 @@ import { MINIONS } from "./csh_bossdata.js";
 	}
 
 	/* 抽取 n 个对手：性格混合（不出现全员同一性格）、同桌不同名、资金足够 */
+    var invitedId=null;
+    function inviteNext(id){if(saveBlocked())return {ok:false,reason:"存档恢复期间不能邀约"};var a=activeList().find(function(p){return String(p.id)===String(id);});if(!a)return {ok:false,reason:"这位牌友暂未在场"};invitedId=a.id;return {ok:true,id:a.id,name:a.name};}
+    function storylines(limit){
+        var known=activeList().slice().sort(function(a,b){return playerTable(b.withPlayer).hands-playerTable(a.withPlayer).hands||stableHash(String(a.id)+dayIndex())-stableHash(String(b.id)+dayIndex());});
+        return known.slice(0,clampNum(limit||3,1,6)).map(function(a){var p=playerTable(a.withPlayer),P=PERSONAS[a.persona]||PERSONAS.math,title,text;
+            if(p.hands===0){title="初次相识";text=a.name+" · "+P.name+"，尚未与你同桌。可以从一场小桌认识这位牌友。";}
+            else if(p.wins&&p.losses){title=p.revenge?"你来我往":"胜负未定";text="你与"+a.name+"已同桌"+p.hands+"手，对方"+p.wins+"胜、"+p.losses+"负；下一桌仍有故事可续。";}
+            else{title="熟人再会";text=a.name+"与你已有"+p.hands+"手交集，"+(p.wins?"此前占了上风":"此前还未占到上风")+"。邀约下一桌，再续这段牌缘。";}
+            return {id:a.id,name:a.name,title:title,text:text,persona:P.name,fund:a.fund,invited:String(invitedId)===String(a.id),hands:p.hands};});
+    }
 	function seat(n, buyIn, opts) {		opts = opts || {};
 		n = clampNum(Math.floor(Number(n) || 0), 0, 5);
 		buyIn = Math.max(AI_MIN_STAKE, Math.floor(Number(buyIn) || 1000));
@@ -1426,6 +1437,8 @@ import { MINIONS } from "./csh_bossdata.js";
 
 		var chosen = [];
 		var usedPersona = {};
+		var invited=pool.find(function(a){return String(a.id)===String(invitedId);});
+		if(n>0&&invited){chosen.push(invited);usedPersona[invited.persona]=1;invitedId=null;}
 		var guard = 0;
 		while (chosen.length < n && guard < 400) {
 			guard++;
@@ -1727,7 +1740,7 @@ import { MINIONS } from "./csh_bossdata.js";
 		   effectiveSkill / mentalFactor —— 供游戏页展示"真实发挥水平"。 */
 		worldStory: worldStory,
 		/* 世界动态（流言）：最近 n 条值得说的事，人物化措辞，只读派生（2026-10-03 新增） */
-		news: news,
+		news: news, storylines:storylines, inviteNext:inviteNext,
 		effectiveSkill: effectiveSkill,
 		mentalFactor: mentalFactor,
 		advanceState: advanceState,

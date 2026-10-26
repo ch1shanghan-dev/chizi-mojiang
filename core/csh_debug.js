@@ -3358,6 +3358,8 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                 var b = document.createElement("button");
                 b.type = "button";
                 b.className = "csh-dbg-gamebtn" + (locked ? " locked" : "");
+                var art={"生涯大厅":"war-record.png","讨伐录":"target-banner.png","天下榜":"inspect-compass.png","行囊":"transfer-chest.png","池子成就":"war-record.png","德州扑克":"interaction-strategy.png","斗地主":"target-banner.png","廿一点":"copy-scroll.png","UNO":"search-lens.png","金鳞市":"transfer-chest.png","妖灵图鉴":"interaction-strategy.png"}[title];
+                if(art){var cover=document.createElement('img');cover.className='gb-art';cover.alt='';cover.setAttribute('aria-hidden','true');cover.src=(lib.assetURL||'')+'extension/池子魔将/image/ui/art-v1/'+art;cover.onerror=function(){this.remove();};b.appendChild(cover);}if(title==='生涯大厅')b.dataset.cshModule='career';
                 var top = document.createElement("span");
                 top.className = "gb-top";
                 var nm = document.createElement("b");
@@ -3634,10 +3636,12 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 
             /* 玩家入口按任务分组；保留原卡片与接线，整卡仍可直接进入。 */
             if (document.documentElement.classList.contains("csh-world-view")) {
+                var hero=document.createElement('section');hero.className='csh-world-hero';var seal=document.createElement('span');seal.className='csh-world-seal';seal.textContent='池';var title=document.createElement('h2');title.textContent='一桌牌，续一段江湖。';var summary=document.createElement('p'),facts=lib.cshWorld&&lib.cshWorld.stats?lib.cshWorld.stats():{};summary.textContent=(facts.chars||0)+' 位牌友 · 已相识 '+(facts.playerOpponents||0)+' 人 · 同桌 '+(facts.playerHands||0)+' 手';hero.appendChild(seal);hero.appendChild(title);hero.appendChild(summary);var begin=document.createElement('button');begin.type='button';begin.className='csh-world-start';begin.textContent='即刻上桌';begin.addEventListener('click',function(){openGame('texas');});hero.appendChild(begin);body.insertBefore(hero,list);
+                if(lib.cshWorld&&lib.cshWorld.storylines){var digest=document.createElement('section');digest.className='csh-world-digest';var digestTitle=document.createElement('h3');digestTitle.textContent='池中风向 · 牌友邀约';digest.appendChild(digestTitle);digest.setAttribute('aria-label','池中风向与牌友邀约');lib.cshWorld.storylines(3).forEach(function(story){var card=document.createElement('article'),title=document.createElement('b'),text=document.createElement('p'),action=document.createElement('button');title.textContent=story.title+' · '+story.name;text.textContent=story.text;action.type='button';action.textContent=story.invited?'已邀约 · 去牌桌':'邀下一桌';action.className='csh-dbg-btn';action.addEventListener('click',function(){var result=lib.cshWorld.inviteNext(story.id);if(result.ok){if(lib.cshUI)lib.cshUI.toast('已邀约'+result.name+'，符合带入条件时优先同桌');openGame('texas');}else if(lib.cshUI)lib.cshUI.toast(result.reason);});card.appendChild(title);card.appendChild(text);card.appendChild(action);digest.appendChild(card);});digest.removeChild(digestTitle);digestTitle.className='csh-world-section';list.insertBefore(digest,list.firstChild);list.insertBefore(digestTitle,digest);}
                 var sectionLabel = document.createElement("div");
                 sectionLabel.className = "csh-world-section";
                 sectionLabel.textContent = "生涯与记录";
-                list.insertBefore(sectionLabel, list.firstChild);
+                list.insertBefore(sectionLabel,list.querySelector('button.csh-dbg-gamebtn'));
                 var playLabel = document.createElement("div");
                 playLabel.className = "csh-world-section";
                 playLabel.textContent = "休闲与探索";

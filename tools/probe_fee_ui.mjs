@@ -10,9 +10,9 @@ window.__feeUI=function(){
 };
 `+marker);
 const rows=[],check=(name,v)=>rows.push({name,passed:!!v});const page=await openProbe(html);try{
- check('fee terms visible before entry',await page.evaluate("document.getElementById('fee-tip').textContent.includes('场供 1%')&&document.getElementById('fee-tip').textContent.includes('最高 20')"));
+ check('fee terms visible before entry',await page.evaluate("document.getElementById('fee-tip').textContent.includes('场供 1%')&&document.getElementById('fee-tip').textContent.includes('无金额上限')"));
  for(const [name,width,height]of [['desktop',1200,800],['phone',390,844],['short',915,412]]){
- await page.send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:false});const r=await page.evaluate('__feeUI()');check(name+' real ledger render separates fee and refund',r.fee===4&&['本手投入','底池获奖','未跟注返还','本手场供','本手净变化','结算后筹码'].every(t=>r.text.includes(t)));check(name+' result panel fits viewport width',await page.evaluate("document.querySelector('.rs-panel').getBoundingClientRect().width<=innerWidth"));const shot=await page.send('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(out,name+'.png'),Buffer.from(shot.data,'base64'));
+ await page.send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:false});const r=await page.evaluate('__feeUI()');check(name+' real ledger render separates fee and refund',r.fee===4&&['本手投入','底池获奖','未跟注返还','本手场供','本手净变化','结算后筹码'].every(t=>r.text.includes(t)));check(name+' result panel fits viewport width',await page.evaluate("document.querySelector('.rs-panel').getBoundingClientRect().width<=innerWidth"));await page.evaluate('new Promise(r=>setTimeout(r,350))');const shot=await page.send('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(out,name+'.png'),Buffer.from(shot.data,'base64'));
  }
 }finally{await page.close();}
 const result={scope:'actual Texas page isolated Chromium, fixed hand; no user wallet or live multiplayer game',passed:rows.filter(r=>r.passed).length,failed:rows.filter(r=>!r.passed).length,failures:rows.filter(r=>!r.passed)};console.log(JSON.stringify(result,null,2));if(result.failed)process.exitCode=1;

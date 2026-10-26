@@ -638,8 +638,9 @@
     .medal { font-size:var(--pfs-micro); padding: 1px 6px; }
   }
 </style>
+<link rel="stylesheet" href="../../core/csh_experience.css">
 </head>
-<body>
+<body class="csh-experience">
 
 <!-- ★ 2026-09-29：移除页面自带浮动「关闭」—— 壳顶带已有关闭，双按钮纯属冗余。
      关闭链路保留：壳顶带按钮 / Esc / 收工结算横幅。 -->
@@ -3140,7 +3141,7 @@ function renderStart() {
     ? (gambleNow ? '入座豪赌桌' : '开始生涯')
     : (entryDone ? '本场带入已结算 · 请回大厅重新入场' : '余额不足 · 需 ' + fmt(MIN_BUYIN) + ' CBY');
   var fee=(Bridge.snapshot()&&Bridge.snapshot().texasRake)||CSH.registry.texasRake();
-  $('#fee-tip').textContent=fee.rateBps?'场供 '+(fee.rateBps/100)+'% · 每手最高 '+fee.cap+' CBY · 见翻牌后收取，未跟注返还免收；收工无额外折扣':'场供已关闭 · 收工无额外折扣';
+  $('#fee-tip').textContent=fee.rateBps?'场供 '+(fee.rateBps/100)+'% · 无金额上限 · 见翻牌后收取，未跟注返还免收；收工无额外折扣':'场供已关闭 · 收工无额外折扣';
   var tip = $('#start-tip');
   /* 【2026-10-03】这一段是**状态提示**，不是规则说明 —— 只在"需要玩家改变行为"时给一句，
      其余情况（一切正常）留空。此前无论什么状态都铺两行解释，等于把说明书写在按钮下面。 */

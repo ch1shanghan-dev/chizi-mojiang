@@ -187,7 +187,7 @@
 		function writesSave(name, payload) {
 			if (name === "shell-open" && payload && payload.key === "save") return false;
 			return ["shell-settle", "shell-settle-session", "shell-task-add", "shell-merit",
-				"shell-sign", "shell-relief", "shell-ach-claim", "shell-pool-ach-claim", "shell-trade",
+				"shell-sign", "shell-relief", "shell-ach-claim", "shell-ach-claim-all", "shell-pool-ach-claim", "shell-trade",
 				"shell-goldfish", "shell-market-new", "shell-aff-do", "shell-cheer", "shell-bounty",
 				"shell-seat", "shell-world-round", "shell-world-result", "shell-open"].indexOf(name) >= 0;
 		}

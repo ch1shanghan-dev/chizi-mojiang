@@ -254,8 +254,8 @@
 	   end = 本手开始筹码 + net
 	   本游戏结算层无抽水（台费由钱包侧按回收率另计），故守恒要求严格相等。 */
 	function finish(hand, players, stacks, pots, payouts, totalPot, settled) {
-		var rake=hand.rake||{},rate=rake.rateBps||0,cap=rake.cap||0,systemCollected=0,rakePaid={};
-		if(!Number.isSafeInteger(rate)||rate<0||rate>1000||!Number.isSafeInteger(cap)||cap<0||cap>1000)throw Error("德州场供配置无效");
+		var rake=hand.rake||{},rate=rake.rateBps||0,cap=rake.cap==null?Number.MAX_SAFE_INTEGER:rake.cap,systemCollected=0,rakePaid={};
+		if(!Number.isSafeInteger(rate)||rate<0||rate>1000||!Number.isSafeInteger(cap)||cap<0||cap>Number.MAX_SAFE_INTEGER)throw Error("德州场供配置无效");
 		var canRake=rate>0 && (!rake.noFlopNoDrop || (hand.community||[]).length>=3);
 		var grossPayouts=Object.assign({},payouts);
 		pots.forEach(function(pt){

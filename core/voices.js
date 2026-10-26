@@ -2,6 +2,9 @@
 // 自动识别草稿 + 人工校对；无对白/不需要的条目已删除
 // 懒人包/语音栏通过 lib.translate["#ext:路径"] 显示中文
 export const cshVoices = {
+    "#ext:池子魔将/audio/skill/csh_juwei1": "镇守城池，必以骨相拼！",
+    "#ext:池子魔将/audio/skill/csh_juwei2": "孔明计虽百算，却难敌吾镇骨千具！",
+    "#ext:池子魔将/audio/skill/csh_chonglei1": "镇守城池，必以骨相拼！",
     "#ext:池子魔将/audio/skill/csh_anzi1": "我的祖先建立了纳祖芒，他们没有被神明、帝王和野兽征服，我也不会。",
     "#ext:池子魔将/audio/skill/csh_anzi2": "荣耀只是暂时的，等纳祖芒永远屹立。",
     "#ext:池子魔将/audio/skill/csh_anzi_reforge1": "轻捷如流沙，矫健如雄鹰。",

@@ -435,7 +435,7 @@ const tongyuanBird = {
 const cshSkillPack = {
         skill: {
             "csh_juwei": {
-                audio: false,
+                audio: "ext:池子魔将/audio/skill:2",
                 trigger: { target: "useCardToTargeted" },
                 lastDo: true,
                 init(player) {
@@ -536,7 +536,7 @@ const cshSkillPack = {
                 },
             },
             "csh_chonglei": {
-                audio: false,
+                audio: "ext:池子魔将/audio/skill:1",
                 trigger: { player: "changeHp" },
                 forced: true,
                 filter(event, player) {

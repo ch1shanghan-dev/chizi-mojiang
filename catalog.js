@@ -1,12 +1,12 @@
-/* 自动生成于 2026-10-26T09:01:50.579Z by tools/release.js —— 发版后 git push 即生效，勿手改 files */
+/* 自动生成于 2026-10-26T12:44:50.885Z by tools/release.js —— 发版后 git push 即生效，勿手改 files */
 window.extension = {
 	"池子魔将": {
 		"name": "池子魔将",
 		"author": "池上寒",
-		"intro": "<font color=#c9a84c>版本</font> <font color=#00FFFF>4.0.11</font>",
-		"version": "4.0.11",
+		"intro": "<font color=#c9a84c>版本</font> <font color=#00FFFF>4.0.12</font>",
+		"version": "4.0.12",
 		"date": "2026-10-26",
-		"size": "135.8MB",
+		"size": "136.3MB",
 		"forum": "https://github.com/ch1shanghan-dev/chizi-mojiang",
 		"netdisk": "",
 		"files": [
@@ -162,6 +162,7 @@ window.extension = {
 			"audio/skill/csh_chengqiang12.mp3",
 			"audio/skill/csh_chengqiang21.mp3",
 			"audio/skill/csh_chengqiang22.mp3",
+			"audio/skill/csh_chonglei1.mp3",
 			"audio/skill/csh_chunqiu1.mp3",
 			"audio/skill/csh_cijia1.mp3",
 			"audio/skill/csh_cijia2.mp3",
@@ -213,6 +214,8 @@ window.extension = {
 			"audio/skill/csh_jiagiang.mp3",
 			"audio/skill/csh_jishe1.mp3",
 			"audio/skill/csh_jishe2.mp3",
+			"audio/skill/csh_juwei1.mp3",
+			"audio/skill/csh_juwei2.mp3",
 			"audio/skill/csh_kuanggu3.mp3",
 			"audio/skill/csh_kuiwei1.mp3",
 			"audio/skill/csh_kuiwei2.mp3",
@@ -319,6 +322,7 @@ window.extension = {
 			"core/csh_cards.js",
 			"core/csh_challenge.js",
 			"core/csh_debug.js",
+			"core/csh_experience.css",
 			"core/csh_games.js",
 			"core/csh_interact.js",
 			"core/csh_interact_lines.js",

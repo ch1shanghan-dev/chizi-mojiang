@@ -61,7 +61,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 	   门禁 E30 会扫描 core/ 与 games/ 里所有 `.wallet.add(` 调用点，确保今后新增来源都带
 	   字符串前缀，不会因这一层静默丢钱。 */
 	var SINGLE_ADD_CAP = 1000000000;   // 单笔硬上限 10 亿（PC_CAP 是总量上限，这里是单笔）      // 上限 1000 亿（2026-10-01 用户指定：由 1 亿上调；仍防溢出，2^53 内安全）
-	var RELIEF_AMOUNT = 800;        // 破产救济（§F.4）
+	var RELIEF_AMOUNT = 3000;        // 回桌援助目标余额（4.0.12）
 	var SIGN_BASE = 1200;           // 签到基础（§F.4）
 	var SIGN_STEP = 200;            // 每连签 +200
 	var SIGN_STREAK_CAP = 15;       // 连签加成封顶 15 天
@@ -89,9 +89,8 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 		? REG.tickets()
 		: { uno: 150, doudizhu: 0, blackjack: 0, texas: 0 };
 	var TICKET_MIN = (REG && typeof REG.minTicket === "function") ? REG.minTicket() : 150;
-	/* 救济门槛 = 最低非零门票（§F.4）。此前这里另写一个字面量 150（TICKET_MIN 也写 150），
-	   同一事实三份副本 —— 现在只有一个来源。 */
-	var RELIEF_THRESHOLD = TICKET_MIN;
+	/* 4.0.12：低流动余额可每日一次补足至援助目标；与游戏最低门票分开。 */
+	var RELIEF_THRESHOLD = 2000;
 
 	/* 带入档位（2026-09-29 新增 · 全扩展唯一一份，来源用户在 2026-09-29 拍板）。
 	   四档在对数尺度上均匀：200 → 2,000 → 20,000 → 200,000。
@@ -766,28 +765,8 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 
 	/* 普通对局奖励：余额与最近64局收据同次严格写入，原生终局仅调用此入口。
 	   待写流水保留在收据中；清理失败不允许挤掉旧收据。 */
-	function matchRewardConfig() {
-		var config = wallet.matchRewardConfig;
-		if (config == null) return {};
-		if (typeof config !== "object" || Array.isArray(config)) throw new Error("对局奖励配置格式异常");
-		return JSON.parse(JSON.stringify(config));
-	}
-	function setMatchRewardConfig(config) {
-		if (saveBlocked()) return saveRefused();
-		if (!config || typeof config !== "object" || Array.isArray(config) || Object.keys(config).length > 128) return { ok:false, reason:"对局奖励配置无效" };
-		var nextConfig = {};
-		for (var mode of Object.keys(config)) {
-			var item = config[mode];
-			if (!/^[a-zA-Z0-9_-]{1,40}$/.test(mode) || ["__proto__","constructor","prototype"].indexOf(mode) >= 0 || !item || !Number.isSafeInteger(item.win) || !Number.isSafeInteger(item.lose) || item.win < 0 || item.lose < 0 || item.win > 1000 || item.lose > 1000) return { ok:false, reason:"每项奖励须为0～1000的整数" };
-			nextConfig[mode] = { win:item.win, lose:item.lose };
-		}
-		try {
-			var next = JSON.parse(JSON.stringify(wallet)); next.matchRewardConfig = nextConfig; next._sig = sigOf(next);
-			if (saveBlocked()) return saveRefused();
-			localStorage.setItem(K_WALLET, JSON.stringify(next)); wallet = next;
-			return { ok:true };
-		} catch (e) { logError("对局奖励配置未保存",e); return { ok:false, reason:"配置保存失败，请重试" }; }
-	}
+	function matchRewardConfig(){return REG&&REG.matchRewards?REG.matchRewards():{identity:{win:300,lose:100},versus:{win:250,lose:80},doudizhu:{win:300,lose:100},guozhan:{win:400,lose:120},boss:{win:150,lose:50}};}
+	function setMatchRewardConfig(){return {ok:false,reason:"对局奖励由扩展统一设定"};}
 	function matchClaims() {
 		var claims = wallet.matchClaims;
 		if (claims == null) return [];
@@ -1107,15 +1086,14 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 		return { ok: true, streak: wallet.streak, amount: amt, gained: gained, bonus: bonus, total: gained + bonus };
 	}
 	/* 破产救济（§F.4）：每日 1 次，仅当 PC < 最低门票 */
+	function reliefState(){var claimed=/^\d{4}-\d{2}-\d{2}$/.test(wallet.reliefDate)&&wallet.reliefDate>=today(),poor=wallet.pc<RELIEF_THRESHOLD;return {threshold:RELIEF_THRESHOLD,target:RELIEF_AMOUNT,claimed:claimed,available:poor&&!claimed,gained:poor&&!claimed?RELIEF_AMOUNT-wallet.pc:0,reason:claimed?"今日已领取":poor?"补足至 "+RELIEF_AMOUNT+" CBY":"余额不足 "+RELIEF_THRESHOLD+" 时可领"};}
 	function relief() {
-		if (saveBlocked()) return saveRefused();
-		var t = today();
-		if (wallet.pc >= RELIEF_THRESHOLD) return { ok: false, reason: "余额充足，无需救济" };
-		if (wallet.reliefDate === t) return { ok: false, reason: "今日已领取救济" };
-		wallet.reliefDate = t;
-		var got = addPC(RELIEF_AMOUNT, "破产救济");
-		return { ok: true, gained: got };
-	}
+        if(saveBlocked())return saveRefused();var state=reliefState();if(!state.available)return {ok:false,reason:state.reason};
+        if(!flushCareerLedger())return {ok:false,reason:"上笔收益流水待恢复"};var before=wallet;
+        try{wallet=JSON.parse(JSON.stringify(before));wallet.pc+=state.gained;wallet.pcPeak=Math.max(wallet.pcPeak,wallet.pc);wallet.reliefDate=today();appendChain(state.gained);
+            wallet.careerPending={key:"relief_"+today().replace(/-/g,"_"),entry:{t:Date.now(),d:state.gained,r:"回桌援助",c:"补给",b:wallet.pc,careerTx:"relief_"+today().replace(/-/g,"_")}};wallet._sig=sigOf(wallet);localStorage.setItem(K_WALLET,JSON.stringify(wallet));
+        }catch(e){wallet=before;return {ok:false,reason:"存档写入失败，领取资格已保留"};}flushCareerLedger();snapshot();return {ok:true,gained:state.gained,balance:wallet.pc};
+    }
 
 	/* ============================================================
 	   5. 官阶（§G）
@@ -2005,7 +1983,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 			ticketOf: ticketOf, payTicket: payTicket,
 			capOf: capOf, settle: settle, settleRun: settleRun, planOf: planOf,
 			sign: sign, canSign: canSign, signAmount: signAmount,
-			relief: relief,
+			relief: relief, reliefState: reliefState,
 			today: today,
 		},
 		/* 每日任务（唯一真值）：五游戏共用同一个状态机 */

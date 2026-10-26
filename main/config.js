@@ -52,10 +52,9 @@ export const cshConfig = {
                 notice("池子世界没能打开，请重启游戏后再试"); return false;
             }},
             "csh_interact_panel":{"name":artConfigLabel("局内互动","interaction-strategy.png"),"intro":"设置局内互动：总开关、互动频率、附带台词。联机不可用。","clear":true,"onclick":function(){ if(!lib.cshInteract||typeof lib.cshInteract.openPanel!=="function"){ notice("局内互动没能打开，请重启游戏后再试"); return false; } lib.cshInteract.openPanel(); return false; }},
-            "csh_match_rewards":{"name":artConfigLabel("对局 CBY 奖励","transfer-chest.png"),"intro":"独立设置各模式胜利与失败的 CBY 奖励；0 可关闭。仅单机正常终局生效，BOSS 特殊奖励另计。","clear":true,"onclick":function(){ if(lib.cshMatchReward&&typeof lib.cshMatchReward.openPanel==="function")lib.cshMatchReward.openPanel();else notice("对局奖励设置尚未就绪，请重启游戏后再试");return false;}},
-            "csh_texas_rake":{"name":"德州场供","intro":"只从已见翻牌、实际争夺的底池收取；每手最高20 CBY。未跟注返还不收费，整场收工不再另扣净赢回收差额。","init":"100","item":{"0":"关闭","50":"0.5% · 每手最高20","100":"1% · 每手最高20","200":"2% · 每手最高20"}},
+            "csh_texas_rake":{"name":"德州场供","intro":"只从已见翻牌、实际争夺的底池收取；不设金额上限。未跟注返还不收费，整场收工不再另扣净赢回收差额。","init":"100","item":{"0":"关闭","50":"0.5% · 无上限","100":"1% · 无上限","200":"2% · 无上限"}},
             "csh_challenge_profile":{"name":"池子挑战难度","intro":"仅池子魔王。爽快档减血减压，挑战者起手6张与1护甲；困难档保留原参数。下局生效，奖励不加倍。","init":"normal","item":{"normal":"爽快 · 推荐","hard":"原味困难"}},
-            "csh_aux_spirit":{"name":"妖灵乱入（实验）","intro":"下局生效。仅单机标准身份场2–7人，内奸不召唤。下家独立AI友军，辅助有限；战绩独立，无普通奖励。","init":false},
+            "csh_aux_spirit":{"name":"妖灵乱入（实验）","intro":"下局生效。仅单机标准身份场2–8人，内奸不召唤。自己准备阶段召唤下家独立AI友军，辅助有限；战绩独立，无普通奖励。","init":false},
             "csh_aux_stats":{"name":"妖灵辅助战绩","clear":true,"onclick":function(){try{const s=lib.cshWallet.wallet.assistedStats();notice("辅助身份场："+s.wins+"胜 "+s.losses+"负；不计普通身份战绩，无常规奖励");}catch(e){notice("辅助战绩不可读取，请先备份并恢复存档");}return false;}},
             /* ===== 功能开关 ===== */
             "csh_effect_announce":{"name":"伤害/击杀/回复播报","intro":"开启后播放伤害、连杀、回复的播报与音效。与其他特效扩展冲突时关掉。","init":false},
