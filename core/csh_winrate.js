@@ -26,9 +26,34 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
             }catch(_e){}
         }
 
+        // 直接入口与宿主结算同样受恢复锁保护；启动阶段不能依赖钱包已安装。
+        function saveBlocked(){
+            try{
+                var guard=lib.cshWallet&&lib.cshWallet.saveGuard;
+                if(guard&&typeof guard.blocked==="function") return guard.blocked();
+                if(localStorage.getItem("csh_migrate_recovery")!==null) return true;
+                var migrate=lib.cshMigrate;
+                var state=migrate&&typeof migrate.recoveryState==="function"?migrate.recoveryState():null;
+                return !!(state&&(state.pending||state.busy));
+            }catch(e){ return true; }
+        }
+        function noticeWR(message){
+            try{
+                if(lib.cshUI&&typeof lib.cshUI.toast==="function"){ lib.cshUI.toast(message); return; }
+            }catch(e){}
+            dbgInfo(message);
+        }
+        function allowWrite(){
+            if(!saveBlocked()) return true;
+            noticeWR("存档操作尚未完成，请先在行囊恢复后再继续");
+            return false;
+        }
         function readData(){
             var d=lib.config[STAT_KEY];
             if(!d||typeof d!="object"||Array.isArray(d)) d={};
+            // 清洗和展示只处理独立快照，不能在恢复期间改动 lib.config 的原对象。
+            try{ d=JSON.parse(JSON.stringify(d)); }
+            catch(e){ dbgError("read snapshot",e); d={}; }
             var needSave=false;
             function cleanWL(e){ // 通用清洗：{games,win,lose}数值校验、平局残留清除、场次对账；返回是否有有效数据
                 if(!e||typeof e!="object"||Array.isArray(e)) return false;
@@ -142,7 +167,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                 if(d.me&&d.me.chars) mergeBucket(d.me.chars);
                 if(merged) needSave=true;
             })();
-            if(needSave) game.saveConfig(STAT_KEY,d);
+            if(needSave&&!saveBlocked()) game.saveConfig(STAT_KEY,JSON.parse(JSON.stringify(d)));
             return d;
         }
         function modeKey(){
@@ -198,6 +223,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
             return arr;
         }
         function record(mode,name,win,st){
+            if(saveBlocked()) return;
             var d=readData();
             var e=d[mode][name];
             if(!e) e=d[mode][name]={games:0,win:0,lose:0,damage:0,damaged:0,gain:0,discard:0,kill:0};
@@ -205,10 +231,11 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
             if(win) e.win++;
             else e.lose++;
             e.damage+=st.damage;e.damaged+=st.damaged;e.gain+=st.gain;e.discard+=st.discard;e.kill+=st.kill;
-            game.saveConfig(STAT_KEY,d);
+            if(!saveBlocked()) game.saveConfig(STAT_KEY,d);
         }
         // 阵营胜率分支：按身份（主/忠/反/内）累计胜负，展示时主忠合并
         function recordCamp(camp,win){
+            if(saveBlocked()) return;
             var d=readData();
             if(!d.camps||typeof d.camps!="object"||Array.isArray(d.camps)) d.camps={};
             var e=d.camps[camp];
@@ -216,10 +243,11 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
             e.games++;
             if(win) e.win++;
             else e.lose++;
-            game.saveConfig(STAT_KEY,d);
+            if(!saveBlocked()) game.saveConfig(STAT_KEY,d);
         }
         // 玩家操控统计：kind="chars"按角色、kind="camps"按身份，只记本地玩家自己的战绩
         function recordMe(kind,key,win){
+            if(saveBlocked()) return;
             var d=readData();
             if(!d.me||typeof d.me!="object"||Array.isArray(d.me)) d.me={};
             if(!d.me[kind]||typeof d.me[kind]!="object"||Array.isArray(d.me[kind])) d.me[kind]={};
@@ -228,9 +256,11 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
             e.games++;
             if(win) e.win++;
             else e.lose++;
-            game.saveConfig(STAT_KEY,d);
+            if(!saveBlocked()) game.saveConfig(STAT_KEY,d);
         }
         function capture(result,result2){
+            if(_status.cshAssistedMatch) return;
+            if(saveBlocked()) return;
             if(_status.over) return;
             if(_status.video) return;
             var mode=modeKey();
@@ -927,6 +957,7 @@ function filterBar(){
         /* 合并策略：逐模式逐角色累加，而不是覆盖（避免误操作清空现有记录）。
            只接受已知数值字段，且只累加正数 —— 负数/NaN 是脏数据，不入账。 */
         function mergePayload(p){
+            if(saveBlocked()) return {ok:false,recovery:true};
             var cur=readData();
             var touched=0,games=0;
             function mergeBucket(src,dst,count){
@@ -962,6 +993,7 @@ function filterBar(){
                     }
                 });
             }
+            if(saveBlocked()) return {ok:false,recovery:true};
             game.saveConfig(STAT_KEY,cur);
             return {chars:touched,games:games};
         }
@@ -1078,6 +1110,7 @@ function filterBar(){
                     var res=parsePayload(ta.value);
                     if(!res.ok){ ioStat(res.error,"bad"); return; }
                     var added=mergePayload(res.payload);
+                    if(added.recovery){ ioStat("存档操作尚未完成，请先在行囊恢复后再继续","bad"); return; }
                     wr.page=0;
                     var root=document.getElementById("csh-wr-root");
                     if(root) render(root);
@@ -1131,6 +1164,7 @@ function filterBar(){
                     if(act!=="io-confirm") return;
                     var inp=layer.querySelector("#csh-wr-io-input");
                     if(!inp||inp.value.trim()!=="确认"){ ioStat("请输入「确认」二字后再清空。","bad"); return; }
+                    if(!allowWrite()) return;
                     game.saveConfig(STAT_KEY,{});
                     wr.page=0;
                     render(root);
@@ -1407,19 +1441,25 @@ function filterBar(){
         }
         /* D1 单条删除（联动 me.chars，避免两页数据打架）+ D4 撤销快照 */
         function delChar(name,root){
+            if(!allowWrite()) return;
             var d=readData();
-            var e=(d[wr.mode]||{})[name];
+            var mode=wr.mode;
+            var e=(d[mode]||{})[name];
             if(!e) return;
             var summary="场次 "+e.games+" · 胜 "+e.win+" · 负 "+e.lose+" · 胜率 "+fmtPct(rateOf(e))+" · 场均击杀 "+fmtNum(e.games?e.kill/e.games:0);
             uiConfirm({
                 title:"删除武将战绩",
-                message:"确定删除【"+cname(name)+"】在「"+MODE_NAMES[wr.mode]+"」的战绩吗？\n"+summary+"\n删除后不可恢复（可点「撤销」）。",
+                message:"确定删除【"+cname(name)+"】在「"+MODE_NAMES[mode]+"」的战绩吗？\n"+summary+"\n删除后不可恢复（可点「撤销」）。",
                 ok:"删除",
                 danger:true,
             },function(ok){
                 if(!ok) return;
+                if(!allowWrite()) return;
+                // 确认等待期间可能有新结算；重新读取并只删除最初确认的模式。
+                d=readData();
+                if(!(d[mode]||{})[name]||!allowWrite()) return;
                 wr._undo=JSON.parse(JSON.stringify(d));               // D4：内存级快照（不落盘）
-                delete d[wr.mode][name];
+                delete d[mode][name];
                 if(d.me&&d.me.chars){ delete d.me.chars[name]; if(!Object.keys(d.me.chars).length) delete d.me.chars; }
                 if(d.me&&!Object.keys(d.me).length) delete d.me;
                 game.saveConfig(STAT_KEY,d);
@@ -1477,6 +1517,7 @@ function filterBar(){
                 else if(act=="prev"){ if(wr.page>0){ wr.page--; render(root); } }
                 else if(act=="next"){ wr.page++; render(root); }
                 else if(act=="resetcamps"){
+                    if(!allowWrite()) return;
                     uiConfirm({
                         title:"重置阵营数据",
                         message:"确定清空阵营胜率数据吗？\n（含全场阵营与你自己的阵营战绩，武将排行与角色胜率排行不受影响）",
@@ -1484,7 +1525,9 @@ function filterBar(){
                         danger:true,
                     },function(ok){
                         if(!ok) return;
+                        if(!allowWrite()) return;
                         var d=readData();
+                        if(!allowWrite()) return;
                         delete d.camps;
                         if(d.me){ delete d.me.camps; if(!Object.keys(d.me).length) delete d.me; }
                         game.saveConfig(STAT_KEY,d);
@@ -1497,18 +1540,22 @@ function filterBar(){
                 }
                 else if(act=="del"){ delChar(val,root); }
                 else if(act=="undo"){
-                    if(wr._undo){ game.saveConfig(STAT_KEY,wr._undo); wr._undo=null; render(root); }
+                    if(wr._undo&&allowWrite()){ game.saveConfig(STAT_KEY,wr._undo); wr._undo=null; render(root); }
                 }
                 else if(act=="clearmode"){
+                    if(!allowWrite()) return;
+                    var clearMode=wr.mode;
                     uiConfirm({
                         title:"清空本模式战绩",
-                        message:"将清空【"+MODE_NAMES[wr.mode]+"】全部武将战绩。\n阵营胜率与玩家操控数据不受影响。",
+                        message:"将清空【"+MODE_NAMES[clearMode]+"】全部武将战绩。\n阵营胜率与玩家操控数据不受影响。",
                         ok:"清空",
                         danger:true,
                     },function(ok){
                         if(!ok) return;
+                        if(!allowWrite()) return;
                         var d2=readData();
-                        delete d2[wr.mode];
+                        if(!allowWrite()) return;
+                        delete d2[clearMode];
                         game.saveConfig(STAT_KEY,d2);
                         wr.page=0; render(root);
                     });
@@ -1536,6 +1583,7 @@ function filterBar(){
             if(wr.view=="camps") renderCamps(root);
             else if(wr.view=="me") renderMe(root);
             else renderList(root);
+            if(lib.cshArt) lib.cshArt.decorate(root.parentNode,"winrate");
         }
         wr.open=function(){
             try{

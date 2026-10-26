@@ -56,7 +56,7 @@
 		texas: {
 			key: "texas", title: "德州扑克", dir: "texas", file: "texas.html",
 			tag: "牌桌", desc: "真实 AI 同桌 · 带入制",
-			landscape: false, settle: "chips", needBuyIn: true, ticket: 0, decay: 0.90,
+			landscape: false, settle: "chips", needBuyIn: true, ticket: 0, decay: 1,
 		},
 		doudizhu: {
 			key: "doudizhu", title: "斗地主", dir: "doudizhu", file: "doudizhu.html",
@@ -238,6 +238,11 @@
 		return { ok: errs.length === 0, count: all().length, errs: errs };
 	}
 
+	function texasRake(value) {
+		var rate = Number(value);
+		if ([0,50,100,200].indexOf(rate) < 0 || value == null) rate = 100;
+		return { rateBps: rate, cap: 20, noFlopNoDrop: true };
+	}
 	var API = {
 		version: "1.0.0",
 		ORDER: ORDER.slice(),
@@ -248,7 +253,7 @@
 		isLobby: isLobby, settleOf: settleOf, needBuyIn: needBuyIn, isLandscape: isLandscape,
 		titleOf: titleOf, dirOf: dirOf,
 		tickets: tickets, decays: decays, minTicket: minTicket, settlePlan: settlePlan,
-		selfTest: selfTest,
+		selfTest: selfTest, texasRake: texasRake,
 	};
 	root.CSH.registry = API;
 	/* 兼容：非 ESM 环境（noname 本体把 lib 挂在全局） */

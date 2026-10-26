@@ -133,7 +133,7 @@ try {
     results.push(...uiCases(ctx.confirmBox, dom.document, dom.key, dom.click, dom.listenerCount).map(r => ({ ...r, name: "DOM: " + r.name })));
     check("DOM: closed dialogs leave no focus timers", dom.timerCount() === 0);
 
-    const names = ["readData", "modeKey", "collect", "charNames", "record", "recordCamp", "recordMe", "capture"];
+    const names = ["saveBlocked", "readData", "modeKey", "collect", "charNames", "record", "recordCamp", "recordMe", "capture"];
     const statsCode = names.map(name => extract(wrSource, name)).join("\n");
     const modeNames = JSON.parse(wrSource.match(/var MODE_NAMES=(\{[^\n]*?\});/)[1].replace(/([{,])(\w+):/g, '$1"$2":'));
     function stats(mode = "identity", outcome = true, overrides = {}) {
@@ -145,7 +145,7 @@ try {
             saveConfig(key, data) { lib.config[key] = data; saves++; } };
         const status = {};
         if (overrides.setup) overrides.setup({ me, enemy, game, status });
-        const sb = vm.createContext({ lib, game, _status: status, get: { mode: () => mode }, STAT_KEY: "stat", MODE_NAMES: modeNames, dbgError() {} });
+        const sb = vm.createContext({ lib, game, _status: status, get: { mode: () => mode }, localStorage: { getItem() { return null; } }, STAT_KEY: "stat", MODE_NAMES: modeNames, dbgError() {} });
         vm.runInContext(statsCode, sb, { timeout: 1000 });
         sb.capture(outcome);
         return { data: lib.config.stat, game, status, capture: sb.capture, saves: () => saves };

@@ -1581,6 +1581,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
             } catch (ePick) {}
             var el = document.getElementById("csh-dbg-overlay");
             if (el && el.__onKey) document.removeEventListener("keydown", el.__onKey, true);
+            if (el && el.__worldObserver) el.__worldObserver.disconnect();
             var focusBack = el && el.__focusBack;
             if (el && el.parentNode) el.parentNode.removeChild(el);
             if (focusBack && focusBack.isConnected && typeof focusBack.focus === "function") {
@@ -3630,6 +3631,19 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                 list.appendChild(gameButton(p.title, p.desc + "（筹备中）", p.tag, null, true));
             });
             body.appendChild(list);
+
+            /* 玩家入口按任务分组；保留原卡片与接线，整卡仍可直接进入。 */
+            if (document.documentElement.classList.contains("csh-world-view")) {
+                var sectionLabel = document.createElement("div");
+                sectionLabel.className = "csh-world-section";
+                sectionLabel.textContent = "生涯与记录";
+                list.insertBefore(sectionLabel, list.firstChild);
+                var playLabel = document.createElement("div");
+                playLabel.className = "csh-world-section";
+                playLabel.textContent = "休闲与探索";
+                var firstGame = list.querySelector(".gb-table,.gb-goldfish,.gb-codex");
+                if (firstGame) list.insertBefore(playLabel, firstGame);
+            }
 
             /* —— CBY 兑换斗转星移道具（2026-10-05）——
                依赖懒人包「斗转星移」扩展：其 api.js 对外暴露 window.dzxy.Props
@@ -6319,7 +6333,29 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                 }
                 step("closePanel", closePanel);
                 step("ensureStyle", ensureStyle);
-                if (playerView) document.documentElement.classList.add("csh-world-view");
+                if (playerView) {
+                    document.documentElement.classList.add("csh-world-view");
+                    if (!document.getElementById("csh-world-task-css")) {
+                        var worldStyle = document.createElement("style");
+                        worldStyle.id = "csh-world-task-css";
+                        worldStyle.textContent = [
+                            'html.csh-world-view #csh-dbg-panel *{text-shadow:none!important;}',
+                            'html.csh-world-view #csh-dbg-title::before{display:none!important;}',
+                            'html.csh-world-view #csh-dbg-sub{padding-left:0!important;}',
+                            'html.csh-world-view #csh-dbg-head{padding:10px 16px!important;}',
+                            'html.csh-world-view .csh-dbg-gamelist{grid-template-columns:repeat(auto-fit,minmax(240px,1fr))!important;gap:10px!important;}',
+                            'html.csh-world-view button.csh-dbg-gamebtn{display:flex!important;flex-direction:column!important;align-items:stretch!important;justify-content:flex-start!important;grid-column:auto!important;min-height:108px!important;padding:14px!important;border-radius:10px!important;background:var(--csh-paper)!important;border:1px solid rgba(var(--csh-bg-rgb),.16)!important;box-shadow:none!important;transform:none!important;}',
+                            'html.csh-world-view button.csh-dbg-gamebtn::before,html.csh-world-view button.csh-dbg-gamebtn::after{display:none!important;}',
+                            'html.csh-world-view button.csh-dbg-gamebtn .gb-top{display:flex!important;justify-content:space-between!important;gap:8px!important;margin:0 0 8px!important;}',
+                            'html.csh-world-view button.csh-dbg-gamebtn .gb-name{font-size:var(--csh-lfs-xl,16px)!important;letter-spacing:0!important;color:var(--csh-bg)!important;}',
+                            'html.csh-world-view button.csh-dbg-gamebtn .gb-mid,html.csh-world-view button.csh-dbg-gamebtn .gb-desc{position:static!important;display:block!important;text-align:left!important;white-space:normal!important;overflow-wrap:anywhere!important;color:var(--csh-gray)!important;font-size:var(--csh-lfs-sm,12px)!important;opacity:1!important;margin:0 0 4px!important;}',
+                            'html.csh-world-view .csh-world-section{position:static!important;grid-column:1/-1!important;font-size:var(--csh-lfs-md,13px)!important;font-weight:600!important;color:var(--csh-bg)!important;margin:6px 0 0!important;}',
+                            'html.csh-world-view button.csh-dbg-gamebtn:hover,html.csh-world-view button.csh-dbg-gamebtn:focus-visible{border-color:var(--csh-accent)!important;outline:2px solid var(--csh-accent)!important;outline-offset:1px!important;}',
+                            '@media(max-width:560px){html.csh-world-view #csh-dbg-head{display:grid!important;grid-template-columns:minmax(0,1fr) auto 44px!important;gap:6px!important;}html.csh-world-view .csh-dbg-head-main{grid-column:1!important;min-width:0!important;}html.csh-world-view #csh-dbg-skin{grid-column:2!important;}html.csh-world-view #csh-dbg-close{grid-column:3!important;}html.csh-world-view #csh-dbg-bgm{grid-row:2!important;grid-column:1/-1!important;}html.csh-world-view #csh-dbg-skin-row{grid-row:3!important;grid-column:1/-1!important;}html.csh-world-view #csh-dbg-bgm input[type=range]{width:64px!important;}html.csh-world-view .csh-dbg-gamelist{grid-template-columns:minmax(0,1fr)!important;}html.csh-world-view button.csh-dbg-gamebtn{min-height:92px!important;}}'
+                        ].join('');
+                        document.documentElement.appendChild(worldStyle);
+                    }
+                }
                 var overlay = document.createElement("div");
                 overlay.id = "csh-dbg-overlay";
                 overlay.__focusBack = document.activeElement;
@@ -6543,6 +6579,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                     }
                     // 刷新状态行
                     sub.textContent = playerView ? "生涯、成就、牌桌与 AI 世界" : playerLine(me());
+                    if (!playerView && lib.cshArt) lib.cshArt.decorate(panel, "debug");
                 }
                 /* —— 彩蛋（§4.5.7）：2.5 秒内连续点「池子休闲」页签满 10 次 → CDK 兑换面板。
                       计数器闭包在此，不碰任何全局；点其他页签或停顿超时即清零。
@@ -6552,7 +6589,8 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                 var eggCount = 0, eggTimer = null;
                 tabDefs.forEach(function (td) {
                     if (playerView && td.id !== "games") return;
-                    var t = document.createElement("div");
+                    var t = document.createElement("button");
+                    t.type = "button";
                     t.className = "csh-dbg-tab" + (td.cls ? " " + td.cls : "") + (td.id === TAB ? " on" : "");
                     t.setAttribute("data-tab", td.id);
                     t.setAttribute("data-cls", td.cls || "");
@@ -6610,6 +6648,24 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 
                 overlay.appendChild(panel);
                 step("appendChild", function () { uiHost().appendChild(overlay); });
+                if (playerView && typeof MutationObserver !== "undefined") {
+                    var hadShell = !!document.getElementById("csh-shell-overlay");
+                    overlay.__worldObserver = new MutationObserver(function () {
+                        var hasShell = !!document.getElementById("csh-shell-overlay");
+                        if (hadShell && !hasShell && overlay.isConnected) {
+                            var scrollBack = body.scrollTop;
+                            var activeCard = body.contains(document.activeElement) ? Array.prototype.indexOf.call(body.querySelectorAll(".csh-dbg-gamebtn"), document.activeElement) : -1;
+                            renderBody(body, "games");
+                            body.scrollTop = scrollBack;
+                            if (activeCard >= 0) {
+                                var targetCard = body.querySelectorAll(".csh-dbg-gamebtn")[activeCard];
+                                if (targetCard) targetCard.focus({ preventScroll: true });
+                            }
+                        }
+                        hadShell = hasShell;
+                    });
+                    overlay.__worldObserver.observe(document.documentElement, { childList: true });
+                }
                 function isTopPanel() {
                     if (!overlay.isConnected) return false;
                     var active = document.activeElement;

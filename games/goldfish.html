@@ -270,6 +270,9 @@ body{background:
     <div class="brand">金鳞市<small>池中金鳞 · 坐地生金</small></div>
     <div class="stats" id="stats"></div>
   </div>
+  <div id="storageStatus" role="status" style="padding:6px 12px;line-height:1.5;flex-shrink:0">正在读取存档…</div>
+  <button id="retryMarket" type="button" style="min-height:44px;align-self:flex-start;margin:0 12px 6px">重新读取</button>
+  <button id="startNewMarket" type="button" hidden style="min-height:44px;align-self:flex-start;margin:0 12px 6px">确认不恢复旧持仓，使用新市场</button>
   <div class="tips" id="tips"></div>
   <div class="gridwrap"><div class="grid" id="grid"></div></div>
   <div class="foot">
@@ -319,7 +322,7 @@ body{background:
    ============================================================ */
 var Bridge = (function () {
   try {
-    var T = CSHPage.transport({ closeName: 'goldfish-close', timeout: 2500 });
+    var T = CSHPage.transport({ closeName: 'goldfish-close', timeout: 7500 });
     return { active: !!T.active, call: T.call };
   } catch (e) { return { active: false, call: function (_, __, cb) { cb && cb(false, null); } }; }
 })();
@@ -327,7 +330,11 @@ function $(s) { return document.querySelector(s); }
 function el(t, c, x) { var e = document.createElement(t); if (c) e.className = c; if (x != null) e.textContent = x; return e; }
 function fmt(n) { return String(Math.round(Number(n) || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, ","); }
 
-var Data = { snap: null, cur: null, qty: 10 };
+var Data = { snap: null, cur: null, qty: 10, unavailable: true };
+function updateTradeAvailability() {
+  $("#bBuy").disabled = Data.unavailable || !!Data.tradeBusy;
+  $("#bSell").disabled = Data.unavailable || !!Data.tradeBusy;
+}
 
 /* ---------- 数据获取（桥 → 父窗兜底） ---------- */
 function parentMarket() {
@@ -340,19 +347,38 @@ function parentMarket() {
 }
 function loadSnap(cb) {
   var receive = cb;
-  cb = function (snap) { if (snap && snap.saveError) toast(snap.saveError); receive(snap); };
+  cb = function (snap) {
+    $("#startNewMarket").hidden = !(snap && snap.missingState);
+    if (!snap || snap.ready === false || snap.ok === false) {
+      $("#storageStatus").textContent = (snap && snap.saveError) || "暂未读到市场存档，请重试。读取失败不会新建或清空持仓。";
+      Data.unavailable = true; updateTradeAvailability();
+      receive(Data.snap || null); return;
+    }
+    Data.unavailable = false; updateTradeAvailability();
+    $("#storageStatus").textContent = snap.saveError || "存档已就绪";
+    if (snap.saveError) toast(snap.saveError);
+    receive(snap);
+  };
+  function fallback() {
+    var M = parentMarket();
+    if (!M) { cb(null); return; }
+    Promise.resolve(M.ready ? M.ready() : true).then(function (ok) {
+      if (ok && M.ensureDay) M.ensureDay();
+      cb(M.snapshot ? M.snapshot() : null);
+    }, function () { cb(null); });
+  }
   if (Bridge.active) {
     Bridge.call("shell-goldfish", null, function (ok, snap) {
       if (ok && snap && snap.list && snap.list.length) { cb(snap); return; }
-      var M = parentMarket();
-      cb(M ? M.snapshot() : null);
+      if (snap && snap.saveError) { cb(snap); return; }
+      fallback();
     });
   } else {
-    var M = parentMarket();
-    cb(M ? M.snapshot() : null);
+    fallback();
   }
 }
 function doTrade(id, n, side, cb) {
+  if (Data.unavailable) { cb({ ok: false, msg: "市场存档尚未就绪，请先重试读取" }); return; }
   /* ★ 2026-10-14 审计修复（真 BUG）：桥模式下**不做本地重放兜底**。
      原因：Bridge.call 超时也会回调 (false, null)（见 core/csh_page.js:114-125 的超时分支），
      而宿主可能只是"慢"——它那边的交易已经落账。此时再走父窗 M.trade() 就会**买/卖两次**
@@ -383,6 +409,8 @@ function renderStats() {
   var s = Data.snap || {};
   var box = $("#stats");
   box.innerHTML = "";
+  if (!Data.snap) { box.textContent = "资产尚未读取"; return; }
+  if (Data.unavailable) box.appendChild(el("span", "stat", "上次快照 · 只读 "));
   var val = (s.marketValue || 0), cost = (s.cost || 0);
   var pnl = val - cost;
   /* ★ 2026-10-15 作者指令：「有 CBY 的地方不要写『现金』之类的词汇」——
@@ -427,9 +455,9 @@ function renderGrid() {
   if (!list.length) {
     var box = el("div", "gf-empty");
     box.style.cssText = "grid-column:1/-1;text-align:center;padding:48px 12px;color:var(--ink-dim)";
-    var t1 = el("div", "", "金鳞市 · 静候开市");
-    t1.style.cssText = "font-family:var(--ff-title);font-size:var(--pfs-2xl);letter-spacing:.3em;color:var(--gold)";
-    var t2 = el("div", "", "五十位妖灵在此挂牌——请从「池子休闲」进入，或确认扩展已加载");
+    var t1 = el("div", "", "市场数据尚未读取");
+    t1.style.cssText = "font-size:var(--pfs-md);color:var(--gold)";
+    var t2 = el("div", "", "可点「重新读取」。若更新后持仓缺失，请在行囊查看旧备份；这里不会将读取失败当成零持仓。" );
     t2.style.cssText = "margin-top:10px;font-size:var(--pfs-sm);letter-spacing:.06em";
     box.appendChild(t1); box.appendChild(t2);
     g.appendChild(box);
@@ -697,10 +725,16 @@ function updateQtyHint() {
 
 /* ---------- 买卖 ---------- */
 function tradeAct(side) {
+  if (Data.unavailable) { toast("市场存档尚未就绪，请先重试读取"); return; }
+  if (Data.tradeBusy) return;
   var it = Data.cur; if (!it) return;
   var n = Data.qty | 0;
   if (n <= 0) { toast("请选择股数"); return; }
+  Data.tradeBusy = true;
+  $("#bBuy").disabled = true; $("#bSell").disabled = true;
   doTrade(it.id, n, side, function (res) {
+    Data.tradeBusy = false;
+    updateTradeAvailability();
     if (!res || !res.ok) { toast((res && res.msg) || "交易失败"); return; }
     toast(res.msg + " @ " + fmt(res.price));
     loadSnap(function (snap) {
@@ -730,6 +764,29 @@ $("#bSell").addEventListener("click", function () { tradeAct("sell"); }, false);
 document.addEventListener("keydown", function (e) { if (e.key === "Escape") closeGirl(); }, false);
 
 /* ---------- 启动 ---------- */
+$("#startNewMarket").addEventListener("click", function () {
+  var button = this, UI = null;
+  try { UI = window.parent.CSH && window.parent.CSH.ui; } catch (e) {}
+  if (!UI || !UI.confirm) { toast("请先从池子世界进入，并在行囊检查旧备份"); return; }
+  if (button.disabled) return;
+  button.disabled = true;
+  UI.confirm({ title: "使用新市场", message: "建议先到行囊检查旧备份。继续后以零持仓开市，不补发体验金；现有旧备份仍会保留。确定继续吗？", danger: true }, function (ok) {
+    if (!ok) { button.disabled = false; return; }
+    function finish(result) {
+      button.disabled = false;
+      if (!result || !result.ok) { toast((result && result.msg) || "未完成，请重试"); return; }
+      $("#retryMarket").click();
+    }
+    if (Bridge.active) Bridge.call("shell-market-new", { confirm: true }, function (ok, result) { finish(result); });
+    else { var market = parentMarket(); finish(market && market.startNew ? market.startNew(true) : null); }
+  });
+});
+$("#retryMarket").addEventListener("click", function () {
+  var button = this; if (button.disabled || Data.tradeBusy) return;
+  button.disabled = true;
+  loadSnap(function (snap) { button.disabled = false; Data.snap = snap; renderStats(); renderGrid(); refreshView(); });
+});
+updateTradeAvailability();
 renderStats();
 loadSnap(function (snap) {
   Data.snap = snap;

@@ -46,6 +46,22 @@ import GEN_LINES from "./csh_interact_lines_gen.js";
 	var K_PLAYER_INTERACT = "csh_player_interact";
 	var playerThrowHooked = false;
 	var skipPlayerThrow = 0;
+	// 冻结扩展持久化写入，原生道具与普通聊天仍照常执行。
+	function saveBlocked() {
+		try {
+			var guard = lib.cshWallet && lib.cshWallet.saveGuard;
+			if (guard && typeof guard.blocked === "function") return guard.blocked();
+			if (localStorage.getItem("csh_migrate_recovery") !== null) return true;
+			var migrate = lib.cshMigrate;
+			var state = migrate && typeof migrate.recoveryState === "function" ? migrate.recoveryState() : null;
+			return !!(state && (state.pending || state.busy));
+		} catch (e) { return true; }
+	}
+	function allowWrite() {
+		if (!saveBlocked()) return true;
+		toast("存档操作尚未完成，请先在行囊恢复后再继续");
+		return false;
+	}
 	function playerThrowTotal() {
 		try {
 			var data = JSON.parse(localStorage.getItem(K_PLAYER_INTERACT) || "null");
@@ -54,13 +70,16 @@ import GEN_LINES from "./csh_interact_lines_gen.js";
 		} catch (e) { return 0; }
 	}
 	function recordPlayerThrow(from, to, emotion) {
+		if (saveBlocked()) return;
 		if (skipPlayerThrow || from !== game.me || !usable(from) || !isAI(to)) return;
 		if (!["flower", "wine", "egg", "shoe"].includes(emotion)) return;
 		if (!_status.gameStarted || _status.video || _status.over || _status.connectMode || game.online || game.observe) return;
 		if (!game.players || game.players.indexOf(to) < 0 || game.players.indexOf(from) < 0) return;
 		try {
 			/* 同步落盘后才进入成就快照；不从 AI 场景次数回填历史。 */
-			localStorage.setItem(K_PLAYER_INTERACT, JSON.stringify({ v: 1, total: Math.min(1000000000, playerThrowTotal() + 1) }));
+			var nextTotal = Math.min(1000000000, playerThrowTotal() + 1);
+			if (saveBlocked()) return;
+			localStorage.setItem(K_PLAYER_INTERACT, JSON.stringify({ v: 1, total: nextTotal }));
 		} catch (e) { logError("玩家道具计数未保存", e); }
 	}
 	function hookPlayerThrow() {
@@ -1123,8 +1142,10 @@ import GEN_LINES from "./csh_interact_lines_gen.js";
 			return out;
 		},
 		setCustom: function (cat, lines) {
+			if (!allowWrite()) return false;
 			var c = lib.config[KEY.custom];
 			if (!c || typeof c !== "object" || Array.isArray(c)) c = {};
+			else c = Object.assign({}, c);
 			var arr = [];
 			if (Array.isArray(lines)) {
 				for (var i = 0; i < lines.length; i++) {
@@ -1134,12 +1155,7 @@ import GEN_LINES from "./csh_interact_lines_gen.js";
 			}
 			if (arr.length) c[cat] = arr;
 			else delete c[cat];
-			if (!Object.keys(c).length) {
-				if (lib.config[KEY.custom] !== undefined) delete lib.config[KEY.custom];
-				game.saveConfig(KEY.custom, undefined);
-			} else {
-				game.saveConfig(KEY.custom, c);
-			}
+			return saveCfg(KEY.custom, Object.keys(c).length ? c : undefined);
 		},
 		customCount: function () {
 			var c = customLines();
@@ -1709,16 +1725,19 @@ import GEN_LINES from "./csh_interact_lines_gen.js";
 		} catch (_e2) {}
 	}
 	function saveCfg(key, val) {
-		// 关掉再迅速打开也不复活旧表现；台词开关不打断连击/表情。
-		if (key === KEY.enable && val === false) clearSceneTasks();
-		if (key === KEY.chat && val === false) sceneChatEpoch++;
+		if (!allowWrite()) return false;
 		try {
 			if (typeof game !== "undefined" && typeof game.saveConfig === "function") {
 				game.saveConfig(key, val);
 			} else if (lib.config) {
-				lib.config[key] = val;
-			}
-		} catch (e) { logError("saveConfig " + key, e); }
+				if (val === undefined) delete lib.config[key];
+				else lib.config[key] = val;
+			} else return false;
+		} catch (e) { logError("saveConfig " + key, e); return false; }
+		// 保存已被接受才失效旧表现；被恢复锁拒绝的设置不改变当前场景。
+		if (key === KEY.enable && val === false) clearSceneTasks();
+		if (key === KEY.chat && val === false) sceneChatEpoch++;
+		return true;
 	}
 	function isOnlineNow() {
 		try {
@@ -1777,15 +1796,17 @@ import GEN_LINES from "./csh_interact_lines_gen.js";
 			return row;
 		}
 
-		var swEnable = document.createElement("div");
+		var swEnable = document.createElement("button");
+		swEnable.type = "button";
+		swEnable.disabled = online;
 		swEnable.className = "csh-ia-sw" + (on ? " on" : "");
 		swEnable.appendChild(document.createElement("div")).className = "knob";
 		swEnable.addEventListener("click", function (e) {
 			e.preventDefault();
 			e.stopPropagation();
+			if (!saveCfg(KEY.enable, !on)) return;
 			on = !on;
 			swEnable.className = "csh-ia-sw" + (on ? " on" : "");
-			saveCfg(KEY.enable, on);
 			refreshStat();
 		}, false);
 		card("总开关", "关闭后 AI 不再主动送花 / 敬酒 / 砸蛋 / 扔鞋", swEnable, online);
@@ -1794,16 +1815,18 @@ import GEN_LINES from "./csh_interact_lines_gen.js";
 		var seg = document.createElement("div");
 		seg.className = "csh-ia-seg";
 		["low", "normal", "high"].forEach(function (k) {
-			var it = document.createElement("span");
+			var it = document.createElement("button");
+			it.type = "button";
+			it.disabled = online;
 			it.className = "it" + (k === cur ? " on" : "");
 			it.textContent = RATE_LABEL[k];
 			it.addEventListener("click", function (e) {
 				e.preventDefault();
 				e.stopPropagation();
+				if (!saveCfg(KEY.rate, k)) return;
 				cur = k;
 				for (var i = 0; i < seg.children.length; i++) seg.children[i].className = "it";
 				it.className = "it on";
-				saveCfg(KEY.rate, k);
 				refreshStat();
 			}, false);
 			seg.appendChild(it);
@@ -1811,15 +1834,17 @@ import GEN_LINES from "./csh_interact_lines_gen.js";
 		card("互动频率", "低 ≈ 每轮 0-1 次 · 中 ≈ 每轮 1-2 次 · 高 ≈ 每轮 2-3 次", seg, online);
 
 		// —— 台词 ——
-		var swChat = document.createElement("div");
+		var swChat = document.createElement("button");
+		swChat.type = "button";
+		swChat.disabled = online;
 		swChat.className = "csh-ia-sw" + (chat ? " on" : "");
 		swChat.appendChild(document.createElement("div")).className = "knob";
 		swChat.addEventListener("click", function (e) {
 			e.preventDefault();
 			e.stopPropagation();
+			if (!saveCfg(KEY.chat, !chat)) return;
 			chat = !chat;
 			swChat.className = "csh-ia-sw" + (chat ? " on" : "");
-			saveCfg(KEY.chat, chat);
 			refreshStat();
 		}, false);
 		card("附带台词", "抛表情时约一半概率同时喊一句台词", swChat, online);
@@ -1828,7 +1853,9 @@ import GEN_LINES from "./csh_interact_lines_gen.js";
 		var CAT_LABEL = { flower: "鲜花", wine: "敬酒", egg: "砸蛋", shoe: "扔鞋", hitBack: "回嘴" };
 		var customCtrl = document.createElement("div");
 		customCtrl.style.cssText = "flex:0 0 auto;";
-		var openCustom = document.createElement("span");
+		var openCustom = document.createElement("button");
+		openCustom.type = "button";
+		openCustom.disabled = online;
 		openCustom.className = "csh-ia-btn";
 		openCustom.textContent = "管理自定义台词";
 		openCustom.addEventListener("click", function (e) {
@@ -1900,7 +1927,8 @@ import GEN_LINES from "./csh_interact_lines_gen.js";
 			inp.type = "text";
 			inp.placeholder = "输入一句台词后回车或点添加";
 			inp.maxLength = 30;
-			var addBtn = document.createElement("span");
+			var addBtn = document.createElement("button");
+			addBtn.type = "button";
 			addBtn.className = "b";
 			addBtn.textContent = "添加";
 			addRow.appendChild(inp);
@@ -1909,7 +1937,8 @@ import GEN_LINES from "./csh_interact_lines_gen.js";
 
 			var foot = document.createElement("div");
 			foot.className = "csh-cust-foot";
-			var closeBtn = document.createElement("span");
+			var closeBtn = document.createElement("button");
+			closeBtn.type = "button";
 			closeBtn.className = "csh-cust-btn";
 			closeBtn.textContent = "完 成";
 			foot.appendChild(closeBtn);
@@ -1921,7 +1950,8 @@ import GEN_LINES from "./csh_interact_lines_gen.js";
 			function buildSeg() {
 				seg.innerHTML = "";
 				CATS.forEach(function (k) {
-					var it = document.createElement("span");
+					var it = document.createElement("button");
+					it.type = "button";
 					it.className = "it" + (k === curCat ? " on" : "");
 					it.textContent = CAT_LABEL[k];
 					it.addEventListener("click", function () {
@@ -1946,13 +1976,15 @@ import GEN_LINES from "./csh_interact_lines_gen.js";
 					chip.className = "csh-cust-line";
 					var txt = document.createElement("span");
 					txt.textContent = ln;
-					var del = document.createElement("span");
+					var del = document.createElement("button");
+					del.type = "button";
 					del.className = "del";
 					del.textContent = "✕";
 					del.title = "删除";
 					del.addEventListener("click", function () {
-						lines.splice(idx, 1);
-						lib.cshInteract.setCustom(curCat, lines);
+						var next = lines.slice();
+						next.splice(idx, 1);
+						if (!lib.cshInteract.setCustom(curCat, next)) return;
 						buildLines();
 						refreshCustomCount();
 					}, false);
@@ -1967,7 +1999,7 @@ import GEN_LINES from "./csh_interact_lines_gen.js";
 				var lines = (lib.cshInteract.getCustom()[curCat] || []).slice();
 				if (lines.indexOf(v) >= 0) { toast("已存在该台词"); return; }
 				lines.push(v);
-				lib.cshInteract.setCustom(curCat, lines);
+				if (!lib.cshInteract.setCustom(curCat, lines)) return;
 				inp.value = "";
 				buildLines();
 				refreshCustomCount();
@@ -2002,7 +2034,8 @@ import GEN_LINES from "./csh_interact_lines_gen.js";
 
 		var foot = document.createElement("div");
 		foot.className = "csh-ia-foot";
-		var testBtn = document.createElement("span");
+		var testBtn = document.createElement("button");
+		testBtn.type = "button";
 		testBtn.className = "csh-ia-btn good";
 		testBtn.textContent = "试 发";
 		testBtn.addEventListener("click", function (e) {
@@ -2030,7 +2063,8 @@ import GEN_LINES from "./csh_interact_lines_gen.js";
 			refreshStat();
 			toast((tr(from) || from.name) + " → " + (tr(to) || to.name) + " · " + emo);
 		}, false);
-		var closeBtn = document.createElement("span");
+		var closeBtn = document.createElement("button");
+		closeBtn.type = "button";
 		closeBtn.className = "csh-ia-btn";
 		closeBtn.textContent = "关 闭";
 		closeBtn.addEventListener("click", function (e) {
@@ -2043,6 +2077,7 @@ import GEN_LINES from "./csh_interact_lines_gen.js";
 		panel.appendChild(foot);
 
 		overlay.appendChild(panel);
+		if (lib.cshArt) lib.cshArt.decorate(panel, "interact");
 		uiHost().appendChild(overlay);
 	}
 

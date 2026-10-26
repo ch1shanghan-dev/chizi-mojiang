@@ -526,7 +526,7 @@ eq("跨日重置：今日确实开了桌（预算生效非空转）", (_hbC.roun
 section("5. 结算桥 claim 三态（超时后可安全重试）");
 const listeners = [];
 globalThis.__sent = [];
-globalThis.parent = { postMessage: (m) => { globalThis.__sent.push(m); } };
+globalThis.parent = { localStorage: globalThis.localStorage, postMessage: (m) => { globalThis.__sent.push(m); } };
 globalThis.addEventListener = (t, fn) => { listeners.push(fn); };
 await import(pathToFileURL(path.join(EXT, "core", "csh_page.js")).href);
 const CP = globalThis.CSHPage;

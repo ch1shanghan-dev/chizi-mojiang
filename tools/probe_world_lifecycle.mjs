@@ -19,16 +19,16 @@ function harness(key='uno'){
   vm.runInContext(clean(read('character/index.js')).replace('export default','var cshCharacter ='),ctx);
   vm.runInContext(clean(read('core/csh_bossdata.js')),ctx);
   vm.runInContext(clean(world),ctx);
-  const noop=()=>{};
+  const noop=()=>{},shellWallet={flushSave:noop,saveEpoch:()=>0};
   Object.assign(ctx,{ackToGame:(name,ok,d)=>acks.push({name,ok,data:d}),logError:(m,e)=>errors.push(m+(e?' '+e.message:'')),logInfo:noop,paintTop:noop,paintPc:noop,cshTableAward:noop,selfCloseAfterSettle:noop,
     cancelSelfClose:noop,removeLeave:noop,ensureStyle:noop,bindMessage:noop,bindEsc:noop,bindVisibility:noop,setTitle:noop,checkOrientation:noop,urlOf:k=>k+'.html',docHost:()=>doc.documentElement,
     ensureChrome(){const fr={src:'',contentWindow:{}};const ov={parentNode:{removeChild(){nodes.clear();}}};nodes.set('csh-shell-frame',fr);nodes.set('csh-shell-overlay',ov);return ov;},
-    wallet:()=>({flushSave:noop}),emit:noop,
+    wallet:()=>shellWallet,emit:noop,
     settle(k,d){ctx.cashCalls++;const profit=d.chips-d.buyIn;return {profit,credited:profit>=0?d.buyIn+Math.floor(profit*.9):d.chips,rate:.9,...ctx.cashOverride};}});
   vm.runInContext(`var current=null,currentBuyIn=0,paused=false,pausedAuto=false,enteredAt=0,tickTimer=0,pausedAt=0,totalPaused=0,CUR_REQ=null;
-    var GUARD={},SHELL_GENERATION=0,TABLE_AFF={minions:[],awarded:false},TABLE_WORLD=null,TABLE_SERIAL=0;
+    var SAVE_SESSION=null,GUARD={},SHELL_GENERATION=0,TABLE_AFF={minions:[],awarded:false},TABLE_WORLD=null,TABLE_SERIAL=0;
     var OV_ID='csh-shell-overlay',META={uno:{},texas:{},blackjack:{},doudizhu:{}},LEGACY_CLOSE={'uno-close':'uno'};`,ctx);
-  const names=['persistenceBlocked','persistenceRefused','cshWorldTableFinish','cshWorldTableBegin','cshWorldTableResult','cshTableRecord','cshTableAward','settleSession','guardKey','fromCurrentFrame','openShell','closeShell','onMessage'];
+  const names=['captureSaveSession','sessionSaveBlocked','sessionRefused','persistenceBlocked','persistenceRefused','cshWorldTableFinish','cshWorldTableBegin','cshWorldTableResult','cshTableRecord','cshTableAward','settleSession','guardKey','fromCurrentFrame','openShell','closeShell','onMessage'];
   for(const n of names)if(functions.has(n))vm.runInContext(functions.get(n),ctx);
   const affection=[];ctx.lib.cshAffection={notePlay:id=>{affection.push(id);return true;}};ctx.toast=noop;
   ctx.close=()=>ctx.closeShell(false);ctx.cashCalls=0;ctx.cashOverride={};
@@ -93,7 +93,7 @@ function unoHarness(h,deferred=false){
   const pending=[],calls=[];
   const T={active:true,onCloseSelf(){},settle(){},isSettled:()=>false,call(cmd,d,cb){calls.push({cmd,d});const ack=h.send(cmd,d);if(cb){if(deferred)pending.push(()=>cb(ack.ok,ack.data));else cb(ack.ok,ack.data);}}};
   const ctx=vm.createContext({CSHPage:{transport:()=>T},COLORS:['red','yellow','green','blue'],Math,Bridge:null,sfx:{deal(){}},view:null,botSeats:[],alive:true,room:null,myHand:[],youIdx:-1,botCount:2,
-    window:{parent:{postMessage:d=>h.send(d.__csh,d)}},LocalNet:{},lsSet(){},$:()=>({value:'玩家'}),toast(){},clearAllTimers(){},quipGreet(){}});
+    window:{parent:{postMessage:d=>h.send(d.__csh,d)}},LocalNet:{},lsSet(){return true;},$:()=>({value:'玩家'}),toast(){},clearAllTimers(){},quipGreet(){}});
   for(const s of snippets)vm.runInContext(s,ctx);
   Object.assign(ctx.Room.prototype,{giveCards(p,n){p.hand=Array(n).fill({color:'red',value:'1',id:1});},pushLog(){},scheduleBot(){},addPlayer(name){this.players.push({name,hand:[],id:'local-me'});return {};},addBot(s){this.players.push({name:s.name,hand:[],id:s.id});},destroy(){},broadcastState(){},canPlay(){return true;}});
   const seats=()=>ctx.Bridge.seats(2,(ok,d)=>{ctx.botSeats=d.seats;});

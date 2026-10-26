@@ -19,7 +19,7 @@ const results = [];
 function check(name, ok, detail) { results.push({ name, passed: !!ok, detail }); }
 function harness() {
   let next = 0, randoms = [], now = 100000;
-  const tasks = new Map(), cancelled = [], chats = [], throws = [], stickers = [];
+  const tasks = new Map(), cancelled = [], chats = [], throws = [], stickers = [], storage = new Map();
   const person = (id, human = false) => ({ playerid: id, name: id, alive: true, controlled: false, node: { avatar: {} }, side: human ? 1 : 2,
     isIn() { return this.alive; }, isUnderControl() { return this.controlled; },
     chat(text) { chats.push({ id, text }); }, throwEmotion(to, name) { throws.push({ id, to: to.playerid, name }); },
@@ -30,6 +30,8 @@ function harness() {
   const lib = { config: {}, skill: {}, translate: {} };
   const math = Object.create(Math); math.random = () => randoms.length ? randoms.shift() : 0.1;
   const ctx = vm.createContext({ lib, game, _status: status, ui: {}, EXTRA_LINES: {}, GEN_LINES: {}, Math: math,
+    localStorage: { getItem: key => storage.has(key) ? storage.get(key) : null,
+      setItem: (key, value) => storage.set(key, String(value)), removeItem: key => storage.delete(key) },
     Date: class extends Date { static now() { return now; } }, console,
     get: { attitude: () => 2, translation: p => p?.name || String(p) },
     setTimeout(fn, delay) { const id = ++next; tasks.set(id, { fn, delay }); return id; },
@@ -45,9 +47,9 @@ function harness() {
     'var PLAYER_GRUDGE_KEY="player";function byId(id){return world.ai.find(a=>a.id===id);}' +
     'function idInRoster(id){return !!byId(id);}function clampNum(n,a,b){return Math.max(a,Math.min(b,Number(n)||0));}' +
     'function saveWorld(){}function pushHistory(){}'+
-    ['idOfPlayer','grudgeValue','addGrudge','grudge'].map(n=>extract(worldSource,n)).join('\n')+
+    ['saveBlocked','idOfPlayer','grudgeValue','addGrudge','grudge'].map(n=>extract(worldSource,n)).join('\n')+
     ';lib.cshWorld={idOfPlayer,addGrudge,grudge,PLAYER_GRUDGE_KEY};globalThis.grudgeWorld=world;',ctx);
-  return { api: ctx.probe, interaction: lib.cshInteract, world: ctx.grudgeWorld, get: ctx.get, lib, game, status, speaker, other, friend, me, tasks, cancelled, chats, throws, stickers,
+  return { api: ctx.probe, interaction: lib.cshInteract, world: ctx.grudgeWorld, get: ctx.get, lib, game, status, speaker, other, friend, me, tasks, cancelled, chats, throws, stickers, storage,
     random(values) { randoms = [...values]; }, advance() { now += 10000; }, recency() { return ctx.observedRecency; },
     flush() { const todo = [...tasks.values()]; tasks.clear(); for (const task of todo) task.fn(); } };
 }

@@ -130,6 +130,36 @@ textarea:focus{outline:none;border-color:var(--line)}
 .excl{margin-top:9px;font-size:var(--pfs-cap2);color:var(--ink-faint);line-height:1.7}
 .excl b{color:var(--ink-dim);font-weight:600}
 .foot{font-size:var(--pfs-cap2);color:var(--ink-faint);line-height:1.7;padding:0 2px 2px}
+.workspace{display:grid;grid-template-columns:minmax(270px,1fr) minmax(330px,1.2fr);gap:12px;align-items:start}
+.workspace .card{margin-bottom:0}
+.work-actions{grid-column:2;grid-row:1}
+.work-data{grid-column:1;grid-row:1}
+.scope{padding:9px 12px;border:1px solid var(--line);border-radius:9px;color:var(--gold);line-height:1.6;margin-bottom:10px}
+.scope small{display:block;color:var(--ink-dim);font-size:var(--pfs-sm)}
+.selection{font-size:var(--pfs-sm);color:var(--gold);margin:0 0 8px;line-height:1.5}
+.primary{background:var(--gold);color:var(--bg);font-weight:700;min-width:130px}
+.primary:hover{background:#ead29c}
+.btn{min-height:44px}
+.code-label{display:block;font-size:var(--pfs-sm);color:var(--ink-dim);margin:14px 0 7px}
+textarea{min-height:110px;max-height:220px}
+.result{padding:9px 0;border-bottom:1px solid var(--line-2);margin-bottom:10px}
+.result .msg{margin-top:0;color:var(--ink)}
+.result .msg.ok{color:var(--ok)}
+.result .msg.bad{color:#e59a90}
+.result .msg.warn{color:var(--warn)}
+.recovery{border:1px solid var(--warn);margin-bottom:10px;padding:10px 12px;border-radius:9px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.recovery[hidden]{display:none}
+.recovery span{flex:1;font-size:var(--pfs-sm);line-height:1.6;min-width:200px}
+details.card{margin-top:10px}
+details.card>summary{cursor:pointer;color:var(--gold);min-height:44px;display:list-item;padding:11px 0;line-height:22px}
+details.card[open]>summary{margin-bottom:8px;border-bottom:1px solid var(--line-2)}
+.inv{grid-template-columns:repeat(auto-fill,minmax(215px,1fr))}
+.iv-k{flex-basis:80px}
+.iv[data-has="1"] .iv-k:before{content:"✓ ";color:var(--ok)}
+.iv[data-has="0"] .iv-k:before{content:"· "}
+.btn:focus-visible,summary:focus-visible{outline:2px solid var(--gold);outline-offset:3px}
+@media(max-width:760px){.workspace{grid-template-columns:1fr}.work-actions,.work-data{grid-column:1;grid-row:auto}.work-actions{order:-1}.topbar{padding-right:120px}.assets{display:none}.card h3 span{display:block;margin-left:0;margin-top:3px}#app{padding-left:14px}}
+@media(max-height:520px){.btn{min-height:44px!important}textarea{min-height:90px}.scope{padding:6px 9px;margin-bottom:7px}.code-label{margin-top:9px}.workspace{gap:8px}}
 
 /* ---------- 紧凑档（实机 915×412）----------
    纪律：只按 max-height 判定、只压字号与间距，不藏关键信息。 */
@@ -165,54 +195,61 @@ textarea:focus{outline:none;border-color:var(--line)}
   </div>
 
   <div id="board">
+    <div class="recovery" id="recovery" hidden><span id="recovery-note"></span><button class="btn" id="b-recover" type="button"></button></div>
+    <div class="workspace">
     <!-- ① 家当清点 -->
-    <div class="card">
+    <div class="card work-data">
       <h3 id="h-inv"></h3>
+      <div class="selection" id="selection"></div>
       <div class="inv" id="inv"></div>
       <div class="note" id="invnote"></div>
     </div>
 
     <!-- ② 一份家当（导出 / 导入共用一格码） -->
-    <div class="card">
+    <div class="card work-actions">
       <h3 id="h-code"></h3>
-      <textarea id="code" spellcheck="false" autocomplete="off"></textarea>
+      <div class="scope" id="scope"></div>
+      <div class="result"><div class="msg" id="msg" role="status" aria-live="polite"></div></div>
       <div class="rowbtn">
-        <button class="btn" id="b-pack" type="button"></button>
+        <button class="btn primary" id="b-pack" type="button"></button>
         <button class="btn ghost" id="b-copy" type="button"></button>
+        <button class="btn ghost" id="b-download" type="button"></button>
+      </div>
+      <label class="code-label" id="code-label" for="code"></label>
+      <textarea id="code" spellcheck="false" autocomplete="off" aria-describedby="msg"></textarea>
+      <div class="rowbtn">
         <button class="btn ghost" id="b-check" type="button"></button>
         <button class="btn" id="b-unpack" type="button"></button>
       </div>
       <div class="diff" id="diff"></div>
-      <div class="msg" id="msg" role="status" aria-live="polite"></div>
+    </div>
     </div>
 
     <!-- ③ 备份与回滚 -->
-    <div class="card">
-      <h3 id="h-bk"></h3>
+    <details class="card">
+      <summary id="h-bk"></summary>
       <div id="bklist"></div>
       <div class="rowbtn">
         <button class="btn ghost" id="b-bk" type="button"></button>
-        <button class="btn ghost" id="b-recover" type="button"></button>
       </div>
       <div class="note" id="bknote"></div>
-    </div>
+    </details>
 
     <!-- ④ 推倒重来 -->
-    <div class="card danger">
-      <h3 id="h-reset"></h3>
+    <details class="card danger">
+      <summary id="h-reset"></summary>
       <div class="note" id="resetnote"></div>
       <div class="rowbtn">
         <button class="btn danger" id="b-reset" type="button"></button>
       </div>
-    </div>
+    </details>
 
     <!-- ⑤ 边界说明 -->
-    <div class="card">
-      <h3 id="h-edge"></h3>
+    <details class="card">
+      <summary id="h-edge"></summary>
       <div class="excl" id="edge"></div>
-    </div>
-
     <div class="foot" id="foot"></div>
+    </details>
   </div>
 </div>
 
@@ -230,8 +267,14 @@ var T = {
   /* 资产条单位 */
   uPc: "池子币", uMerit: "功勋",
   /* 家当清点 */
-  hInv: "家当清点", hInvSub: "这一趟要带走的全部",
-  invNote: "带勾的是本机有的；灰色的是你还没用过的部分，跟着行囊一起走，不会丢。",
+  hInv: "随行内容", hInvSub: "以本机清点结果为准",
+  invNote: "✓ 表示已有数据；灰色表示尚未使用，导出时会略过空项。整份打包，无需逐项选择。",
+  scope: "当前范围：全部玩家数据",
+  scopeNote: "钱包、进度、战绩、世界与个人偏好统一打包；不支持拆分选择。",
+  selection: "共 {n} 类 · 已有数据 {has} 类 · 全部随行",
+  selectionLoading: "正在清点本机数据…",
+  selectionFailed: "本机清点暂不可用，请重新读取后再打包。",
+  capacity: "不设整包数量或容量限额；各项按存档规则校验。",
   /* 域标签（与宿主 inventory() 的逻辑键 1:1；新增域必须在这里补一行，否则门禁会红） */
   d: {
     wallet: "池子币", rank: "功勋", winrate: "战绩", world: "AI 世界",
@@ -240,6 +283,7 @@ var T = {
     playerInteract: "道具互动", rankHigh: "历史最高", poolAchv: "池子成就", poolAchvPay: "成就奖励", storeResume: "下载进度", bounty: "指定讨伐",
     ledger: "账本", walletHist: "兑换台账", walletSnap: "余额快照",
     texasBest: "德州纪录", bjBest: "廿一点纪录", sniperBest: "神弩手纪录",
+    auxSpirit: "妖灵乱入", challengeProfile: "挑战难度", texasRake: "德州场供",
     names: "各处留名", panelSkin: "面板皮肤", bgmVolume: "音乐音量", bgmOn: "音乐开关",
     sfxVolume: "音效音量", texasSet: "德州设置", bjSet: "廿一点设置",
     /* ★ 「调试」二字不能出现在成品页（门禁 E28 会拦）—— 这一项是面板里存下的预设，
@@ -255,15 +299,23 @@ var T = {
   fmtSum: "合计 {v}", fmtFull: "满档 {v}", fmtCost: "成本 {v}",
   fmtGained: "累计 {v}",
   /* 码区 */
-  hCode: "一份家当", hCodeSub: "生成一串带走，或把别人的倒进来",
-  phCode: "点「收进行囊」生成一串；或把别人的那串粘到这里",
-  bPack: "收进行囊", bCopy: "复制", bCheck: "验一验", bUnpack: "倒进来",
-  msgIdle: "行囊是空的。点「收进行囊」，把这一身家当收进来。",
-  msgPacked: "已收好 · {n} 字 · 格式 v{v}。复制带走，或先存着。",
+  hCode: "打包与导入", hCodeSub: "打包 → 复制或保存文件",
+  phCode: "一键打包后这里会出现存档码；也可粘贴已有存档码，先校验预览再导入。",
+  codeLabel: "存档码 / 粘贴待导入的存档码",
+  bPack: "一键打包", bCopy: "复制存档码", bDownload: "保存文件", bCheck: "只校验", bUnpack: "导入存档", bConfirmImport: "确认导入",
+  msgIdle: "清点后，点「一键打包」生成完整存档。",
+  msgWorking: "正在处理，请稍候…",
+  msgPacked: "打包完成 · {n} 字 / {bytes} · 格式 v{v}。可复制存档码或保存文件；本机存档保留。",
+  msgDownloaded: "已生成存档文件并交给浏览器保存。",
+  msgDownloadFail: "文件未能生成，请复制存档码带走。",
+  msgCodeChanged: "存档码已修改，请重新校验预览。",
+  msgHostBusy: "宿主仍在处理存档，完成后自动重新清点。",
+  msgReconciled: "宿主操作已结束，已重新清点。请核对当前数值与备份。",
+  msgReadFail: "读取未完成，保留上次显示；可在「备份与回滚」中点击「重新读取」。",
   msgCopied: "已复制到剪贴板。",
   msgCopyFail: "复制没成功，框里已全选，手动复制一次即可。",
   msgCheckOk: "这份家当是好的 · 来自 {build} · 生成于 {time}",
-  msgCheckAgain: "这份家当是好的。再点一次「倒进来」就装进这一身。",
+  msgCheckAgain: "校验通过。请检查下方差异，再点「确认导入」。导入前会自动备份本机。",
   msgUnpacked: "已倒进来 · 备份戳 {stamp}。若数值没变，退出游戏重进一次即刷新。",
   msgEmpty: "框里是空的。",
   msgPackFail: "没收成：{err}",
@@ -276,9 +328,9 @@ var T = {
   dkKill: "已击破魔王", dkGirls: "羁绊人数",
   /* 备份 */
   hBk: "备份与回滚", hBkSub: "每次倒入前都会自动留一份",
-  bBk: "读取备份", bBkRoll: "回滚", bRecover: "恢复未完成操作",
+  bBk: "重新读取", bBkRoll: "回滚", bRecover: "恢复未完成操作",
   bkNone: "这台机器上还没有备份（倒过一次家当之后就有了）。",
-  bkNote: "只留最近三份，更早的会被挤掉。",
+  bkNote: "本机自动备份只留最近三份，更早的会被挤掉；另存的文件由你保管。",
   bkCell: "{pc} 池子币 · {ai} 位世界角色",
   msgRolled: "已回滚到 {t}。",
   msgRollFail: "回滚没成功：{err}",
@@ -289,9 +341,9 @@ var T = {
   msgPending: "暂未收到完成结果，请稍后点击“恢复未完成操作”确认，恢复后再继续使用其他功能。",
   /* 重置 */
   hReset: "推倒重来", hResetSub: "不可撤销",
-  resetNote: "清空全部家当，回到刚装好扩展的样子（2000 池子币 / 平民）。请先「收进行囊」留一份，再动手。",
+  resetNote: "清空全部家当，回到刚装好扩展的样子（2000 池子币 / 平民）。请先「一键打包」并另存一份，再动手。",
   bReset: "重置这一身",
-  resetConfirm1: "确定要清空这一身家当吗？\n\n清完就回到出厂初始态：\n· 池子币回到 2000，官阶回到「平民」\n· 战绩 / 讨伐录 / 羁绊 / 金鳞市持仓 / 成就 / 每日任务\n· 兑换码记录（已兑换的码会失效）\n\n建议先「收进行囊」留一份。",
+  resetConfirm1: "确定要清空这一身家当吗？\n\n清完就回到出厂初始态：\n· 池子币回到 2000，官阶回到「平民」\n· 战绩 / 讨伐录 / 羁绊 / 金鳞市持仓 / 成就 / 每日任务\n· 兑换码记录（已兑换的码会失效）\n\n建议先「一键打包」并另存一份。",
   resetConfirm2: "第二次确认：真的推倒重来吗？",
   msgReset: "已清空，正在刷新…",
   msgResetFail: "重置没成功：{err}",
@@ -321,7 +373,43 @@ function big(n) {
   if (n >= 10000) return (n / 10000).toFixed(2) + " 万";
   return fmt(n);
 }
-var STATE = { inv: [], excluded: [], version: 0, pending: null, backups: [] };
+var STATE = { inv: [], excluded: [], version: 0, pending: null, backups: [], ready: false,
+  busy: false, recovery: false, hostBusy: false, disposed: false, loadSeq: 0, poll: null };
+function currentCode() { var ta = el("code"); return ta ? String(ta.value || "").trim() : ""; }
+function syncControls() {
+  var lock = STATE.busy || STATE.hostBusy || STATE.recovery;
+  var ids = ["b-pack", "b-check", "b-unpack", "b-reset", "b-bk", "b-recover", "b-copy", "b-download"];
+  for (var i = 0; i < ids.length; i++) {
+    var b = el(ids[i]); if (!b) continue;
+    b.disabled = ids[i] === "b-recover" ? STATE.busy || STATE.hostBusy :
+      ids[i] === "b-bk" ? STATE.busy :
+      ids[i] === "b-copy" || ids[i] === "b-download" ? STATE.busy || !currentCode() :
+      lock || (ids[i] === "b-pack" && !STATE.ready);
+  }
+  var un = el("b-unpack"); if (un) un.textContent = STATE.pending === currentCode() && STATE.pending ? T.bConfirmImport : T.bUnpack;
+  var ta = el("code"); if (ta) ta.readOnly = !!STATE.busy;
+  var rc = el("recovery"); if (rc) rc.hidden = !(STATE.recovery || STATE.hostBusy);
+  var rn = el("recovery-note"); if (rn) rn.textContent = STATE.hostBusy ? T.msgHostBusy : T.msgRecoveryNeeded;
+  var list = el("bklist");
+  if (list && list.querySelectorAll) {
+    var rolls = list.querySelectorAll("[data-roll]");
+    for (var j = 0; j < rolls.length; j++) rolls[j].disabled = lock;
+  }
+}
+function beginAction(recovering) {
+  if (STATE.disposed || STATE.busy || STATE.hostBusy) return false;
+  if (STATE.recovery && !recovering) { setMsg(T.msgRecoveryFirst, "warn"); return false; }
+  STATE.busy = true; syncControls(); return true;
+}
+function endAction() { STATE.busy = false; syncControls(); }
+function actionCall(name, data, mutation, cb) {
+  setMsg(T.msgWorking);
+  call(name, data, function (ok, r) {
+    if (STATE.disposed) return;
+    if ((r && r.recovery) || (mutation && !ok && !r)) STATE.recovery = true;
+    endAction(); cb(ok, r); syncControls();
+  });
+}
 
 /* ---------- 桥（与 Game Shell 通信）----------
    ★ 与 rank.html 同款：本页没有自关逻辑，关闭由壳的 ✕ 负责 ⇒ 不传 closeName。 */
@@ -332,7 +420,7 @@ function bridged() { return !!(Bridge && Bridge.active); }
 function call(name, payload, cb) {
   if (!bridged()) { setMsg(T.msgOffline, "warn"); cb(false, null); return; }
   try {
-    Bridge.call(name, payload, function (ok, d) { cb(!!ok, d || null); });
+    Bridge.call(name, payload, function (ok, d) { if (!STATE.disposed) cb(!!ok, d == null ? null : d); });
   } catch (e) { cb(false, null); }
 }
 function setMsg(s, cls) {
@@ -366,16 +454,20 @@ function applyStaticCopy() {
       sp.textContent = T[subOf[k]];
     }
   }
-  var btns = [["b-pack", "bPack"], ["b-copy", "bCopy"], ["b-check", "bCheck"],
+  var btns = [["b-pack", "bPack"], ["b-copy", "bCopy"], ["b-download", "bDownload"], ["b-check", "bCheck"],
     ["b-unpack", "bUnpack"], ["b-bk", "bBk"], ["b-recover", "bRecover"], ["b-reset", "bReset"]];
   for (var j = 0; j < btns.length; j++) { var bb = el(btns[j][0]); if (bb) bb.textContent = T[btns[j][1]]; }
   var nn = el("invnote"); if (nn) nn.textContent = T.invNote;
+  var sl = el("selection"); if (sl) sl.textContent = T.selectionLoading;
+  var sc = el("scope"); if (sc) sc.innerHTML = esc(T.scope) + "<small>" + esc(T.scopeNote) + "</small><small>" + esc(T.capacity) + "</small>";
+  var cl = el("code-label"); if (cl) cl.textContent = T.codeLabel;
   var bn = el("bknote"); if (bn) bn.textContent = T.bkNote;
   var rn = el("resetnote"); if (rn) rn.textContent = T.resetNote;
   var ed = el("edge"); if (ed) ed.innerHTML = esc(T.edgeLead);
   var f = el("foot"); if (f) f.innerHTML = T.foot.join("<br>");
   /* 码区初始态 */
   setMsg(T.msgIdle);
+  syncControls();
 }
 applyStaticCopy();
 
@@ -420,6 +512,7 @@ function renderInv() {
       + '<span class="iv-x">' + (it.has ? esc(got.d || "") : "") + '</span></div>';
   }
   box.innerHTML = h;
+  var sl = el("selection"); if (sl) sl.textContent = tt("selection", {n: STATE.inv.length, has: STATE.inv.filter(function (x) { return x.has; }).length});
 }
 function renderAssets(s) {
   var box = el("assets");
@@ -489,37 +582,53 @@ function renderBackups(list) {
   for (var k = 0; k < bs.length; k++) {
     (function (x) {
       x.addEventListener("click", function () {
+        if (!beginAction()) return;
         var st = x.getAttribute("data-roll");
         ask(T.msgRolled.split("{t}")[0] + stampText(st) + "？", function () {
-          call("shell-mig-rollback", { stamp: st }, function (ok, r) {
-            if (ok) { setMsg(tt("msgRolled", { t: stampText(st) }), "ok"); loadAll(); }
+          actionCall("shell-mig-rollback", { stamp: st }, true, function (ok, r) {
+            if (ok) { STATE.pending = null; hideDiff(); setMsg(tt("msgRolled", { t: stampText(st) }), "ok"); loadAll(); }
             else setFailure("msgRollFail", r);
           });
-        });
+        }, endAction);
       }, false);
     })(bs[k]);
   }
+  syncControls();
 }
 
 /* ---------- 动作 ---------- */
 function doPack() {
-  setMsg("", "");
-  call("shell-mig-export", null, function (ok, d) {
+  if (!STATE.ready || !beginAction()) return;
+  actionCall("shell-mig-export", null, false, function (ok, d) {
     if (!ok || !d || !d.code) { setMsg(tt("msgPackFail", { err: (d && d.err) || T.msgPending }), "bad"); return; }
     var ta = el("code");
     if (ta) { ta.value = d.code; try { ta.select(); } catch (e) {} }
     STATE.pending = null;
     hideDiff();
     /* 版本号从最近一次清点里取（拿不到就不写死一个假版本） */
-    setMsg(tt("msgPacked", { n: d.code.length, v: STATE.version || "?" }), "ok");
+    var bytes = new Blob([d.code]).size;
+    setMsg(tt("msgPacked", { n: d.code.length, bytes: bytes < 1024 ? bytes + " B" : (bytes / 1024).toFixed(1) + " KiB", v: STATE.version || "?" }), "ok");
   });
 }
+function doDownload() {
+  if (STATE.busy || !currentCode()) return;
+  var url = null, a = null;
+  try {
+    url = URL.createObjectURL(new Blob([currentCode()], { type: "text/plain;charset=utf-8" }));
+    a = document.createElement("a"); a.href = url;
+    a.download = "chizi-save-" + new Date().toISOString().replace(/[:.]/g, "-") + ".txt";
+    document.body.appendChild(a); a.click(); document.body.removeChild(a); a = null;
+    setMsg(T.msgDownloaded, "ok");
+  } catch (e) { if (a && a.parentNode) a.parentNode.removeChild(a); setMsg(T.msgDownloadFail, "warn"); }
+  if (url) setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+}
 function doCopy() {
+  if (STATE.busy) return;
   var ta = el("code");
   if (!ta || !ta.value) { setMsg(T.msgEmpty, "warn"); return; }
   var txt = ta.value;
-  var done = function () { setMsg(T.msgCopied, "ok"); };
-  var fail = function () { setMsg(T.msgCopyFail, "warn"); };
+  var done = function () { if (!STATE.disposed && currentCode() === txt.trim() && !STATE.busy) setMsg(T.msgCopied, "ok"); };
+  var fail = function () { if (!STATE.disposed && currentCode() === txt.trim() && !STATE.busy) { ta.focus(); ta.select(); setMsg(T.msgCopyFail, "warn"); } };
   try {
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(txt).then(done, function () { legacyCopy(txt, done, fail); });
@@ -546,8 +655,11 @@ function doCheck(hint) {
   var ta = el("code");
   var code = ta ? String(ta.value || "").trim() : "";
   if (!code) { setMsg(T.msgEmpty, "warn"); return; }
+  if (!beginAction()) return;
+  STATE.pending = null;
   hideDiff();
-  call("shell-mig-import", { code: code, dryRun: true }, function (ok, r) {
+  actionCall("shell-mig-import", { code: code, dryRun: true }, false, function (ok, r) {
+    if (currentCode() !== code) { STATE.pending = null; setMsg(T.msgCodeChanged, "warn"); return; }
     if (!ok || !r || !r.ok) { STATE.pending = null; setMsg(tt("msgCheckFail", { err: (r && r.err) || "?" }), "bad"); return; }
     STATE.pending = code;
     var meta = r.meta || {};
@@ -561,37 +673,43 @@ function doCheck(hint) {
    ① 优先宿主自绘弹窗（lib.cshUI.confirm），项目规范禁原生 confirm；
    ② **回调只在"确认"时执行** —— 取消一定不动作；
    ③ 宿主不可用时才回退原生，绝不静默执行（静默执行 = 误删玩家存档）。 */
-function ask(msg, onOk) {
+function ask(msg, onOk, onCancel) {
+  var resolved = false;
+  function finish(ok) { if (resolved || STATE.disposed) return; resolved = true; if (ok) onOk(); else if (onCancel) onCancel(); }
   var host = null;
   try { host = (window.parent && window.parent.lib && window.parent.lib.cshUI) || null; } catch (e) {}
   if (host && typeof host.confirm === "function") {
     host.confirm({ title: "请确认", message: msg, ok: "确定", cancel: "取消", danger: true },
-      function (ok) { if (ok) onOk(); });
+      function (ok) { finish(ok); });
     return;
   }
-  try { if (window.confirm(msg)) onOk(); } catch (e2) {}
+  try { finish(window.confirm(msg)); } catch (e2) { finish(false); }
 }
 function doUnpack() {
   var ta = el("code");
   var code = ta ? String(ta.value || "").trim() : "";
   if (!code) { setMsg(T.msgEmpty, "warn"); return; }
   if (STATE.pending !== code) { doCheck(T.msgCheckAgain); return; }
+  if (!beginAction()) return;
   ask(T.diffTitle + "。\n\n" + T.bUnpack + "？", function () {
-    call("shell-mig-import", { code: code }, function (ok, r) {
+    if (currentCode() !== code || STATE.pending !== code) { endAction(); setMsg(T.msgCodeChanged, "warn"); return; }
+    actionCall("shell-mig-import", { code: code }, true, function (ok, r) {
       if (!ok || !r || !r.ok) { setFailure("msgUnpackFail", r); return; }
       STATE.pending = null;
       setMsg(tt("msgUnpacked", { stamp: (r && r.backup) || "—" }), "ok");
       hideDiff();
       loadAll();
     });
-  });
+  }, endAction);
 }
 function doReset() {
+  if (!beginAction()) return;
   /* 双层确认是刻意的（防误触清空全部家当），改成嵌套 ask 保留这层保护。 */
   ask(T.resetConfirm1, function () {
     ask(T.resetConfirm2, function () {
-      call("shell-mig-reset", null, function (ok, r) {
+      actionCall("shell-mig-reset", null, true, function (ok, r) {
         if (ok && r && r.ok) {
+          STATE.busy = true;
           setMsg(T.msgReset, "ok");
           setTimeout(function () {
             try { window.parent.location.reload(); }
@@ -599,30 +717,49 @@ function doReset() {
           }, 600);
         } else setFailure("msgResetFail", r);
       });
-    });
-  });
+    }, endAction);
+  }, endAction);
 }
 function doRecover() {
-  call("shell-mig-recover", null, function (ok, r) {
-    if (ok && r && r.ok) { setMsg(T.msgRecovered, "ok"); loadAll(); }
+  if (!beginAction(true)) return;
+  actionCall("shell-mig-recover", null, true, function (ok, r) {
+    if (ok && r && r.ok) { STATE.recovery = false; STATE.pending = null; hideDiff(); setMsg(T.msgRecovered, "ok"); loadAll(); }
     else setFailure("msgRecoverFail", r);
   });
 }
-function loadBackups() {
-  call("shell-mig-backups", null, function (ok, list) { renderBackups(ok ? list : []); });
+function loadBackups(seq) {
+  seq = seq || STATE.loadSeq;
+  call("shell-mig-backups", null, function (ok, list) {
+    if (seq !== STATE.loadSeq) return;
+    if (ok && Array.isArray(list)) renderBackups(list); else setMsg(T.msgReadFail, "warn");
+  });
 }
 function loadAll() {
+  var seq = ++STATE.loadSeq;
   call("shell-mig-inventory", null, function (ok, d) {
+    if (seq !== STATE.loadSeq) return;
     if (ok && d) {
       STATE.inv = d.list || [];
       STATE.excluded = d.excluded || [];
       STATE.version = d.version || 0;
+      STATE.ready = true;
+      var wasHostBusy = STATE.hostBusy;
+      STATE.recovery = !!(d.recovery && d.recovery.pending);
+      STATE.hostBusy = !!(d.recovery && d.recovery.busy);
       if (d.recovery && d.recovery.pending) setMsg(d.recovery.err || T.msgRecoveryNeeded, "warn");
+      if (STATE.hostBusy) setMsg(T.msgHostBusy, "warn");
+      else if (wasHostBusy && !STATE.recovery) { STATE.pending = null; hideDiff(); setMsg(T.msgReconciled, "ok"); }
+      renderInv(); renderEdge();
+      if (STATE.hostBusy && !STATE.poll) STATE.poll = setTimeout(function () { STATE.poll = null; if (!STATE.disposed) loadAll(); }, 1000);
+    } else {
+      STATE.ready = false;
+      var sl = el("selection"); if (sl) sl.textContent = T.selectionFailed;
+      setMsg(T.msgReadFail, "warn");
     }
-    renderInv(); renderEdge();
+    syncControls();
   });
-  call("shell-stats", null, function (ok, s) { renderAssets(ok ? s : null); });
-  loadBackups();
+  call("shell-stats", null, function (ok, s) { if (seq !== STATE.loadSeq) return; if (ok && s) renderAssets(s); });
+  loadBackups(seq);
 }
 
 /* ---------- boot ---------- */
@@ -635,8 +772,8 @@ function loadAll() {
       && /^(https?|file):$/.test(window.location.protocol);
   } catch (e0) { real = false; }
   if (!real) return;
-  var bind = [["b-pack", doPack], ["b-copy", doCopy], ["b-check", doCheck],
-    ["b-unpack", doUnpack], ["b-bk", loadBackups], ["b-recover", doRecover], ["b-reset", doReset]];
+  var bind = [["b-pack", doPack], ["b-copy", doCopy], ["b-download", doDownload], ["b-check", doCheck],
+    ["b-unpack", doUnpack], ["b-bk", loadAll], ["b-recover", doRecover], ["b-reset", doReset]];
   /* ★ 必须包一层再挂：直接把函数当监听器会把 **事件对象** 当第一个实参传进去，
      而 doCheck(hint) 的第一个形参正是"提示语" ⇒ 页面上会出现 [object PointerEvent]。
      （这条是实测截图抓出来的，不是想出来的。） */
@@ -652,7 +789,9 @@ function loadAll() {
   if (ta) ta.addEventListener("input", function () {
     STATE.pending = null;
     hideDiff();
+    syncControls();
   }, false);
+  window.addEventListener("pagehide", function () { STATE.disposed = true; if (STATE.poll) clearTimeout(STATE.poll); }, false);
   loadAll();
 })();
 </script>

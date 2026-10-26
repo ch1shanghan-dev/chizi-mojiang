@@ -1,580 +1,64 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
-<title>池子魔将 · 池子成就</title>
-<!-- 池子成就（2026-10-20 · 史诗感重构）
-     零外部资源 / 零网络请求。数据源 = core/csh_pool_achv.js（RULES + localStorage）。
-     ★ 滚动铁律（本页曾经整页翻不动）：body 必须 height:100dvh + overflow:hidden，
-       列表自己是唯一滚动容器（flex:1 + min-height:0 + overflow-y:auto）。
-       把滚动交给 body 在游戏 iframe 里会被裁掉，表现为"手指划不动"。 -->
-<script src="../core/csh_pool_achv.js"></script>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
+<title>池子成就</title>
+<script src="../core/csh_pool_achv.js"></script><script src="../core/csh_page.js"></script>
 <style>
-  :root{
-    --bg0:#0b0908; --bg1:#16110c;
-    --panel:rgba(28,22,16,.86); --panel-2:rgba(38,30,21,.94);
-    --line:rgba(216,189,122,.16); --line-2:rgba(216,189,122,.32);
-    --ink:#f2e9d8; --ink-dim:#a3947c; --gold:#d8bd7a; --gold-hi:#f7e3ae;
-    --r1:#8d8d8d; --r2:#c9a84c; --r3:#a463d8;
-    --ff-title:"Noto Serif SC","Songti SC","STSong","SimSun",serif;
-    --ff-body:-apple-system,"PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif;
-  
-  /* 字号收编档（2026-10-20）：同值 token 替换裸字号，渲染不变；同档多值待实机测量后并档 */
-  --pfs-micro: 9px;
-  --pfs-micro2: 10px;
-  --pfs-micro3: 10.5px;
-  --pfs-cap: 11px;
-  --pfs-cap2: 11.5px;
-  --pfs-sm: 12px;
-  --pfs-sm2: 12.5px;
-  --pfs-md: 13px;
-  --pfs-md2: 13.5px;
-  --pfs-lg: 14px;
-  --pfs-lg2: 14.5px;
-  --pfs-lg3: 15px;
-  --pfs-lg4: 15.5px;
-  --pfs-xl: 16px;
-  --pfs-xl2: 18px;
-  --pfs-xl3: 19px;
-  --pfs-2xl: 21px;
-  --pfs-3xl: 25px;
-  --pfs-3xl2: 30px;
-}
-  *{box-sizing:border-box}
-  html,body{margin:0;padding:0;height:100%}
-  body{
-    display:flex;flex-direction:column;height:100dvh;overflow:hidden;
-    color:var(--ink);font-family:var(--ff-body);font-size:var(--pfs-md);
-    padding:12px 13px 10px;
-    background:
-      radial-gradient(900px 420px at 50% -8%, rgba(216,189,122,.16), transparent 62%),
-      radial-gradient(600px 320px at 88% 108%, rgba(164,99,216,.10), transparent 60%),
-      linear-gradient(180deg,var(--bg1),var(--bg0));
-    -webkit-font-smoothing:antialiased;
-  }
-  body::before{
-    content:'';position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.35;
-    background-image:
-      repeating-linear-gradient(90deg, rgba(216,189,122,.045) 0 1px, transparent 1px 3px),
-      repeating-linear-gradient(0deg, rgba(216,189,122,.028) 0 1px, transparent 1px 3px);
-    mask-image:radial-gradient(100% 70% at 50% 0%, #000 20%, transparent 78%);
-    -webkit-mask-image:radial-gradient(100% 70% at 50% 0%, #000 20%, transparent 78%);
-  }
-  body>*{position:relative;z-index:1}
-
-  .hd{flex:0 0 auto;display:flex;align-items:center;gap:10px;margin-bottom:10px;
-      /* 右上角是壳的悬浮控制组（余额胶囊 + 关闭）。这里必须让位，否则进度环会被压住。
-         变量由 core/csh_shell.js 注入，单点真源；独立打开时回退同值。 */
-      padding-right:var(--csh-dock-safe,clamp(150px,20vw,200px));}
-  .back{
-    flex:0 0 auto;height:29px;padding:0 13px;border-radius:999px;cursor:pointer;
-    background:rgba(216,189,122,.08);border:1px solid var(--line);
-    color:var(--gold);font-family:var(--ff-body);font-size:var(--pfs-cap2);letter-spacing:.04em;
-    transition:background .18s,border-color .18s;
-  }
-  .back:hover{background:rgba(216,189,122,.16);border-color:var(--line-2)}
-  .ttl{flex:1 1 auto;min-width:0}
-  .ttl h1{
-    margin:0;font-family:var(--ff-title);font-weight:700;font-size:var(--pfs-2xl);letter-spacing:.16em;
-    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-    background:linear-gradient(180deg,#fff5d8 0%,var(--gold) 62%,#a8863c 100%);
-    -webkit-background-clip:text;background-clip:text;color:transparent;
-    text-shadow:0 0 22px rgba(216,189,122,.16);
-  }
-  .ttl .sub{margin-top:2px;font-size:var(--pfs-micro3);color:var(--ink-dim);letter-spacing:.14em}
-  .ring{flex:0 0 auto;position:relative;width:62px;height:62px}
-  .ring svg{display:block;transform:rotate(-90deg)}
-  .ring .track{stroke:rgba(216,189,122,.14)}
-  .ring .arc{stroke:url(#gArc);stroke-linecap:round;transition:stroke-dashoffset .7s cubic-bezier(.2,.7,.2,1)}
-  .ring .pct{
-    position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
-    font-size:var(--pfs-lg);font-weight:800;color:var(--gold-hi);font-variant-numeric:tabular-nums;letter-spacing:.02em;
-  }
-  .ring .pct i{font-style:normal;font-size:var(--pfs-micro);color:var(--ink-dim);font-weight:400;letter-spacing:.08em;margin-top:1px}
-
-  .rare-bar{flex:0 0 auto;display:flex;gap:7px;margin-bottom:9px}
-  .rb{
-    flex:1 1 0;min-width:0;position:relative;overflow:hidden;
-    display:flex;align-items:baseline;gap:6px;padding:7px 10px;border-radius:10px;
-    background:var(--panel);border:1px solid var(--line);
-  }
-  .rb::after{content:'';position:absolute;left:0;top:0;bottom:0;width:2px;opacity:.85}
-  .rb.i1::after{background:var(--r1)} .rb.i2::after{background:var(--r2)} .rb.i3::after{background:var(--r3)}
-  .rb b{font-size:var(--pfs-md2);font-variant-numeric:tabular-nums;color:var(--ink)}
-  .rb span{font-size:var(--pfs-micro3);color:var(--ink-dim);letter-spacing:.08em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .rb em{font-style:normal;font-size:var(--pfs-micro2);color:var(--ink-dim);margin-left:auto;font-variant-numeric:tabular-nums}
-
-  .tools{flex:0 0 auto;display:flex;gap:7px;margin-bottom:8px}
-  .search{
-    flex:1 1 auto;min-width:0;height:30px;padding:0 12px;border-radius:9px;
-    background:rgba(0,0,0,.30);border:1px solid var(--line);color:var(--ink);
-    font-family:var(--ff-body);font-size:var(--pfs-sm);outline:none;
-  }
-  .search::placeholder{color:rgba(163,148,124,.7)}
-  .search:focus{border-color:var(--line-2);box-shadow:0 0 0 2px rgba(216,189,122,.10)}
-  .sort{
-    flex:0 0 auto;height:30px;padding:0 11px;border-radius:9px;cursor:pointer;
-    background:rgba(216,189,122,.07);border:1px solid var(--line);color:var(--gold);
-    font-family:var(--ff-body);font-size:var(--pfs-cap2);white-space:nowrap;
-  }
-  .sort:hover{background:rgba(216,189,122,.14)}
-
-  .chips{flex:0 0 auto;display:flex;gap:6px;margin-bottom:9px;overflow-x:auto;scrollbar-width:none;padding-bottom:1px}
-  .chips::-webkit-scrollbar{display:none}
-  .chip{
-    flex:0 0 auto;height:27px;padding:0 11px;border-radius:999px;cursor:pointer;
-    background:rgba(28,22,16,.8);border:1px solid var(--line);color:var(--ink-dim);
-    font-family:var(--ff-body);font-size:var(--pfs-cap2);white-space:nowrap;letter-spacing:.03em;
-    transition:all .16s;
-  }
-  .chip:hover{border-color:var(--line-2);color:var(--ink)}
-  .chip.on{
-    background:linear-gradient(180deg,rgba(216,189,122,.24),rgba(216,189,122,.10));
-    border-color:rgba(216,189,122,.62);color:var(--gold-hi);font-weight:700;
-    box-shadow:0 0 14px rgba(216,189,122,.16) inset,0 2px 8px rgba(0,0,0,.32);
-  }
-  .chip .n{opacity:.62;margin-left:3px;font-variant-numeric:tabular-nums}
-
-  /* ---------- 列表：唯一滚动容器（不要改） ---------- */
-  .list{
-    flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;
-    -webkit-overflow-scrolling:touch;scrollbar-width:thin;
-    display:flex;flex-direction:column;gap:7px;padding:1px 2px 6px 1px;
-  }
-  .list::-webkit-scrollbar{width:5px}
-  .list::-webkit-scrollbar-thumb{background:rgba(216,189,122,.22);border-radius:3px}
-  .list::-webkit-scrollbar-track{background:transparent}
-
-  .row{
-    position:relative;display:flex;align-items:center;gap:11px;flex:0 0 auto;
-    padding:11px 12px 11px 15px;border-radius:11px;cursor:pointer;
-    background:linear-gradient(180deg,rgba(32,25,18,.92),rgba(24,19,14,.92));
-    border:1px solid var(--line);
-    transition:transform .12s,border-color .18s,box-shadow .22s,background .2s;
-  }
-  .row:hover{
-    transform:translateY(-1px);border-color:var(--line-2);
-    box-shadow:0 6px 22px rgba(0,0,0,.42),0 0 0 1px rgba(216,189,122,.08) inset;
-  }
-  .row:active{transform:translateY(0) scale(.997)}
-  .row::before{content:'';position:absolute;left:0;top:9px;bottom:9px;width:3px;border-radius:3px;opacity:.9}
-  .row.r1::before{background:linear-gradient(180deg,#a5a5a5,rgba(141,141,141,.15))}
-  .row.r2::before{background:linear-gradient(180deg,var(--gold-hi),rgba(201,168,76,.18))}
-  .row.r3::before{background:linear-gradient(180deg,#d3a6ff,rgba(164,99,216,.18))}
-  .row.done{border-color:rgba(216,189,122,.46);background:linear-gradient(180deg,rgba(58,45,26,.95),rgba(30,23,15,.95))}
-  .row.done::after{
-    content:'';position:absolute;inset:0;border-radius:11px;pointer-events:none;
-    box-shadow:0 0 20px rgba(216,189,122,.13) inset;
-    animation:breath 4.6s ease-in-out infinite;
-  }
-  @keyframes breath{0%,100%{opacity:.45}50%{opacity:1}}
-  .row.r3.done{border-color:rgba(164,99,216,.56);background:linear-gradient(180deg,rgba(52,32,66,.95),rgba(26,18,30,.95))}
-  .row.r3.done::after{box-shadow:0 0 22px rgba(164,99,216,.16) inset}
-
-  .row .ico{
-    flex:0 0 auto;width:34px;height:34px;display:flex;align-items:center;justify-content:center;
-    border-radius:10px;font-size:var(--pfs-xl);background:rgba(216,189,122,.07);border:1px solid rgba(216,189,122,.10);
-  }
-  .row.done .ico{background:rgba(216,189,122,.14);border-color:rgba(216,189,122,.32)}
-  .row .mid{flex:1 1 auto;min-width:0}
-  .row .nm{
-    font-family:var(--ff-title);font-size:var(--pfs-lg2);font-weight:700;letter-spacing:.03em;
-    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-  }
-  .row.done .nm{color:var(--gold-hi)}
-  .row .ds{
-    font-size:var(--pfs-cap2);color:var(--ink-dim);margin-top:3px;line-height:1.35;
-    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-  }
-  .row .st{flex:0 0 auto;display:flex;flex-direction:column;align-items:flex-end;gap:3px}
-  .row .tag{
-    font-size:var(--pfs-micro3);padding:2px 9px;border-radius:999px;letter-spacing:.06em;
-    border:1px solid var(--line-2);color:var(--ink-dim);white-space:nowrap;
-  }
-  .row .tag.t1{border-color:rgba(141,141,141,.45)}
-  .row .tag.t2{border-color:rgba(201,168,76,.55);color:#e2c987}
-  .row .tag.t3{border-color:rgba(164,99,216,.55);color:#cfa6f0}
-  .row.done .tag{
-    color:#171208;font-weight:800;border-color:transparent;
-    background:linear-gradient(180deg,#fbeec4,var(--gold));
-    box-shadow:0 1px 8px rgba(216,189,122,.34);
-  }
-  .row .cnt{font-size:var(--pfs-micro2);color:var(--ink-dim);font-variant-numeric:tabular-nums}
-  .row .dot{width:6px;height:6px;border-radius:50%;background:#e2a33c;box-shadow:0 0 8px rgba(226,163,60,.8)}
-
-  .empty{
-    margin:auto;padding:36px 20px;text-align:center;color:var(--ink-dim);line-height:1.95;max-width:340px;
-  }
-  .empty .sig{font-size:var(--pfs-3xl2);opacity:.5;margin-bottom:10px}
-  .empty b{display:block;color:var(--gold);font-family:var(--ff-title);font-size:var(--pfs-xl);letter-spacing:.08em;margin-bottom:7px}
-  .empty span{font-size:var(--pfs-sm)}
-
-  .mask{
-    position:fixed;inset:0;z-index:30;display:none;align-items:center;justify-content:center;padding:18px;
-    background:rgba(5,4,3,.66);backdrop-filter:blur(8px);
-  }
-  .mask.on{display:flex;animation:fade .2s ease-out}
-  @keyframes fade{from{opacity:0}to{opacity:1}}
-  .sheet{
-    position:relative;width:min(440px,100%);max-height:calc(100dvh - 36px);overflow:auto;
-    padding:20px 19px 15px;border-radius:17px;
-    background:linear-gradient(180deg,#241c14,#171210);
-    border:1px solid rgba(216,189,122,.42);
-    box-shadow:0 24px 70px rgba(0,0,0,.62),0 0 0 1px rgba(216,189,122,.08) inset;
-    animation:rise .26s cubic-bezier(.2,.8,.2,1);
-  }
-  @keyframes rise{from{transform:translateY(14px) scale(.98);opacity:0}to{transform:none;opacity:1}}
-  .sheet::before{
-    content:'';position:absolute;left:16px;right:16px;top:0;height:1px;
-    background:linear-gradient(90deg,transparent,rgba(216,189,122,.75),transparent);
-  }
-  .sheet .close{
-    position:absolute;right:11px;top:11px;width:27px;height:27px;border-radius:8px;cursor:pointer;
-    background:transparent;border:1px solid var(--line);color:var(--ink-dim);font-size:var(--pfs-lg3);line-height:1;
-  }
-  .sheet .close:hover{border-color:var(--line-2);color:var(--ink)}
-  .sheet .big{
-    width:50px;height:50px;border-radius:14px;display:flex;align-items:center;justify-content:center;
-    font-size:var(--pfs-3xl);margin-bottom:11px;background:rgba(216,189,122,.10);border:1px solid rgba(216,189,122,.26);
-    box-shadow:0 0 24px rgba(216,189,122,.14);
-  }
-  .sheet h2{
-    margin:0 0 6px;font-family:var(--ff-title);font-size:var(--pfs-xl3);letter-spacing:.06em;
-    background:linear-gradient(180deg,#fff3d0,var(--gold));-webkit-background-clip:text;background-clip:text;color:transparent;
-  }
-  .sheet .meta{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:13px}
-  .sheet .badge{font-size:var(--pfs-micro3);padding:2px 9px;border-radius:999px;border:1px solid var(--line-2);color:var(--ink-dim);letter-spacing:.05em}
-  .sheet .badge.b2{color:#e2c987;border-color:rgba(201,168,76,.6)}
-  .sheet .badge.b3{color:#cfa6f0;border-color:rgba(164,99,216,.6)}
-  .sheet .sec{margin-bottom:11px}
-  .sheet .k{font-size:var(--pfs-micro3);color:var(--ink-dim);letter-spacing:.14em;margin-bottom:4px}
-  .sheet .v{font-size:var(--pfs-md2);line-height:1.8}
-  .sheet .hint{font-size:var(--pfs-sm);line-height:1.75;color:#bda98a}
-  .sheet .rec{display:flex;gap:18px;flex-wrap:wrap}
-  .sheet .rec .it{min-width:66px}
-  .sheet .rec b{display:block;font-size:var(--pfs-lg4);color:var(--gold-hi);font-variant-numeric:tabular-nums;margin-top:2px}
-  .sheet .act{display:flex;gap:8px;margin-top:15px}
-  .btn{
-    flex:1 1 auto;height:38px;border-radius:11px;cursor:pointer;
-    font-family:var(--ff-body);font-size:var(--pfs-md);font-weight:800;letter-spacing:.04em;
-    border:1px solid rgba(216,189,122,.6);
-    background:linear-gradient(180deg,rgba(247,227,174,.96),rgba(201,168,76,.96));color:#241a09;
-    box-shadow:0 6px 18px rgba(216,189,122,.22);
-    transition:filter .16s,transform .1s;
-  }
-  .btn:hover{filter:brightness(1.06)}
-  .btn:active{transform:scale(.99)}
-  .btn:disabled{
-    cursor:default;background:transparent;border-color:var(--line);color:var(--ink-dim);
-    font-weight:400;box-shadow:none;filter:none;
-  }
-  .btn.ghost{background:transparent;color:var(--ink-dim);border-color:var(--line);font-weight:400;box-shadow:none}
-  .btn.ghost:hover{border-color:var(--line-2);color:var(--ink)}
-
-  .ft{flex:0 0 auto;display:flex;align-items:center;justify-content:center;gap:10px;padding-top:8px}
-  .ft .reset{
-    background:transparent;border:1px solid var(--line);color:rgba(163,148,124,.75);
-    height:27px;padding:0 13px;border-radius:999px;cursor:pointer;font-size:var(--pfs-cap);letter-spacing:.04em;
-  }
-  .ft .reset:hover{border-color:rgba(122,58,56,.7);color:#e0938f}
-
-  @media (max-height:640px){
-    body{padding:9px 10px 7px;font-size:var(--pfs-sm2)}
-    .ttl h1{font-size:var(--pfs-xl2)}
-    .ring{width:54px;height:54px}
-    .rare-bar .rb{padding:6px 9px}
-    .row{padding:9px 11px 9px 14px}
-  }
+:root{color-scheme:dark;--bg:#171919;--panel:#202323;--line:#3c4141;--ink:#edf0eb;--muted:#bbc2bb;--accent:#ddc88e;--pfs-sm:12px;--pfs-md:14px;--pfs-lg:18px}
+*{box-sizing:border-box}html,body{height:100%;margin:0}body{display:flex;flex-direction:column;overflow:hidden;padding:8px 12px;background:var(--bg);color:var(--ink);font:var(--pfs-md)/1.45 system-ui,"Microsoft YaHei",sans-serif}
+button,input,select{font:inherit;color:inherit;border:1px solid var(--line);background:var(--panel);border-radius:5px}button{cursor:pointer;min-height:44px;padding:6px 12px}button:disabled{cursor:default;color:var(--muted)}button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+header{display:flex;align-items:center;gap:12px;min-height:44px;flex-shrink:0;padding-right:var(--csh-dock-safe,clamp(150px,20vw,200px))}h1{font-size:var(--pfs-lg);margin:0;white-space:nowrap}#summary{color:var(--muted);font-size:var(--pfs-sm);margin:5px 0 7px}.filters{display:flex;gap:8px;flex-wrap:wrap;flex-shrink:0}.filters input{flex:1 1 160px;width:140px;min-width:100px;padding:7px 9px;min-height:44px}.filters select{padding:5px;min-height:44px;max-width:100%}.note{margin:6px 0;color:var(--muted);font-size:var(--pfs-sm)}#message{color:var(--accent);min-height:18px;font-size:var(--pfs-sm);flex-shrink:0}#list{min-height:0;overflow:auto;flex:1;overscroll-behavior:contain;padding-bottom:8px}.row{display:grid;grid-template-columns:minmax(0,1fr) 176px;gap:6px 18px;padding:10px 2px;border-bottom:1px solid var(--line);align-items:center}.name{font-weight:700;font-size:var(--pfs-md)}.meta{font-size:var(--pfs-sm);font-weight:400;color:var(--muted);margin-left:10px}.condition{margin-top:2px;overflow-wrap:anywhere}.progress{display:flex;align-items:center;gap:8px;margin-top:4px;font-size:var(--pfs-sm);color:var(--muted)}progress{width:100px;height:7px;accent-color:var(--accent)}.reward{font-size:var(--pfs-sm);margin-bottom:4px}.claim{width:100%;min-height:44px}.claim.ready{border-color:var(--accent);color:var(--accent)}.claim.done{background:transparent;border-color:transparent}.hint{font-size:var(--pfs-sm);color:var(--muted);margin-top:2px}.empty{padding:30px 10px;color:var(--muted)}
+@media(max-width:540px){body{padding:6px 9px}.row{grid-template-columns:minmax(0,1fr) 120px;gap:8px}.meta{display:block;margin:0}.reward{font-size:var(--pfs-sm)}.filters{gap:5px}.filters input{flex-basis:100%;width:100%}.filters select{flex:1;min-width:0}header{gap:8px}h1{font-size:var(--pfs-md)}}
+@media(max-height:430px) and (min-width:541px){body{padding-top:3px}.row{padding:6px 2px}.note{margin:3px 0}.hint{display:none}#summary{margin:2px 0 4px}}
 </style>
-</head>
-<body>
-  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
-    <defs>
-      <linearGradient id="gArc" x1="0" y1="0" x2="1" y2="1">
-        <stop offset="0%" stop-color="#f7e3ae"/><stop offset="60%" stop-color="#d8bd7a"/><stop offset="100%" stop-color="#a8863c"/>
-      </linearGradient>
-    </defs>
-  </svg>
-
-  <div class="hd">
-    <button class="back" id="back" type="button">返回</button>
-    <div class="ttl">
-      <h1>池子成就</h1>
-      <div class="sub" id="subLine">以战为证</div>
-    </div>
-    <div class="ring">
-      <svg width="62" height="62" viewBox="0 0 62 62">
-        <circle class="track" cx="31" cy="31" r="26" fill="none" stroke-width="5"/>
-        <circle class="arc" id="ringArc" cx="31" cy="31" r="26" fill="none" stroke-width="5"
-                stroke-dasharray="163.4" stroke-dashoffset="163.4"/>
-      </svg>
-      <div class="pct"><span id="pct">0%</span><i id="ringSub">0/0</i></div>
-    </div>
-  </div>
-
-  <div class="rare-bar" id="rareBar"></div>
-
-  <div class="tools">
-    <input class="search" id="q" type="text" placeholder="搜成就名 / 条件…" autocomplete="off">
-    <button class="sort" id="sort" type="button">稀有度</button>
-  </div>
-
-  <div class="chips" id="catChips"></div>
-  <div class="list" id="list"></div>
-  <div class="ft"><button class="reset" id="reset" type="button">重置成就进度</button></div>
-
-  <div class="mask" id="mask">
-    <div class="sheet" id="sheet">
-      <button class="close" id="close" type="button">×</button>
-      <div class="big" id="dIco">🏅</div>
-      <h2 id="dName">—</h2>
-      <div class="meta" id="dMeta"></div>
-      <div class="sec"><div class="k">条 件</div><div class="v" id="dDesc">—</div></div>
-      <div class="sec" id="dHintWrap" style="display:none"><div class="k">提 示</div><div class="hint" id="dHint"></div></div>
-      <div class="sec"><div class="k">你的记录</div><div class="rec" id="dRec"></div></div>
-      <div class="act">
-        <button class="btn" id="dClaim" type="button">领取奖励</button>
-        <button class="btn ghost" id="dClose2" type="button">关闭</button>
-      </div>
-    </div>
-  </div>
-
+</head><body>
+<header><h1>池子成就</h1></header>
+<div id="summary"></div>
+<div class="filters" aria-label="成就筛选">
+<input id="search" type="search" placeholder="搜索名称或条件" aria-label="搜索名称或条件">
+<select id="category" aria-label="分类"><option>全部分类</option><option>操作</option><option>连击</option><option>逆境</option><option>模式</option><option>武将</option></select>
+<select id="status" aria-label="状态"><option>全部状态</option><option>待领取</option><option>未解锁</option><option>已领取</option></select>
+<select id="sort" aria-label="排序"><option>待领优先</option><option>进度优先</option><option>原始顺序</option></select>
+</div>
+<div class="note">单机身份、斗地主、对决中记录；单局条件显示历史最佳，武将胜场跨局累计。</div>
+<div id="message" role="status" aria-live="polite"></div>
+<main id="list" aria-label="成就列表"></main>
 <script>
-(function () {
-  var PA = window.CSH_POOL_ACHV;
-  var listEl = document.getElementById("list");
-  if (!PA) {
-    listEl.innerHTML = '<div class="empty"><div class="sig">⚱</div><b>成就引擎没有加载</b><span>扩展文件缺失，请重装扩展。</span></div>';
-    return;
-  }
-  var CATS = ["操作", "连击", "逆境", "模式", "武将"];
-  var CAT_ICO = { "操作": "⚔", "连击": "🔥", "逆境": "🛡", "模式": "🎴", "武将": "🧝" };
-  var RARE_NAME = { 1: "普通", 2: "稀有", 3: "史诗" };
-  var RARE_REWARD = { 1: { pc: 500, merit: 5 }, 2: { pc: 1500, merit: 15 }, 3: { pc: 5000, merit: 40 } };
-  var SUBS = { "操作": "以手为锋", "连击": "势不可挡", "逆境": "绝境生花", "模式": "各擅胜场", "武将": "人将合一" };
-
-  var state = { cat: "全部", only: "全部", q: "", sort: 0 };
-  /* 发奖对账自愈（2026-10-20）：台账/钱包流水显示已付、seen 却丢了的，
-     进页先补回 seen —— 只补标记，不发钱。 */
-  try { if (typeof PA.reconcile === "function") PA.reconcile(); } catch (eR) {}
-  var store = PA.load();
-  function got(id) { return store.got && store.got[id]; }
-
-  function paintHead() {
-    var cs = PA.claimState();
-    var pct = cs.total ? Math.round(cs.got / cs.total * 100) : 0;
-    var arc = document.getElementById("ringArc"), C = 2 * Math.PI * 26;
-    arc.setAttribute("stroke-dasharray", C.toFixed(1));
-    arc.setAttribute("stroke-dashoffset", (C * (1 - cs.got / Math.max(1, cs.total))).toFixed(1));
-    document.getElementById("pct").textContent = pct + "%";
-    document.getElementById("ringSub").textContent = cs.got + "/" + cs.total;
-    document.getElementById("subLine").textContent = cs.unread ? ("有 " + cs.unread + " 项奖励待领") : (cs.got ? "以战为证" : "尚未落笔");
-
-    var bar = document.getElementById("rareBar");
-    bar.textContent = "";
-    [1, 2, 3].forEach(function (r) {
-      var total = 0, have = 0;
-      PA.RULES.forEach(function (x) { if (x.rare === r) { total++; if (got(x.id)) have++; } });
-      var d = document.createElement("div");
-      d.className = "rb i" + r;
-      var s = document.createElement("span"); s.textContent = RARE_NAME[r];
-      var b = document.createElement("b"); b.textContent = have;
-      var em = document.createElement("em"); em.textContent = "/" + total;
-      d.appendChild(s); d.appendChild(b); d.appendChild(em);
-      bar.appendChild(d);
-    });
-  }
-
-  function paintChips() {
-    var box = document.getElementById("catChips");
-    box.textContent = "";
-    var cats = ["全部"].concat(CATS);
-    cats.forEach(function (c) {
-      var n = c === "全部" ? PA.RULES.length : PA.RULES.filter(function (x) { return x.cat === c; }).length;
-      var b = document.createElement("button");
-      b.type = "button";
-      b.className = "chip" + (state.cat === c ? " on" : "");
-      b.appendChild(document.createTextNode(c));
-      var sp = document.createElement("span"); sp.className = "n"; sp.textContent = n;
-      b.appendChild(sp);
-      b.addEventListener("click", function () { state.cat = c; paintChips(); paintList(); paintSub(); });
-      box.appendChild(b);
-    });
-    [["全部", "全部"], ["已解锁", "已解锁"], ["未解锁", "未解锁"]].forEach(function (p) {
-      var b = document.createElement("button");
-      b.type = "button";
-      b.className = "chip" + (state.only === p[1] ? " on" : "");
-      b.textContent = p[0];
-      b.addEventListener("click", function () { state.only = p[1]; paintChips(); paintList(); });
-      box.appendChild(b);
-    });
-  }
-  function paintSub() {
-    var s = document.getElementById("subLine");
-    if (state.cat !== "全部" && SUBS[state.cat]) s.textContent = SUBS[state.cat];
-    else { var cs = PA.claimState(); s.textContent = cs.unread ? ("有 " + cs.unread + " 项奖励待领") : (cs.got ? "以战为证" : "尚未落笔"); }
-  }
-
-  function paintList() {
-    var box = listEl;
-    box.textContent = "";
-    var q = (state.q || "").trim();
-    var rows = PA.RULES.filter(function (r) {
-      if (state.cat !== "全部" && r.cat !== state.cat) return false;
-      var d = !!got(r.id);
-      if (state.only === "已解锁" && !d) return false;
-      if (state.only === "未解锁" && d) return false;
-      if (q && (r.name + r.desc + r.cat).indexOf(q) < 0) return false;
-      return true;
-    });
-    if (state.sort === 0) {
-      rows.sort(function (a, b) { return (b.rare - a.rare) || (!!got(a.id) - !!got(b.id)) || (a.cat < b.cat ? -1 : 1); });
-    } else {
-      rows.sort(function (a, b) { return (!!got(a.id) - !!got(b.id)) || (b.rare - a.rare); });
-    }
-    if (!rows.length) {
-      var e = document.createElement("div");
-      e.className = "empty";
-      var sig = '<div class="sig">✦</div>';
-      if (q) e.innerHTML = sig + "<b>没有匹配的成就</b><span>换个关键词试试。</span>";
-      else if (state.only === "已解锁") e.innerHTML = sig + "<b>还没有解锁任何成就</b><span>去打一局身份、斗地主或对决 —— 你的操作会被记下来。</span>";
-      else if (state.only === "未解锁") e.innerHTML = sig + "<b>这个分类已经全部点亮</b><span>换一个分类看看。</span>";
-      else e.innerHTML = sig + "<b>这里还没有内容</b><span>换一个筛选条件。</span>";
-      box.appendChild(e);
-      return;
-    }
-    rows.forEach(function (r) {
-      var d = got(r.id);
-      var row = document.createElement("div");
-      row.className = "row r" + r.rare + (d ? " done" : "");
-      var ico = document.createElement("div"); ico.className = "ico"; ico.textContent = CAT_ICO[r.cat] || "🏅";
-      var mid = document.createElement("div"); mid.className = "mid";
-      var nm = document.createElement("div"); nm.className = "nm"; nm.textContent = r.name;
-      var ds = document.createElement("div"); ds.className = "ds"; ds.textContent = r.desc;
-      mid.appendChild(nm); mid.appendChild(ds);
-      var st = document.createElement("div"); st.className = "st";
-      var tag = document.createElement("span");
-      tag.className = "tag t" + r.rare + (d ? " done" : "");
-      tag.textContent = d ? "已解锁" : RARE_NAME[r.rare];
-      st.appendChild(tag);
-      if (d && !store.seen[r.id]) {
-        var dot = document.createElement("span"); dot.className = "dot"; dot.title = "奖励待领";
-        st.appendChild(dot);
-      } else if (d && d.n > 1) {
-        var c = document.createElement("span"); c.className = "cnt"; c.textContent = d.n + " 次";
-        st.appendChild(c);
-      }
-      row.appendChild(ico); row.appendChild(mid); row.appendChild(st);
-      row.addEventListener("click", function () { openSheet(r); });
-      box.appendChild(row);
-    });
-  }
-
-  var curRule = null;
-  function modeName(m) { return m === "identity" ? "身份场" : (m === "doudizhu" ? "斗地主" : (m === "versus" ? "对决" : "—")); }
-  function fmtDate(t) {
-    if (!t) return "—";
-    var d = new Date(t), p = function (n) { return n < 10 ? "0" + n : "" + n; };
-    return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()) + " " + p(d.getHours()) + ":" + p(d.getMinutes());
-  }
-  function openSheet(r) {
-    curRule = r;
-    var d = got(r.id);
-    document.getElementById("dIco").textContent = CAT_ICO[r.cat] || "🏅";
-    document.getElementById("dName").textContent = r.name;
-    var meta = document.getElementById("dMeta"); meta.textContent = "";
-    var tags = [RARE_NAME[r.rare], r.cat];
-    tags.push(r.modes && r.modes.length ? r.modes.map(modeName).join(" / ") : "全模式");
-    tags.forEach(function (t) {
-      var b = document.createElement("span");
-      b.className = "badge" + (t === "稀有" ? " b2" : (t === "史诗" ? " b3" : ""));
-      b.textContent = t; meta.appendChild(b);
-    });
-    document.getElementById("dDesc").textContent = r.desc;
-    var hw = document.getElementById("dHintWrap");
-    if (r.hint) { hw.style.display = ""; document.getElementById("dHint").textContent = r.hint; }
-    else hw.style.display = "none";
-    var rec = document.getElementById("dRec"); rec.textContent = "";
-    var items = d
-      ? [["达成次数", d.n + " 次"], ["首次达成", fmtDate(d.t)], ["达成模式", modeName(d.m)]]
-      : [["状态", "未解锁"], ["奖励", RARE_REWARD[r.rare].pc + " CBY"], ["功勋", "+" + RARE_REWARD[r.rare].merit]];
-    items.forEach(function (it) {
-      var w = document.createElement("div"); w.className = "it";
-      var k = document.createElement("div"); k.className = "k"; k.textContent = it[0];
-      var v = document.createElement("b"); v.textContent = it[1];
-      w.appendChild(k); w.appendChild(v); rec.appendChild(w);
-    });
-    var claim = document.getElementById("dClaim");
-    claim.disabled = !d || !!store.seen[r.id];
-    claim.textContent = !d ? "未达成" : (store.seen[r.id] ? "已领取" : "领取 " + RARE_REWARD[r.rare].pc + " CBY + " + RARE_REWARD[r.rare].merit + " 功勋");
-    document.getElementById("mask").classList.add("on");
-  }
-  function closeSheet() { document.getElementById("mask").classList.remove("on"); curRule = null; }
-
-  document.getElementById("dClaim").addEventListener("click", function () {
-    if (!curRule || !got(curRule.id)) return;
-    var r = curRule, rw = RARE_REWARD[r.rare];
-    store = PA.load();
-    if (store.seen[r.id]) return;
-    var btn = document.getElementById("dClaim");
-    /* 发奖对账（2026-10-20）：台账/钱包流水显示已付过的，只补 seen 不发钱 ——
-       成就页「重新开始」或单清存档不能再刷奖励。 */
-    if (typeof PA.isPaid === "function" && PA.isPaid(r.id)) {
-      store.seen[r.id] = 1; PA.save(store);
-      btn.disabled = true; btn.textContent = "已领取";
-      paintHead(); paintList(); return;
-    }
-    var paid = false, meritPaid = false;
-    try {
-      var W = (window.CSH && window.CSH.wallet) || null;
-      if (W && typeof W.addPC === "function") { W.addPC(rw.pc, "池子成就/" + r.name); paid = true; }
-    } catch (e) {}
-    try {
-      var R = (window.CSH && window.CSH.rank) || null;
-      if (R && typeof R.addMerit === "function") { R.addMerit(rw.merit, "池子成就/" + r.name); meritPaid = true; }
-    } catch (e2) {}
-    if (!paid) { btn.textContent = "钱包未就绪，请回主界面再领"; return; }
-    if (typeof PA.recordPaid === "function") PA.recordPaid(r.id, rw.pc, meritPaid ? rw.merit : 0);
-    else { store.seen[r.id] = 1; PA.save(store); }
-    btn.disabled = true;
-    btn.textContent = meritPaid ? "已领取" : "已领取（功勋未记账）";
-    paintHead(); paintList();
-  });
-
-  document.getElementById("q").addEventListener("input", function () { state.q = this.value; paintList(); });
-  document.getElementById("sort").addEventListener("click", function () {
-    state.sort = state.sort ? 0 : 1;
-    this.textContent = state.sort ? "未解锁优先" : "稀有度";
-    paintList();
-  });
-  document.getElementById("close").addEventListener("click", closeSheet);
-  document.getElementById("dClose2").addEventListener("click", closeSheet);
-  document.getElementById("mask").addEventListener("click", function (e) { if (e.target === this) closeSheet(); });
-  document.getElementById("back").addEventListener("click", function () { try { history.back(); } catch (e) {} });
-  document.addEventListener("keydown", function (e) { if (e.key === "Escape") closeSheet(); });
-
-  function doReset() {
-    PA.save({ v: PA.VER, got: {}, seen: {}, chars: {} });
-    store = PA.load();
-    paintHead(); paintChips(); paintList();
-  }
-  document.getElementById("reset").addEventListener("click", function () {
-    var host = null;
-    try { host = (window.parent && window.parent.lib && window.parent.lib.cshUI) || null; } catch (e) {}
-    if (host && typeof host.confirm === "function") {
-      host.confirm({
-        title: "重置池子成就",
-        message: "会清空全部解锁记录与武将胜场累计，不可撤销。已领取过的奖励不会重置，重新达成后不会再发一次。",
-        ok: "清空", cancel: "算了", danger: true
-      }, function (ok) { if (ok) doReset(); });
-      return;
-    }
-    if (confirm("确定要清空池子成就的全部进度吗？这个操作不可撤销。\n注意：已领取过的奖励不会重置，重新达成后不会再发一次。")) doReset();
-  });
-
-  paintHead(); paintChips(); paintList();
+(function(){
+"use strict";
+var PA=window.CSH_POOL_ACHV,T=window.CSHPage.transport({closeName:"achv-close",timeout:3500}),pending={},store;
+var $=function(id){return document.getElementById(id);},mode={identity:"身份",doudizhu:"斗地主",versus:"对决"};
+function el(tag,cls,text){var n=document.createElement(tag);if(cls)n.className=cls;if(text!=null)n.textContent=text;return n;}
+if(!PA){$("message").textContent="成就未就绪，请关闭后重开";return;}
+function state(r){return pending[r.id]?"待领取":store.seen[r.id]?"已领取":store.got[r.id]?"待领取":"未解锁";}
+function render(){
+ PA.reconcile();store=PA.load();var total=PA.RULES.length,got=0,paid=0;
+ PA.RULES.forEach(function(r){if(store.got[r.id])got++;if(store.got[r.id]&&store.seen[r.id]&&!pending[r.id])paid++;});
+ $("summary").textContent="已解锁 "+got+" / "+total+" · 待领取 "+(got-paid)+" · 已领取 "+paid;
+ if(PA.storageError())$("message").textContent=PA.storageError();
+ var q=$("search").value.trim(),cat=$("category").value,st=$("status").value;
+ var rows=PA.RULES.filter(function(r){return (cat==="全部分类"||r.cat===cat)&&(st==="全部状态"||state(r)===st)&&(!q||(r.name+" "+r.desc+" "+r.cat).indexOf(q)>=0);});
+ var sort=$("sort").value;
+ rows.sort(function(a,b){if(sort==="待领优先")return (state(a)==="待领取"?-1:state(a)==="未解锁"?0:1)-(state(b)==="待领取"?-1:state(b)==="未解锁"?0:1);if(sort==="进度优先"){var pa=PA.progress(a,store),pb=PA.progress(b,store);return pb.value/pb.target-pa.value/pa.target;}return 0;});
+ var list=$("list");list.textContent="";
+ if(!rows.length){list.appendChild(el("div","empty","没有匹配的成就，试试其他筛选条件。"));return;}
+ rows.forEach(function(r){
+  var row=el("article","row"),main=el("div"),aside=el("div"),nm=el("div","name",r.name),rw=PA.reward(r),pr=PA.progress(r,store);
+  row.dataset.id=r.id;nm.appendChild(el("span","meta",r.cat+" · "+(r.modes.length?r.modes.map(function(m){return mode[m];}).join(" / "):"三种模式")));main.appendChild(nm);
+  main.appendChild(el("div","condition",r.desc));
+  var pg=el("div","progress"),bar=el("progress");bar.max=pr.target;bar.value=pr.value;bar.setAttribute("aria-label",r.name+"进度");pg.appendChild(bar);pg.appendChild(el("span","",pr.label+" "+pr.value+" / "+pr.target));main.appendChild(pg);
+  if(r.hint)main.appendChild(el("div","hint",r.hint));
+  aside.appendChild(el("div","reward",rw.pc+" 池子币 · "+rw.merit+" 基础功勋"));
+  var stateNow=state(r),button=el("button","claim"+(stateNow==="待领取"?" ready":stateNow==="已领取"?" done":""),pending[r.id]?"领取中…":stateNow==="待领取"?"领取奖励":stateNow);
+  button.type="button";button.disabled=stateNow!=="待领取"||!!pending[r.id];button.addEventListener("click",function(){claim(r);});aside.appendChild(button);row.appendChild(main);row.appendChild(aside);list.appendChild(row);
+ });
+}
+function claim(r){
+ if(pending[r.id])return;pending[r.id]=true;$("message").textContent="";render();
+ T.call("shell-pool-ach-claim",{key:r.id},function(ok,data){delete pending[r.id];$("message").textContent=ok?(data&&data.already?"已领取过该奖励":"已领取「"+r.name+"」奖励"):(data&&data.reason||"领取未完成，请回主界面后重试");render();var row=$("list").querySelector('[data-id="'+r.id+'"] button');if(row&&!row.disabled)row.focus();});
+}
+["category","status","sort"].forEach(function(id){$(id).addEventListener("change",render);});$("search").addEventListener("input",render);
+window.addEventListener("storage",function(e){if(!e.key||[PA.KEY,PA.PAY_KEY,"csh_wallet","csh_rank"].indexOf(e.key)>=0)render();});render();
 })();
-</script>
-</body>
-</html>
+</script></body></html>

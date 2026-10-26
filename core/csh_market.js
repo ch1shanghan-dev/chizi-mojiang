@@ -877,13 +877,60 @@ function saveBlocked() {
 function blank() {
 	return { v: 1, day: dayKey(), dayNo: 0, prices: {}, hold: {}, cost: {}, gift: false, earned: 0, pendingDiv: 0, tips: [] };
 }
+let loading = null, loadedMissing = false, loadError = "", readSource = "", missingDetail = null, acceptMissing = false;
+function missingEvidence() {
+	const ledgerRaw = localStorage.getItem("csh_ledger");
+	const ledger = ledgerRaw === null ? [] : JSON.parse(ledgerRaw);
+	const history = Array.isArray(ledger) && ledger.some(entry => entry && typeof entry.r === "string" && entry.r.indexOf("金鳞市") >= 0);
+	const backups = [];
+	for (let i = 0; i < localStorage.length; i++) {
+		const key = localStorage.key(i);
+		if (!key || !key.startsWith("csh_mig_backup_")) continue;
+		const body = JSON.parse(localStorage.getItem(key));
+		const state = body && (body.goldfish || (body.wallet && (body.wallet.marketPending?.state || body.wallet.marketSaved)));
+		if (state && typeof state === "object") backups.push(key.slice("csh_mig_backup_".length));
+	}
+	return history || backups.length ? { history: !!history, backups: backups.sort().reverse() } : null;
+}
+function decodeState(value) {
+	if (typeof value === "string") value = JSON.parse(value);
+	if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("金鳞市存档格式异常，原数据已保留");
+	// 历史迁移 numMap 会把合法空持仓清成 null；只在副本上兼容该形状。
+	value = { ...value };
+	for (const field of ["hold", "cost"]) if (value[field] === null) value[field] = {};
+	for (const field of ["prices", "hold", "cost"]) {
+		if (value[field] !== undefined && (!value[field] || typeof value[field] !== "object" || Array.isArray(value[field]))) throw new Error("金鳞市存档字段异常：" + field + "，原数据已保留");
+	}
+	return value;
+}
+function readLegacy() {
+	// 只读取历史实际存在的同键LS及宿主LS配置，不猜测并合并来源不明的存档。
+	const raw = localStorage.getItem(KEY);
+	if (raw !== null) return { value: decodeState(JSON.parse(raw)), source: "legacy-local" };
+	if (!lib.db && typeof lib.configprefix === "string") {
+		const text = localStorage.getItem(lib.configprefix + "config");
+		if (text !== null) {
+			const config = JSON.parse(text);
+			if (!config || typeof config !== "object" || Array.isArray(config)) throw new Error("宿主配置读取异常，未新建市场存档");
+			if (config[KEY] !== undefined && config[KEY] !== null) return { value: decodeState(config[KEY]), source: "host-local" };
+		}
+	}
+	return null;
+}
 function read() {
 	let s = null;
 	const wallet = lib.cshWallet && lib.cshWallet.wallet;
 	const pending = wallet && wallet.marketPending && wallet.marketPending();
-	if (pending) s = pending.state;
-	try { if (!s) s = lib.config[KEY]; } catch (e0) {}
-	if (!s || typeof s !== "object") s = blank();
+	if (pending) { s = decodeState(pending.state); readSource = "wallet-pending"; }
+	if (!s && wallet && wallet.marketSaved) { const saved = wallet.marketSaved(); if (saved) { s = decodeState(saved); readSource = "wallet-saved"; } }
+	if (!s && lib.config[KEY] !== undefined && lib.config[KEY] !== null) { s = decodeState(lib.config[KEY]); readSource = "host-config"; }
+	if (!s) { const legacy = readLegacy(); if (legacy) { s = legacy.value; readSource = legacy.source; } }
+	if (!s && lib.db && !loadedMissing) throw new Error(loadError || "正在读取金鳞市存档，请稍后重试");
+	if (!s) {
+		missingDetail = missingEvidence();
+		if (missingDetail && !acceptMissing) throw new Error("当前市场存档缺失，检测到历史交易或旧备份。已暂停开户与交易，请先在行囊检查备份。");
+		s = blank(); readSource = "new";
+	} else missingDetail = null;
 	s = JSON.parse(JSON.stringify(s)); // 失败的计算不能提前改动内存真值。
 	if (typeof s.dayNo !== "number" || !isFinite(s.dayNo) || s.dayNo < 0) s.dayNo = 0;
 	if (!s.prices || typeof s.prices !== "object") s.prices = {};
@@ -893,6 +940,54 @@ function read() {
 	if (typeof s.pendingDiv !== "number" || !isFinite(s.pendingDiv) || s.pendingDiv < 0) s.pendingDiv = 0;
 	if (typeof s.day !== "string") s.day = dayKey();
 	return s;
+}
+
+/* 显式等待持久配置读取成功，读失败不能降级为空档，更不能先领开户礼覆盖旧档。 */
+export function ready() {
+	if (loading) return loading;
+	loading = Promise.resolve().then(async function () {
+		try {
+			const W = lib.cshWallet && lib.cshWallet.wallet;
+			if (!(W && ((W.marketPending && W.marketPending()) || (W.marketSaved && W.marketSaved()))) && lib.config[KEY] == null && lib.db && !loadedMissing) {
+				const stored = await new Promise(function (resolve, reject) {
+					let tx, value, timer, settled = false;
+					function finish(error) { if (settled) return; settled = true; clearTimeout(timer); error ? reject(error) : resolve(value); }
+					try {
+						tx = lib.db.transaction(["config"], "readonly");
+						tx.oncomplete = function () { finish(); };
+						tx.onabort = function () { finish(tx.error || new Error("市场存档读取中止")); };
+						tx.onerror = function () {};
+						const req = tx.objectStore("config").get(KEY);
+						req.onsuccess = function () { value = req.result; };
+						timer = setTimeout(function () { try { tx.abort(); } catch (e) {} finish(new Error("市场存档读取超时，请重试")); }, 5000);
+					} catch (e) { finish(e); }
+				});
+				if (stored !== undefined && stored !== null) lib.config[KEY] = decodeState(stored);
+				else loadedMissing = true;
+			}
+			const state = read();
+			if (W && W.commitMarket && W.marketSaved && !W.marketSaved() && !(W.marketPending && W.marketPending()) && readSource !== "new" && !saveBlocked()) {
+				const kept = W.commitMarket(state, 0, "金鳞市旧档保全");
+				if (!kept.ok) throw new Error(kept.msg || "市场旧档保全失败，请重试");
+				syncPending();
+			}
+			loadError = ""; return true;
+		} catch (e) { loadError = String(e.message || e); return false; }
+	}).finally(function () { loading = null; });
+	return loading;
+}
+export function startNew(confirmed) {
+	if (saveBlocked()) return { ok: false, msg: RECOVERY_MESSAGE };
+	if (confirmed !== true || !missingDetail) return { ok: false, msg: "请先检查旧备份并明确确认" };
+	try { read(); return { ok: false, msg: "已经读取到市场存档，请刷新后继续" }; }
+	catch (e) { if (!missingDetail) return { ok: false, msg: String(e.message || e) }; }
+	acceptMissing = true;
+	try {
+		const state = blank(); state.gift = true; // 旧市场已开过，不能重复发放体验金。
+		const result = write(state, 0, "金鳞市确认使用新档");
+		if (result.ok) { missingDetail = null; loadError = ""; }
+		return result;
+	} finally { acceptMissing = false; }
 }
 
 /* 不 await saveConfig：本机宿主不返回其内部 Promise，putDB 也在 request 成功时
@@ -973,6 +1068,7 @@ function write(s, delta, reason) {
    每天：①价格 = 现价×(1+漂移+噪声) 再向趋势线×(1+热度) 回归；
         ②持仓分红 = 持仓 × 当日价 × 1.5% → 钱包（离线多天一次性补发）。 */
 export function ensureDay() {
+	if (loadError) return { ok: false, msg: loadError, days: 0, dividend: 0 };
 	if (saveBlocked()) return { ok: false, msg: RECOVERY_MESSAGE, recovery: true, days: 0, dividend: 0 };
 	try {
 		const s = read();
@@ -1049,13 +1145,15 @@ export function ensureDay() {
 		return { ok: true, days: days, dividend: Math.round(dividend) };
 	} catch (e) {
 		console.warn("[池子魔将] 金鳞市结算异常", e);
-		return { days: 0, dividend: 0 };
+		lastSaveError = String(e.message || e);
+		return { ok: false, msg: lastSaveError, days: 0, dividend: 0 };
 	}
 }
 
 /* ---------- 快照（页面渲染用 · 双通道：桥 shell-goldfish / 父窗 CSH.market.snapshot） ---------- */
 export function snapshot() {
 	try {
+		if (loadError) throw new Error(loadError);
 		const s = read();
 		const wallet = lib.cshWallet && lib.cshWallet.wallet;
 		const pc = wallet && typeof wallet.pc === "function" ? wallet.pc() : 0;
@@ -1090,6 +1188,7 @@ export function snapshot() {
 			});
 		}
 		return {
+			ok: true, ready: true, source: readSource,
 			day: s.dayNo, pc: pc, marketValue: Math.round(marketValue),
 			saveError: lastSaveError,
 			cost: Math.round(costSum), earned: s.earned,
@@ -1099,13 +1198,14 @@ export function snapshot() {
 		};
 	} catch (e) {
 		console.warn("[池子魔将] 金鳞市快照异常", e);
-		return { day: 0, pc: 0, marketValue: 0, cost: 0, earned: 0, list: [], cfg: {} };
+		return { ok: false, ready: false, saveError: String(e.message || e), missingState: missingDetail, list: [] };
 	}
 }
 
 /* ---------- 交易（买/卖 · 走钱包单一账本） ----------
    side: "buy" | "sell"；n = 股数（正整数）。返回 {ok, msg, ...}。 */
 export function trade(id, n, side) {
+	if (loadError) return { ok: false, msg: loadError };
 	if (saveBlocked()) return { ok: false, msg: RECOVERY_MESSAGE, recovery: true };
 	try {
 		if (LISTED.indexOf(id) < 0) return { ok: false, msg: "该标的未在金鳞市挂牌" };
@@ -1155,10 +1255,12 @@ export function installMarket() {
 		if (lib.cshMarket) return;
 		lib.cshMarket = {
 			KEY: KEY,
+			ready: ready,
+			startNew: startNew,
 			syncPending: syncPending,
 			pending: function () {
 				const wallet = lib.cshWallet && lib.cshWallet.wallet;
-				return !!(syncing || (wallet && wallet.marketPending && wallet.marketPending()));
+				return !!(loading || syncing || (wallet && wallet.marketPending && wallet.marketPending()));
 			},
 			ensureDay: ensureDay,
 			snapshot: snapshot,
@@ -1177,7 +1279,7 @@ export function installMarket() {
 				WELCOME_GIFT: WELCOME_GIFT,
 			},
 		};
-		syncPending();
+		ready(); syncPending();
 		if (lib.cshDebug && typeof lib.cshDebug.info === "function") {
 			lib.cshDebug.info("market: 金鳞市就绪（" + LISTED.length + " 位挂牌 · 存档 " + KEY + "）");
 		}

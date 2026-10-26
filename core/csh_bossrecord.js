@@ -5,10 +5,10 @@
      · 对局侧写入：skills/boss.js 的 csh_boss_watch（魔王阵亡 → record）
      · 快照聚合：  core/csh_shell.js buildStats → summary()
      · 讨伐录展示：games/bossbook.html（桥 shell-stats + 父窗兜底 summary）
-   ★ 存储 = lib.config["extension_池子魔将_bossKill"]（game.saveConfig 范式
-     同 winrateData，随无名杀存档持久化）——无新增 localStorage / 无新桥命令。
-   ★ 经济层（4d）天然幂等：首杀 = n===1 一生只发生一次；每日 = 按日键一天一笔
-     ——重复击破只增计数不发钱。入账走 csh_wallet 单一账本。
+   ★ 存储 = 钱包bossSaved保全副本 + 原lib.config兼容镜像。
+     同名ZIP更新删除extension_*配置时，可继续读取保全副本；行囊按原域迁移。
+   ★ 经济层（4d）按讨伐次数/日期判首杀与每日；入账走 csh_wallet 单一账本。
+     配置与钱包是不同后端，异步失败/崩溃不具备跨后端原子保证。
    ★ 数值单点（§6.7）：REWARD_FIRST / REWARD_DAILY 实机校准只改这里。
    ============================================================ */
 import { lib, game, _status } from "../../../noname.js";
@@ -46,9 +46,76 @@ export const MINION_CBY_ASBOSS = 800;            /* 作为 BOSS 应战时（自�
      · 达成即消费：recordMinion 里发现命中的就是悬赏目标 → 立即清空标记（不会粘住下一次）。
    注意：判定"已讨伐"用的是 summary().minions[id].n，与讨伐录同源，不另立一份账。 */
 const KEY_BOUNTY = "extension_池子魔将_csh_bounty";
+const SAVE_FIELDS = { [KEY]: "bossKill", [KEY_ASBOSS]: "bossAsBoss", [KEY_BOUNTY]: "bounty" };
 export const BOUNTY_COST = 1000;                 /* 单点价格（作者定：1000 CBY 一次） */
+function saveBlocked() {
+	try {
+		if (_status.reloading) return true;
+		const guard = lib.cshWallet && lib.cshWallet.saveGuard;
+		if (guard && typeof guard.blocked === "function") return guard.blocked();
+		if (localStorage.getItem("csh_migrate_recovery") !== null) return true;
+		const migrate = lib.cshMigrate;
+		const state = migrate && typeof migrate.recoveryState === "function" && migrate.recoveryState();
+		return !!(state && (state.pending || state.busy));
+	} catch (e) { return true; }
+}
+function readSavedValue(key) {
+	const wallet = lib.cshWallet && lib.cshWallet.wallet;
+	const saved = wallet && typeof wallet.bossSaved === "function" ? wallet.bossSaved() : null;
+	const field = SAVE_FIELDS[key];
+	if (saved && Object.prototype.hasOwnProperty.call(saved, field)) return saved[field];
+	const value = lib.config[key];
+	if (value != null) return value;
+	const legacy = localStorage.getItem(key);
+	return legacy === null ? null : JSON.parse(legacy);
+}
+function readConfigCopy(key) {
+	const value = readSavedValue(key);
+	if (value == null) return {};
+	if (typeof value !== "object" || Array.isArray(value)) throw new Error("讨伐存档格式异常，原值保留：" + key);
+	return JSON.parse(JSON.stringify(value));
+}
+function saveConfigCopy(key, value) {
+	if (saveBlocked()) return false;
+	let previous, copy, existed, preserved = false;
+	try {
+		copy = JSON.parse(JSON.stringify(value));
+		previous = lib.config[key]; existed = Object.prototype.hasOwnProperty.call(lib.config, key);
+		if (saveBlocked()) return false;
+		const wallet = lib.cshWallet && lib.cshWallet.wallet;
+		if (wallet && typeof wallet.preserveBoss === "function") {
+			if (!preserveExisting()) return false; // Startup may have been frozen by an unfinished recovery.
+			if (!wallet.preserveBoss({ [SAVE_FIELDS[key]]: copy })) return false;
+			preserved = true;
+		}
+		if (saveBlocked()) return preserved;
+		if (!game || typeof game.saveConfig !== "function") return preserved;
+		game.saveConfig(key, copy);
+		return true; // With preserveBoss this acknowledges the durable copy, not host mirror completion.
+	} catch (e) {
+		try { if (!preserved && lib.config[key] === copy) { if (existed) lib.config[key] = previous; else delete lib.config[key]; } } catch (ignored) {}
+		console.warn("[池子魔将] 讨伐存档写入异常", e);
+		return preserved;
+	}
+}
 function bountyRaw() {
-	try { return String((lib.config && lib.config[KEY_BOUNTY]) || ""); } catch (e) { return ""; }
+	try { const value = readSavedValue(KEY_BOUNTY); return typeof value === "string" ? value : ""; } catch (e) { return ""; }
+}
+function preserveExisting() {
+	if (saveBlocked()) return false;
+	const wallet = lib.cshWallet && lib.cshWallet.wallet;
+	if (!wallet || typeof wallet.preserveBoss !== "function") return false;
+	const saved = wallet.bossSaved() || {}, patch = {};
+	for (const key of Object.keys(SAVE_FIELDS)) {
+		const field = SAVE_FIELDS[key];
+		if (Object.prototype.hasOwnProperty.call(saved, field)) continue;
+		const value = readSavedValue(key);
+		if (value == null) continue; // No record is not evidence of a previous record.
+		if (field === "bounty") { if (typeof value !== "string") throw new Error("悬赏存档格式异常，原值保留"); }
+		else { if (field === "bossKill") readStore(); else readAsBoss(); }
+		patch[field] = value;
+	}
+	return !Object.keys(patch).length || wallet.preserveBoss(patch);
 }
 export function bountyCheck(id) {
 	id = String(id || "");
@@ -56,7 +123,7 @@ export function bountyCheck(id) {
 	try {
 		const sm = summary();
 		if (sm && sm.minions && sm.minions[id] && sm.minions[id].n > 0) return { ok: false, reason: "hunted" };
-	} catch (e) { /* 读取异常按"可下单"处理，由 bountySet 再兜一次 */ }
+	} catch (e) { return { ok: false, reason: "unavailable" }; }
 	return { ok: true, id: id };
 }
 export function bountyGet() {
@@ -65,23 +132,25 @@ export function bountyGet() {
 	return bountyCheck(id).ok ? id : "";
 }
 export function bountySet(id) {
+	if (saveBlocked()) return { ok: false, reason: "recovery" };
 	const chk = bountyCheck(id);
 	if (!chk.ok) return chk;
-	try { game.saveConfig(KEY_BOUNTY, chk.id); return { ok: true, id: chk.id }; }
+	try { return saveConfigCopy(KEY_BOUNTY, chk.id) ? { ok: true, id: chk.id } : { ok: false, reason: saveBlocked() ? "recovery" : "error" }; }
 	catch (e) { return { ok: false, reason: "error" }; }
 }
 export function bountyClear() {
-	try { game.saveConfig(KEY_BOUNTY, ""); return true; } catch (e) { return false; }
+	return saveConfigCopy(KEY_BOUNTY, "");
 }
 export const MINION_MERIT = 25;                  /* 每只妖灵的功勋（官阶线 · 日软上限内自然衰减） */
 export const MINION_HEAT = { first: 1.5, repeat: 0.3, cap: 50 };  /* 金鳞市基本面加成（%）：
                                                     首次 +1.5% / 重复 +0.3% 每次 / 软上限 +50% */
 
-/* ---------- 存储读写（winrateData 范式：读即清洗，写走 saveConfig） ---------- */
+/* ---------- 存储读写（独立副本清洗，写走 saveConfig；恢复期只读） ---------- */
 function readStore() {
-	let s = null;
-	try { s = lib.config[KEY]; } catch (e0) {}
-	if (!s || typeof s !== "object") s = {};
+	const s = readConfigCopy(KEY);
+	for (const field of ["map", "ext", "extPool", "minions"]) {
+		if (s[field] != null && (typeof s[field] !== "object" || Array.isArray(s[field]))) throw new Error("讨伐存档字段异常，原值保留：" + field);
+	}
 	if (!s.map || typeof s.map !== "object") s.map = {};
 	for (const k of Object.keys(s.map)) {
 		const e = s.map[k];
@@ -132,12 +201,7 @@ function readStore() {
 }
 
 function writeStore(s) {
-	try {
-		lib.config[KEY] = s;
-		if (game && typeof game.saveConfig === "function") game.saveConfig(KEY, s);
-	} catch (eW) {
-		console.warn("[池子魔将] 讨伐存档写入异常", eW);
-	}
+	return saveConfigCopy(KEY, s);
 }
 
 function killCount(s) {
@@ -153,61 +217,59 @@ function dayKey() {
 
 /* ---------- 核心：记录一次击破（由 csh_boss_watch 在对局侧调用） ----------
    阵营判定已在 watch.filter 完成（魔王阵亡 + 玩家为挑战者方）——本函数不重复判。 */
-export function record(bossId, opts) {
-	try {
-		if (typeof bossId !== "string" || bossId.indexOf("csh_boss_") !== 0) return null;
-		const orig = "csh_" + bossId.slice(9);
-		/* ★ 2026-10-14 审计修复（真 BUG）：原写法 `const tier = tierOf(orig); if (!tierOf(orig)) return null;`
-		   —— `tierOf()` 内部是 `ID2TIER[id] || "elite"`，**恒返回真值**（精英兜底），
-		   所以这行校验是**死代码**：任何 `csh_boss_*` 形状的字符串（哪怕不在名册里）
-		   都能写进存档并拿到精英档奖励。改为对名册真值白名单校验。 */
-		if (allBossIds().indexOf(bossId) < 0) return null;
-		const tier = tierOf(orig);
-		if (!tier) return null;
-
-		const s = readStore();
-		const e = s.map[bossId] || (s.map[bossId] = { n: 0 });
-		e.n++;
-		e.last = Date.now();
-		if (!e.first) e.first = e.last;
-		/* v4.2 速通排行：记录最快击破轮数（讨伐录展示 + 速通成就） */
-		if (opts && typeof opts.round === "number" && opts.round > 0) {
-			if (typeof e.best !== "number" || opts.round < e.best) e.best = opts.round;
-		}
-		writeStore(s);
-
-		const total = killCount(s);
-		const name = (lib.translate && (lib.translate[bossId] || lib.translate[orig])) || orig;
-		try {
-			const rTxt = (typeof e.best === "number") ? " · 最快 " + e.best + " 轮" : "";
-			if (e.n === 1) game.log("新的讨伐记录：" + name + "！讨伐录已更新 · 第 " + total + " / " + allBossIds().length + " 位" + rTxt);
-			else game.log("讨伐录已更新 · 第 " + total + " / " + allBossIds().length + " 位（" + name + " · " + e.n + " 讨）" + rTxt);
-		} catch (eL) {}
-
-		/* ---------- 经济层（4d）：首杀一次性 + 每日首战（天然幂等） ---------- */
-		try {
-			const wallet = lib.cshWallet && lib.cshWallet.wallet;
-			if (wallet && typeof wallet.add === "function") {
-				if (e.n === 1 && REWARD_FIRST[tier]) {
-					wallet.add(REWARD_FIRST[tier], "讨伐首杀:" + name);
-					game.log("首杀奖励 +" + REWARD_FIRST[tier] + " CBY");
-				}
-				const day = dayKey();
-				if (s.lastDaily !== day && REWARD_DAILY[tier]) {
-					s.lastDaily = day;
-					writeStore(s);
-					wallet.add(REWARD_DAILY[tier], "每日首战:" + name);
-					game.log("每日首战奖励 +" + REWARD_DAILY[tier] + " CBY");
-				}
-			}
-		} catch (ePay) {
-			console.warn("[池子魔将] 讨伐奖励入账异常", ePay);
-		}
-		return { total: total, entry: e, tier: tier };
-	} catch (eR) {
-		console.warn("[池子魔将] 讨伐记录异常", eR);
-		return null;
-	}
+/* In-memory precommit retry queue. Snapshot adoption invalidates old uncommitted events. */
+let recordQueue = [], recordTokens = new WeakMap(), recordTimer = null;
+function rewardEpoch() { const W=lib.cshWallet; return W&&typeof W.saveEpoch==='function'?W.saveEpoch():0; }
+function retryRewards() {
+ recordTimer=null;
+ while(recordQueue.length){
+  const task=recordQueue[0];
+  if(task.epoch!==rewardEpoch()){recordQueue.shift();continue;}
+  if(saveBlocked())break;
+  try { task.result=task.run(); } catch(error){console.warn('[池子魔将] 讨伐收益未保存',error);}
+  if(!task.result)break;
+  recordQueue.shift();
+ }
+ if(recordQueue.length&&recordTimer==null&&typeof setTimeout==='function')recordTimer=setTimeout(retryRewards,1000);
+ return !recordQueue.length;
+}
+function recordReward(token,run) {
+ if(saveBlocked())return null;
+ if(game.boss&&Number.isSafeInteger(game.boss._cshBossEpoch)&&game.boss._cshBossEpoch!==rewardEpoch())return null;
+ const event=token&&typeof token==='object'?token:{};
+ if(recordTokens.has(event)){const old=recordTokens.get(event);if(old.epoch!==rewardEpoch())return null;if(!old.result)retryRewards();return old.result;}
+ if(recordQueue.length>=100){console.warn('[池子魔将] 讨伐收益队列已满，请先恢复存储');return null;}
+ const task={epoch:rewardEpoch(),run:run,result:null};recordTokens.set(event,task);recordQueue.push(task);retryRewards();
+ if(!task.result&&lib.cshUI&&lib.cshUI.toast)lib.cshUI.toast('讨伐结算暂未保存，正在重试，请勿重载');
+ return task.result;
+}
+function rewardWallet() {
+ const W=lib.cshWallet&&lib.cshWallet.wallet;
+ return W&&typeof W.commitBossEvent==='function'?W:null;
+}
+function rewardSaved() { const W=rewardWallet();if(!W||!preserveExisting())return null;return W.bossSaved()||{}; }
+function mirrorRewards(saved) {
+ for(const key of Object.keys(SAVE_FIELDS)){const field=SAVE_FIELDS[key];if(!Object.prototype.hasOwnProperty.call(saved,field))continue;
+  try{if(!saveBlocked()&&game.saveConfig)game.saveConfig(key,JSON.parse(JSON.stringify(saved[field])));}catch(error){console.warn('[池子魔将] 讨伐兼容配置待同步',error);}
+ }
+}
+export function record(bossId,opts) {
+ if(saveBlocked()||typeof bossId!=='string'||allBossIds().indexOf(bossId)<0)return null;
+ const orig='csh_'+bossId.slice(9),tier=tierOf(orig),token=opts&&opts.event||game.boss||{};
+ return recordReward(token,function(){
+  const W=rewardWallet(),saved=rewardSaved();if(!W||!saved)return null;
+  const state=W.bossRewardState(),s=readStore(),e=s.map[bossId]||(s.map[bossId]={n:0});
+  const first=!state.first[bossId]&&e.n===0,day=dayKey(),daily=state.daily!==day&&s.lastDaily!==day;
+  e.n++;e.last=Date.now();if(!e.first)e.first=e.last;
+  if(opts&&Number.isSafeInteger(opts.round)&&opts.round>0&&(typeof e.best!=='number'||opts.round<e.best))e.best=opts.round;
+  if(daily)s.lastDaily=day;saved.bossKill=s;
+  const name=(lib.translate&&(lib.translate[bossId]||lib.translate[orig]))||orig;
+  const result=W.commitBossEvent({saved:saved,pc:(first?REWARD_FIRST[tier]:0)+(daily?REWARD_DAILY[tier]:0),merit:0,first:first?bossId:null,daily:daily?day:null,reason:'讨伐:'+name},token);
+  if(!result.ok)return null;mirrorRewards(saved);
+  try{var firstGain=first?Math.min(result.gained,REWARD_FIRST[tier]):0;if(first)game.log('首杀奖励 +'+firstGain+' CBY');if(daily)game.log('每日首战奖励 +'+(result.gained-firstGain)+' CBY');}catch(error){}
+  try{game.log('讨伐录已更新：'+name+' · 实得 '+result.gained+' CBY'+(result.pending?' · 收益记录待恢复':''));}catch(error){}
+  return {total:killCount(s),entry:e,tier:tier,cby:result.gained};
+ });
 }
 
 /* ---------- v4.2：扮演魔王（应战模式）战绩 ----------
@@ -215,24 +277,18 @@ export function record(bossId, opts) {
    判负 = 玩家即魔王且魔王死亡；判胜 = 玩家即魔王且最后一名挑战者倒下。
    由 skills/boss.js 的 csh_boss_watch / csh_boss_watch2 在 dieAfter 时机调用。 */
 function readAsBoss() {
-	let o = null;
-	try { o = lib.config[KEY_ASBOSS]; } catch (e0) {}
-	if (!o || typeof o !== "object") o = {};
+	const o = readConfigCopy(KEY_ASBOSS);
 	if (typeof o.win !== "number" || !isFinite(o.win) || o.win < 0) o.win = 0;
 	if (typeof o.lose !== "number" || !isFinite(o.lose) || o.lose < 0) o.lose = 0;
 	return o;
 }
 export function recordAsBoss(win) {
 	try {
+		if (saveBlocked()) return null;
 		const o = readAsBoss();
 		if (win) o.win++; else o.lose++;
 		o.last = Date.now();
-		try {
-			lib.config[KEY_ASBOSS] = o;
-			if (game && typeof game.saveConfig === "function") game.saveConfig(KEY_ASBOSS, o);
-		} catch (eW) {
-			console.warn("[池子魔将] 应战战绩写入异常", eW);
-		}
+		if (!saveConfigCopy(KEY_ASBOSS, o)) return null;
 		return o;
 	} catch (e) {
 		console.warn("[池子魔将] 应战战绩异常", e);
@@ -252,51 +308,29 @@ export function recordAsBoss(win) {
      · 玩家为**挑战者**（game.me !== game.boss）→ MINION_CBY（800）；
      · 玩家为**魔王**（应战模式，game.me === game.boss，自家妖灵被挑战者击破）
        → MINION_CBY_ASBOSS（800）。场景由调用方经 opts.asBoss 传入（日志据此标注）。 */
-export function recordMinion(minionId, opts) {
-	try {
-		if (typeof minionId !== "string" || minionId.indexOf("csh_boss_minion_") !== 0) return null;
-		/* 白名单校验（同上：前缀判断不足以防脏数据/伪造 id 进存档） */
-		if (!Object.prototype.hasOwnProperty.call(MINIONS, minionId)) return null;
-		const asBoss = !!(opts && opts.asBoss);          /* 应战场景标记（由 csh_boss_watch 判定传入） */
-		const amt = asBoss ? MINION_CBY_ASBOSS : MINION_CBY;
-		const s = readStore();
-		const e = s.minions[minionId] || (s.minions[minionId] = { n: 0 });
-		e.n++;
-		e.last = Date.now();
-		if (!e.first) e.first = e.last;
-		writeStore(s);
-
-		/* v6.7：数据层真源优先（MINION_NAMES 零时序依赖）→ lib.translate 兜底。
-		   旧写法把 lib.translate 放在第一顺位 ⇒ 角色包未加载时日志/结算显示原始 id。 */
-		const name = MINION_NAMES[minionId] || (lib.translate && lib.translate[minionId]) || minionId;
-		const heatAdd = e.n === 1 ? MINION_HEAT.first : MINION_HEAT.repeat;
-		try {
-			const wallet = lib.cshWallet && lib.cshWallet.wallet;
-			if (wallet && typeof wallet.add === "function") wallet.add(amt, "讨伐妖灵:" + name);
-		} catch (eW) {}
-		try {
-			const rank = lib.cshWallet && lib.cshWallet.rank;
-			if (rank && typeof rank.addMerit === "function") rank.addMerit(MINION_MERIT, "讨伐妖灵");
-		} catch (eM) {}
-		try {
-			game.log("妖灵讨伐" + (asBoss ? "（应战）" : "") + "：" + name + " ×" + e.n + " —— CBY +" + amt +
-				" · 功勋 +" + MINION_MERIT + " · 金鳞市热度 +" + heatAdd + "%");
-		} catch (eL) {}
-		/* v6.2 好感度：讨伐她 → 她记住你这一战（+6，同一只每天一次；模块缺失时零副作用） */
-		try {
-			if (lib.cshAffection && typeof lib.cshAffection.noteHunt === "function") {
-				lib.cshAffection.noteHunt(minionId);
-			}
-		} catch (eA) {}
-		/* 指定讨伐令：目标达成即消费（清空悬赏标记 —— 用**原始存档值**比对，不能用 bountyGet，
-		   因为此时 e.n 刚 ++，bountyGet 已把"已讨伐"目标过滤成空串了） */
-		try { if (bountyRaw() === minionId) bountyClear(); } catch (eBO) {}
-		return { n: e.n, cby: amt, merit: MINION_MERIT, heat: heatAdd, asBoss: asBoss };
-	} catch (e) {
-		console.warn("[池子魔将] 妖灵讨伐收益异常", e);
-		return null;
-	}
+function actualGain(value, maximum) {
+	return typeof value === "number" && Number.isFinite(value) ? Math.max(0, Math.min(maximum, Math.floor(value))) : 0;
 }
+function heatAt(n) {
+	return n > 0 ? Math.min(MINION_HEAT.cap, MINION_HEAT.first + (n - 1) * MINION_HEAT.repeat) : 0;
+}
+export function recordMinion(minionId,opts) {
+ if(saveBlocked()||!Object.prototype.hasOwnProperty.call(MINIONS,minionId))return null;
+ const token=opts&&opts.event||{},asBoss=!!(opts&&opts.asBoss);
+ return recordReward(token,function(){
+  const W=rewardWallet(),saved=rewardSaved();if(!W||!saved)return null;
+  const s=readStore(),e=s.minions[minionId]||(s.minions[minionId]={n:0});e.n++;e.last=Date.now();if(!e.first)e.first=e.last;
+  saved.bossKill=s;if(bountyRaw()===minionId)saved.bounty='';
+  const name=MINION_NAMES[minionId]||(lib.translate&&lib.translate[minionId])||minionId;
+  const r=W.commitBossEvent({saved:saved,pc:asBoss?MINION_CBY_ASBOSS:MINION_CBY,merit:MINION_MERIT,reason:'讨伐妖灵:'+name},token);
+  if(!r.ok)return null;mirrorRewards(saved);
+  const heatAdd=Math.round((heatAt(e.n)-heatAt(e.n-1))*1e6)/1e6;
+  try{game.log('妖灵讨伐：'+name+' ×'+e.n+' · CBY +'+r.gained+' · 功勋 +'+r.meritGained+(r.meritPending?'（待补领）':'')+' · 热度 +'+heatAdd+'%');}catch(error){}
+  try{if(!saveBlocked()&&lib.cshAffection&&lib.cshAffection.noteHunt)lib.cshAffection.noteHunt(minionId);}catch(error){}
+  return {n:e.n,cby:r.gained,merit:r.meritGained,meritPending:r.meritPending,heat:heatAdd,asBoss:asBoss};
+ });
+}
+
 /* 金鳞市基本面加成（%，批次 B 读取）：0 = 无记录；由 n 推算（首破 first + 重复 repeat×次数） */
 export function minionHeat(minionId) {
 	try {
@@ -304,7 +338,7 @@ export function minionHeat(minionId) {
 		const e = s.minions && s.minions[minionId];
 		const n = (e && e.n > 0) ? e.n : 0;
 		if (!n) return 0;
-		return Math.min(MINION_HEAT.cap, MINION_HEAT.first + (n - 1) * MINION_HEAT.repeat);
+		return heatAt(n);
 	} catch (e) { return 0; }
 }
 
@@ -409,6 +443,7 @@ export function extRoster() {
 /* 记录一次外传击破（由 csh_boss_watch_ext 在对局侧调用）。
    ★ 拒绝 csh_boss_ 前缀——那是池子魔将魔王通道（record()），两条通道互斥不串味。 */export function recordExt(id, opts) {
 	try {
+		if (saveBlocked()) return null;
 		if (typeof id !== "string" || id.length === 0 || id.length >= 64) return null;
 		if (id.indexOf("csh_boss_") === 0) return null;          /* 魔王通道，不走外传 */
 		const s = readStore();
@@ -420,7 +455,7 @@ export function extRoster() {
 		if (opts && typeof opts.round === "number" && opts.round > 0) {
 			if (typeof e.best !== "number" || opts.round < e.best) e.best = opts.round;
 		}
-		writeStore(s);
+		if (!writeStore(s)) return null;
 		const name = (lib.translate && lib.translate[id]) || id;
 		try {
 			const rTxt = (typeof e.best === "number") ? " · 最快 " + e.best + " 轮" : "";
@@ -443,6 +478,7 @@ export function extRoster() {
 /* 在 boss 模式内快照外传名册（幂等覆盖 · 由 lib.cshBossRecord.snapshotExt 调用）。 */
 export function snapshotExt() {
 	try {
+		if (saveBlocked()) return 0;
 		const list = extRoster();
 		if (!list.length) return 0;
 		const s = readStore();
@@ -452,7 +488,7 @@ export function snapshotExt() {
 				hp: r.hp, diff: r.diff, diffKey: r.diffKey, diffName: r.diffName,
 			};
 		}
-		writeStore(s);
+		if (!writeStore(s)) return 0;
 		return list.length;
 	} catch (eS) {
 		return 0;
@@ -643,6 +679,7 @@ export function summary() {
    （boss 是每局新对象：一局只记一次、不跨局泄漏）。 */
 function recordOnOver() {
 	try {
+		if (saveBlocked()) return;
 		if (!lib.config || lib.config.mode !== "boss") return;
 		const boss = game && game.boss;
 		if (!boss || !game.bossinfo) return;
@@ -656,23 +693,28 @@ function recordOnOver() {
 		} catch (eDbg) {}
 		if (game.me === boss) {
 			/* 应战（玩家即魔王）：魔王死 = 负；场上再无挑战者 = 胜（与 mode/boss.js 同判据） */
-			if (dead) { boss._cshBossRecorded = true; recordAsBoss(false); }
+			if (dead) { if (recordAsBoss(false)) boss._cshBossRecorded = true; }
 			else if (!game.hasPlayer(function (cur) { return !cur.side; }, true)) {
-				boss._cshBossRecorded = true; recordAsBoss(true);
+				if (recordAsBoss(true)) boss._cshBossRecorded = true;
 			}
 			return;
 		}
 		if (!dead) return;                                       /* 挑战者视角：只有魔王死才算击破 */
-		boss._cshBossRecorded = true;
 		const nm = String(boss.name || "");
-		if (nm.indexOf("csh_boss_") === 0) record(nm, { round: game.roundNumber });
-		else recordExt(nm, { round: game.roundNumber });         /* 外传：非池子魔将 BOSS 被击破 */
+		const recorded = nm.indexOf("csh_boss_") === 0 ? record(nm, { round: game.roundNumber, event: boss }) : recordExt(nm, { round: game.roundNumber });
+		if (recorded) boss._cshBossRecorded = true;
 	} catch (e) { console.warn("[池子魔将] 收尾讨伐记录异常", e); }
 }
 
 export function installBossRecord() {
+	if(game.addGlobalSkill&&!lib.skill.csh_boss_economy_session){
+		lib.skill.csh_boss_economy_session={trigger:{global:"gameStart"},forced:true,silent:true,popup:false,priority:100000,filter:function(){return lib.config.mode==="boss";},content:async function(){if(game.boss)game.boss._cshBossEpoch=rewardEpoch();}};
+		game.addGlobalSkill("csh_boss_economy_session");
+	}
 	try {
+		try { preserveExisting(); } catch (eCopy) { console.warn("[池子魔将] 讨伐旧档保全未完成", eCopy); }
 		const api = {
+            retryRewards: retryRewards,
 			record: record,
 			recordAsBoss: recordAsBoss,
 			recordMinion: recordMinion,

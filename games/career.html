@@ -485,6 +485,34 @@ html,body{width:100%;height:100%;background:var(--ink-0);color:var(--text);-webk
   .lg-row .tag{display:none}
 }
 </style>
+<style id="world-task-layout">
+/* 以内容和任务为主，保留所有原有栏目。 */
+:root{--fs-tiny:12px;--fs-cap:12px;--fs-menu:15px;--fs-title:20px;--fs-display:24px;--text-dim:#aab0b8}
+#app *{text-shadow:none}
+#tabs{flex-basis:148px;padding-top:48px;overflow-y:auto}
+.tab{flex:0 0 auto;min-height:48px;letter-spacing:0;padding:10px 14px;font-family:var(--ff-body)}
+.tab::before{display:none}.tab:hover,.tab.on{transform:none}
+#body{padding:52px 16px 18px;overscroll-behavior:contain}
+.sect h3{font-size:var(--fs-lead);letter-spacing:0}
+.world-tools{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:0 0 12px}
+.world-tools label{display:flex;align-items:center;gap:8px;flex:1 1 200px}
+.world-tools label span{white-space:nowrap;flex:none}
+.world-tools input{min-width:0;width:100%;height:44px;background:var(--ink-1);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font:inherit}
+.world-tools button,.bd-tab{min-height:44px}
+#bd-status{flex:1 0 100%;font-size:var(--fs-cap);color:var(--text-dim)}
+#bd-news{max-height:220px;overflow-y:auto;overscroll-behavior:contain}
+.world-summary{margin-bottom:16px;border:1px solid var(--line);border-radius:8px;padding:0 12px}
+.world-summary summary{cursor:pointer;min-height:44px;display:flex;align-items:center;font-size:var(--fs-sm)}
+.world-summary summary::before{content:'▸';margin-right:8px}.world-summary[open] summary::before{content:'▾'}
+.row[role=button]{cursor:pointer}.row[role=button]:hover,.row[role=button]:focus-visible{background:var(--gold-fill);outline:1px solid var(--gold)}
+.row .nm{overflow-wrap:anywhere}.row .nm span{display:block;margin-left:0!important}
+#modal .mbox{max-height:100%;overflow-y:auto;overscroll-behavior:contain}
+#modal .mbox .mi{white-space:pre-line;font-size:var(--fs-sm)}#modal .mbox .mb:empty{display:none}
+#p-board .rows{max-height:none;overflow:visible}
+button:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+@media(max-width:600px) and (min-height:441px){#app{flex-direction:column}#tabs{flex:0 0 auto;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));padding:48px 6px 6px;gap:4px;overflow:visible}.tab{min-width:0;min-height:44px;padding:6px;font-size:var(--fs-sm);gap:2px}.tab .tm{max-width:100%;font-size:var(--fs-cap)}#body{padding:12px}.tab.on::after{height:2px;width:100%;top:auto;bottom:0}#rankFocus .name{font-size:var(--fs-menu)}}
+@media(max-height:440px) and (min-width:481px){#app{flex-direction:row}#tabs{display:flex;flex-direction:column;flex-basis:120px;padding:8px 0;overflow-y:auto}.tab{min-height:46px;padding:8px 12px}#body{padding-top:48px}.world-tools{margin-bottom:8px}}
+</style>
 </head>
 <body>
 <div id="app">
@@ -494,7 +522,7 @@ html,body{width:100%;height:100%;background:var(--ink-0);color:var(--text);-webk
     <button class="tab" data-p="tasks">任务<i class="tm" id="tm-tasks"></i></button>
     <button class="tab" data-p="ach">成就<i class="tm" id="tm-ach"></i></button>
     <button class="tab" data-p="rank">官阶<i class="tm" id="tm-rank"></i></button>
-    <button class="tab" data-p="board">排行<i class="tm" id="tm-board"></i></button>
+    <button class="tab" data-p="board">世界与牌友<i class="tm" id="tm-board"></i></button>
   </div>
   <div id="body">
     <!-- 总览（2026-10-03 · 双栏化）
@@ -632,8 +660,14 @@ html,body{width:100%;height:100%;background:var(--ink-0);color:var(--text);-webk
 
     <!-- 排行 -->
     <div class="page" id="p-board">
-      <div class="sect"><h3>世界动态</h3><div class="feed" id="bd-news"></div></div>
-      <div class="sect"><h3>世界之最</h3><div class="wmax" id="bd-most"></div></div>
+      <div class="world-tools">
+        <label><span>查找牌友</span><input id="bd-search" type="search" placeholder="姓名或牌风" aria-label="查找牌友"></label>
+        <button class="btn ghost" id="bd-me" type="button">找到我</button>
+        <button class="btn ghost" id="bd-refresh" type="button">刷新世界</button>
+        <span id="bd-status" role="status" aria-live="polite">世界载入中…</span>
+      </div>
+      <details class="world-summary" open><summary>世界动态</summary><div class="feed" id="bd-news"></div></details>
+      <details class="world-summary"><summary>世界之最与我的牌桌</summary><div class="wmax" id="bd-most"></div></details>
       <div class="diffbox" id="bd-note">数据源：AI 世界档案（资金与胜负随牌局实时演化）。</div>
       <div class="sect">
         <div class="bd-tabs">
@@ -659,7 +693,7 @@ html,body{width:100%;height:100%;background:var(--ink-0);color:var(--text);-webk
   </div>
 </div>
 
-<div id="modal"><div class="mbox">
+<div id="modal" role="dialog" aria-modal="true" aria-labelledby="md-name"><div class="mbox">
   <div class="mb" id="md-badge"></div>
   <h4 id="md-name">—</h4>
   <div class="mi" id="md-info"></div>
@@ -676,7 +710,7 @@ html,body{width:100%;height:100%;background:var(--ink-0);color:var(--text);-webk
 var Bridge = (function () {
   /* 传输核心来自 core/csh_page.js（唯一实现）；大厅用 2500ms 超时（子页响应较重） */
   var T = CSHPage.transport({ closeName: 'career-close', timeout: 2500 });
-  return { active: T.active, call: T.call };
+  return { active: T.active, call: T.call, close: T.close };
 })();
 
 function $(s) { return document.querySelector(s); }
@@ -793,6 +827,9 @@ function bindTabs() {
       var pages = document.querySelectorAll(".page");
       for (var k = 0; k < pages.length; k++) pages[k].className = "page";
       $("#p-" + p).className = "page on";
+      $("#body").scrollTop = 0;
+      for (var n = 0; n < all.length; n++) all[n].setAttribute("aria-pressed", all[n] === this ? "true" : "false");
+      if (p === "board") refreshWorld();
       if (p === "ledger") loadLedger(false);   /* 账本按需拉取（不拖慢开局快照） */
     }, false);
   }
@@ -1387,6 +1424,7 @@ function renderMatrix() {
   }
 }
 function showRankModal(lv, rec) {
+  modalFocusBack = document.activeElement;
   var seg = segOfRank(lv);
   $("#md-badge").innerHTML = (State.badges && State.badges[lv]) ? State.badges[lv] : fallbackBadge(lv, segColor(seg.color));
   $("#md-name").textContent = (rec && rec.name) || ("第 " + lv + " 阶");
@@ -1402,6 +1440,7 @@ function showRankModal(lv, rec) {
     "门票折扣 <b>" + Math.round((p.discount || 0) * 100) + "%</b>（真实生效）<br>" +
     "签到加成 <b>+" + fmt(p.sign || 0) + "</b> CBY";
   $("#modal").className = "on";
+  $("#md-close").focus();
 }
 
 /* ============================================================
@@ -1550,6 +1589,10 @@ function fillBoard(sel, arr, valFn, subFn, titleFn) {
   var box = $(sel);
   if (!box) return;
   box.innerHTML = "";
+  var query = ($("#bd-search").value || "").trim().toLowerCase();
+  var indexed = arr.map(function (a, i) { return { person: a, position: i + 1 }; });
+  indexed = indexed.filter(function (item) { var a = item.person; return !query || [a.name, a.personaName, a.personaDesc, a.isMe ? "你" : ""].join(" ").toLowerCase().indexOf(query) >= 0; });
+  arr = indexed.map(function (item) { return item.person; });
   if (!arr.length) { box.appendChild(el("div", "diffbox", "暂无数据")); return; }
   /* 排行榜全量渲染（2026-10-07 · 作者要求核心=完整可浏览+找到自己）：
      不再截前 10，整榜滚动；「你」行自动滚进视野。 */
@@ -1558,8 +1601,31 @@ function fillBoard(sel, arr, valFn, subFn, titleFn) {
     var row = el("div", "row" + (a.isMe ? " me" : ""));
     /* v6.3：牌风的一句话人设挂 title（鼠标悬停即读"这个人怎么打牌"） */
     if (titleFn) { try { row.title = titleFn(a); } catch (eT) {} }
-    if (a.isMe) setTimeout(function () { try { row.scrollIntoView({ block: "center" }); } catch (eS) {} }, 0);
-    row.appendChild(el("div", "pvp", String(i + 1)));
+    row.appendChild(el("div", "pvp", String(indexed[i].position)));
+    row.tabIndex = 0;
+    row.setAttribute("role", "button");
+    row.setAttribute("aria-label", "查看 " + (a.name || "牌友") + " 档案");
+    (function (person, entry) {
+      function showPerson() {
+        modalFocusBack = entry;
+        $("#md-badge").textContent = "";
+        $("#md-name").textContent = person.name || "牌友";
+        var lines = person.isMe ? ["这是你在当前榜单的位置。", "池子币 " + fmt((State.snap || {}).pc)] : [
+          "资金 " + fmt(person.fund || 0),
+          "牌风 " + (person.personaName || "暂无记录"),
+          person.personaDesc || "",
+          "牌技 " + Number(person.skill || 0).toFixed(3),
+          "牌局 " + fmt(person.hands || 0) + " 手 · 获胜 " + fmt(person.wins || 0) + " 手",
+          "最大底池 " + fmt(person.biggestPot || 0),
+          person.retired ? "已退隐" : "在场"
+        ];
+        $("#md-info").textContent = lines.filter(Boolean).join("\n");
+        $("#modal").className = "on";
+        $("#md-close").focus();
+      }
+      entry.addEventListener("click", showPerson);
+      entry.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); showPerson(); } });
+    })(a, row);
     /* ★ 2026-09-29 修复：此前把 <span …> 拼进 textContent，
        排行榜整列显示 HTML 源码（用户截图实锤）。改为真元素节点。 */
     var nm = el("div", "nm");
@@ -1648,6 +1714,19 @@ function adoptSnap(snap) {
   }
   renderOverview();
   renderAch();          /* 成就墙依赖快照里的实时统计 */
+  if (State.world) renderBoard();
+}
+var worldLoadSeq = 0;
+function refreshWorld() {
+  var seq = ++worldLoadSeq;
+  $("#bd-status").textContent = "正在刷新世界…";
+  Bridge.call("shell-world", null, function (ok, w) {
+    if (seq !== worldLoadSeq) return;
+    if (ok && w) {
+      State.world = w; renderBoard();
+      $("#bd-status").textContent = "已更新 · " + ((w.ai || []).length) + " 位牌友 · 点击人物查看档案";
+    } else $("#bd-status").textContent = "刷新失败，已保留当前内容；可再次刷新。";
+  });
 }
 function loadWalletSnap(round) {
   round = round || 0;
@@ -1684,9 +1763,7 @@ function reloadAll() {
       State.ranks = r; renderCatalog(); renderMatrix(); renderOverview();
     }
   });
-  Bridge.call("shell-world", null, function (ok, w) {
-    if (ok && w) { State.world = w; renderBoard(); }
-  });
+  refreshWorld();
   Bridge.call("shell-badge-all", { form: "md" }, function (ok, b) {
     if (ok && b && b.list) {
       var map = {};
@@ -1728,7 +1805,29 @@ function bindActions() {
 bindTabs();
 bindPcLink();
 /* 弹窗关闭：原先挂在前一版的存档绑定函数里，摘掉那块时把这一行搬出来单独挂 */
-  $("#md-close").addEventListener("click", function () { $("#modal").className = ""; }, false);
+var modalFocusBack = null;
+function closeDetail() {
+  $("#modal").className = "";
+  if (modalFocusBack && modalFocusBack.isConnected) modalFocusBack.focus({ preventScroll: true });
+}
+$("#md-close").addEventListener("click", closeDetail, false);
+$("#modal").addEventListener("click", function (e) { if (e.target === this) closeDetail(); });
+document.addEventListener("keydown", function (e) {
+  if (!$("#modal").classList.contains("on")) {
+    if (e.key === "Escape" && Bridge.active && typeof Bridge.close === "function") { e.preventDefault(); e.stopImmediatePropagation(); Bridge.close(); }
+    return;
+  }
+  if (e.key === "Escape") { e.preventDefault(); e.stopImmediatePropagation(); closeDetail(); }
+  if (e.key === "Tab") { e.preventDefault(); $("#md-close").focus(); }
+}, true);
+$("#bd-search").addEventListener("input", renderBoard);
+$("#bd-refresh").addEventListener("click", function () { refreshWorld(); loadWalletSnap(); });
+$("#bd-me").addEventListener("click", function () {
+  $("#bd-search").value = ""; renderBoard();
+  var active = document.querySelector(".bd-view.on .row.me");
+  if (active) { active.scrollIntoView({ block: "center" }); active.focus({ preventScroll: true }); }
+  else toast("此榜还没有你的记录，资金榜可查看当前身家。");
+});
 
 bindActions();
 bindAchFilters();
@@ -1749,6 +1848,7 @@ document.addEventListener("click", function (e) {
   var all = document.querySelectorAll(".bd-tab");
   for (var j = 0; j < all.length; j++) all[j].className = "bd-tab";
   t.className = "bd-tab on";
+  for (var a = 0; a < all.length; a++) all[a].setAttribute("aria-pressed", all[a] === t ? "true" : "false");
   var vs = document.querySelectorAll(".bd-view");
   for (var k = 0; k < vs.length; k++) vs[k].className = "sect bd-view";
   var v = document.getElementById("v-" + t.getAttribute("data-bd"));

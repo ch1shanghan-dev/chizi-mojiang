@@ -679,7 +679,7 @@ function genId(prefix) {
   return p + 'x-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
 }
 function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
-function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+function lsSet(k, v) { return CSHPage.lsSet(k, v); }
 
 /* ---------- 音效：统一 SfxBus（§4.7.1） ----------
  * 本文件不再自带 AudioContext 合成 —— 那套实现此前在 5 款游戏里各复制了一份，
@@ -1771,7 +1771,7 @@ function reportBots(myLeft) {
 
 function startGame() {
   var name = ($('#inp-name').value || '').trim().slice(0, 12) || '池子';
-  lsSet('csh_uno_name', name);
+  if (!lsSet('csh_uno_name', name)) return;
 
   if (room) room.destroy();
   clearAllTimers();

@@ -36,6 +36,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 	   0. 常量（数值唯一来源 · §5.5.4 禁止散落魔法数字）
 	   ============================================================ */
 	var K_WALLET = "csh_wallet";
+	var adoptedSaveEpoch = 0;
 	var K_RANK = "csh_rank";
 	var K_USED = "csh_cdk_used";
 	var K_SNAP = "csh_wallet_snap";
@@ -491,6 +492,107 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 	function marketPending() {
 		return wallet.marketPending ? JSON.parse(JSON.stringify(wallet.marketPending)) : null;
 	}
+	function marketSaved() {
+		return wallet.marketSaved ? JSON.parse(JSON.stringify(wallet.marketSaved)) : null;
+	}
+	/* 讨伐配置保全：同名ZIP更新会删除extension_*配置，钱包不受该清理影响。
+	   保全副本是已接受写入的真值；宿主config只作兼容镜像。无经济入账。 */
+	function bossSaved() {
+		if (wallet.bossSaved == null) return null;
+		if (typeof wallet.bossSaved !== "object" || Array.isArray(wallet.bossSaved)) throw new Error("讨伐保全副本格式异常");
+		["bossKill", "bossAsBoss", "bounty"].forEach(function (key) {
+			if (!Object.prototype.hasOwnProperty.call(wallet.bossSaved, key)) return;
+			var value = wallet.bossSaved[key];
+			if (key === "bounty" ? typeof value !== "string" : !value || typeof value !== "object" || Array.isArray(value)) throw new Error("讨伐保全字段异常：" + key);
+		});
+		return JSON.parse(JSON.stringify(wallet.bossSaved));
+	}
+	function preserveBoss(patch) {
+		if (saveBlocked()) return false;
+		var before = wallet;
+		try {
+			if (!patch || typeof patch !== "object" || Array.isArray(patch)) return false;
+			var fields = Object.keys(patch);
+			if (!fields.length || fields.some(function (key) {
+				if (key === "bounty") return typeof patch[key] !== "string";
+				return ["bossKill", "bossAsBoss"].indexOf(key) < 0 || !patch[key] || typeof patch[key] !== "object" || Array.isArray(patch[key]);
+			})) return false;
+			var saved = bossSaved() || {};
+			fields.forEach(function (key) { saved[key] = JSON.parse(JSON.stringify(patch[key])); });
+			var next = JSON.parse(JSON.stringify(before)); next.bossSaved = saved; next._sig = sigOf(next);
+			if (saveBlocked()) return false;
+			localStorage.setItem(K_WALLET, JSON.stringify(next));
+			wallet = next;
+			return true;
+		} catch (e) { logError("讨伐保全失败，原数据保留", e); return false; }
+	}
+	/* BOSS checkpoint: authoritative record+CBY, strict rank receipt, recoverable ledger. */
+	var bossEventCache = new WeakMap();
+	function validateBossRewards(value) {
+		if(value==null)return null;
+		var x=JSON.parse(JSON.stringify(value));
+		if(x.v!==1||typeof x.origin!=="string"||!/^[a-zA-Z0-9-]{8,96}$/.test(x.origin)||!Number.isSafeInteger(x.seq)||x.seq<0||!x.first||typeof x.first!=="object"||Array.isArray(x.first)||Object.keys(x.first).length>1000||typeof x.daily!=="string")throw Error("讨伐奖励凭据损坏，原档保留");
+		Object.keys(x.first).forEach(function(id){if(!/^csh_boss_[a-zA-Z0-9_]+$/.test(id)||x.first[id]!==true)throw Error("讨伐首杀凭据损坏");});
+		if(x.pending){var p=x.pending;if(p.seq!==x.seq||!Number.isSafeInteger(p.baseMerit)||p.baseMerit<0||p.baseMerit>25||!Number.isSafeInteger(p.pc)||p.pc<0||p.pc>5000||typeof p.id!=="string"||p.id!==x.origin+"-"+p.seq||typeof p.reason!=="string"||p.reason.length>80||!Number.isSafeInteger(p.t))throw Error("讨伐待兑现凭据损坏");}
+		return x;
+	}
+	function bossRewardState() {
+		if(wallet.bossRewards)return validateBossRewards(wallet.bossRewards);
+		if(rankData.bossReceipt)throw Error("讨伐钱包与官阶不是同一经济快照");
+		var saved=bossSaved(),old=saved&&saved.bossKill||{},first={};
+		Object.keys(old.map||{}).forEach(function(id){if(/^csh_boss_[a-zA-Z0-9_]+$/.test(id)&&old.map[id]&&old.map[id].n>0)first[id]=true;});
+		return {v:1,origin:"boss-"+Date.now().toString(36)+"-"+Math.random().toString(36).slice(2),seq:0,first:first,daily:old.lastDaily||"",pending:null};
+	}
+	function flushBossRewards() {
+		if(saveBlocked())return false;
+		try {
+			var state=bossRewardState(),p=state.pending;if(!p)return true;
+			var rec=rankData.bossReceipt;
+			if(!rec||rec.origin!==state.origin||rec.seq!==p.seq){
+				if(rec&&(rec.origin!==state.origin||rec.seq!==p.seq-1))throw Error("讨伐官阶凭据不一致");
+				if(!rec&&p.seq!==1)throw Error("讨伐官阶凭据缺失");
+				var nextRank=JSON.parse(JSON.stringify(rankData)),gained=0;
+				if(p.baseMerit){
+					var day=today();if(nextRank.meritDate!==day){nextRank.meritDate=day;nextRank.meritToday=0;}
+					var raw=p.baseMerit*(nextRank.rank>=HIGH_RANK_FROM?HIGH_RANK_DECAY:1),room=Math.max(0,MERIT_SOFT_BASE+nextRank.rank*MERIT_SOFT_PER-nextRank.meritToday);
+					gained=Math.floor(raw<=room?raw:room+(raw-room)*MERIT_OVERFLOW_RATE);
+					nextRank.merit+=gained;nextRank.meritToday+=gained;nextRank.rank=rankOfMerit(nextRank.merit);
+				}
+				nextRank.bossReceipt={origin:state.origin,seq:p.seq,gained:gained};
+				localStorage.setItem(K_RANK,JSON.stringify(nextRank));rankData=nextRank;
+			}
+			if(p.pc){
+				var ledger=JSON.parse(localStorage.getItem(K_LEDGER)||"[]");if(!Array.isArray(ledger))throw Error("流水格式异常");
+				if(!ledger.some(function(e){return e&&e.bossTx===p.id;})){
+					ledger.unshift({t:p.t,d:p.pc,r:p.reason,c:"讨伐",b:p.balance,bossTx:p.id});
+					localStorage.setItem(K_LEDGER,JSON.stringify(ledger.slice(0,LEDGER_MAX)));
+				}
+			}
+			var next=JSON.parse(JSON.stringify(wallet));next.bossRewards.pending=null;next._sig=sigOf(next);
+			localStorage.setItem(K_WALLET,JSON.stringify(next));wallet=next;return true;
+		}catch(e){logError("讨伐收益待恢复",e);return false;}
+	}
+	function commitBossEvent(spec,token) {
+		if(saveBlocked())return saveRefused();
+		if(token&&typeof token==="object"&&bossEventCache.has(token))return Object.assign({},bossEventCache.get(token),{already:true});
+		if(!flushBossRewards())return {ok:false,reason:"上笔讨伐收益尚未恢复，请稍后重试"};
+		try {
+			if(!spec||!spec.saved||typeof spec.saved!=="object"||!Number.isSafeInteger(spec.pc)||spec.pc<0||spec.pc>5000||!Number.isSafeInteger(spec.merit)||spec.merit<0||spec.merit>25||typeof spec.reason!=="string"||spec.reason.length>80)throw Error("讨伐结算无效");
+			var state=bossRewardState();if(state.seq>=Number.MAX_SAFE_INTEGER)throw Error("讨伐凭据序号已满");state.seq++;
+			if(spec.first)state.first[spec.first]=true;if(spec.daily)state.daily=spec.daily;
+			var next=JSON.parse(JSON.stringify(wallet)),got=Math.min(spec.pc,PC_CAP-next.pc);
+			next.pc+=got;next.pcPeak=Math.max(next.pcPeak,next.pc);next.bossSaved=JSON.parse(JSON.stringify(spec.saved));
+			state.pending={seq:state.seq,id:state.origin+"-"+state.seq,pc:got,baseMerit:spec.merit,reason:spec.reason,t:Date.now(),balance:next.pc};
+			next.bossRewards=validateBossRewards(state);
+			// appendChain operates on wallet; restore the old object if the strict write fails.
+			var before=wallet;wallet=next;try{if(got)appendChain(got);wallet._sig=sigOf(wallet);localStorage.setItem(K_WALLET,JSON.stringify(wallet));}catch(error){wallet=before;throw error;}
+			var complete=flushBossRewards(),receipt=rankData.bossReceipt;
+			var result={ok:true,recordCommitted:true,gained:got,meritGained:receipt&&receipt.origin===state.origin&&receipt.seq===state.seq?receipt.gained:0,meritPending:!receipt||receipt.origin!==state.origin||receipt.seq!==state.seq,pending:!complete};
+			if(token&&typeof token==="object")bossEventCache.set(token,result);
+			return result;
+		}catch(e){logError("讨伐结算未保存",e);return {ok:false,reason:"讨伐结算未保存，请稍后重试"};}
+	}
+
 	function flushMarketLedger() {
 		if (saveBlocked()) return false;
 		var pending = wallet.marketPending;
@@ -540,6 +642,8 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 		var before = wallet;
 		try {
 			wallet = JSON.parse(JSON.stringify(before));
+			// ZIP同名导入会清除extension_*配置；钱包保留最新已确认的持仓真值。
+			wallet.marketSaved = wallet.marketPending.state;
 			delete wallet.marketPending;
 			wallet._sig = sigOf(wallet);
 			localStorage.setItem(K_WALLET, JSON.stringify(wallet));
@@ -605,6 +709,145 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 		return { ok: true, gained: amount, balance: wallet.pc };
 	}
 
+	/* 池子成就：CBY 与其凭据同写钱包，功勋与其凭据同写官阶。
+	   跨键中断保持可重试，任何阶段都不会因下一阶段失败再次付款。 */
+	function poolClaimed(id) {
+		return !!(wallet.poolClaims && wallet.poolClaims[id] && rankData.poolClaims && Object.prototype.hasOwnProperty.call(rankData.poolClaims, id));
+	}
+	function flushPoolLedger() {
+		if (saveBlocked()) return false;
+		var claims = wallet.poolClaims || {}, ids = Object.keys(claims);
+		try {
+			var list = JSON.parse(localStorage.getItem(K_LEDGER) || "[]");
+			if (!Array.isArray(list)) throw Error("流水格式异常");
+			var dirty = false;
+			ids.forEach(function (id) { var rec = claims[id]; if (!rec.entry) return;
+				if (!list.some(function (e) { return e && e.poolTx === id; })) { list.unshift(rec.entry); dirty = true; }
+			});
+			if (dirty) localStorage.setItem(K_LEDGER, JSON.stringify(list.sort(function(a,b){return b.t-a.t;}).slice(0, LEDGER_MAX)));
+			var before = wallet, next = JSON.parse(JSON.stringify(wallet)), clean = false;
+			ids.forEach(function (id) { if (next.poolClaims[id].entry) { delete next.poolClaims[id].entry; clean = true; } });
+			if (clean) { next._sig = sigOf(next); localStorage.setItem(K_WALLET, JSON.stringify(next)); wallet = next; }
+			return true;
+		} catch (e) { logError("池子成就流水待恢复", e); return false; }
+	}
+	function claimPool(id, pc, merit, label) {
+		if (saveBlocked()) return saveRefused();
+		if (typeof id !== "string" || !/^[a-zA-Z0-9_]{1,60}$/.test(id) || !Number.isSafeInteger(pc) || pc <= 0 || pc > SINGLE_ADD_CAP ||
+			!Number.isSafeInteger(merit) || merit <= 0 || merit > 1000 || typeof label !== "string" || !label.trim()) return { ok:false, reason:"成就奖励无效" };
+		var paid = wallet.poolClaims && wallet.poolClaims[id], gained = 0;
+		if (!paid) {
+			if (wallet.pc + pc > PC_CAP) return { ok:false, reason:"余额空间不足，请消费后再领取" };
+			var before = wallet;
+			try {
+				wallet = JSON.parse(JSON.stringify(before)); wallet.pc += pc; wallet.pcPeak = Math.max(wallet.pcPeak, wallet.pc); appendChain(pc);
+				if (!wallet.poolClaims || typeof wallet.poolClaims !== "object") wallet.poolClaims = {};
+				wallet.poolClaims[id] = { pc:pc, merit:merit, t:Date.now(), entry:{ t:Date.now(), d:pc, r:("池子成就/"+label).slice(0,40), c:"成就", b:wallet.pc, poolTx:id } };
+				wallet._sig = sigOf(wallet); localStorage.setItem(K_WALLET, JSON.stringify(wallet)); gained = pc;
+			} catch (e) { wallet = before; logError("池子成就奖励提交失败",e); return {ok:false,reason:"存档写入失败，请重试"}; }
+		}
+		var meritDone = rankData.poolClaims && Object.prototype.hasOwnProperty.call(rankData.poolClaims,id), meritGained = 0;
+		if (!meritDone) {
+			var rankBefore = rankData;
+			try {
+				var next = JSON.parse(JSON.stringify(rankBefore)), day = today();
+				if (next.meritDate !== day) { next.meritDate = day; next.meritToday = 0; }
+				var raw = merit * (next.rank >= HIGH_RANK_FROM ? HIGH_RANK_DECAY : 1), room = Math.max(0, MERIT_SOFT_BASE + next.rank * MERIT_SOFT_PER - next.meritToday);
+				meritGained = Math.floor(raw <= room ? raw : room + (raw-room)*MERIT_OVERFLOW_RATE);
+				next.merit += meritGained; next.meritToday += meritGained; next.rank = rankOfMerit(next.merit);
+				if (!next.poolClaims || typeof next.poolClaims !== "object") next.poolClaims = {};
+				next.poolClaims[id] = meritGained;
+				localStorage.setItem(K_RANK,JSON.stringify(next)); rankData = next;
+			} catch(e) { rankData = rankBefore; logError("池子成就功勋待补领",e); return {ok:false,partial:true,gained:gained,reason:"池子币已到账，功勋待补领，请重试"}; }
+		}
+		flushPoolLedger(); snapshot();
+		return {ok:true,already:!!paid && !!meritDone,gained:gained,meritGained:meritGained,balance:wallet.pc};
+	}
+
+	/* 普通对局奖励：余额与最近64局收据同次严格写入，原生终局仅调用此入口。
+	   待写流水保留在收据中；清理失败不允许挤掉旧收据。 */
+	function matchRewardConfig() {
+		var config = wallet.matchRewardConfig;
+		if (config == null) return {};
+		if (typeof config !== "object" || Array.isArray(config)) throw new Error("对局奖励配置格式异常");
+		return JSON.parse(JSON.stringify(config));
+	}
+	function setMatchRewardConfig(config) {
+		if (saveBlocked()) return saveRefused();
+		if (!config || typeof config !== "object" || Array.isArray(config) || Object.keys(config).length > 128) return { ok:false, reason:"对局奖励配置无效" };
+		var nextConfig = {};
+		for (var mode of Object.keys(config)) {
+			var item = config[mode];
+			if (!/^[a-zA-Z0-9_-]{1,40}$/.test(mode) || ["__proto__","constructor","prototype"].indexOf(mode) >= 0 || !item || !Number.isSafeInteger(item.win) || !Number.isSafeInteger(item.lose) || item.win < 0 || item.lose < 0 || item.win > 1000 || item.lose > 1000) return { ok:false, reason:"每项奖励须为0～1000的整数" };
+			nextConfig[mode] = { win:item.win, lose:item.lose };
+		}
+		try {
+			var next = JSON.parse(JSON.stringify(wallet)); next.matchRewardConfig = nextConfig; next._sig = sigOf(next);
+			if (saveBlocked()) return saveRefused();
+			localStorage.setItem(K_WALLET, JSON.stringify(next)); wallet = next;
+			return { ok:true };
+		} catch (e) { logError("对局奖励配置未保存",e); return { ok:false, reason:"配置保存失败，请重试" }; }
+	}
+	function matchClaims() {
+		var claims = wallet.matchClaims;
+		if (claims == null) return [];
+		if (!Array.isArray(claims) || claims.some(function (r) { return !r || typeof r.id !== "string" || !Number.isSafeInteger(r.pc) || r.pc < 0; })) throw new Error("对局奖励收据格式异常");
+		return claims;
+	}
+	function flushMatchLedger() {
+		if (saveBlocked()) return false;
+		try {
+			var claims = matchClaims();
+			if (!claims.some(function (r) { return !!r.entry; })) return true;
+			var list = JSON.parse(localStorage.getItem(K_LEDGER) || "[]");
+			if (!Array.isArray(list)) throw new Error("流水格式异常");
+			claims.forEach(function (r) { if (r.entry && !list.some(function (e) { return e && e.matchTx === r.id; })) list.push(r.entry); });
+			localStorage.setItem(K_LEDGER, JSON.stringify(list.sort(function (a,b) { return b.t-a.t; }).slice(0,LEDGER_MAX)));
+			var next = JSON.parse(JSON.stringify(wallet)); next.matchClaims.forEach(function (r) { delete r.entry; }); next._sig = sigOf(next);
+			localStorage.setItem(K_WALLET, JSON.stringify(next)); wallet = next;
+			return true;
+		} catch (e) { logError("对局奖励流水待恢复",e); return false; }
+	}
+	function assistedStats() {
+        var s=wallet.assistedStats;
+        if(!s)return {v:1,wins:0,losses:0,receipts:[]};
+        if(s.v!==1||!Number.isSafeInteger(s.wins)||s.wins<0||!Number.isSafeInteger(s.losses)||s.losses<0||!Array.isArray(s.receipts)||s.receipts.length>64||s.receipts.some(function(id){return typeof id!=="string"||!/^[a-zA-Z0-9_-]{10,100}$/.test(id);}))throw Error("辅助战绩损坏，请先备份恢复");
+        return JSON.parse(JSON.stringify(s));
+    }
+    function settleAssisted(id,win) {
+        if(saveBlocked())return saveRefused();
+        if(typeof id!=="string"||!/^[a-zA-Z0-9_-]{10,100}$/.test(id)||typeof win!=="boolean")return {ok:false,reason:"辅助战绩无效"};
+        try{
+            var s=assistedStats();if(s.receipts.indexOf(id)>=0)return {ok:true,already:true};
+            var field=win?"wins":"losses";if(s[field]>=Number.MAX_SAFE_INTEGER)return {ok:false,reason:"战绩已达上限"};
+            s[field]++;s.receipts=s.receipts.slice(-63).concat(id);
+            var next=JSON.parse(JSON.stringify(wallet));next.assistedStats=s;next._sig=sigOf(next);
+            if(saveBlocked())return saveRefused();localStorage.setItem(K_WALLET,JSON.stringify(next));wallet=next;
+            return {ok:true,stats:assistedStats(),gained:0};
+        }catch(e){return {ok:false,reason:"辅助战绩保存失败"};}
+    }
+	function settleMatch(id, mode, win, amount) {
+		if (saveBlocked()) return saveRefused();
+		if (typeof id !== "string" || !/^[a-zA-Z0-9_-]{10,100}$/.test(id) || typeof mode !== "string" || !/^[a-zA-Z0-9_-]{1,40}$/.test(mode) || typeof win !== "boolean" || !Number.isSafeInteger(amount) || amount < 0 || amount > 1000) return { ok:false, reason:"对局奖励无效" };
+		var claims;
+		try { claims = matchClaims(); } catch (e) { return { ok:false, reason:e.message }; }
+		if (claims.some(function (r) { return r.id === id; })) { flushMatchLedger(); return { ok:true, already:true, gained:0, balance:wallet.pc }; }
+		if (!flushMatchLedger()) return { ok:false, reason:"上笔奖励流水尚未恢复，请稍后重试" };
+		var before = wallet, gained = 0;
+		try {
+			wallet = JSON.parse(JSON.stringify(before)); gained = Math.min(amount, PC_CAP-wallet.pc);
+			wallet.pc += gained; wallet.pcPeak = Math.max(wallet.pcPeak,wallet.pc); if (gained) appendChain(gained);
+			wallet.matchClaims = (wallet.matchClaims || []).slice(-63);
+			var reason = "对局奖励:" + mode + (win ? "/胜利" : "/失败");
+			wallet.matchClaims.push({ id:id, mode:mode, win:win, pc:gained, t:Date.now(), entry:gained ? {t:Date.now(),d:gained,r:reason,c:"对局奖励",b:wallet.pc,matchTx:id} : null });
+			wallet._sig = sigOf(wallet);
+			if (saveBlocked()) { wallet = before; return saveRefused(); }
+			localStorage.setItem(K_WALLET,JSON.stringify(wallet));
+		} catch (e) { wallet = before; logError("对局奖励提交失败",e); return { ok:false, reason:"奖励保存失败，请重试" }; }
+		flushMatchLedger(); snapshot();
+		return { ok:true, gained:gained, balance:wallet.pc };
+	}
+
 	/* 门票折扣（§G.3）：按段给 */
 	function discountOf(rankLv) {
 		var seg = segOfRank(rankLv).seg;
@@ -653,6 +896,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 			try { var p = REG.settlePlan(gameKey); if (p) return p; } catch (eP) {}
 		}
 		if (gameKey === "uno") return { key: "uno", mode: "rank", ticket: TICKET.uno, perBeat: 0.6, capMult: 2 };
+		if (gameKey === "texas") return { key: gameKey, mode: "chips", ticket: 0, decay: 1 };
 		if (gameKey === "blackjack") return { key: gameKey, mode: "chips", ticket: 0, decay: 0.95 };
 		return { key: gameKey, mode: "chips", ticket: 0, decay: 0.90 };
 	}
@@ -925,6 +1169,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 	}
 	/* 加功勋（统一入口 · §G.6.2）：软上限 + 40级后×0.6 + 不可购买，全部内部实现 */
 	function addMerit(n, reason) {
+		if (wallet.bossRewards && wallet.bossRewards.pending && !flushBossRewards()) return {ok:false,gained:0,reason:"讨伐功勋待恢复"};
 		if (saveBlocked()) return saveRefused();
 		n = Number(n) || 0;
 		if (n <= 0) return { ok: false, gained: 0 };
@@ -1383,6 +1628,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 		if (r.indexOf("讨伐首杀") === 0) return "讨伐首杀";
 		if (r.indexOf("每日首战") === 0) return "每日首战";
 		if (r.indexOf("讨伐妖灵") === 0) return "妖灵讨伐";
+		if (r.indexOf("对局奖励:") === 0) return "对局奖励";
 		if (r.indexOf("连签") === 0 || r.indexOf("签到") === 0) return "签到";
 		if (r.indexOf("破产救济") === 0) return "破产救济";
 		if (r.indexOf("每日任务") === 0) return "每日任务";
@@ -1628,6 +1874,9 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 	   会在导入的无签名钱包上把旧内存重新写回，丢掉新余额和领奖凭据。 */
 	function reloadSave(snapshot, options) {
 		if (!(snapshot && options && options.memoryOnly) && saveBlocked()) return saveRefused();
+		try { if (lib.cshMatchReward && typeof lib.cshMatchReward.invalidate === "function") lib.cshMatchReward.invalidate(); } catch (e) { logError("对局奖励会话重置异常",e); }
+		adoptedSaveEpoch++;
+		bossEventCache = new WeakMap();
 		var supplied = snapshot && typeof snapshot === "object";
 		var memoryOnly = supplied && options && options.memoryOnly;
 		if (_saveTimer) { clearTimeout(_saveTimer); _saveTimer = 0; }
@@ -1654,7 +1903,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 		   容错读盘，也不在确认前补签名/补流水；之后正常保存会签名新对象。 */
 		if (memoryOnly) return { ok: true, action: "adopt-memory", pc: wallet.pc };
 		var result = integrityCheck();
-		flushCareerLedger();
+		flushCareerLedger(); flushPoolLedger();
 		return result;
 	}
 
@@ -1710,6 +1959,8 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 	   ============================================================ */
 	var CSH = {
 		version: "1.1.0",
+		validateBossRewards: validateBossRewards,
+		saveEpoch: function () { return adoptedSaveEpoch; },
 		saveGuard: { blocked: function () { return saveBlocked(); }, reason: SAVE_BLOCK_REASON },
 		/* 存储键名唯一真值（§5.5.3）。csh_migrate 的导入导出由此取键名，
 		   不再各自另写一份（2026-10-01 收敛）。 */
@@ -1743,7 +1994,11 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 			peak: function () { return wallet.pcPeak; },
 			add: addPC, spend: spendPC, SINGLE_ADD_CAP: SINGLE_ADD_CAP,
 			claimCareer: claimCareer,
-			commitMarket: commitMarket, marketPending: marketPending, completeMarket: completeMarket,
+			claimPool: claimPool, poolClaimed: poolClaimed, poolPending: function(id) { return !!(wallet.poolClaims && wallet.poolClaims[id] && !poolClaimed(id)); },
+			commitMarket: commitMarket, marketPending: marketPending, marketSaved: marketSaved, completeMarket: completeMarket,
+			bossSaved: bossSaved, preserveBoss: preserveBoss, commitBossEvent: commitBossEvent, bossRewardState: bossRewardState, flushBossRewards: flushBossRewards,
+			assistedStats: assistedStats, settleAssisted: settleAssisted,
+			matchRewardConfig: matchRewardConfig, setMatchRewardConfig: setMatchRewardConfig, settleMatch: settleMatch,
 			/* v6.2 账本（来源与去处） */
 			ledger: ledger, ledgerSummary: ledgerSummary, ledgerClear: ledgerClear,
 			catOf: catOf,
@@ -1830,7 +2085,7 @@ lib.cshWallet = CSH;
 		integrityCheck();
 		crossCheck();
 		taskEnsureDay();
-		flushCareerLedger();
+		flushCareerLedger(); flushPoolLedger(); flushMatchLedger(); flushBossRewards();
 	} catch (e) { logError("启动自检失败", e); }
 
 	logInfo("钱包模块已加载：PC=" + wallet.pc + " 峰值=" + wallet.pcPeak +

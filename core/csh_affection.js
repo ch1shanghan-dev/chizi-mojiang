@@ -1,3 +1,4 @@
+import "./csh_bond.js";
 import { lib, game } from "../../../noname.js";
 import { MINIONS } from "./csh_bossdata.js";
 import { affOf as affLinesOf, AFF_SHAPE, FAV, OATH_LINES } from "./csh_aff_lines.js";
@@ -5,7 +6,7 @@ import { affOf as affLinesOf, AFF_SHAPE, FAV, OATH_LINES } from "./csh_aff_lines
    池子魔将 · 妖灵好感度（v6.2 立 · v6.3 大扩）
    ------------------------------------------------------------
    一句话定位：**把「打招呼 / 说说话 / 摸摸头 / 送礼 / 讨伐 / 持股」六种互动
-   折算成一条 0~100 的亲密度**，再按五档解锁台词、视觉表现与经济回报。
+   折算成一条 0~88000 的亲密度**，再按五档解锁台词、视觉表现与经济回报。
 
    ★ 数据真源：`csh_affection`（localStorage）
        { id: { v, last, day:{hunt,hold,talk,head,gift}, cnt:{...}, got:{...} } }
@@ -34,14 +35,10 @@ import { affOf as affLinesOf, AFF_SHAPE, FAV, OATH_LINES } from "./csh_aff_lines
    （满羁绊 88000 = 五心圆满）；礼物四档 200 / 1000 / 5000 / 12000（星砂为本土顶档）。
    日活来源按雀魂"对局"量级重定：讨伐 = 对局（+40）· 持股 +20 · 三互动 5/5/10。
    ★ 作者另定：**礼物不限次数**（雀魂有每日上限，此处放开——"礼物也不限次数购买"）。 */
-export const AFF_MAX = 88000;
-export const AFF_LEVELS = [
-	{ min: 38000, key: "S", name: "羁绊", color: "#f0709c" },
-	{ min: 18000, key: "A", name: "信赖", color: "#dc9ab6" },
-	{ min: 8000, key: "B", name: "亲近", color: "#d8bd7a" },
-	{ min: 2000, key: "C", name: "相识", color: "#93a6bb" },
-	{ min: 0, key: "D", name: "陌路", color: "#6d7480" },
-];
+const BOND = (typeof window !== "undefined" ? window : globalThis).CSHBond;
+export const AFF_MAX = BOND.MAX;
+export const AFF_LEVELS = BOND.LEVELS;
+export function resolveBondProgress(total) { return BOND.resolveBondProgress(total); }
 export const AFF_GAIN = { hunt: 40, hold: 20, talk: 5, head: 5, close: 10, play: 5,
 	tea: 3, stars: 8, callname: 12 };   /* ★ 雀魂移植：讨伐=对局 +40；v6.9 三新互动 */
 /* v6.9 三新互动的台词池映射（先复用既存池——"先复用再扩写"）：茶=闲聊 / 看星=私语 / 称呼=羁绊句 */
@@ -106,6 +103,22 @@ const COOL_DAYS = 14;
 const KEY = "csh_affection";
 const DAILY_KEYS = ["hunt", "hold", "talk", "head", "close", "gift"];
 const LEVEL_ORDER = ["D", "C", "B", "A", "S"];
+
+// 同源页面可以直调本模块，不能只依赖壳消息的恢复守卫。
+function saveBlocked() {
+	try {
+		const guard = lib.cshWallet && lib.cshWallet.saveGuard;
+		if (guard && typeof guard.blocked === "function") return guard.blocked();
+		// 钱包尚未安装时仍保留启动恢复保护；凭据无法读取也不放行写入。
+		if (localStorage.getItem("csh_migrate_recovery") !== null) return true;
+		const migrate = lib.cshMigrate;
+		const state = migrate && typeof migrate.recoveryState === "function" ? migrate.recoveryState() : null;
+		return !!(state && (state.pending || state.busy));
+	} catch (e) { return true; }
+}
+function saveRefused() {
+	return { ok: false, reason: "存档操作尚未完成，请先在行囊恢复后再继续", recovery: true };
+}
 
 function dayKey() {
 	try {
@@ -191,7 +204,8 @@ export function get(id) {
 	if (!id) return null;
 	var s = readStore();
 	var e = s[id] || { v: 0, last: 0, day: {}, cnt: {} };
-	var L = levelOf(e.v);
+	var progress = resolveBondProgress(e.v);
+	var L = progress.level;
 	return {
 		id: id, v: e.v, level: L.key, levelName: L.name, color: L.color,
 		next: nextLevelOf(e.v) ? nextLevelOf(e.v).key : null,
@@ -223,7 +237,7 @@ export function get(id) {
 					need: 38000, locked: LEVEL_ORDER.indexOf(lvl) < 4 },
 			};
 		})(),
-		pct: Math.round(e.v / AFF_MAX * 100),
+		pct: progress.percent, progress: progress,
 		perks: perkKeysFor(L.key),                       /* ★ 内联算：perkKeys(id) 会再走 get() → 递归 */
 		heat: Math.round((e.v / AFF_MAX * AFF_ECON.heatMax) * 10000) / 100,
 	};
@@ -251,6 +265,7 @@ function moodOf(e) {
 /* ---------- 唯一的增长入口 ---------- */
 function stAdd(id, n, src) {
 	try {
+		if (saveBlocked()) return null;
 		if (typeof id !== "string" || !Object.prototype.hasOwnProperty.call(MINIONS, id)) return null;
 		n = Math.round(Number(n) || 0);
 		if (n <= 0) return null;
@@ -276,6 +291,7 @@ function stAdd(id, n, src) {
 /* 只记「今天已互动」，不改数值——满档（羁绊 100）时仍然能按下按钮。 */
 function stDay(id, src) {
 	try {
+		if (saveBlocked()) return;
 		if (typeof id !== "string" || !Object.prototype.hasOwnProperty.call(MINIONS, id)) return;
 		var s = readStore();
 		var e = s[id] || (s[id] = { v: 0, last: 0, day: {}, cnt: {} });
@@ -291,6 +307,7 @@ function dailyOk(e, src) {
 }
 export function canGain(id, src) {
 	try {
+		if (saveBlocked()) return false;
 		if (typeof id !== "string" || !Object.prototype.hasOwnProperty.call(MINIONS, id)) return false;
 		var s = readStore();
 		return dailyOk(s[id], src);
@@ -313,6 +330,7 @@ function heardOfRaw(id) {
 }
 function markHeard(id, kind, key) {
 	try {
+		if (saveBlocked()) return;
 		var st = readStore();
 		var e = st[id];
 		if (!e) return;
@@ -424,6 +442,7 @@ export function noteTalk(id) {
      true——非数字一律按我们自己掷出的 roll 计，金额口径始终以本模块为准。 */
 function rollGive(id, levelKey, v, act) {
 	try {
+		if (saveBlocked()) return { give: 0, line: "" };
 		if (AFF_GIVE.acts.indexOf(act) < 0) return { give: 0, line: "" };
 		var roll = giveRoll(levelKey, v);
 		if (!(roll > 0)) return { give: 0, line: "" };
@@ -478,6 +497,7 @@ function huntedNow(id) {
 }
 export function interact(id, act) {
 	try {
+		if (saveBlocked()) return saveRefused();
 		if (typeof id !== "string" || !Object.prototype.hasOwnProperty.call(MINIONS, id)) return { ok: false, reason: "bad-id" };
 		if (!huntedNow(id)) return { ok: false, reason: "need-hunt" };   /* ★ 未讨伐：互动全锁 */
 		var cur = get(id);
@@ -540,6 +560,7 @@ export function interact(id, act) {
 export const OATH_COST = { stardust: 2, fav: 3 };
 export function oath(id) {
 	try {
+		if (saveBlocked()) return saveRefused();
 		if (typeof id !== "string" || !Object.prototype.hasOwnProperty.call(MINIONS, id)) return { ok: false, reason: "bad-id" };
 		if (!huntedNow(id)) return { ok: false, reason: "need-hunt" };
 		var cur = get(id);
@@ -585,6 +606,7 @@ export function tableQuip(id) {
 /* 送礼：先扣钱（走钱包单一账本），扣款成功才加好感 —— 顺序不可颠倒 */
 export function gift(id, giftKey) {
 	try {
+		if (saveBlocked()) return saveRefused();
 		var g = null;
 		for (const it of AFF_GIFTS) if (it.key === giftKey) g = it;
 		if (!g) return { ok: false, reason: "no-gift" };
@@ -685,6 +707,7 @@ export function summary() {
 }
 export function reset(id) {
 	try {
+		if (saveBlocked()) return false;
 		var s = readStore();
 		if (id) delete s[id]; else s = {};
 		writeStore(s);
@@ -699,7 +722,7 @@ export function installAffection() {
 			AFF_MAX: AFF_MAX, AFF_LEVELS: AFF_LEVELS, AFF_GAIN: AFF_GAIN,
 			AFF_GIFTS: AFF_GIFTS, AFF_ACTS: AFF_ACTS, AFF_PERKS: AFF_PERKS, AFF_ECON: AFF_ECON, AFF_GIVE: AFF_GIVE,
 			giveRoll: giveRoll,
-			levelOf: levelOf, toNext: toNext, nextLevelOf: nextLevelOf,
+			levelOf: levelOf, toNext: toNext, nextLevelOf: nextLevelOf, resolveBondProgress: resolveBondProgress,
 			get: get, list: list, summary: summary,
 			noteHunt: noteHunt, noteHold: noteHold, noteTalk: noteTalk, notePlay: notePlay,
 			gift: gift, interact: interact, line: line, shape: shape, linesOf: linesOf,

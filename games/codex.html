@@ -16,6 +16,8 @@
 <title>妖灵图鉴</title>
 <script src="../core/csh_selftest.js" data-csh-selftest="auto"></script>
 <script src="../core/csh_page.js"></script>
+<script src="../core/csh_net.js"></script>
+<script src="../core/csh_bond.js"></script>
 <style>
 /* 书法体注册：ZMX3 = **全覆盖子集**（4058 字 · 由开源 Zhi Mang Xing 完整版子集化，
    2026-10-15）。此前本页误把 csh_fx_font_1/2（78/84 字的**游戏内技能横幅**专用子集）
@@ -333,6 +335,13 @@ body.empty .foot{display:none}
 .lgroup.locked{opacity:.42;filter:grayscale(.5)}
 .lgroup.locked .lline{filter:blur(3.5px);user-select:none}
 .lglock{font-size:var(--pfs-cap);color:var(--ink-faint);letter-spacing:.1em}
+@media(max-width:600px){
+ .topbar{padding-right:148px;min-height:42px;gap:0}
+ .topbar .brand{display:none}
+ .stats{margin-left:0;gap:4px;font-size:var(--pfs-sm2)}
+ .stat{padding:4px 6px}
+}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
 </style>
 </head>
 <body>
@@ -406,33 +415,7 @@ function fmt(n) { return String(Math.round(Number(n) || 0)).replace(/\B(?=(\d{3}
    https://localhost，所以基址必须是 **https**（明文 http 会被混合内容拦掉）。 */
 var NET_BASE = "https://chishanghan.duckdns.org";
 var SHARE = {};
-function netReq2(path, cb) {
-  var done = false;
-  function fin(ok, o) { if (done) return; done = true; cb(ok, o); }
-  var req = null;
-  try { req = (typeof window !== "undefined" && window.require) ? window.require : null; } catch (e0) {}
-  if (req) {
-    try {
-      var http = req(/^https:/.test(NET_BASE) ? "https" : "http"), url = req("url"), u = url.parse(NET_BASE + path);
-      var r = http.request({ hostname: u.hostname, port: u.port || (/^https:/.test(NET_BASE) ? 443 : 80), path: u.path, method: "GET", timeout: 6000 },
-        function (res) {
-          var buf = ""; res.setEncoding("utf8");
-          res.on("data", function (d) { buf += d; });
-          res.on("end", function () { try { fin(res.statusCode < 300, JSON.parse(buf)); } catch (e) { fin(false, null); } });
-        });
-      r.on("error", function () { fin(false, null); });
-      r.on("timeout", function () { try { r.destroy(); } catch (e) {} fin(false, null); });
-      r.end();
-      return;
-    } catch (eN) {}
-  }
-  try {
-    var to = setTimeout(function () { fin(false, null); }, 6000);
-    fetch(NET_BASE + path, { cache: "no-store" }).then(function (res) {
-      return res.text().then(function (t) { clearTimeout(to); try { fin(res.ok, JSON.parse(t)); } catch (e) { fin(false, null); } });
-    }).catch(function () { clearTimeout(to); fin(false, null); });
-  } catch (e2) { fin(false, null); }
-}
+function netReq2(path, cb) { CSHNet.request(path,"GET",null,cb,6000); }
 function fetchShare(cb) {
   /* ★ 只在**真实页面**里发请求：离线冒烟/沙箱环境拿不到 location.protocol ⇒ 直接回空，
      不发网络请求（否则沙箱里会把 Node 的 fetch 打崩，本项目既有纪律同此）。 */
@@ -443,7 +426,7 @@ function fetchShare(cb) {
   } catch (eR) { if (cb) cb(); return; }
   netReq2("/girls", function (ok, r) {
     SHARE = {};
-    if (ok && r && r.ok) { var L = r.girls || []; for (var i = 0; i < L.length; i++) SHARE[L[i].girl] = L[i]; }
+    if (ok && r && r.ok) { var L = CSHNet.girls(r.girls); for (var i = 0; i < L.length; i++) SHARE[L[i].girl] = L[i]; }
     if (cb) cb();
   });
 }
@@ -563,14 +546,8 @@ function buildItems(c) {
 var AFF = {
   /* ★ 2026-10-16 深夜 · 雀魂移植（与宿主 csh_affection 同源同值）：
      五段累计 2000/8000/18000/38000/88000（满羁绊）；礼物 200/1000/5000/12000 · 偏好 ×1.5。 */
-  max: 88000,
-  levels: [
-    { min: 38000, key: "S", name: "羁绊" },
-    { min: 18000, key: "A", name: "信赖" },
-    { min: 8000, key: "B", name: "亲近" },
-    { min: 2000, key: "C", name: "相识" },
-    { min: 0, key: "D", name: "陌路" }
-  ],
+  max: CSHBond.MAX,
+  levels: CSHBond.LEVELS,
   /* v6.3：礼物四档（涨价）+ 三种互动动作 + 四档经济回报（与宿主 csh_affection 同源同值） */
   gifts: [
     { key: "wine", name: "一杯烈酒", cost: 6000, add: 200 },
@@ -661,16 +638,16 @@ function renderAff(it) {
   var box = $("#affbox");
   box.innerHTML = "";
   var st = it.affState || affOf(it.id);
-  var lv = affLevel(st.v);
-  var filled = Math.max(0, AFF.levels.length - 1 - AFF.levels.indexOf(lv));
-  if (st.v >= AFF.max) filled = 5;   /* 满羁绊 88000 = 五心圆满（雀魂五星口径） */
+  var progress = CSHBond.resolveBondProgress(st.v);
+  var lv = progress.level;
+  var filled = progress.complete ? 5 : progress.index;   /* 满羁绊 88000 = 五心圆满（雀魂五星口径） */
   box.className = "affbox" + (lv.key === "S" ? " sTier" : "");
 
   var head = el("div", "affhead");
   head.appendChild(el("div", "afftitle", "亲 密"));
   /* ★ 2026-10-16 深夜（作者："相识·C 这个·C 纯属多余"）：只留档位名，不再缀字母键 */
   head.appendChild(el("div", "afflv", lv.name));
-  head.appendChild(el("div", "affval", st.v + " / " + AFF.max));
+  head.appendChild(el("div", "affval", progress.current + " / " + progress.target));
   /* 置顶（v6.8 · 作者："可以手动给喜欢的置顶"） */
   var pb = el("button", "pinbtn" + (isPinned(it.id) ? " on" : ""), isPinned(it.id) ? "已置顶" : "置顶");
   pb.title = isPinned(it.id) ? "取消置顶（列表回到好感排序）" : "把她钉在列表最前";
@@ -684,13 +661,17 @@ function renderAff(it) {
 
   var bar = el("div", "affbar");
   var bi = document.createElement("i");
-  bi.style.width = Math.max(2, Math.round(st.v)) + "%";
+  bi.style.width = progress.percent + "%";
+  bar.setAttribute("role", "progressbar");
+  bar.setAttribute("aria-valuemin", "0");
+  bar.setAttribute("aria-valuemax", String(progress.target));
+  bar.setAttribute("aria-valuenow", String(progress.current));
   bar.appendChild(bi);
   box.appendChild(bar);
 
   var meta = el("div", "affmeta");
-  var nxt = affNext(st.v);
-  meta.appendChild(el("div", "", nxt ? ("距离「" + nxt.name + "」还差 " + st.toNext) : "已到最高档「羁绊」"));
+  meta.appendChild(el("div", "", "累计亲密度 " + progress.total + " / " + progress.max));
+  meta.appendChild(el("div", "", progress.complete ? "羁绊圆满" : ("距离「" + (progress.next ? progress.next.name : "圆满") + "」还差 " + progress.remaining)));
   if (st.mood === "cool") meta.appendChild(el("div", "grow", "久未相见"));
   box.appendChild(meta);
 
@@ -946,8 +927,8 @@ function renderStats() {
 var PINS = [];
 try { PINS = JSON.parse(pinLS("csh_codex_pins") || "[]") || []; } catch (eP2) { PINS = []; }
 if (!Array.isArray(PINS)) PINS = [];
-function pinLS(k, v) { try { if (v === undefined) return localStorage.getItem(k) || ""; localStorage.setItem(k, v); } catch (e) { return ""; } }
-function pinSave() { pinLS("csh_codex_pins", JSON.stringify(PINS)); }
+function pinLS(k, v) { if (v !== undefined) return CSHPage.lsSet(k, v); return CSHPage.lsGet(k) || ""; }
+function pinSave() { return pinLS("csh_codex_pins", JSON.stringify(PINS)); }
 function isPinned(id) { return PINS.indexOf(id) >= 0; }
 function sortItems() {
   var orig = {};
@@ -962,9 +943,11 @@ function sortItems() {
   });
 }
 function togglePin(id) {
-  var i = PINS.indexOf(id);
-  if (i >= 0) PINS.splice(i, 1); else PINS.unshift(id);
-  pinSave();
+  if (!CSHPage.requireSave()) return;
+  var next = PINS.slice(), i = next.indexOf(id);
+  if (i >= 0) next.splice(i, 1); else next.unshift(id);
+  if (!pinLS("csh_codex_pins", JSON.stringify(next))) return;
+  PINS = next;
   sortItems();
   renderList();
   var it = Data.items[Data.cur];
@@ -994,7 +977,7 @@ function renderList() {
     gs.appendChild(el("span", "gk", it.n > 0 ? ("×" + it.n) : "未讨"));
     if (st.v > 0) {
       var hb = el("span", "gh", "\u2665 " + st.v);
-      hb.title = "她对你的好感 " + st.v + " / 100（" + lv.name + "）";
+      hb.title = "她对你的好感 " + st.v + " / " + AFF.max + "（" + lv.name + "）";
       gs.appendChild(hb);
     }
     meta.appendChild(gs);

@@ -21,6 +21,9 @@ import "../core/csh_svggen.js";
    主页面（ESM，无 currentScript）由 csh_debug.js 在面板渲染完后显式调 auto(overlay)。 */
 import "../core/csh_selftest.js";
 import "../core/csh_wallet.js";
+import "../core/csh_match_reward.js";
+import { installAuxSpirit } from "../core/csh_aux_spirit.js";
+import { installUIKit } from "../core/csh_uikit.js";
 import "../core/csh_world.js";
 import "../core/csh_badge.js";
 import "../core/csh_shell.js";
@@ -28,6 +31,7 @@ import "../core/csh_migrate.js";
 /* 面板样式 token 层（阶段 4 · 2026-09-29）：调试面板/局内互动的颜色唯一真值，
    启动即把 :root 的 --csh-* 变量注入宿主文档，csh_debug/csh_interact 全部改用它。 */
 import "../core/csh_theme.js";
+import "../core/csh_art.js";
 import "../core/csh_interact.js";
 import "../core/csh_voice.js";
 import "../core/csh_games.js";
@@ -37,6 +41,13 @@ import "../core/csh_achv.js";
 /* 池子成就（2026-10-20）：操作型成就引擎，零 import 双载——
    主文档这份负责局内事件采集（install 由 content.js 调），成就页用经典 <script> 引同一份源码渲染。 */
 import "../core/csh_pool_achv.js";
+try { installAuxSpirit({lib,game,get,ui,status:_status}); } catch(eAux) { console.warn('[池子魔将] 妖灵守护安装失败',eAux); }
+/* Normal match CBY observes host events only; the wallet owns atomic receipts. */
+try {
+	if (typeof window !== "undefined" && window.CSH_MATCH_REWARD) {
+		window.CSH_MATCH_REWARD.install({lib:lib,game:game,get:get,status:_status,ensureUI:installUIKit});
+	}
+} catch (eMatchReward) { console.warn("[池子魔将] 对局奖励安装失败", eMatchReward); }
 /* 音效总线（§4.7.1）：core/csh_sfx.js 零 import，只把总线挂到 window.CSH_SFX。
    主页面里由这里转挂到 lib.cshSfx —— 这样 csh_sfx.js 自身不必依赖 noname 的 lib，
    才能被 games/ 下的 iframe 用经典 <script> 直接加载（同一份实现，两个文档各挂各的）。 */

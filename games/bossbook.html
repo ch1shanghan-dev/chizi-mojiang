@@ -455,7 +455,7 @@ function seriesList(sk) {
   return out;
 }
 function getSeen() { try { return parseInt(localStorage.getItem(SEEN_KEY), 10) || 0; } catch (e) { return 0; } }
-function saveSeen(v) { try { localStorage.setItem(SEEN_KEY, String(v)); } catch (e) {} }
+function saveSeen(v) { return CSHPage.lsSet(SEEN_KEY, String(v)); }
 
 /* ---------- 日期 ---------- */
 function p2(n) { return (n < 10 ? "0" : "") + n; }
@@ -679,7 +679,8 @@ function renderPreface() {
     cb.checked = hid;
     var hint = el("small", "", hid ? "（已开启 · 下次进入挑战模式生效）" : "（选魔列表，下次进入挑战模式生效）");
     cb.addEventListener("change", function () {
-      try { localStorage.setItem(HIDE_KEY, cb.checked ? "1" : "0"); } catch (e1) {}
+      if (!CSHPage.lsSet(HIDE_KEY, cb.checked ? "1" : "0")) { cb.checked = hid; return; }
+      hid = cb.checked;
       hint.textContent = cb.checked ? "（已开启 · 下次进入挑战模式生效）" : "（已关闭 · 挑战列表显示全部魔王）";
     });
     lab.appendChild(cb);
@@ -1137,6 +1138,7 @@ function scheduleDwell() {
     dwellT = 0;
     var pg = pages[cur] && pages[cur].elm;
     if (!pg || !pg.querySelectorAll) return;
+    if (!CSHPage.requireSave()) return;
     var freshEls = pg.querySelectorAll("[data-fresh]");
     var mx = 0, m = mapOf(), ids = [];
     for (var i = 0; i < freshEls.length; i++) {
@@ -1144,13 +1146,15 @@ function scheduleDwell() {
       var rec = m[id];
       if (rec && rec.last > mx) mx = rec.last;
       ids.push(id);
-      freshEls[i].classList.remove("fresh");
-      freshEls[i].removeAttribute("data-fresh");
     }
     if (mx > Data.seen) {
+      if (!saveSeen(mx)) return; /* 成功写入后才清本页红点与旧内存。 */
       Data.seen = mx;
-      saveSeen(mx);          /* 页面只负责写；入口红点由外部读此键 */
       for (var k = 0; k < ids.length; k++) delete Data.fresh[ids[k]];
+    }
+    for (var j = 0; j < freshEls.length; j++) {
+      freshEls[j].classList.remove("fresh");
+      freshEls[j].removeAttribute("data-fresh");
     }
   }, DWELL_MS + 60);
 }

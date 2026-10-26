@@ -1,7 +1,7 @@
 /* ============================================================
    池子魔将 · 池子成就（操作型成就引擎 · v1 · 2026-10-20）
    ------------------------------------------------------------
-   定位：生涯成就（core/csh_achv.js，434 条）回答「你积累了多少」，
+	   定位：生涯成就（core/csh_achv.js）回答「你积累了多少」，
          池子成就回答「你打出过什么」。两份数据源、两套判定、互不干涉。
 
    ★ 结构（为什么这么切）：
@@ -23,14 +23,14 @@
 	if (root.CSH_POOL_ACHV) return;                 /* 幂等：重复引入直接返回 */
 
 	var KEY = "csh_pool_achv";                      /* localStorage 存档键（须登记 csh_migrate） */
-	var VER = 1;
+	var VER = 2;
 	var MODES = { identity: 1, doudizhu: 1, versus: 1 };   /* 白名单：身份 / 斗地主 / 对决 */
 
 	/* 事件白名单。改动这里等于改动"成就系统能看到什么"，必须同步门禁 E52。 */
 	var _EVENTS = { turn: 1, useCard: 1, useSkill: 1, damage: 1, die: 1, judge: 1, hp: 1, over: 1 };
 
 	/* ============================================================
-	   1. 规则表（40 条）
+	   1. 规则表（80 条）
 	   ------------------------------------------------------------
 	   cat  ：操作 / 连击 / 逆境 / 模式 / 武将
 	   rare ：1 普通 · 2 稀有 · 3 史诗（只影响奖励与色条）
@@ -63,13 +63,13 @@
 			test: function (c) { return c.targets >= 3; } },
 		{ id: "op_empty_dodge", name: "空手夺刃", cat: "操作", rare: 1, modes: [], on: ["useCard"],
 			desc: "没有手牌时打出闪",
-			test: function (c) { return c.name === "闪" && c.handAfter === 0; } },
+			test: function (c) { return (c.name === "shan" || c.name === "闪") && c.handAfter === 0; } },
 		{ id: "op_dodge3", name: "铁壁", cat: "操作", rare: 1, modes: [], on: ["over"],
 			desc: "单局连续闪避 3 次",
 			test: function (c, a) { return a.dodgeStreakMax >= 3; } },
 		{ id: "op_back_full", name: "逆流而上", cat: "操作", rare: 2, modes: [], on: ["over"],
 			desc: "单局从 1 点体力回到满体力",
-			test: function (c, a) { return a.hpMin === 1 && a.hpNow >= a.hpMax && a.hpMax > 1; } },
+			test: function (c, a) { return a.recoveredFull; } },
 		{ id: "op_kill2turn", name: "斩草除根", cat: "操作", rare: 3, modes: [], on: ["die"],
 			desc: "同一回合内击破 2 名角色",
 			test: function (c, a) { return a.killsTurn >= 2; } },
@@ -80,7 +80,7 @@
 		/* ---------- 连击 8 ---------- */
 		{ id: "cb_double", name: "双杀", cat: "连击", rare: 2, modes: [], on: ["die"],
 			desc: "连续两个回合都有击破",
-			test: function (c, a) { return a.killTurnsInRow >= 2; } },
+			test: function (c, a) { return Math.max(a.killTurnsInRowMax, a.killTurnsInRow + (a.killsTurn > 0 ? 1 : 0)) >= 2; } },
 		{ id: "cb_triple", name: "三连斩", cat: "连击", rare: 3, modes: [], on: ["over"],
 			desc: "单局击破 3 名角色",
 			test: function (c, a) { return a.kills >= 3; } },
@@ -109,13 +109,13 @@
 			test: function (c, a) { return c.win && a.hpNow === 1; } },
 		{ id: "ad_alone", name: "孤军奋战", cat: "逆境", rare: 3, modes: ["identity", "versus"], on: ["over"],
 			desc: "队友全部阵亡后独自获胜",
-			test: function (c, a) { return c.win && a.allyDead && a.survivors <= 2; } },
+			test: function (c, a) { return c.win && a.allyDead; } },
 		{ id: "ad_one_card", name: "背水一战", cat: "逆境", rare: 1, modes: [], on: ["over"],
 			desc: "获胜时手牌不超过 1 张",
-			test: function (c, a) { return c.win && a.handAtWin <= 1; } },
+			test: function (c, a) { return c.win && a.handAtWin >= 0 && a.handAtWin <= 1; } },
 		{ id: "ad_near_death2", name: "死里逃生", cat: "逆境", rare: 3, modes: [], on: ["over"],
 			desc: "单局两次从濒死状态恢复",
-			test: function (c, a) { return a.nearDeath >= 2; } },
+			test: function (c, a) { return a.rescued >= 2; } },
 		{ id: "ad_low_long", name: "血战到底", cat: "逆境", rare: 3, modes: [], on: ["over"],
 			desc: "体力不超过 1 且打满 15 回合后获胜",
 			test: function (c, a) { return c.win && a.hpNow <= 1 && a.turn >= 15; } },
@@ -150,10 +150,10 @@
 			test: function (c, a) { return c.win && a.meIdentity === "nei" && a.survivors === 1; } },
 		{ id: "md_first_round", name: "首轮定胜", cat: "模式", rare: 2, modes: ["versus"], on: ["over"],
 			desc: "对决模式第 1 轮结束战斗并获胜",
-			test: function (c, a) { return c.win && a.turn <= 1; } },
+			test: function (c, a) { return c.win && a.round <= 1; } },
 		{ id: "md_three_round", name: "三回合", cat: "模式", rare: 3, modes: ["versus"], on: ["over"],
 			desc: "对决模式 3 轮内获胜",
-			test: function (c, a) { return c.win && a.turn <= 3; } },
+			test: function (c, a) { return c.win && a.round <= 3; } },
 
 		/* ---------- 武将 4 ---------- */
 		{ id: "gen_main", name: "本命", cat: "武将", rare: 2, modes: [], on: ["over"],
@@ -163,7 +163,7 @@
 			desc: "用 50 名不同武将各赢过至少 1 局", hint: "跨对局累计",
 			test: function (c, a) { return c.win && a.distinctWins >= 50; } },
 		{ id: "gen_all_skills", name: "熟极而流", cat: "武将", rare: 2, modes: [], on: ["over"],
-			/* 原条件是「把武将技能全发动一遍」—— 锁定技/触发技根本不会走 useSkill，
+			/* 原条件是「把武将技能全发动一遍」—— 锁定技/触发技需要从完整 useSkill 历史采集，
 			   那条永远达不成。改成「同一个技能单局发动 3 次」，可达成且有意义。 */
 			desc: "同一个技能单局发动 3 次",
 			test: function (c, a) {
@@ -173,7 +173,7 @@
 			} },
 		{ id: "gen_niliu", name: "逆流", cat: "武将", rare: 3, modes: [], on: ["over"],
 			desc: "单局把「逆流」类技能触发 3 次以上",
-			test: function (c, a) { return (a.skillUseCount["niliu"] || 0) >= 3; } },
+			test: function (c, a) { return Object.keys(a.skillUseCount).reduce(function (n, k) { return /niliu/.test(k) ? n + a.skillUseCount[k] : n; }, 0) >= 3; } },
 
 		/* ---------- 扩展 20 条（2026-10-20 · 作者「还可以更加丰富」） ----------
 		   全部只读已有聚合量，不新增采集点 —— 加内容不加成本。 */
@@ -301,7 +301,7 @@
 	function newRun(meta) {
 		meta = meta || {};
 		return {
-			mode: meta.mode || "",
+			mode: meta.mode || "", round: 0,
 			meSeat: meta.meSeat == null ? -1 : meta.meSeat,
 			meIdentity: meta.meIdentity || "",
 			meChars: meta.meChars || [],
@@ -313,7 +313,7 @@
 			handUp: 0, handUpMax: 0, lastHandEnd: -1,
 			/* 伤害与击破 */
 			dmgMax: 0, dmgTurn: 0, dmgTurnMax: 0,
-			hurt: 0, hpMax: 0, hpNow: 0, hpMin: 99, nearDeath: 0,
+			hurt: 0, hpMax: 0, hpNow: 0, hpMin: 99, nearDeath: 0, rescued: 0, inDying: false, recoveredFull: false, turnOpen: false, ownTurn: false, ended: false,
 			kills: 0, killsTurn: 0, killsTurnMax: 0, killTurnsInRow: 0, killTurnsInRowMax: 0,
 			killByRole: {}, killTurns: {},
 			dmgTurnsInRow: 0, dmgTurnsInRowMax: 0, dmgTurns: {},
@@ -334,104 +334,61 @@
 		};
 	}
 
-	function bumpTurn(a) {
-		/* 回合边界：把"本回合量"结算进 Max，再清零 */
-		if (a.cardsTurn > a.cardsTurnMax) a.cardsTurnMax = a.cardsTurn;
-		if (a.dmgTurn > a.dmgTurnMax) a.dmgTurnMax = a.dmgTurn;
-		if (a.skillTurn > a.skillTurnMax) a.skillTurnMax = a.skillTurn;
-		if (a.killsTurn > a.killsTurnMax) a.killsTurnMax = a.killsTurn;
-		if (a.emptyHandTurns > a.emptyHandTurnsMax) a.emptyHandTurnsMax = a.emptyHandTurns;
-		if (a.handUp > a.handUpMax) a.handUpMax = a.handUp;
-		/* 连续回合类：本回合有没有发生 */
-		if (a.killsTurn > 0) a.killTurnsInRow++; else a.killTurnsInRow = 0;
-		if (a.killTurnsInRow > a.killTurnsInRowMax) a.killTurnsInRowMax = a.killTurnsInRow;
-		if (a.dmgTurn > 0) a.dmgTurnsInRow++; else a.dmgTurnsInRow = 0;
-		if (a.dmgTurnsInRow > a.dmgTurnsInRowMax) a.dmgTurnsInRowMax = a.dmgTurnsInRow;
-		if (a.skillTurn > 0) a.skillChain++; else a.skillChain = 0;
-		if (a.skillChain > a.skillChainMax) a.skillChainMax = a.skillChain;
-		a.cardsTurn = 0; a.dmgTurn = 0; a.skillTurn = 0; a.killsTurn = 0;
-		a.emptyHandTurns = 0; a.handUp = 0;
-		a.turn++;
+	function maxima(a) {
+		["cards", "dmg", "skill", "kills"].forEach(function (k) { a[k + "TurnMax"] = Math.max(a[k + "TurnMax"], a[k + "Turn"]); });
 	}
-
-	/* ============================================================
-	   3. 事件喂入（只累加，不判定）
-	   ------------------------------------------------------------
-	   ev 是**归一化后**的事件，宿主负责把引擎事件翻译成这个形状：
-	     { t:"turn",  seat }                                    我的回合开始
-	     { t:"useCard", seat, name, targets, handAfter, before }
-	     { t:"useSkill", seat, skill }
-	     { t:"damage", seat, victimSeat, num, bySkill }
-	     { t:"die", seat, victimSeat, bySkill, victimRole }
-	     { t:"judge", seat, hit }
-	     { t:"hp", seat, hp, maxHp }
-	     { t:"over", win, turns, survivors, ident, landlordSeat }
-	   ============================================================ */
+	function endTurn(a, hand) {
+		if (!a.turnOpen) return;
+		maxima(a);
+		if (a.ownTurn) {
+			[["killsTurn", "killTurnsInRow"], ["dmgTurn", "dmgTurnsInRow"], ["skillTurn", "skillChain"]].forEach(function (p) {
+				a[p[1]] = a[p[0]] > 0 ? a[p[1]] + 1 : 0;
+				a[p[1] + "Max"] = Math.max(a[p[1] + "Max"], a[p[1]]);
+			});
+			if (typeof hand === "number") {
+				a.emptyHandTurns = hand === 0 ? a.emptyHandTurns + 1 : 0;
+				a.emptyHandTurnsMax = Math.max(a.emptyHandTurnsMax, a.emptyHandTurns);
+				a.handUp = a.lastHandEnd >= 0 && hand > a.lastHandEnd ? a.handUp + 1 : 0;
+				a.handUpMax = Math.max(a.handUpMax, a.handUp); a.lastHandEnd = hand;
+			}
+		}
+		a.turnOpen = false;
+	}
 	function feed(a, ev) {
-		if (!a || !ev) return;
+		if (!a || !ev || a.ended) return;
+		var mine = ev.seat === a.meSeat;
 		switch (ev.t) {
 			case "turn":
-				/* 【2026-10-20 修】原来只在"我的回合"才推进 ⇒ a.turn 实际是"我行动过几次"，
-				   一局通常 5~10 次，「打满 20 回合」永远达不成。回合是全场节拍，谁开始都算。 */
-				bumpTurn(a);
-				break;
+				if (ev.end) { endTurn(a, ev.hand); break; }
+				endTurn(a, ev.hand); a.turn++; a.ownTurn = mine; a.turnOpen = true;
+				a.cardsTurn = a.dmgTurn = a.skillTurn = a.killsTurn = 0; break;
 			case "useCard":
-				if (ev.seat === a.meSeat) {
-					a.cardsTurn++;
-					a.cardsTotal = (a.cardsTotal || 0) + 1;
-					a.played[ev.name] = 1;
-					if (typeof ev.handAfter === "number") {
-						a.lastHandEnd = ev.handAfter;
-						if (ev.handAfter < a.handMin) a.handMin = ev.handAfter;
-						if (ev.handAfter === 0) a.emptyHandTurns++;
-						if (a.lastHandPrev != null && ev.handAfter > a.lastHandPrev) a.handUp++;
-						a.lastHandPrev = ev.handAfter;
-					}
-				}
-				a.playsBySeat[ev.seat] = (a.playsBySeat[ev.seat] || 0) + 1;
+				if (!ev.respond) a.playsBySeat[ev.seat] = (a.playsBySeat[ev.seat] || 0) + 1;
+				if (!mine) break;
+				if (!ev.respond) { a.cardsTurn++; a.cardsTotal++; }
+				a.played[ev.name] = 1;
+				if (typeof ev.handAfter === "number") a.handMin = Math.min(a.handMin, ev.handAfter);
+				if (ev.name === "shan" || ev.name === "闪") { a.dodgeStreak++; a.dodgeStreakMax = Math.max(a.dodgeStreakMax, a.dodgeStreak); }
 				break;
 			case "useSkill":
-				if (ev.seat === a.meSeat) {
-					a.skillTurn++;
-					a.skillUseCount[ev.skill] = (a.skillUseCount[ev.skill] || 0) + 1;
-				}
-				break;
+				if (mine && ev.skill) { a.skillTurn++; a.skillUseCount[ev.skill] = (a.skillUseCount[ev.skill] || 0) + 1; } break;
 			case "damage":
-				if (ev.victimSeat === a.meSeat) {
-					a.hurt += ev.num || 0;
-					var left = a.hpNow - (ev.num || 0);
-					if (left <= 0 && a.hpNow > 0) a.nearDeath++;
-				}
-				if (ev.seat === a.meSeat) {
-					a.dmgTurn += ev.num || 0;
-					if ((ev.num || 0) > a.dmgMax) a.dmgMax = ev.num;
-				}
-				/* 记下"这一下是不是技能造成的"，供「收网」在 die 时回读 */
+				if (ev.victimSeat === a.meSeat) { a.hurt += ev.num || 0; a.dodgeStreak = 0; }
+				if (mine) { a.dmgTurn += ev.num || 0; a.dmgMax = Math.max(a.dmgMax, ev.num || 0); }
 				if (!a.lastDmgBySkill) a.lastDmgBySkill = {};
-				a.lastDmgBySkill[ev.victimSeat] = !!ev.bySkill;
-				break;
+				a.lastDmgBySkill[ev.victimSeat] = mine && !!ev.bySkill; break;
 			case "die":
-				if (ev.seat === a.meSeat && ev.victimSeat !== a.meSeat) {
-					a.kills++;
-					a.killsTurn++;
-					if (ev.victimRole) a.killByRole[ev.victimRole] = (a.killByRole[ev.victimRole] || 0) + 1;
-				}
-				break;
-			case "judge":
-				a.judgeTotal++;
-				if (ev.hit) a.judgeHit++;
-				break;
+				if (mine && ev.victimSeat !== a.meSeat) { a.kills++; a.killsTurn++; a.killByRole[ev.victimRole] = (a.killByRole[ev.victimRole] || 0) + 1; } break;
+			case "judge": if (mine) { a.judgeTotal++; if (ev.hit) a.judgeHit++; } break;
 			case "hp":
-				if (ev.seat === a.meSeat) {
-					a.hpNow = ev.hp;
-					if (ev.maxHp && (!a.hpMax || ev.maxHp > a.hpMax)) a.hpMax = ev.maxHp;
-					if (ev.hp < a.hpMin) a.hpMin = ev.hp;
-					if (ev.hp === 0 && a.hpMin > 0) a.nearDeath++;
-				}
-				break;
-			default:
-				break;
+				if (!mine) break;
+				if (ev.hp <= 0 && !a.inDying) { a.nearDeath++; a.inDying = true; }
+				if (ev.hp > 0 && a.inDying) { a.rescued++; a.inDying = false; }
+				a.hpNow = ev.hp; a.hpMax = ev.maxHp || a.hpMax; a.hpMin = Math.min(a.hpMin, ev.hp);
+				if (a.hpMin <= 1 && a.hpNow >= a.hpMax && a.hpMax > 1) a.recoveredFull = true; break;
+			case "over": endTurn(a, ev.hand); break;
 		}
+		maxima(a);
 	}
 
 	/* ============================================================
@@ -448,6 +405,7 @@
 		for (var i = 0; i < list.length; i++) {
 			var r = list[i];
 			if (r.modes && r.modes.length && r.modes.indexOf(a.mode) < 0) continue;
+			if ((ev.t === "damage" || ev.t === "useCard" || ev.t === "die") && ev.seat !== a.meSeat) continue;
 			if (a.unlocked.indexOf(r.id) >= 0) continue;       /* 本局已解锁，不重复 */
 			var ok = false;
 			try { ok = !!r.test(ev, a); } catch (e) { ok = false; }
@@ -476,36 +434,116 @@
 		if (ev.ident) for (var sid in ev.ident) if (ev.ident[sid] === "fan") a.fanTotal++;
 	}
 
+	var PROGRESS = {};
+	PROGRESS["op_hit3"] = { field: "dmgMax", goal: 3 };
+	PROGRESS["op_one_slash"] = { field: "dmgMax", goal: 4 };
+	PROGRESS["op_hit5"] = { field: "dmgMax", goal: 5 };
+	PROGRESS["op_thunder"] = { field: "dmgMax", goal: 6 };
+	PROGRESS["op_cards4"] = { field: "cardsTurnMax", goal: 4 };
+	PROGRESS["op_five_cards"] = { field: "cardsTurnMax", goal: 5 };
+	PROGRESS["op_cards6"] = { field: "cardsTurnMax", goal: 6 };
+	PROGRESS["op_cards_total"] = { field: "cardsTotal", goal: 30 };
+	PROGRESS["op_cards50"] = { field: "cardsTotal", goal: 50 };
+	PROGRESS["cb_judge2"] = { field: "judgeHit", goal: 2 };
+	PROGRESS["op_judge3"] = { field: "judgeHit", goal: 3 };
+	PROGRESS["op_judge_all"] = { field: "judgeTotal", goal: 5 };
+	PROGRESS["op_judge8"] = { field: "judgeTotal", goal: 8 };
+	PROGRESS["op_kill2turn"] = { field: "killsTurnMax", goal: 2 };
+	PROGRESS["cb_kill_turn3"] = { field: "killsTurnMax", goal: 3 };
+	PROGRESS["cb_kill1"] = { field: "kills", goal: 1 };
+	PROGRESS["ad_double_kill"] = { field: "kills", goal: 2 };
+	PROGRESS["ad_no_hurt_kill"] = { field: "kills", goal: 2 };
+	PROGRESS["ad_low_double"] = { field: "kills", goal: 2 };
+	PROGRESS["md_versus_king"] = { field: "kills", goal: 2 };
+	PROGRESS["cb_triple"] = { field: "kills", goal: 3 };
+	PROGRESS["ad_one_vs_many"] = { field: "kills", goal: 3 };
+	PROGRESS["md_butcher"] = { field: "kills", goal: 4 };
+	PROGRESS["cb_kill5"] = { field: "kills", goal: 5 };
+	PROGRESS["cb_double"] = { field: "killTurnsInRowMax", goal: 2 };
+	PROGRESS["cb_skill_chain"] = { field: "skillChainMax", goal: 3 };
+	PROGRESS["cb_dmg_chain"] = { field: "dmgTurnsInRowMax", goal: 4 };
+	PROGRESS["cb_no_break"] = { field: "dmgTurnsInRowMax", goal: 5 };
+	PROGRESS["cb_dmg6"] = { field: "dmgTurnsInRowMax", goal: 6 };
+	PROGRESS["cb_skill2"] = { field: "skillTurnMax", goal: 2 };
+	PROGRESS["cb_skill3turn"] = { field: "skillTurnMax", goal: 3 };
+	PROGRESS["cb_hand_up"] = { field: "handUpMax", goal: 3 };
+	PROGRESS["md_empty_three"] = { field: "emptyHandTurnsMax", goal: 2 };
+	PROGRESS["ad_no_card3"] = { field: "emptyHandTurnsMax", goal: 3 };
+	PROGRESS["cb_dodge2"] = { field: "dodgeStreakMax", goal: 2 };
+	PROGRESS["op_dodge3"] = { field: "dodgeStreakMax", goal: 3 };
+	PROGRESS["ad_near_death"] = { field: "nearDeath", goal: 1 };
+	PROGRESS["ad_near_death2"] = { field: "rescued", goal: 2 };
+	PROGRESS["op_veteran"] = { field: "turn", goal: 15 };
+	PROGRESS["op_long_win"] = { field: "turn", goal: 20 };
+	PROGRESS["op_marathon"] = { field: "turn", goal: 25 };
+	PROGRESS["gen_main"] = { field: "charWins", goal: 20 };
+	PROGRESS["gen_hundred_win"] = { field: "charWins", goal: 50 };
+	PROGRESS["gen_twenty_chars"] = { field: "distinctWins", goal: 20 };
+	PROGRESS["gen_hundred"] = { field: "distinctWins", goal: 50 };
+	PROGRESS["md_fan_slayer"] = { field: "fanKills", goal: 1 };
+	PROGRESS["md_loyal_blade"] = { field: "fanKills", goal: 2 };
+	PROGRESS["gen_all_skills"] = { field: "skillMax", goal: 3 };
+	PROGRESS["op_skill_master"] = { field: "skillMax", goal: 4 };
+	PROGRESS["gen_niliu"] = { field: "niliuUses", goal: 3 };
+	PROGRESS["cb_kinds3"] = { field: "skillKinds", goal: 3 };
+	PROGRESS["cb_kinds4"] = { field: "skillKinds", goal: 4 };
+	function progress(r, state) {
+		state = state || load(); var m = PROGRESS[r.id], done = !!state.got[r.id];
+		var cumulative = m && (m.field === "charWins" || m.field === "distinctWins"), value = Number((state.progress || {})[r.id]) || 0;
+		if (cumulative) { var wins = Object.keys(state.chars || {}).map(function(k){return Number(state.chars[k]) || 0;}); value = Math.max(value, m.field === "charWins" ? Math.max.apply(null,[0].concat(wins)) : wins.filter(function(n){return n>0;}).length); }
+		return { value: done ? (m ? m.goal : 1) : Math.min(m ? m.goal : 1, value),
+			target: m ? m.goal : 1, label: m ? (cumulative ? "累计进度" : "历史最佳") : "满足全部条件", done: done };
+	}
+	function updateProgress(o, a) {
+		a.fanKills = a.killByRole.fan || 0; a.skillKinds = Object.keys(a.skillUseCount).length;
+		a.skillMax = Math.max.apply(null, [0].concat(Object.keys(a.skillUseCount).map(function (k) { return a.skillUseCount[k]; })));
+		a.niliuUses = Object.keys(a.skillUseCount).reduce(function (n, k) { return /niliu/.test(k) ? n + a.skillUseCount[k] : n; }, 0);
+		o.progress = o.progress || {};
+		RULES.forEach(function (r) { var m = PROGRESS[r.id]; if (m && (!r.modes.length || r.modes.indexOf(a.mode) >= 0)) o.progress[r.id] = Math.max(o.progress[r.id] || 0, Math.min(m.goal, Number(a[m.field]) || 0)); });
+	}
+
 	/* ============================================================
-	   5. 存档（localStorage；只在解锁时写）
+	   5. 存档（localStorage；保留历史最佳与已解锁记录）
 	   ============================================================ */
-	var memStore = null;
+	var memStore = null, storageError = "", runtimeLib = null;
+	function blocked() {
+		try {
+			var shared = runtimeLib || root.lib;
+			if (!shared && root.parent && root.parent !== root) shared = root.parent.lib;
+			var wallet = shared && shared.cshWallet;
+			if (wallet && wallet.saveGuard && typeof wallet.saveGuard.blocked === "function") return wallet.saveGuard.blocked();
+			if (localStorage.getItem("csh_migrate_recovery") !== null) return true;
+			var migrate = shared && shared.cshMigrate || root.CSH && root.CSH.migrate;
+			if (!migrate && root.parent && root.parent !== root) migrate = root.parent.CSH && root.parent.CSH.migrate;
+			var state = migrate && typeof migrate.recoveryState === "function" && migrate.recoveryState();
+			return !!(state && (state.pending || state.busy));
+		} catch (e) { return true; }
+	}
 	function load() {
 		try {
 			if (typeof localStorage === "undefined") return memStore || (memStore = { v: VER, got: {}, seen: {}, chars: {} });
 			var raw = localStorage.getItem(KEY);
-			if (!raw) return { v: VER, got: {}, seen: {}, chars: {} };
+			if (!raw) { storageError = ""; return { v: VER, got: {}, seen: {}, chars: {}, progress: {} }; }
 			var o = JSON.parse(raw);
-			if (!o || typeof o !== "object") return { v: VER, got: {}, seen: {}, chars: {} };
-			o.got = o.got || {}; o.seen = o.seen || {}; o.chars = o.chars || {};
+			if (!o || typeof o !== "object" || Array.isArray(o)) throw Error("成就存档格式异常");
+			o.got = o.got || {}; o.seen = o.seen || {}; o.chars = o.chars || {}; o.progress = o.progress || {}; storageError = "";
 			return o;
-		} catch (e) { return { v: VER, got: {}, seen: {}, chars: {} }; }
+		} catch (e) { storageError = "成就存档暂不可读，请重试"; return { v: VER, got: {}, seen: {}, chars: {}, progress: {} }; }
 	}
 	function save(o) {
-		memStore = o;
-		try {
-			if (typeof localStorage !== "undefined") localStorage.setItem(KEY, JSON.stringify(o));
-		} catch (e) {}
+		if (blocked() || storageError) return false;
+		try { if (typeof localStorage !== "undefined") localStorage.setItem(KEY, JSON.stringify(o)); memStore = o; return true; }
+		catch (e) { return false; }
 	}
 	function unlock(id, mode) {
 		var o = load();
 		var now = Date.now();
 		if (o.got[id]) { o.got[id].n = (o.got[id].n || 1) + 1; }
 		else { o.got[id] = { t: now, m: mode || "", n: 1 }; }
-		save(o);
-		return o.got[id];
+		return save(o) ? o.got[id] : null;
 	}
 	function claimState() {
+		reconcile();
 		var o = load();
 		var got = 0, seen = 0, byRare = { 1: 0, 2: 0, 3: 0 };
 		for (var i = 0; i < RULES.length; i++) {
@@ -541,6 +579,7 @@
 		} catch (e) { return { v: 1, paid: {} }; }
 	}
 	function savePay(o) {
+		if (blocked()) return;
 		memPay = o;
 		try {
 			if (typeof localStorage !== "undefined") localStorage.setItem(K_PAY, JSON.stringify(o));
@@ -560,7 +599,7 @@
 		if (_walletPaidCache) return _walletPaidCache;
 		var names = {};
 		try {
-			var W = root.CSH && root.CSH.wallet;
+			var W = (runtimeLib && runtimeLib.cshWallet && runtimeLib.cshWallet.wallet) || (root.CSH && root.CSH.wallet);
 			if (W && typeof W.ledger === "function") {
 				var list = W.ledger({ kind: "in" });
 				for (var i = 0; i < list.length; i++) {
@@ -574,6 +613,16 @@
 	}
 	/* 领取闸门：true=已付过（调用方补 seen、不发钱）；false=可以发钱 */
 	function isPaid(id) {
+		try { var w = (runtimeLib || root.lib) && (runtimeLib || root.lib).cshWallet; if (w && w.wallet.poolPending && w.wallet.poolPending(id)) return false; if (w && w.wallet.poolClaimed && w.wallet.poolClaimed(id)) return true; } catch (e) {}
+		/* iframe 未加载钱包模块，仍须以钱包/官阶各自的持久收据对账。
+		   只有池子币收据时留待补领功勋，不能把部分提交显示成已领取。 */
+		try { if (typeof localStorage !== "undefined") {
+			var durableWallet = JSON.parse(localStorage.getItem("csh_wallet") || "{}");
+			if (durableWallet.poolClaims && durableWallet.poolClaims[id]) {
+				var durableRank = JSON.parse(localStorage.getItem("csh_rank") || "{}");
+				return !!(durableRank.poolClaims && Object.prototype.hasOwnProperty.call(durableRank.poolClaims,id));
+			}
+		} } catch (e) {}
 		var o = load();
 		if (o.seen[id]) return true;
 		var p = loadPay();
@@ -584,8 +633,9 @@
 	}
 	/* 发钱成功后记账：写台账 + 补 seen + 流水缓存失效（下次重扫） */
 	function recordPaid(id, pc, merit) {
+		if (blocked()) return false;
 		var p = loadPay();
-		if (!p.paid[id]) {
+		if (!p.paid[id] && !isPaid(id)) {
 			p.paid[id] = { t: Date.now(), pc: Math.floor(Number(pc) || 0), merit: Math.floor(Number(merit) || 0) };
 			savePay(p);
 		}
@@ -600,7 +650,7 @@
 		for (var i = 0; i < RULES.length; i++) {
 			var id = RULES[i].id;
 			if (!o.got[id] || o.seen[id]) continue;
-			if (!p.paid[id]) {
+			if (!p.paid[id] && !isPaid(id)) {
 				if (wn === null) wn = walletPaidNames();
 				if (!wn[ruleName(id)]) continue;
 			}
@@ -618,187 +668,118 @@
 	   宁可这层保守一点，也不要让成就去猜引擎细节。
 	   ============================================================ */
 	function install(host) {
-		try {
-			if (!host || !host.game || !host.lib) return false;
-			var game = host.game, lib = host.lib;
-			if (lib.__cshPoolAchvInstalled) return true;
-			lib.__cshPoolAchvInstalled = true;
-
-			var run = null;
-			function mode() {
-				try { return String((lib.config && lib.config.mode) || ""); } catch (e) { return ""; }
-			}
-			function allowed() {
-				/* 联机 / 旁观 / 调试局 / 导入过程 一律不计 */
-				try {
-					if (lib.config && lib.config.connectMode) return false;
-					if (lib.config && lib.config.dev) return false;
-					if (typeof _status !== "undefined" && (_status.importingExtension || _status.videoInited)) return false;
-					if (typeof game !== "undefined" && game.observe) return false;
-				} catch (e) {}
-				return true;
-			}
-			function active() {
-				return run && allowed() && MODES[run.mode] === 1;
-			}
-
-			/* 事件翻译：引擎 → 归一化事件（拿不准的字段一律给安全默认值） */
-			function onGameStart() {
-				var m = mode();
-				if (!MODES[m] || !allowed()) { run = null; return; }
-				var me = null;
-				try { me = game.me || (game.players && game.players[0]); } catch (e) {}
-				run = newRun({
-					mode: m,
-					meSeat: me && typeof me.seatNum === "number" ? me.seatNum : -1,
-					meIdentity: (me && me.identity) || "",
-					meChars: me && me.name ? [String(me.name)] : [],
-					seatCount: (game.players && game.players.length) || 0,
-				});
-				try {
-					run.hpNow = me ? me.hp : 0;
-					run.hpMax = me ? me.maxHp : 0;
-					run.hpMin = me ? me.hp : 99;
-				} catch (e2) {}
-			}
-			function seatOf(p) {
-				try { return p && typeof p.seatNum === "number" ? p.seatNum : -1; } catch (e) { return -1; }
-			}
-			function pump(ev) {
-				if (!active()) return;
-				feed(run, ev);
-				var hit = judge(run, ev);
-				if (!hit.length) return;
-				for (var i = 0; i < hit.length; i++) {
-					run.unlocked.push(hit[i].id);
-					unlock(hit[i].id, run.mode);
-				}
-				try { host.onUnlock && host.onUnlock(hit, run); } catch (e) {}
-			}
-
-			/* 全局技：只挂白名单里的引擎事件，全部 silent，不影响牌局 */
-			var SKILL = "csh_pool_achv_tap";
-			lib.skill[SKILL] = {
-				trigger: {
-					global: ["gameStart"],
-					player: ["phaseUseBegin", "useCard", "useSkill", "damageEnd", "die", "judgeEnd", "changeHp"],
-				},
-				forced: true,
-				silent: true,
-				popup: false,
-				priority: 100,
-				filter: function () { return active(); },
-				content: function () {
-					try {
-						var t = trigger.name;
-						if (t === "gameStart") { onGameStart(); return; }
-						if (t === "phaseUseBegin") { pump({ t: "turn", seat: seatOf(player) }); return; }
-						if (t === "useCard") {
-							pump({
-								t: "useCard", seat: seatOf(player), name: trigger.card && trigger.card.name,
-								targets: (trigger.targets && trigger.targets.length) || 0,
-								handAfter: player ? player.countCards("h") : 0,
-								before: (trigger.card && trigger.card.cards && trigger.card.cards.length) || 0,
-							});
-							return;
-						}
-						if (t === "useSkill") { pump({ t: "useSkill", seat: seatOf(player), skill: trigger.skill }); return; }
-						if (t === "damageEnd") {
-							pump({
-								t: "damage", seat: seatOf(trigger.source), victimSeat: seatOf(player),
-								num: trigger.num || 0, bySkill: !!trigger.skill,
-							});
-							return;
-						}
-						if (t === "die") {
-							/* die 事件的 player 是**死者**，击杀者要从 trigger.source 取；
-							   引擎没给 source 时（毒/判定致死等）不记在任何人头上。 */
-							pump({
-								t: "die", seat: seatOf(trigger.source), victimSeat: seatOf(player),
-								bySkill: false, victimRole: (player && player.identity) || "",
-							});
-							return;
-						}
-						if (t === "judgeEnd") { pump({ t: "judge", seat: seatOf(player), hit: !!trigger.result }); return; }
-						if (t === "changeHp") {
-							pump({ t: "hp", seat: seatOf(player), hp: player.hp, maxHp: player.maxHp });
-							return;
-						}
-					} catch (e) { try { host.log && host.log("feed 异常：" + e); } catch (e2) {} }
-				},
-			};
-			if (game.addGlobalSkill) game.addGlobalSkill(SKILL);
-
-			/* 结算：包 game.over（与 csh_bossrecord 同一先例）。
-			   ★ 包装体里不引用闭包变量，防联机序列化带走 —— 所以先取局部引用。 */
-			var orig = game.over;
-			if (typeof orig === "function" && !orig.__cshPoolAchv) {
-				var wrapped = function () {
-					try { window.__cshPoolAchvOver && window.__cshPoolAchvOver(arguments[0]); } catch (e) {}
-					return orig.apply(this, arguments);
-				};
-				wrapped.__cshPoolAchv = true;
-				game.over = wrapped;
-			}
-			root.__cshPoolAchvOver = function (winner) {
-				try {
-					if (!active()) return;
-					var me = game.me || {};
-					/* 胜负口径：以 game.over(winner) 的实参为准（true / 玩家对象 / 玩家数组）。
-					   拿不准就算"没赢"——宁可漏记一条成就，也不给错的。 */
-					var win = false;
-					try {
-						if (winner === true) win = true;
-						else if (Array.isArray(winner)) win = winner.indexOf(me) >= 0;
-						else if (winner === me) win = true;
-					} catch (eW) { win = false; }
-
-					/* 跨局累计（本命 / 百将）：先读存档里的历史，再判本局，最后统一落盘。
-					   ★ 用"判之前的值 + 本局"注入，避免"本局赢了但本命不吃这局"。 */
-					var cross = { chars: 0, distinct: 0 };
-					try {
-						var st0 = load();
-						var nm0 = (run.meChars && run.meChars[0]) || "";
-						var prev0 = (st0.chars && st0.chars[nm0]) || 0;
-						cross.chars = prev0 + (win ? 1 : 0);
-						cross.distinct = Object.keys(st0.chars || {}).length + ((win && !prev0) ? 1 : 0);
-					} catch (eC) {}
-					run.charWins = cross.chars;
-					run.distinctWins = cross.distinct;
-					var ident = {};
-					try {
-						for (var i = 0; i < game.players.length; i++) ident[game.players[i].seatNum] = game.players[i].identity || "";
-					} catch (e2) {}
-					var landlord = null;
-					try {
-						if (run.mode === "doudizhu" && game.zhu) landlord = game.zhu.seatNum;
-					} catch (e3) {}
-					pump({
-						t: "over", win: win, turns: run.turn,
-						survivors: (game.players || []).filter(function (p) { try { return p.isAlive(); } catch (e) { return false; } }).length,
-						ident: ident, landlordSeat: landlord,
-						hand: (function () { try { return me.countCards("h"); } catch (eH) { return null; } })(),
-					});
-					/* 落盘跨局累计（只记胜场；赢了才 +1） */
-					try {
-						if (win) {
-							var st1 = load();
-							var nm1 = (run.meChars && run.meChars[0]) || "";
-							if (nm1) {
-								st1.chars = st1.chars || {};
-								st1.chars[nm1] = (st1.chars[nm1] || 0) + 1;
-								save(st1);
-							}
-						}
-					} catch (eP) {}
-					run = null;
-				} catch (e) { try { host.log && host.log("over 异常：" + e); } catch (e2) {} }
-			};
-			return true;
-		} catch (e) {
-			try { host && host.log && host.log("install 失败：" + e); } catch (e2) {}
-			return false;
+		if (!host || !host.game || !host.lib) return false;
+		var game = host.game, lib = host.lib, status = host.status || {}; runtimeLib = lib;
+		if (lib.__cshPoolAchvInstalled) return true;
+		var run = null, seenSkills = new WeakSet(), seenDeaths = new WeakSet(), seenDamage = new WeakSet(), seenCards = new WeakSet(), pendingHits = [], unsavedHits = [];
+		var actorSeats = new WeakMap(), nextActorSeat = 1;
+		// videoInited marks normal recording initialization in the host, not replay mode.
+		function allowed() { return !status.cshAssistedMatch && !status.connectMode && !(lib.config && lib.config.connectMode) && !status.importingExtension && !status.video && !game.observe && !blocked(); }
+		function seatOf(p) {
+			if (!p) return -1;
+			// Host seats can be zero at gameStart and can change during play. These IDs
+			// belong only to this run's event accounting, and follow the player object.
+			if (!actorSeats.has(p)) actorSeats.set(p, nextActorSeat++);
+			return actorSeats.get(p);
 		}
+		function all() { return (game.players || []).concat(game.dead || []).filter(function (p, i, a) { return a.indexOf(p) === i; }); }
+		function friends(p, q) {
+			if (p === q) return true;
+			if (run.mode === "identity") return (p.identity === "zhu" || p.identity === "zhong" || p.identity === "mingzhong") && (q.identity === "zhu" || q.identity === "zhong" || q.identity === "mingzhong") || p.identity === "fan" && q.identity === "fan";
+			if (run.mode === "doudizhu") return (p === game.zhu) === (q === game.zhu);
+			try { return !!p.isFriendOf(q); } catch (e) { return false; }
+		}
+		function scene() {
+			var me = game.me, living = game.players || [], allies = 0, foes = 0, lostAllies = 0;
+			all().forEach(function (p) { if (p === me) return; var alive = living.indexOf(p) >= 0;
+				if (friends(me, p)) { if (!alive) lostAllies++; else allies++; }
+				else if (alive) { foes++; if (p.hp >= p.maxHp && p.maxHp > 0) run.foeFullHpSeen = true; }
+			});
+			run.allyDead = lostAllies > 0 && allies === 0;
+			run.allyGap = Math.max(run.allyGap, foes - (allies + 1));
+		}
+		function start() {
+			var m; try { m = host.getMode ? host.getMode() : lib.config.mode; } catch (e) {}
+			if (!MODES[m] || !allowed() || !game.me) { run = null; return; }
+			var me = game.me, chars = [me.name1 || me.name, me.name2].filter(Boolean).filter(function (v, i, a) { return a.indexOf(v) === i; });
+			actorSeats = new WeakMap(); nextActorSeat = 1; all().forEach(seatOf);
+			run = newRun({ mode: m, meSeat: seatOf(me), meIdentity: me.identity || "", meChars: chars, seatCount: all().length });
+			run.hpNow = run.hpMin = me.hp; run.hpMax = me.maxHp; run.handMin = me.countCards("h");
+			seenSkills = new WeakSet(); seenDeaths = new WeakSet(); seenDamage = new WeakSet(); seenCards = new WeakSet(); pendingHits = []; unsavedHits = []; scene();
+		}
+		function skills() {
+			try { game.me.getAllHistory("useSkill").forEach(function (h) { if (!h || seenSkills.has(h)) return; seenSkills.add(h);
+				if (h.skill && h.skill !== "csh_pool_achv_tap" && h.skill.indexOf("csh_pool_") !== 0) feed(run, { t: "useSkill", seat: run.meSeat, skill: h.skill });
+			}); } catch (e) {}
+		}
+		function pump(ev, chars) {
+			if (!run || !allowed() || run.ended) return;
+			run.round = Math.max(run.round, Number(game.roundNumber) || 1); skills(); scene(); feed(run, ev);
+			var hit = unsavedHits.concat(judge(run, ev)).filter(function(r,i,all){return all.findIndex(function(v){return v.id===r.id;})===i;}), st = load(); if (chars) st.chars = chars; updateProgress(st, run); var fresh = [];
+			hit.forEach(function (r) { if (st.got[r.id]) return; st.got[r.id] = { t: Date.now(), m: run.mode, n: 1 }; fresh.push(r); });
+			if (save(st)) { unsavedHits = []; hit.forEach(function (r) { if (run.unlocked.indexOf(r.id) < 0) run.unlocked.push(r.id); }); pendingHits = pendingHits.concat(fresh); }
+			else unsavedHits = hit;
+		}
+		function cardEvent(ev, respond) { if (!ev || !ev.player || seenCards.has(ev)) return; seenCards.add(ev);
+			pump({t:"useCard",seat:seatOf(ev.player),name:ev.card && ev.card.name,targets:(ev.targets||[]).length,handAfter:ev.player.countCards("h"),before:(ev.cards||[]).length,respond:respond});
+		}
+		function damageEvent(ev) { if (!ev || !ev.player || seenDamage.has(ev)) return; seenDamage.add(ev);
+			pump({t:"damage",seat:seatOf(ev.source),victimSeat:seatOf(ev.player),num:ev.num||0,bySkill:!!ev.skill || !!(ev.getParent && ev.getParent().skill)});
+		}
+
+		function death(ev) { if (!ev || !ev.player || seenDeaths.has(ev)) return;
+			seenDeaths.add(ev); pump({t:"die",seat:seatOf(ev.source),victimSeat:seatOf(ev.player),victimRole:ev.player.identity || ""});
+		}
+
+		var taps = ["gameStart", "phaseBefore", "phaseAfter", "useCardAfter", "respondAfter", "useSkill", "logSkillBegin", "damageEnd", "die", "dieAfter", "judgeEnd", "changeHp"];
+		lib.skill.csh_pool_achv_tap = {
+			trigger: { global: taps }, forced: true, silent: true, popup: false, forceDie: true, priority: -100, _priority: -10000,
+			filter: function (ev, p, name) { return p === game.me && allowed() && (name === "gameStart" || !!run && !run.ended); },
+			async content(event, trigger) {
+				try {
+					var t = event.triggername, p = trigger.player;
+					if (t === "gameStart") { start(); return; }
+					if (!run) return;
+					if (t === "phaseBefore" || t === "phaseAfter") { pump({ t: "turn", seat: seatOf(p), end: t === "phaseAfter", hand: p === game.me ? p.countCards("h") : undefined }); return; }
+					if (t === "useCardAfter" || t === "respondAfter") { cardEvent(trigger, t === "respondAfter"); return; }
+					if (t === "damageEnd") { damageEvent(trigger); return; }
+					if (t === "die" || t === "dieAfter") { death(trigger); return; }
+					if (t === "judgeEnd") { pump({ t: "judge", seat: seatOf(p), hit: !!(trigger.result && trigger.result.bool) }); return; }
+					if (t === "changeHp") { pump({ t: "hp", seat: seatOf(p), hp: p.hp, maxHp: p.maxHp }); return; }
+					skills();
+				} catch (e) { if (host.log) host.log("事件采集失败：" + e); }
+			},
+		};
+		if (game.addGlobalSkill) game.addGlobalSkill("csh_pool_achv_tap");
+		var orig = game.over;
+		if (typeof orig === "function") game.over = function () {
+			try {
+				if (run && !run.ended && allowed()) {
+					/* 模式 dieAfter 可在 die 触发前调用 over；补采当前已确认死亡事件。 */
+					var current = status.event;
+					function ancestor(name) { return current && (current.name === name ? current : current.getParent && current.getParent(name)); }
+					var card = ancestor("useCard"), damage = ancestor("damage");
+					if (card && card.name === "useCard") cardEvent(card,false);
+					if (damage && damage.name === "damage" && (damage.num || 0) > 0) damageEvent(damage);
+					var dyingEvent = status.event;
+					if (dyingEvent && dyingEvent.name !== "die" && dyingEvent.getParent) dyingEvent = dyingEvent.getParent("die");
+					if (dyingEvent && dyingEvent.name === "die" && (game.dead || []).indexOf(dyingEvent.player) >= 0) death(dyingEvent);
+					var winner = arguments[0], me = game.me, win = winner === true || winner === me || Array.isArray(winner) && winner.indexOf(me) >= 0;
+					var st = load(), chars = Object.assign({}, st.chars);
+					if (win) run.meChars.forEach(function (n) { chars[n] = (chars[n] || 0) + 1; });
+					run.charWins = Math.max.apply(null, [0].concat(run.meChars.map(function (n) { return chars[n] || 0; })));
+					run.distinctWins = Object.keys(chars).filter(function (n) { return chars[n] > 0; }).length;
+					var ident = {}; all().forEach(function (p) { ident[seatOf(p)] = p.identity || ""; });
+					pump({ t: "over", win: win, survivors: (game.players || []).length, ident: ident, landlordSeat: game.zhu ? seatOf(game.zhu) : null, hand: me.countCards("h") }, chars);
+					run.ended = true;
+					if (pendingHits.length && host.onUnlock) host.onUnlock(pendingHits, run);
+					pendingHits = [];
+				}
+			} catch (e) { if (host.log) host.log("结算记录失败：" + e); }
+			return orig.apply(this, arguments);
+		};
+		lib.__cshPoolAchvInstalled = true;
+		return true;
 	}
 
 	/* ============================================================
@@ -825,8 +806,9 @@
 	root.CSH_POOL_ACHV = {
 		VER: VER, KEY: KEY, MODES: MODES, EVENTS: _EVENTS,
 		RULES: RULES, INDEX: INDEX,
-		newRun: newRun, feed: feed, judge: judge, install: install,
-		load: load, save: save, unlock: unlock, claimState: claimState,
+		newRun: newRun, feed: feed, judge: judge, install: install, progress: progress, updateProgress: updateProgress,
+		reward: function (r) { return [{pc:0,merit:0},{pc:500,merit:5},{pc:1500,merit:15},{pc:5000,merit:40}][r.rare]; },
+		load: load, save: save, unlock: unlock, claimState: claimState, storageError: function () { return storageError; },
 		PAY_KEY: K_PAY, isPaid: isPaid, recordPaid: recordPaid, reconcile: reconcile,
 		selfTest: selfTest,
 	};

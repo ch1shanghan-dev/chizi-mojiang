@@ -404,7 +404,7 @@ export function cshContent(config, pack) { try {
         if (window.CSH_POOL_ACHV && typeof window.CSH_POOL_ACHV.install === "function") {
             window.CSH_POOL_ACHV.install({
                 game: game,
-                lib: lib,
+                lib: lib, status: _status, getMode: function () { return get.mode(); },
                 log: function (m) { try { console.warn("[池子成就] " + m); } catch (e) {} },
                 onUnlock: function (hit) {
                     try {

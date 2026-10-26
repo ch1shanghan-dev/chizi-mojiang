@@ -202,6 +202,7 @@ import { lib, game } from "../../../noname.js";
 	var K_CFG_BOSSASBOSS = "extension_池子魔将_bossAsBoss";   /* 扮演魔王战绩（lib.config） */
 	var K_CFG_GOLDFISH = "extension_池子魔将_goldfish";       /* 金鳞市（lib.config） */
 	var K_CFG_BOUNTY = "extension_池子魔将_csh_bounty";       /* 指定讨伐令目标（lib.config · 2026-10-17） */
+	var BOSS_SAVED_FIELDS = [["bossKill", K_CFG_BOSSKILL], ["bossAsBoss", K_CFG_BOSSASBOSS], ["bounty", K_CFG_BOUNTY]];
 	/* 键族（多键合成一个逻辑域）：UI 已阅类 / 玩家在各处留的名字 */
 	var GROUP_UI_SEEN = [["bossbookSeen", "csh_bossbook_seen"], ["bossHideKilled", "csh_boss_hide_killed"]];
 	var GROUP_NAMES = [["ddz", "csh_ddz_name"], ["uno", "csh_uno_name"],
@@ -322,7 +323,41 @@ import { lib, game } from "../../../noname.js";
 	}
 
 	/* ---------- 单字段清洗 ---------- */
-	function cleanWallet(o) {
+	function cleanMatchRewardConfig(o) {
+		var out = {};
+		if (!o || typeof o !== "object" || Array.isArray(o)) return out;
+		Object.keys(o).slice(0,128).forEach(function (mode) {
+			var item = o[mode];
+			if (!/^[a-zA-Z0-9_-]{1,40}$/.test(mode) || ["__proto__","constructor","prototype"].indexOf(mode) >= 0 || !item || typeof item !== "object") return;
+			out[mode] = { win:clampNum(item.win,0,1000), lose:clampNum(item.lose,0,1000) };
+		});
+		return out;
+	}
+	function cleanMatchClaims(o) {
+		if (!Array.isArray(o)) return [];
+		var seen = {}, out = [];
+		o.slice(-64).forEach(function (r) {
+			if (!r || typeof r.id !== "string" || !/^[a-zA-Z0-9_-]{10,100}$/.test(r.id) || typeof r.mode !== "string" || !/^[a-zA-Z0-9_-]{1,40}$/.test(r.mode) || typeof r.win !== "boolean" || seen[r.id]) return;
+			seen[r.id] = true; out.push({id:r.id,mode:r.mode,win:r.win,pc:clampNum(r.pc,0,1000),t:isPastStamp(r.t)});
+		});
+		return out;
+	}
+	function cleanBossRewards(o) {
+		if(o==null)return null;
+		if(!lib.cshWallet||typeof lib.cshWallet.validateBossRewards!=="function")throw Error("讨伐经济清洗器未就绪");
+		return lib.cshWallet.validateBossRewards(o);
+	}
+	function cleanBossReceipt(o) {
+		if(o==null)return null;
+		if(typeof o!=="object"||typeof o.origin!=="string"||!/^[a-zA-Z0-9-]{8,96}$/.test(o.origin)||!Number.isSafeInteger(o.seq)||o.seq<1||!Number.isSafeInteger(o.gained)||o.gained<0||o.gained>25)throw Error("讨伐官阶凭据损坏");
+		return {origin:o.origin,seq:o.seq,gained:o.gained};
+	}
+	function cleanAssisted(o) {
+        if(o==null)return null;
+        if(o.v!==1||!Number.isSafeInteger(o.wins)||o.wins<0||!Number.isSafeInteger(o.losses)||o.losses<0||!Array.isArray(o.receipts)||o.receipts.length>64||o.receipts.some(function(id){return typeof id!=="string"||!/^[a-zA-Z0-9_-]{10,100}$/.test(id);}))throw Error("辅助战绩格式无效");
+        return {v:1,wins:o.wins,losses:o.losses,receipts:o.receipts.slice()};
+    }
+    function cleanWallet(o) {
 		if (!o || typeof o !== "object") return null;
 		/* 2026-09-29：删除 bank / quota / quotaDate（钱包里已不存在这三个死字段）。
 		   新增 pcPeak：生涯峰值，真实可核，用于大厅与成就。 */
@@ -333,6 +368,11 @@ import { lib, game } from "../../../noname.js";
 			streak: clampNum(o.streak, 0, 9999),
 			reliefDate: clampStr(o.reliefDate, 20),
 			careerClaims: cleanAchv(o.careerClaims) || {},
+			poolClaims: cleanPoolClaims(o.poolClaims),
+			matchRewardConfig: cleanMatchRewardConfig(o.matchRewardConfig),
+			matchClaims: cleanMatchClaims(o.matchClaims),
+			bossRewards: cleanBossRewards(o.bossRewards),
+			assistedStats: cleanAssisted(o.assistedStats),
 		};
 	}
 	function cleanRank(o) {
@@ -342,6 +382,8 @@ import { lib, game } from "../../../noname.js";
 			merit: clampNum(o.merit, 0, 999999999),
 			meritToday: clampNum(o.meritToday, 0, 999999999),
 			meritDate: clampStr(o.meritDate, 20),
+			poolClaims: numMap(o.poolClaims, 100, 0, 1000) || {},
+			bossReceipt: cleanBossReceipt(o.bossReceipt),
 		};
 	}
 	/* A2：id 分类型清洗。字符串主键（97 人方案）走 clampStr，数字（旧档）走 clampNum。 */
@@ -645,9 +687,15 @@ import { lib, game } from "../../../noname.js";
 	/* 池子成就存档：{v, got:{id:{t,m,n}}, seen:{id:1}}。
 	   只做形状校验与截断 —— 不因为某条 id 不认识就整体丢弃（旧存档遇到新版本规则表时，
 	   认不出的 id 留着无副作用，丢掉反而会把玩家进度吃回去）。 */
+	function cleanPoolClaims(o) {
+		var out = {}; if (!o || typeof o !== "object") return out;
+		Object.keys(o).slice(0,100).forEach(function(id){ var r=o[id]; if (!/^[a-zA-Z0-9_]{1,60}$/.test(id) || !r || typeof r!=="object") return;
+			out[id]={pc:clampNum(r.pc,0,5000),merit:clampNum(r.merit,0,40),t:isPastStamp(r.t)};
+		}); return out;
+	}
 	function cleanPoolAchv(o) {
 		if (!o || typeof o !== "object") return null;
-		var out = { v: 1, got: {}, seen: {} };
+		var out = { v: 2, got: {}, seen: {}, chars: numMap(o.chars, 3000, 0, 999999) || {}, progress: numMap(o.progress, 100, 0, 999999) || {} };
 		var src = (o.got && typeof o.got === "object") ? o.got : {};
 		var keys = Object.keys(src).slice(0, 800);
 		for (var i = 0; i < keys.length; i++) {
@@ -884,8 +932,8 @@ import { lib, game } from "../../../noname.js";
 		var out = {
 			dayNo: clampNum(o.dayNo, 0, 999999),
 			day: typeof o.day === "string" ? clampStr(o.day, 20) : "",
-			hold: numMap(o.hold, 64, 0, 999999999),
-			cost: numMap(o.cost, 64, 0, PC_CAP()),
+			hold: numMap(o.hold, 64, 0, 999999999) || {},
+			cost: numMap(o.cost, 64, 0, PC_CAP()) || {},
 			gift: !!o.gift,
 			earned: clampNum(o.earned, 0, 999999999999),
 			pendingDiv: clampNum(o.pendingDiv, 0, PC_CAP()),
@@ -907,6 +955,7 @@ import { lib, game } from "../../../noname.js";
 				t: isPastStamp(e.t), d: d,
 				r: clampStr(e.r, 40), c: clampStr(e.c, 16),
 				b: clampNum(e.b, 0, PC_CAP()),
+				bossTx: typeof e.bossTx === "string" && /^[a-zA-Z0-9-]{8,120}$/.test(e.bossTx) ? e.bossTx : undefined,
 			});
 		}
 		return out.length ? out : null;
@@ -940,6 +989,9 @@ import { lib, game } from "../../../noname.js";
 	var KEY_DEFS = [
 		["winrate", K_WINRATE, cleanWinrate, 3],
 		["wallet", K_WALLET, cleanWallet, 0],
+		["auxSpirit", "extension_池子魔将_csh_aux_spirit", function(v){return v==null?null:v===true;}, 3],
+		["challengeProfile", "extension_池子魔将_csh_challenge_profile", function(v){return v==null?null:v==="hard"?"hard":"normal";}, 3],
+		["texasRake", "extension_池子魔将_csh_texas_rake", function(v){if(v==null)return null;return String([0,50,100,200].indexOf(Number(v))>=0?Number(v):100);}, 3],
 		["rank", K_RANK, cleanRank, 0],
 		["world", K_WORLD, cleanWorld, 0],
 		["cdkUsed", K_CDK, cleanCdk, 0],
@@ -1014,9 +1066,23 @@ import { lib, game } from "../../../noname.js";
 				body[k] = collectJSON(lsKey, strict);
 			}
 		}
+		/* 讨伐副本已在钱包中确认，ZIP清掉或异步未同步的config不能覆盖它。
+		   按原有三个域扁平化，旧行囊格式不增加重复展示的内部域。 */
+		var bossSaved = body.wallet && body.wallet.bossSaved;
+		if (bossSaved != null) {
+			if (typeof bossSaved !== "object" || Array.isArray(bossSaved)) throw new Error("讨伐保全副本格式异常");
+			BOSS_SAVED_FIELDS.forEach(function (entry) {
+				if (!Object.prototype.hasOwnProperty.call(bossSaved, entry[0])) return;
+				var value = bossSaved[entry[0]];
+				if (entry[0] === "bounty" ? typeof value !== "string" : !value || typeof value !== "object" || Array.isArray(value)) throw new Error("讨伐保全字段异常：" + entry[0]);
+				body[entry[0]] = copyValue(value);
+			});
+		}
 		/* 市场检查点已经与余额共同落盘，不能导出仍旧的 config 持仓。
 		   迁移文件扁平化成原有 wallet/goldfish/ledger 三域，不携带本机同步任务。 */
 		var pending = body.wallet && body.wallet.marketPending;
+		var savedMarket = body.wallet && body.wallet.marketSaved;
+		if (!pending && savedMarket) body.goldfish = savedMarket;
 		if (pending && pending.state) {
 			body.goldfish = pending.state;
 			if (pending.entry) {
@@ -1027,6 +1093,19 @@ import { lib, game } from "../../../noname.js";
 		}
 		/* 生涯奖励原子凭据随余额迁移，并并入旧版领奖集合；待补流水扁平化。
 		   导入不带本机待执行任务，旧版本也能识别已经兑现的奖励。 */
+		var matchClaims = body.wallet && body.wallet.matchClaims;
+		if (Array.isArray(matchClaims)) {
+			var matchList = Array.isArray(body.ledger) ? body.ledger.slice() : [];
+			matchClaims.forEach(function (rec) { if (rec && rec.entry && !matchList.some(function (e) { return e && e.matchTx === rec.id; })) matchList.push(rec.entry); });
+			body.ledger = matchList.sort(function (a,b) { return b.t-a.t; });
+		}
+		var poolClaims = body.wallet && body.wallet.poolClaims;
+		if (poolClaims) {
+			var pl = Array.isArray(body.ledger) ? body.ledger.slice() : [];
+			Object.keys(poolClaims).forEach(function(id){var rec=poolClaims[id]; if(rec && rec.entry && !pl.some(function(e){return e && e.poolTx===id;})) pl.unshift(rec.entry);});
+			body.ledger = pl.sort(function(a,b){return b.t-a.t;});
+		}
+
 		var career = body.wallet && body.wallet.careerClaims;
 		if (career && typeof career === "object") body.achv = Object.assign({}, body.achv || {}, career);
 		var careerPending = body.wallet && body.wallet.careerPending;
@@ -1065,9 +1144,9 @@ import { lib, game } from "../../../noname.js";
 		for (var i = MAX_BACKUPS; i < keys.length; i++) strictSet(keys[i], null);
 	}
 	function backups() {
-		return backupKeys().map(function (k) {
+		return backupKeys(true).map(function (k) {
 			var stamp = k.slice(K_BACKUP_PREFIX.length);
-			var d = lsJSON(k, null);
+			var d = collectJSON(k, true);
 			var aiN = d && d.world && Array.isArray(d.world.ai) ? d.world.ai.length : 0;
 			return { stamp: stamp, time: Number(stamp), ai: aiN, pc: d && d.wallet ? d.wallet.pc : 0 };
 		});
@@ -1123,6 +1202,19 @@ import { lib, game } from "../../../noname.js";
 	}
 
 	/* 先构造写入计划，不调用可能吞掉落盘失败的 world.importRaw。 */
+	function validateBossSelection(body,replaceMissing) {
+		var localBossWallet=collectJSON(K_WALLET,true),hasBossEconomy=(localBossWallet&&localBossWallet.bossRewards)||(body.wallet&&body.wallet.bossRewards)||(body.rank&&body.rank.bossReceipt);
+		if(hasBossEconomy){
+			var walletSelected=body.wallet!=null||replaceMissing,rankSelected=body.rank!=null||replaceMissing;
+			if(walletSelected!==rankSelected)throw Error("讨伐经济存档需同时选择钱包与官阶，原档未改动");
+			if(walletSelected&&body.wallet&&body.wallet.bossRewards){
+				var state=cleanBossRewards(body.wallet.bossRewards),receipt=body.rank&&cleanBossReceipt(body.rank.bossReceipt),water=receipt?receipt.seq:0;
+				if((receipt&&receipt.origin!==state.origin)||water>state.seq||water<(state.pending?state.seq-1:state.seq))throw Error("讨伐钱包与官阶不是同一经济快照");
+			}
+			if(walletSelected&&!(body.wallet&&body.wallet.bossRewards)&&body.rank&&body.rank.bossReceipt)throw Error("讨伐钱包凭据缺失");
+		}
+
+	}
 	async function applyAll(body, replaceMissing) {
 		var plan = { local: {}, config: [] };
 		for (var i = 0; i < KEY_DEFS.length; i++) {
@@ -1162,6 +1254,48 @@ import { lib, game } from "../../../noname.js";
 			} else if (v != null || replaceMissing) {
 				plan.local[lsKey] = v == null ? null : JSON.stringify(v);
 			}
+		}
+		/* 市场配置与钱包保全副本必须采用同一批持仓。仅导入 goldfish 时钱包
+		   不在文件中，仍须纳入写入计划和原值 journal，防止旧 marketSaved
+		   在重启后覆盖导入结果。迁移只留下持仓真值，不携带本机同步任务。 */
+		if (body.goldfish != null || replaceMissing) {
+			var walletText = Object.prototype.hasOwnProperty.call(plan.local, K_WALLET) ? plan.local[K_WALLET] : localStorage.getItem(K_WALLET);
+			if (walletText !== null) {
+				var marketWallet = JSON.parse(walletText);
+				if (!marketWallet || typeof marketWallet !== "object" || Array.isArray(marketWallet)) throw new Error("钱包格式异常，未覆盖市场存档");
+				if (body.goldfish != null) marketWallet.marketSaved = copyValue(body.goldfish);
+				else delete marketWallet.marketSaved;
+				delete marketWallet.marketPending;
+				delete marketWallet._sig; // 迁移后的对象由钱包按原有无签名导入流程采用。
+				plan.local[K_WALLET] = JSON.stringify(marketWallet);
+			}
+		}
+		/* 讨伐域单独导入也同步钱包保全副本；钱包单独导入则保留本机未指定的
+		   讨伐域。所有新增钱包写入与原值一起进入commitPlan/journal。 */
+		if (replaceMissing || BOSS_SAVED_FIELDS.some(function (entry) { return body[entry[0]] != null; }) || Object.prototype.hasOwnProperty.call(plan.local, K_WALLET)) {
+			var bossWalletText = Object.prototype.hasOwnProperty.call(plan.local, K_WALLET) ? plan.local[K_WALLET] : localStorage.getItem(K_WALLET);
+			if (bossWalletText !== null) {
+				var bossWallet = JSON.parse(bossWalletText), oldWallet = collectJSON(K_WALLET, true), existingBoss = oldWallet && oldWallet.bossSaved;
+				if (!bossWallet || typeof bossWallet !== "object" || Array.isArray(bossWallet)) throw new Error("钱包格式异常，未覆盖讨伐存档");
+				if (existingBoss != null && (typeof existingBoss !== "object" || Array.isArray(existingBoss))) throw new Error("讨伐保全副本格式异常");
+				var nextBoss = {};
+				BOSS_SAVED_FIELDS.forEach(function (entry) {
+					var field = entry[0], value;
+					if (body[field] != null) value = body[field];
+					else if (!replaceMissing) value = existingBoss && Object.prototype.hasOwnProperty.call(existingBoss, field) ? existingBoss[field] : cfgGet(entry[1], true);
+					if (value != null) nextBoss[field] = copyValue(value);
+				});
+				if (Object.keys(nextBoss).length) bossWallet.bossSaved = nextBoss;
+				else delete bossWallet.bossSaved;
+				delete bossWallet._sig;
+				plan.local[K_WALLET] = JSON.stringify(bossWallet);
+			}
+		}
+		validateBossSelection(body,replaceMissing);
+		// A display-record-only import never reopens historical first-kill eligibility.
+		if(!body.wallet&&body.bossKill&&Object.prototype.hasOwnProperty.call(plan.local,K_WALLET)&&plan.local[K_WALLET]){
+			var mergedWallet=JSON.parse(plan.local[K_WALLET]);
+			if(mergedWallet.bossRewards){Object.keys(body.bossKill.map||{}).forEach(function(id){if(/^csh_boss_[a-zA-Z0-9_]+$/.test(id)&&body.bossKill.map[id].n>0)mergedWallet.bossRewards.first[id]=true;});plan.local[K_WALLET]=JSON.stringify(mergedWallet);}
 		}
 		await commitPlan(plan);
 	}
@@ -1286,7 +1420,7 @@ import { lib, game } from "../../../noname.js";
 			try { pending = localStorage.getItem(K_RECOVERY) !== null; } catch (readError) {}
 			logMsg("存档操作失败：" + String(error && error.message || error));
 			return { ok: false, err: String(error && error.message || error), recovery: pending };
-		} finally { mutating = false; }
+		} finally { mutating = false; Promise.resolve().then(function(){var W=lib.cshWallet&&lib.cshWallet.wallet;if(W&&W.flushBossRewards)W.flushBossRewards();}); }
 	}
 	function recover() {
 		return mutation(async function () { return { ok: true, recovered: true }; });
@@ -1407,7 +1541,7 @@ import { lib, game } from "../../../noname.js";
 	   与天下榜页同一条纪律：「页面上一切对外可见的字只从文案表里取」。
 	   顺序 = 玩家最关心的顺序（钱 → 位分 → 战绩 → 妖灵 → 市集 → 设置）。 */
 	function inventory(body) {
-		body = body || collect();
+		body = body || collect(true);
 		var rows = [];
 		function add(key, has, n, extra) {
 			rows.push({ key: key, has: !!has, n: n || 0, extra: extra || null });
@@ -1464,6 +1598,9 @@ import { lib, game } from "../../../noname.js";
 		var nm = cleanNames(body.names);
 		add("names", !!nm, nm ? Object.keys(nm).length : 0, null);
 		/* 设置类（跟着走，但不必计数） */
+		add("auxSpirit", body.auxSpirit != null, 0, null);
+		add("challengeProfile", body.challengeProfile != null, 0, null);
+		add("texasRake", body.texasRake != null, 0, null);
 		add("panelSkin", body.panelSkin != null && body.panelSkin !== "", 0, null);
 		add("bgmVolume", body.bgmVolume != null, 0, null);
 		add("bgmOn", !!body.bgmOn, 0, null);
@@ -1549,6 +1686,7 @@ import { lib, game } from "../../../noname.js";
 		opts = opts || {};
 		var ins = await inspect(code);
 		if (!ins.ok) return ins;
+		try { validateBossSelection(ins.data,false); } catch(error) { return {ok:false,err:String(error.message||error)}; }
 		var diff = diffOf(ins.data);
 		if (opts.dryRun) return { ok: true, dryRun: true, diff: diff, summary: ins.summary };
 		if (marketBusy()) return { ok: false, err: "市场存档正在同步，请稍后重试" };

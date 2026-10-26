@@ -634,13 +634,13 @@
 
   /* ==STORE-START== 存档：统一 csh_bj_ 前缀，避免与其他模块冲突 */
   function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
-  function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  function lsSet(k, v) { return CSHPage.lsSet(k, v); }
   function lsJSON(k, d) {
     var s = lsGet(k);
     if (!s) return d;
     try { var o = JSON.parse(s); return (o && typeof o === 'object') ? o : d; } catch (e) { return d; }
   }
-  function lsPut(k, o) { try { lsSet(k, JSON.stringify(o)); } catch (e) {} }
+  function lsPut(k, o) { try { return lsSet(k, JSON.stringify(o)); } catch (e) { return false; } }
   /* ==STORE-END== */
 
   /* ---------- 音效：统一 SfxBus（§4.7.1） ----------
@@ -996,7 +996,13 @@ try { CRD = (typeof window !== 'undefined' && window.CSH && window.CSH.cards) ? 
      此处只做数值兜底（防止存档里是字符串/null）。 */
   if (typeof set.bet !== 'number' || !isFinite(set.bet) || set.bet <= 0) set.bet = 50;
 
-  function saveSet() { lsPut(K_SET, { difficulty: set.difficulty, hintOn: set.hintOn, bet: set.bet }); }
+  function saveSet() { return lsPut(K_SET, { difficulty: set.difficulty, hintOn: set.hintOn, bet: set.bet }); }
+  function chooseSet(key, value) {
+    if (!CSHPage.requireSave()) return false;
+    var next = Object.assign({}, set); next[key] = value;
+    if (!lsPut(K_SET, next)) return false;
+    set = next; return true;
+  }
   function saveBest() {
     if (!state) return;
     /* shell 内筹码由宿主钱包托管，不落本地；只记生涯手数与连胜（用于图鉴/排行）。
@@ -1430,6 +1436,7 @@ try { CRD = (typeof window !== 'undefined' && window.CSH && window.CSH.cards) ? 
      4. 对局流程
      ============================================================ */
   function startGame() {
+    if (!CSHPage.requireSave()) return;
     /* 本场已结算（钱已交回宿主）后再开局，第二局的钱将无处入账 —— 直接退回宿主。
        桥每次 shell 会话只允许一次结算，这是契约，不是可以绕过的限制。 */
     if (Bridge.active && Bridge.isSettled()) { closePage(); return; }
@@ -1962,20 +1969,20 @@ try { CRD = (typeof window !== 'undefined' && window.CSH && window.CSH.cards) ? 
   $('#bet-chips').addEventListener('click', function (e) {
     var b = e.target && e.target.closest ? e.target.closest('.chip-btn') : null;
     if (!b || b.disabled) return;
-    set.bet = Number(b.getAttribute('data-bet'));
-    saveSet(); sfx.ui(); renderStart();
+    if (!chooseSet('bet', Number(b.getAttribute('data-bet')))) return;
+    sfx.ui(); renderStart();
   });
   $('#diff-seg').addEventListener('click', function (e) {
     var b = e.target && e.target.closest ? e.target.closest('.seg-btn') : null;
     if (!b) return;
-    set.difficulty = b.getAttribute('data-diff');
-    saveSet(); sfx.ui(); renderStart();
+    if (!chooseSet('difficulty', b.getAttribute('data-diff'))) return;
+    sfx.ui(); renderStart();
   });
   $('#hint-seg').addEventListener('click', function (e) {
     var b = e.target && e.target.closest ? e.target.closest('.seg-btn') : null;
     if (!b) return;
-    set.hintOn = b.getAttribute('data-hint') === '1';
-    saveSet(); sfx.ui(); renderStart();
+    if (!chooseSet('hintOn', b.getAttribute('data-hint') === '1')) return;
+    sfx.ui(); renderStart();
   });
 
   /* Esc：保险 → 玩法 → 结算横幅 → 页面（三通路行为一致） */

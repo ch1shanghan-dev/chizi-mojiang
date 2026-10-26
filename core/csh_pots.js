@@ -137,16 +137,23 @@
 
 	function settle(hand) {
 		hand = hand || {};
-		var players = Array.isArray(hand.players) ? hand.players : [];
+		var players = Array.isArray(hand.players) ? hand.players.map(function(p){ var c=p.contrib==null?0:Number(p.contrib); if(!Number.isSafeInteger(c)||c<0||c>100000000000)throw Error("德州投入无效"); return Object.assign({},p,{contrib:c,_committed:c}); }) : [];
 		var community = hand.community || [];
 		var stacks = hand.stacks || {};
 		var dealerId = hand.dealerId;
 		var ids = [];
 		var i, j;
-		for (i = 0; i < players.length; i++) ids.push(players[i].id);
+		for (i = 0; i < players.length; i++) { var id=players[i].id; if(!/^[a-zA-Z0-9_-]{1,64}$/.test(String(id))||["__proto__","constructor","prototype"].indexOf(String(id))>=0||ids.some(function(x){return String(x)===String(id);}))throw Error("德州座位无效"); ids.push(id); }
 
 		var payouts = {};
 		for (i = 0; i < players.length; i++) payouts[players[i].id] = 0;
+		// Unmatched highest contribution is a refund, never a contested prize.
+		var uncalled = {}, orderedContrib = players.slice().sort(function(a,b){return b.contrib-a.contrib;});
+		if (orderedContrib.length > 1 && orderedContrib[0].contrib > orderedContrib[1].contrib) {
+			var owner=orderedContrib[0], amountBack=owner.contrib-orderedContrib[1].contrib;
+			owner.contrib-=amountBack; payouts[owner.id]=amountBack; uncalled[owner.id]=amountBack;
+		}
+		hand = Object.assign({},hand,{uncalled:uncalled});
 
 		/* 2.1 只有未弃牌且未出局的玩家能争池；其余人的钱照样留在池里（§5） */
 		var live = [];
@@ -162,7 +169,8 @@
 
 		var pots = [];
 		var totalPot = 0;
-		for (i = 0; i < players.length; i++) totalPot += Math.max(0, Math.floor(players[i].contrib || 0));
+		for (i = 0; i < players.length; i++) totalPot += players[i]._committed;
+		for (var refundId in uncalled) pots.push({id:"uncalled",amount:uncalled[refundId],eligible:[players.find(function(p){return String(p.id)===refundId;}).id],winners:[players.find(function(p){return String(p.id)===refundId;}).id],refund:true,payouts:Object.assign({},uncalled)});
 
 		if (live.length <= 0) {
 			/* 全部出局/弃牌而池里有钱：不猜归属，如实标记为未分配，交给上层的兜底逻辑处理 */
@@ -172,11 +180,12 @@
 		if (live.length === 1) {
 			/* 只剩一人：全部底池归他（含其他人弃掉的筹码），单池单赢家 */
 			var w0 = live[0];
-			payouts[w0.id] += totalPot;
+			var foldPot=players.reduce(function(sum,p){return sum+p.contrib;},0);
+			payouts[w0.id] += foldPot;
 			pots.push({
-				id: 'main', amount: totalPot, eligible: live.map(function (x) { return x.id; }),
+				id: 'main', amount: foldPot, eligible: live.map(function (x) { return x.id; }),
 				winners: [w0.id], byFold: true,
-				payouts: (function () { var o = {}; o[w0.id] = totalPot; return o; })(),
+				payouts: (function () { var o = {}; o[w0.id] = foldPot; return o; })(),
 			});
 			return finish(hand, players, stacks, pots, payouts, totalPot, true);
 		}
@@ -245,27 +254,48 @@
 	   end = 本手开始筹码 + net
 	   本游戏结算层无抽水（台费由钱包侧按回收率另计），故守恒要求严格相等。 */
 	function finish(hand, players, stacks, pots, payouts, totalPot, settled) {
+		var rake=hand.rake||{},rate=rake.rateBps||0,cap=rake.cap||0,systemCollected=0,rakePaid={};
+		if(!Number.isSafeInteger(rate)||rate<0||rate>1000||!Number.isSafeInteger(cap)||cap<0||cap>1000)throw Error("德州场供配置无效");
+		var canRake=rate>0 && (!rake.noFlopNoDrop || (hand.community||[]).length>=3);
+		var grossPayouts=Object.assign({},payouts);
+		pots.forEach(function(pt){
+			pt.rake=0;if(!canRake||pt.refund||!settled)return;
+			var fee=Math.min(cap-systemCollected,Math.floor(pt.amount*rate/10000));if(fee<=0)return;
+			pt.grossPayouts=Object.assign({},pt.payouts);var assigned=0;
+			var order=orderFromDealerLeft(pt.winners,hand.dealerId,players.map(function(p){return p.id;}));
+			var fees={};order.forEach(function(id){fees[id]=Math.floor(fee*pt.grossPayouts[id]/pt.amount);assigned+=fees[id];});
+			for(var k=0;assigned<fee;k=(k+1)%order.length){var id=order[k];if(fees[id]<pt.grossPayouts[id]){fees[id]++;assigned++;}}
+			order.forEach(function(id){pt.payouts[id]-=fees[id];payouts[id]-=fees[id];rakePaid[id]=(rakePaid[id]||0)+fees[id];});
+			pt.rake=fee;systemCollected+=fee;
+		});
+		var events=[],roundId=String(hand.roundId||"preview"),stamp=Number.isSafeInteger(hand.timestamp)?hand.timestamp:0;
+		function event(kind,id,amount){if(amount)events.push({kind:kind,roundId:roundId,playerId:id,amount:amount,idempotencyKey:roundId+":"+id+":"+kind,timestamp:stamp});}
+
 		var ledger = [], startSum = 0, endSum = 0, i;
 		for (i = 0; i < players.length; i++) {
 			var p = players[i];
 			var st = (typeof stacks[p.id] === 'number') ? stacks[p.id] : null;
-			var committed = Math.max(0, Math.floor(p.contrib || 0));
+			var committed = p._committed;
 			var won = payouts[p.id] || 0;
+			var refund=(hand.uncalled&&hand.uncalled[p.id])||0,fee=rakePaid[p.id]||0,gross=(grossPayouts[p.id]||0)-refund;
 			var net = won - committed;
+			event("stake_debit",p.id,-committed);event("uncalled_refund",p.id,refund);event("payout",p.id,gross);event("rake",p.id,-fee);
 			var end = (st == null) ? null : st + net;
 			if (st != null) { startSum += st; endSum += end; }
 			ledger.push({
 				id: p.id, name: p.name, isHuman: !!p.isHuman,
 				startStack: st, committed: committed, won: won, net: net, endStack: end,
+				payout: gross, uncalledRefund: refund, rakePaid: fee, tableFee: 0,
 				folded: !!p.folded, out: !!p.out,
 			});
 		}
 		var gained = 0;
 		for (i = 0; i < ledger.length; i++) gained += ledger[i].won;
 		/* 守恒：发放总额必须等于池内总额（守恒失败说明有筹码被凭空造出或吞掉） */
-		var conserved = (gained === totalPot) && (startSum === 0 || endSum === startSum);
+		var conserved = (gained + systemCollected === totalPot) && (startSum === 0 || endSum + systemCollected === startSum);
 		return {
 			pots: pots, payouts: payouts, ledger: ledger, potTotal: totalPot,
+			roundId: roundId, events: events, systemCollected: systemCollected,
 			startSum: startSum, endSum: endSum,
 			conservation: conserved ? 'PASS' : 'FAIL',
 			ok: !!settled && conserved,

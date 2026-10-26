@@ -15,6 +15,7 @@
    ============================================================ */
 import { lib, game } from "../../../noname.js";
 import { buildBossConfig, allBossIds } from "../core/csh_bossdata.js";
+import { installChallengeConfig } from "../core/csh_challenge.js";
 import { cshBossSelfLoad } from "../character/boss.js";   /* ★ 懒人包兼容：自愈补载 */
 
 /* ---------- v4.2 隐藏已讨伐魔王（作者定案：开关做在池子休闲·讨伐录里） ----------
@@ -130,14 +131,15 @@ export function cshBossModeInstall() {
 			if (RBX && typeof RBX.snapshotExt === "function") RBX.snapshotExt();
 		} catch (eSX) {}
 		/* gameDraw（函数型配置在此补齐；本体标准：魔王 8 张 / 挑战者 4 张） */
-		const gameDraw = player => (player === game.boss ? 8 : 4);
+
 
 		/* ---------- lib.boss 配置（逐键写入；global 等他方键保留） ---------- */
 		if (!lib.boss) lib.boss = {};
 		for (const bid of order) {
-			const c = cfg[bid];
+			const profile = lib.config.extension_池子魔将_csh_challenge_profile === "hard" ? "hard" : "normal";
+			const c = cfg[bid] && installChallengeConfig(cfg[bid], profile, {game});
 			if (!c) continue;
-			c.gameDraw = gameDraw;
+			/* gameDraw is provided by the selected challenge profile. */
 			lib.boss[bid] = c;
 		}
 

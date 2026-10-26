@@ -2151,7 +2151,7 @@ const skill = {
 				/* 妖灵讨伐收益分支（挑战者 3000 / 应战 1000 + 功勋 + 金鳞市热度 · 单点常量在 bossrecord）
 				   v6.2：取消同局去重（作者："妖灵收益不再去重"）→ 每次击破都结算；**2026-10-16 三轮修正：两场景两值**（挑战者 3000 / 应战 1000，asBoss 由本处按 game.me === game.boss 判定传入）。 */
 				if (String((trigger.player && trigger.player.name) || "").indexOf("csh_boss_minion_") === 0) {
-					if (typeof rec.recordMinion === "function") rec.recordMinion(trigger.player.name, { asBoss: game.me === game.boss });
+					if (typeof rec.recordMinion === "function") rec.recordMinion(trigger.player.name, { asBoss: game.me === game.boss, event: trigger });
 					return;
 				}
 				/* ★ 2026-10-16 晚根因修复：与 game.over 收尾通道（csh_bossrecord.recordOnOver）互斥。
@@ -2162,15 +2162,12 @@ const skill = {
 				if (game.me === game.boss) {
 					if (typeof rec.recordAsBoss !== "function") return;
 					if (trigger.player === game.boss) {
-						if (game.boss) game.boss._cshBossRecorded = true;
-						rec.recordAsBoss(false);
+						if (rec.recordAsBoss(false) && game.boss) game.boss._cshBossRecorded = true;
 					} else if (!game.hasPlayer(function (cur) { return cur.side === false && cur.isIn(); })) {
-						if (game.boss) game.boss._cshBossRecorded = true;
-						rec.recordAsBoss(true);
+						if (rec.recordAsBoss(true) && game.boss) game.boss._cshBossRecorded = true;
 					}
 				} else if (typeof rec.record === "function") {
-					if (game.boss) game.boss._cshBossRecorded = true;
-					rec.record(trigger.player.name, { round: game.roundNumber });
+					if (rec.record(trigger.player.name, { round: game.roundNumber, event: game.boss }) && game.boss) game.boss._cshBossRecorded = true;
 				}
 			} catch (e) {}
 		},

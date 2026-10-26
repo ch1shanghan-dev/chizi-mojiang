@@ -49,9 +49,68 @@
 		catch (e) { return null; }
 	}
 	function lsSet(k, v) {
-		try { if (typeof localStorage !== "undefined" && localStorage) localStorage.setItem(k, v); }
-		catch (e) {}
+		if (!requireSave()) return false;
+		try { root.localStorage.setItem(k, v); return true; }
+		catch (e) { saveReason = "保存未完成，请关闭后重新进入"; saveNotice(); return false; }
 	}
+
+	/* 页面读入旧对象后，即使恢复凭据已清除，也不能把旧对象覆盖回新存档。
+	   在共享脚本加载（页内脚本读存档之前）捕获真实钱包代次；代次/钱包变化后
+	   此文档永久只读，重新进入才创建新快照。没有宿主的独立页继续原有本地存储。 */
+	var saveWallet = null, saveEpoch = null, saveStale = false, saveCaptureFailed = false;
+	var saveReason = "存档操作尚未完成，请稍后重新进入";
+	function saveHost() {
+		var scope = root.parent && root.parent !== root ? root.parent : root;
+		// 同源访问失败不可冒充独立页；非调试宿主仅暴露 CSH，仍使用真实接口。
+		var lib = scope.lib, api = scope.CSH;
+		return { scope: scope, wallet: (lib && lib.cshWallet) || (api && api.wallet) || null,
+			migrate: (lib && lib.cshMigrate) || (api && api.migrate) || null };
+	}
+	try {
+		saveWallet = saveHost().wallet;
+		if (saveWallet) {
+			if (typeof saveWallet.saveEpoch !== "function") throw new Error("Missing save epoch");
+			saveEpoch = saveWallet.saveEpoch();
+			if (typeof saveEpoch !== "number" || !isFinite(saveEpoch)) throw new Error("Invalid save epoch");
+		}
+	} catch (eCapture) { saveCaptureFailed = true; }
+	function saveAllowed() {
+		if (saveStale || saveCaptureFailed) { saveReason = "存档已更新，请关闭后重新进入"; return false; }
+		try {
+			var host = saveHost(), wallet = host.wallet;
+			if (wallet !== saveWallet || (wallet && (typeof wallet.saveEpoch !== "function" || wallet.saveEpoch() !== saveEpoch))) {
+				saveStale = true; saveReason = "存档已更新，请关闭后重新进入"; return false;
+			}
+			saveReason = "存档操作尚未完成，请稍后重新进入";
+			if (root.localStorage.getItem("csh_migrate_recovery") !== null) return false;
+			if (host.scope !== root && host.scope.localStorage.getItem("csh_migrate_recovery") !== null) return false;
+			if (wallet) {
+				if (!wallet.saveGuard || typeof wallet.saveGuard.blocked !== "function" || wallet.saveGuard.blocked() !== false) return false;
+			}
+			if (host.migrate) {
+				if (typeof host.migrate.recoveryState !== "function") return false;
+				var state = host.migrate.recoveryState();
+				if (!state || state.pending !== false || state.busy !== false || state.err) return false;
+			}
+			return true;
+		} catch (eRead) { saveReason = "暂时无法保存，请关闭后重新进入"; return false; }
+	}
+	var saveNoticeAt = 0;
+	function saveNotice() {
+		try {
+			if (Date.now() - saveNoticeAt < 2000) return;
+			saveNoticeAt = Date.now();
+			var doc = root.document, node = doc.getElementById("csh-page-save-notice");
+			if (!node) {
+				node = doc.createElement("div"); node.id = "csh-page-save-notice"; node.setAttribute("role", "status");
+				node.style.cssText = "position:fixed;left:12px;right:12px;bottom:12px;z-index:var(--csh-z-toast,9999);padding:10px;background:#302a23;color:#f0e6cf;border:1px solid #bda570;font-size:var(--csh-lfs-md,13px);text-align:center;pointer-events:none";
+				(doc.body || doc.documentElement).appendChild(node);
+			}
+			node.textContent = saveReason;
+			setTimeout(function () { if (node.parentNode) node.parentNode.removeChild(node); }, 5000);
+		} catch (eNotice) {}
+	}
+	function requireSave() { if (saveAllowed()) return true; saveNotice(); return false; }
 	function rnd(n) { return Math.floor(Math.random() * n); }
 	function rndMs(a, b) { return a + Math.random() * (b - a); }
 
@@ -125,10 +184,23 @@
 			try { w(d.ok, d.data); } catch (e) {}
 		}, false);
 
+		function writesSave(name, payload) {
+			if (name === "shell-open" && payload && payload.key === "save") return false;
+			return ["shell-settle", "shell-settle-session", "shell-task-add", "shell-merit",
+				"shell-sign", "shell-relief", "shell-ach-claim", "shell-pool-ach-claim", "shell-trade",
+				"shell-goldfish", "shell-market-new", "shell-aff-do", "shell-cheer", "shell-bounty",
+				"shell-seat", "shell-world-round", "shell-world-result", "shell-open"].indexOf(name) >= 0;
+		}
 		function call(name, payload, cb, timeoutMs) {
 			if (!hasParent) { if (cb) cb(false, null); return; }
+			var mutates = writesSave(name, payload);
+			if (mutates && !requireSave()) { if (cb) cb(false, { recovery: true, reason: saveReason }); return; }
 			var req = name + "#" + (seq[name] = (seq[name] || 0) + 1);
-			waiters[req] = cb || function () {};
+			// 恢复期间或采用新档之后到达的旧成功应答，不能确认旧局结算。
+			waiters[req] = function (ok, data) {
+				if (mutates && !requireSave()) { ok = false; data = { recovery: true, reason: saveReason }; }
+				if (cb) cb(ok, data);
+			};
 			var msg = { __csh: name, req: req };
 			if (payload) for (var k in payload) if (payload.hasOwnProperty(k)) msg[k] = payload[k];
 			try { root.parent.postMessage(msg, "*"); }
@@ -364,5 +436,6 @@ root.CSHPage = {
 		fmt: fmt, lsGet: lsGet, lsSet: lsSet, rnd: rnd, rndMs: rndMs, transport: transport,
 		statusOf: statusOf, say: say, sayThrottled: sayThrottled, QUIPS: QUIPS, seatAnchor: seatAnchor,
 		toastCap: toastCap,
+		saveAllowed: saveAllowed, requireSave: requireSave,
 	};
 })(typeof window !== "undefined" ? window : this);

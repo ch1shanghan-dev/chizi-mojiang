@@ -82,7 +82,30 @@ for(const c of cases){
     await send('Page.navigate',{url:pathToFileURL(file).href});
     for(let i=0;i<180;i++){
       const r=await send('Runtime.evaluate',{expression:'document.getElementById("audit-results")?.textContent||""',returnByValue:true});
-      if(r.result.value){const shot=await send('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(out,c.name+'.png'),Buffer.from(shot.data,'base64'));return JSON.parse(r.result.value);}
+      if(r.result.value){
+        const rows=JSON.parse(r.result.value);
+        const returns=await send('Runtime.evaluate',{awaitPromise:true,returnByValue:true,expression:`(async()=>{
+          const checks=[],check=(name,passed)=>checks.push({name,passed});
+          const body=document.getElementById('csh-dbg-body');body.scrollTop=140;const before=body.scrollTop;
+          const shell=document.createElement('div');shell.id='csh-shell-overlay';document.documentElement.appendChild(shell);
+          await new Promise(r=>setTimeout(r,0));
+          lib.cshWorld.stats=()=>({chars:149,retired:1,fundSum:200000});shell.remove();
+          await new Promise(r=>setTimeout(r,0));
+          check('return from shell refreshes world card summary',body.querySelector('.gb-career').textContent.includes('在场 148 人')&&body.querySelector('.gb-career').textContent.includes('20.00 万'));
+          check('return refresh preserves directory scroll',Math.abs(body.scrollTop-before)<2);
+          check('all task groups survive refresh',body.querySelectorAll('.csh-world-section').length===2&&body.querySelectorAll('button.csh-dbg-gamebtn:not(.locked)').length===11);
+          const overlay=document.getElementById('csh-dbg-overlay');
+          check('world return observer belongs to overlay',!!overlay.__worldObserver);
+          document.getElementById('csh-dbg-close').click();
+          check('closing world removes its only overlay',!document.getElementById('csh-dbg-overlay'));
+          lib.cshDebug.openLobby();
+          document.getElementById('csh-dbg-body').scrollTop=0;
+          for(const id of ['csh-dbg-panel','csh-dbg-overlay'])document.getElementById(id)?.style.setProperty('animation','none','important');
+          return checks;
+        })()`});
+        rows.push(...returns.result.value);
+        const shot=await send('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(out,c.name+'.png'),Buffer.from(shot.data,'base64'));return rows;
+      }
       await new Promise(resolve=>setTimeout(resolve,50));
     }throw Error('world entry browser test timed out');
   });all.push({case:c,checks:result});

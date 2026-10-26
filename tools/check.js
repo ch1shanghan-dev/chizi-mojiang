@@ -1448,7 +1448,7 @@ async function runBossChecks() {
 		if (!fs.existsSync(affPath)) e24.push("缺 core/csh_affection.js");
 		else {
 			const af = fs.readFileSync(affPath, "utf8");
-			if (!/AFF_LEVELS\s*=/.test(af) || (af.match(/key: "[SABCD]"/g) || []).length < 5) e24.push("五档定义不完整");
+			if (!/AFF_LEVELS\s*=/.test(af) || (fs.readFileSync(path.join(ROOT,"core/csh_bond.js"),"utf8").match(/key:\x27[SABCD]\x27/g) || []).length < 5) e24.push("五档定义不完整");
 			if (!/export function noteHunt/.test(af) || !/export function noteHold/.test(af) || !/export function noteTalk/.test(af) || !/export function gift/.test(af)) e24.push("四来源不齐");
 			/* v6.4：统一互动入口 interact（含 close 贴近）与台词收集册 heard —— 缺一即静默降级 */
 			if (!/export function interact\s*\(/.test(af)) e24.push("缺统一互动入口 interact");
@@ -1943,7 +1943,7 @@ async function runBossChecks() {
 			const t32 = fs.readFileSync(rp32, "utf8");
 			if (!/var NET_BASE = "/.test(t32)) e32.push("rank.html 缺 NET_BASE 常量");
 			if (/id="net-url"|placeholder="https?:/.test(t32)) e32.push("rank.html 把服务器地址做成了输入框（玩家不该看到）");
-			if (!/window\.require/.test(t32)) e32.push("rank.html 未走 Node 原生 http（明文 http 会被安全上下文拦掉）");
+			if (!/CSHNet\.request/.test(t32) || !t32.includes("csh_net.js")) e32.push("rank.html 未接共享 HTTPS 双通道");
 			if (t32.indexOf('NET_BASE.indexOf("https://") !== 0') >= 0)
 				e32.push("rank.html 仍在明文 http 下直接放弃 fetch —— 手机端没有 Node，必须允许尝试（失败静默）");
 		}
@@ -1977,9 +1977,9 @@ async function runBossChecks() {
 	{
 		const e33 = [];
 		const t33 = fs.readFileSync(path.join(ROOT, "games", "rank.html"), "utf8");
-		if (!/require\("os"\)/.test(t33) || !/machineFp/.test(t33))
-			e33.push("缺机器指纹（Electron 可 require('os')，清了浏览器数据也认得出同一台）");
-		if (!/fp: NET\.fp/.test(t33)) e33.push("submit 未带 fp（服务端无法按机器认领）");
+		if (/networkInterfaces|os\.hostname|os\.cpus|os\.totalmem/.test(t33) || !/function machineFp\(\) \{ return ""; \}/.test(t33))
+			e33.push("客户端必须停止收集硬件指纹，旧字段仅留空兼容");
+		if (!/fp: NET\.fp/.test(t33)) e33.push("submit 未保留空 fp 兼容字段");
 		if (!/seg: NET\.seg/.test(t33)) e33.push("submit 未带 seg（官阶，真源是钱包 RANKS，页面不许另抄一份表）");
 		if (!/uid=/.test(t33) || !/NET\.me/.test(t33))
 			e33.push("拉榜未带 uid / 未接 me（不在前 N 名就看不到自己排第几）");
@@ -2207,11 +2207,12 @@ async function runBossChecks() {
 				const m = t.match(/var NET_BASE = "([^"]*)"/);
 				if (!m) e38.push(rel + " 有 NET_BASE 但写法无法静态核对");
 				else if (m[1].indexOf("https://") !== 0) e38.push(rel + " 基址不是 https（手机端会被拦）：" + m[1]);
-				if (t.indexOf("window.require") < 0) e38.push(rel + " 缺 Node 通道（桌面端取不到数据）");
-				if (t.indexOf("fetch(") < 0) e38.push(rel + " 缺 fetch 兜底（手机端唯一通道）");
+				if (!t.includes("csh_net.js") || !t.includes("CSHNet.request")) e38.push(rel + " 未接共享 HTTPS 双通道");
 			}
 		};
 		if (fs.existsSync(gdir)) walk38(gdir);
+		const transport38 = fs.readFileSync(path.join(ROOT,"core","csh_net.js"),"utf8");
+		if(!transport38.includes("req('https')") || !transport38.includes("root.fetch(") || !transport38.includes("credentials:'omit'") || !transport38.includes("redirect:'error'") || !transport38.includes("size>MAX")) e38.push("共享传输缺HTTPS双通道、凭据隔离或响应尺寸上限");
 		if (e38.length) fail("执行级 E38：云功能基址与双通道（" + e38.slice(0, 3).join("；") + "）");
 		else ok("执行级 E38：云功能基址全 https + Node/fetch 双通道齐全（手机端混合内容拦截不再复发）");
 	}
@@ -2580,7 +2581,7 @@ async function runBossChecks() {
 		if (!/BOUNTY_COST\s*=\s*1000/.test(br47)) e47.push("BOUNTY_COST ≠ 1000（作者定 1000 CBY 一次）");
 		if (!/export function bountyGet/.test(br47) || !/export function bountySet/.test(br47) || !/export function bountyClear/.test(br47) || !/export function bountyCheck/.test(br47))
 			e47.push("bountyGet/Set/Clear/Check 四件套不齐");
-		else if (!/bountyRaw\(\) === minionId\) bountyClear\(\)/.test(br47)) e47.push("recordMinion 未在达成后清空悬赏标记（会粘住下一次）");
+		else if (!/if\(bountyRaw\(\)===minionId\)saved.bounty=\x27\x27/.test(br47)) e47.push("recordMinion 未在达成后清空悬赏标记（会粘住下一次）");
 		/* ★ 2026-10-17 实机踩坑（「悬赏失败 · 明明有 CBY」）：installBossRecord 是**手写白名单**，
 		   新函数漏挂 → 宿主桥取不到 → 报 nomodule → 点了没用。必须白名单显式挂 + 缺失补挂。 */
 		else if (!/bountySet: bountySet/.test(br47) || !/bountyGet: bountyGet/.test(br47) || !/BOUNTY_COST: BOUNTY_COST/.test(br47))
@@ -2670,7 +2671,7 @@ async function runBossChecks() {
 		const rk48 = fs.readFileSync(path.join(ROOT, "games", "rank.html"), "utf8");
 		if (!/RANK_CACHE_KEY\s*=\s*"csh_rank_cache_v1"/.test(rk48)) e48.push("天下榜缺榜单缓存键");
 		else if (!/function cacheWrite\s*\(/.test(rk48) || !/cacheWrite\(\)/.test(rk48)) e48.push("天下榜未写缓存");
-		else if (!/timeout: 4500/.test(rk48)) e48.push("天下榜请求超时未收到 4.5s");
+		else if (!/CSHNet\.request\(path,method,body,cb,4500\)/.test(rk48)) e48.push("天下榜未向共享传输传入4.5s超时");
 		/* 上报口径（2026-10-18）：服务端取 max，客户端必须上报「历史最高」而不是当前余额，
 		   否则「打出新高 → 断网 → 花掉一部分 → 再传」会把那一笔永久抹掉。 */
 		else if (!/rankHighMerge\s*\(/.test(rk48) || !/cby:\s*upCby/.test(rk48)) e48.push("天下榜上报未取历史最高（花掉池子币会带走已打出的成绩）");
@@ -2831,7 +2832,7 @@ async function runBossChecks() {
 			if (!fs.existsSync(svPath)) e50.push("缺 games/save.html");
 			else {
 				const sv = fs.readFileSync(svPath, "utf8");
-				if (!/function ask\(msg, onOk\)/.test(sv)) e50.push("save.html 缺 ask() 统一确认入口");
+				if (!/function ask\(msg, onOk(?:, onCancel)?\)/.test(sv)) e50.push("save.html 缺 ask() 统一确认入口");
 				const rawConf = (sv.match(/window\.confirm\(/g) || []).length;
 				if (rawConf > 1) e50.push("save.html 仍有 " + rawConf + " 处裸 window.confirm（破坏性操作必须走 ask）");
 				if (!fs.existsSync(path.join(ROOT, "tools", "probe_save_guards.mjs"))) e50.push("缺 tools/probe_save_guards.mjs（确认回调行为没有验证）");
@@ -2902,10 +2903,10 @@ async function runBossChecks() {
 		 * E52（2026-10-20 · 池子成就：操作型成就引擎）
 		 * ------------------------------------------------------------------
 		 * 这套东西最容易烂的三个地方：
-		 *   ① 规则表悄悄膨胀成"数值阶梯"（生涯成就 434 条的教训）——锁条数与 id 唯一；
+		 *   ① 既有内容丢失/主键重复——保留至少 80 条与 id 唯一；
 		 *   ② 悄悄接了新事件（万能 Hook 的开端）——锁事件白名单恰好 8 个；
 		 *   ③ 联机/旁观把成就刷爆——锁 connectMode 守卫与 silent。
-		 * 判定逻辑本身由 tools/probe_pool_achv.mjs 跑（29 条断言），门禁只锁结构。 */
+		 * 行为由 probe_pool_achv/rebuild/browser 覆盖；门禁锁采集、宿主领奖和滚动结构。 */
 		const e52 = [];
 		let ids52 = [];
 		const paPath = path.join(ROOT, "core", "csh_pool_achv.js");
@@ -2913,7 +2914,7 @@ async function runBossChecks() {
 		else {
 			const pa52 = fs.readFileSync(paPath, "utf8");
 			ids52 = Array.from(pa52.matchAll(/\{\s*id:\s*"([a-z0-9_]+)"/g)).map((m) => m[1]);
-			if (ids52.length < 40) e52.push("规则不足 40 条（当前 " + ids52.length + "）");
+			if (ids52.length < 80) e52.push("规则不足 80 条（当前 " + ids52.length + "）");
 			const dup52 = ids52.filter((x, i) => ids52.indexOf(x) !== i);
 			if (dup52.length) e52.push("规则 id 重复：" + Array.from(new Set(dup52)).join("、"));
 			const ev52 = pa52.match(/var _EVENTS = \{([^}]*)\}/);
@@ -2930,9 +2931,17 @@ async function runBossChecks() {
 			if (!/池子成就\//.test(pa52) || !/ledger/.test(pa52)) e52.push("缺钱包流水反推兜底（台账被清时最后一道防线）");
 			if (!/K_POOL_ACHV_PAY/.test(mg52)) e52.push("台账键 csh_pool_achv_pay 未登记 csh_migrate（导出/导入会丢台账）");
 			const ah52 = fs.existsSync(path.join(ROOT, "games", "achv.html")) ? fs.readFileSync(path.join(ROOT, "games", "achv.html"), "utf8") : "";
-			if (ah52 && !/PA\.isPaid/.test(ah52)) e52.push("成就页领取前没过 isPaid 闸门（清档刷奖漏洞还在）");
-			if (ah52 && !/PA\.recordPaid/.test(ah52)) e52.push("成就页发奖后没写台账 recordPaid");
+			/* 奖励只在宿主复核并提交；页面只发规则 ID，不再自行写钱包。 */
+			const sh52 = fs.readFileSync(path.join(ROOT, "core", "csh_shell.js"), "utf8");
+			const claim52 = sh52.match(/if \(cmd === "shell-pool-ach-claim"\) \{([\s\S]*?)ackToGame\("shell-pool-ach-claim",[^;]+; return;\s*\}/)?.[1] || "";
+			if (!/PA\.load\(\)\.got\[def\.id\]/.test(claim52) || !/PA\.RULES\.find/.test(claim52)) e52.push("宿主未复核真实规则与解锁记录");
+			if (!/PA\.isPaid/.test(claim52) || !/PA\.recordPaid/.test(claim52) || !/PA\.reward\(def\)/.test(claim52) || !/wallet\.claimPool\(def\.id,rw\.pc,rw\.merit,def\.name\)/.test(claim52)) e52.push("宿主领奖缺去重/规则奖励/持久提交/对账");
+			const wa52 = fs.readFileSync(path.join(ROOT, "core", "csh_wallet.js"), "utf8");
+			if (!/function claimPool\(/.test(wa52) || !/poolClaims/.test(wa52) || !/next\.poolClaims\[id\]/.test(wa52)) e52.push("钱包/官阶缺池子奖励独立持久收据");
+			if (ah52 && (!/T\.call\("shell-pool-ach-claim",\{key:r\.id\}/.test(ah52) || !/PA\.reconcile\(\)/.test(ah52))) e52.push("成就页缺宿主领奖请求或刷新对账");
+			if (ah52 && /(?:wallet|CSH\.wallet)\.(?:add|claimPool)\(/.test(ah52)) e52.push("成就页不应自行提交经济奖励");
 			if (!fs.existsSync(path.join(ROOT, "tools", "probe_pool_achv.mjs"))) e52.push("缺 tools/probe_pool_achv.mjs（判定层没有探针就等于没有验证）");
+			for (const probe52 of ["probe_pool_achv_rebuild.mjs", "probe_pool_achv_browser.mjs"]) if (!fs.existsSync(path.join(ROOT, "tools", probe52))) e52.push("缺 tools/" + probe52);
 			const dbgA = fs.readFileSync(path.join(ROOT, "core", "csh_debug.js"), "utf8");
 			/* 2026-10-20 真实事故：成就卡建好了却忘了 appendChild ⇒ 池子世界里那张卡直接不存在，
 			   而 E32（registry/CARDS）和 E52 全都绿 —— 因为没人检查"卡有没有挂上去"。
@@ -2945,8 +2954,8 @@ async function runBossChecks() {
 				/* 2026-10-20 真实事故：整页划不动。游戏 iframe 里 body 自然滚动会被裁掉，
 				   必须 body 定高 + overflow:hidden，列表自己做唯一滚动容器。 */
 				const ah = fs.readFileSync(achvPath, "utf8");
-				if (!/height:\s*100dvh/.test(ah) || !/overflow:\s*hidden/.test(ah)) e52.push("成就页 body 未定高/未裁切（在 iframe 里会划不动）");
-				if (!/\.list\s*\{[^}]*overflow-y:\s*auto/.test(ah)) e52.push("成就页列表不是滚动容器（.list 缺 overflow-y:auto）");
+				if (!/(?:html\s*,\s*body\s*\{[^}]*height:\s*100%|body\s*\{[^}]*height:\s*100dvh)/.test(ah) || !/body\s*\{[^}]*overflow:\s*hidden/.test(ah)) e52.push("成就页 body 未定高/未裁切（在 iframe 里会划不动）");
+				if (!/(?:#list|\.list)\s*\{[^}]*(?:overflow-y|overflow):\s*auto/.test(ah)) e52.push("成就页列表不是滚动容器（列表缺 overflow:auto）");
 				if (!/min-height:\s*0/.test(ah)) e52.push("成就页滚动容器缺 min-height:0（flex 子项不会收缩，滚不动）");
 			}
 		}

@@ -31874,7 +31874,7 @@ const cshSkillPack = {
         },
         translate: {
             "csh_juwei": "拒围",
-            "csh_juwei_info": "当你成为牌的唯一目标后，你可以选择一项：①令此牌不能被响应，并令X增加1；②摸X张牌。" + get.poptip("rule_beishui") + "：依次执行①②，然后令此牌对你额外结算一次。（X初始为1，整局累计；无法执行背水后果时不能选择背水）",
+            "csh_juwei_info": "当你成为牌的唯一目标时，你可以选择一项：①令此牌不可响应，X+1；②摸X张牌；" + get.poptip("rule_beishui") + "：令此牌额外结算一次。（X初始为1）",
             "csh_chonglei": "重垒",
             "csh_chonglei_info": "锁定技，当你的体力值发生变化时，你获得1点护甲。",
 

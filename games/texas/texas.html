@@ -21,6 +21,7 @@
      主页面（ESM，无 currentScript）不自动跑，由 csh_debug.js 在面板渲染完后显式调。 -->
 <script src="../../core/csh_selftest.js" data-csh-selftest="auto"></script>
 <script src="../../core/csh_page.js"></script>
+<script src="../../core/csh_registry.js"></script>
 <!-- 结算账本（《德州结算逻辑与 UI 重构方案 v1.0》§3）：全扩展唯一的"钱怎么算"实现。
      牌力评估 + 底池分层 + 资格判定 + 平分余数 + 玩家账本 + 守恒校验都在里面，
      本页只读它的输出（G.ledger），不再自己算一分钱。 -->
@@ -701,6 +702,7 @@
 
     <div class="medals" id="medals"></div>
     <div class="tip" id="start-tip"></div>
+    <div class="tip" id="fee-tip" style="grid-column:1/-1"></div>
   </div>
 </div>
 
@@ -842,13 +844,13 @@ function rndMs(a, b) { return a + Math.random() * (b - a); }
 
 /* ==STORE-START== 存档：统一 csh_texas_ 前缀，避免与其他模块冲突 */
 function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
-function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+function lsSet(k, v) { return CSHPage.lsSet(k, v); }
 function lsJSON(k, d) {
   var s = lsGet(k);
   if (!s) return d;
   try { var o = JSON.parse(s); return (o && typeof o === 'object') ? o : d; } catch (e) { return d; }
 }
-function lsPut(k, o) { try { lsSet(k, JSON.stringify(o)); } catch (e) {} }
+function lsPut(k, o) { try { return lsSet(k, JSON.stringify(o)); } catch (e) { return false; } }
 /* ==STORE-END== */
 
 function logErr(m, e) { try { console.log('[池子魔将·德州] ' + m, e); } catch (e2) {} }
@@ -1250,10 +1252,16 @@ if (typeof career.set.winrateOn !== 'boolean') career.set.winrateOn = true;
 function saveBank() {
   /* §4.1.1 统一钱包：在 shell 内本金唯一来源是 csh_wallet（宿主），
      本地 csh_texas_bank 只在独立调试时兜底，避免双数据源。 */
-  if (!Bridge.active) lsPut(K_BANK, career.bank);
+  return Bridge.active ? true : lsPut(K_BANK, career.bank);
 }
-function saveBest() { lsPut(K_BEST, career.best); }
-function saveSet() { lsPut(K_SET, career.set); }
+function saveBest() { return lsPut(K_BEST, career.best); }
+function saveSet() { return lsPut(K_SET, career.set); }
+function chooseSet(key, value) {
+  if (!CSHPage.requireSave()) return false;
+  var next = Object.assign({}, career.set); next[key] = value;
+  if (!lsPut(K_SET, next)) return false;
+  career.set = next; return true;
+}
 
 /* 从宿主统一钱包同步本金到本地镜像（入场后调用）
    ★ 2026-09-29：同步成功即置 bankSynced，canStart 从此以真值为准；失败也不再死锁。 */
@@ -1301,7 +1309,8 @@ var Daily = {
       /* 统一钱包已负责签到补足，这里返回本地镜像状态供 UI 判断 */
       return { changed: false, streak: career.bank.streak, quota: quotaOf(career.bank.streak) };
     }
-    var last = career.bank.lastDay;
+    if (!CSHPage.requireSave()) return { changed: false, streak: career.bank.streak, quota: quotaOf(career.bank.streak) };
+    var previous = Object.assign({}, career.bank), last = career.bank.lastDay;
     if (today === last) {
       return { changed: false, streak: career.bank.streak, quota: quotaOf(career.bank.streak) };
     }
@@ -1313,7 +1322,7 @@ var Daily = {
     var q = quotaOf(career.bank.streak);
     var topped = false;
     if (career.bank.bank < q) { career.bank.bank = q; topped = true; }
-    saveBank();
+    if (!saveBank()) { career.bank = previous; return { changed: false, streak: career.bank.streak, quota: quotaOf(career.bank.streak) }; }
     return { changed: true, streak: career.bank.streak, quota: q, topped: topped };
   },
   quota: function () { return quotaOf(career.bank.streak); },
@@ -1333,14 +1342,16 @@ var Sign = {
   },
   /* 7 格循环：第 3 格 +1,000、第 7 格 +3,000（一次性，可超出当日额度但受上限截断） */
   claim: function (today) {
+    if (!CSHPage.requireSave()) return null;
     if (!Sign.canClaim(today)) return null;
+    var previous = Object.assign({}, career.bank);
     career.bank.lastSignDay = today;
     var streak = Math.max(1, career.bank.streak);
     var pos = ((streak - 1) % 7) + 1;
     var grant = pos === 7 ? 3000 : (pos === 3 ? 1000 : 0);
     var before = career.bank.bank;
     if (grant > 0) career.bank.bank = Math.min(CAP, career.bank.bank + grant);
-    saveBank();
+    if (!saveBank()) { career.bank = previous; return null; }
     return { streak: streak, pos: pos, grant: grant, capped: grant > 0 && before + grant > CAP };
   },
 };
@@ -1547,6 +1558,8 @@ function makeSession() {
   var isGamble = buyIn >= Bridge.gambleAt();   /* 门槛唯一真值在宿主钱包 */
   return {
     n: n, aiCount: n - 1, buyIn: buyIn,
+    sessionId: "texas-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2),
+    rake: (Bridge.snapshot() && Bridge.snapshot().texasRake) || CSH.registry.texasRake(),
     pacing: PACING[career.set.pacing] || PACING.long,
     players: players,
     seats: seats,             /* ★ 供结算时回写 AI 世界 */
@@ -1877,6 +1890,8 @@ function showdown() {
    任何一处改动都要同步两遍，而漂移一旦发生就是最难查的错账。
    ============================================================ */
 function awardPots() {
+  var roundId = G.sessionId + ":" + G.handNo;
+  if (G.ledger && G.ledger.roundId === roundId) return G.lastResults;
   settleHand();
   return G.lastResults;
 }
@@ -1887,12 +1902,15 @@ function awardPots() {
    undefined/上一手旧值，显示为 0（用户实测：筹码明明增加、结算提示"无变化"）。
    现在两条路都在这里出账本，界面只读 G.ledger 的口径保持不变。 */
 function settleHand() {
+  var roundId = G.sessionId + ":" + G.handNo;
+  if (G.ledger && G.ledger.roundId === roundId) return G.ledger;
   var i, P = window.CSHPots;
   /* 本手开始时的筹码 = 现筹码 + 本手已投入（payChips 只在这两者之间搬运） */
   var stacks = {};
   for (i = 0; i < G.n; i++) stacks[G.players[i].id] = G.players[i].chips + G.players[i].contrib;
 
   var res = P.settle({
+    roundId: roundId, timestamp: Date.now(), rake: G.rake,
     players: G.players.map(function (p) {
       return {
         id: p.id, name: p.isHuman ? '你' : p.name, isHuman: !!p.isHuman,
@@ -2190,9 +2208,9 @@ function announceAction(idx, text) {
 }
 
 /* ============================================================
-   本场结束 / 收工（§4.1.1 结算：带入 + 净赢×0.90，且受 §H 封顶）
+   本场结束 / 收工（手内已计场供，整场不叠折扣，沿用收益封顶）
    ============================================================ */
-var DECAY_TEXAS = 0.90;    /* 盈利回收率（§4.1.1） */
+var DECAY_TEXAS = 1;    /* 盈利回收率（§4.1.1） */
 var CAP_MULT = 25;         /* §H：单局净收益上限 = 带入 × 25%… 实际按 capOf 由钱包给出 */
 function endSession(reason) {
   if (!G || G.sessionOver) return;
@@ -2748,7 +2766,7 @@ function showHandBanner() {
     for (i = 0; i < led.pots.length; i++) {
       var pt = led.pots[i];
       var CIRC = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨'];
-      var label = pt.id === 'main' ? '主池'
+      var label = pt.refund ? '未跟注返还' : pt.id === 'main' ? '主池'
         : (pt.id.indexOf('side') === 0 ? ('边池' + (CIRC[Number(pt.id.slice(4)) - 1] || pt.id.slice(4))) : '退回层');
       var wnames = pt.winners.map(function (id) { return id === 0 ? '你' : G.players[id].name; }).join('、');
       var enames = pt.eligible.map(function (id) { return id === 0 ? '你' : G.players[id].name; }).join(' / ');
@@ -2778,8 +2796,10 @@ function showHandBanner() {
   if (meLed) {
     boxLed.innerHTML =
       '<div class="rs-row"><div class="rs-name">本手投入</div><div class="rs-hand">牌局中投入的全部筹码</div><div class="rs-gain">-' + fmt(meLed.committed) + '</div></div>' +
-      '<div class="rs-row"><div class="rs-name">底池获得</div><div class="rs-hand">从各底池分到手的合计</div><div class="rs-gain">+' + fmt(meLed.won) + '</div></div>' +
-      '<div class="rs-row' + (meLed.net > 0 ? ' win' : '') + '"><div class="rs-name">本手净变化</div><div class="rs-hand">获得 − 投入</div><div class="rs-gain' + (meLed.net === 0 ? ' zero' : '') + '">' + (meLed.net > 0 ? '+' : '') + fmt(meLed.net) + '</div></div>' +
+      '<div class="rs-row"><div class="rs-name">底池获奖</div><div class="rs-hand">场供扣除前</div><div class="rs-gain">+' + fmt(meLed.payout) + '</div></div>' +
+      '<div class="rs-row"><div class="rs-name">未跟注返还</div><div class="rs-hand">原路退回，不计获奖</div><div class="rs-gain">+' + fmt(meLed.uncalledRefund) + '</div></div>' +
+      '<div class="rs-row"><div class="rs-name">本手场供</div><div class="rs-hand">整场不再额外折扣 · 系统共收 ' + fmt(led.systemCollected) + '</div><div class="rs-gain">-' + fmt(meLed.rakePaid) + '</div></div>' +
+      '<div class="rs-row' + (meLed.net > 0 ? ' win' : '') + '"><div class="rs-name">本手净变化</div><div class="rs-hand">获奖 + 返还 − 投入 − 场供</div><div class="rs-gain' + (meLed.net === 0 ? ' zero' : '') + '">' + (meLed.net > 0 ? '+' : '') + fmt(meLed.net) + '</div></div>' +
       (meLed.endStack != null ? '<div class="rs-row"><div class="rs-name">结算后筹码</div><div class="rs-hand">本手开始 ' + fmt(meLed.startStack) + '</div><div class="rs-gain">' + fmt(meLed.endStack) + '</div></div>' : '');
   }
   if (won) sfx.win(); else sfx.lose();
@@ -3044,7 +3064,7 @@ function renderStart() {
       } else if (!affordable) {
         b.disabled = true;
       } else {
-        b.addEventListener('click', function () { career.set.buyIn = v; saveSet(); sfx.ui(); renderStart(); }, false);
+        b.addEventListener('click', function () { if (!chooseSet('buyIn', v)) return; sfx.ui(); renderStart(); }, false);
       }
       buySeg.appendChild(b);
     })(tiers[i]);
@@ -3065,7 +3085,7 @@ function renderStart() {
       b.type = 'button';
       b.className = 'seg-btn' + (career.set.pacing === k ? ' on' : '');
       b.innerHTML = P.label + '<small>' + P.hint + '</small>';
-      b.addEventListener('click', function () { career.set.pacing = k; saveSet(); sfx.ui(); renderStart(); }, false);
+      b.addEventListener('click', function () { if (!chooseSet('pacing', k)) return; sfx.ui(); renderStart(); }, false);
       pacSeg.appendChild(b);
     })(pk[i]);
   }
@@ -3081,7 +3101,7 @@ function renderStart() {
       b.type = 'button';
       b.className = 'seg-btn' + (career.set.aiCount === v ? ' on' : '');
       b.innerHTML = v + '<small>人</small>';
-      b.addEventListener('click', function () { career.set.aiCount = v; saveSet(); sfx.ui(); renderStart(); }, false);
+      b.addEventListener('click', function () { if (!chooseSet('aiCount', v)) return; sfx.ui(); renderStart(); }, false);
       aiSeg.appendChild(b);
     })(i);
   }
@@ -3095,7 +3115,7 @@ function renderStart() {
       b.type = 'button';
       b.className = 'seg-btn' + (career.set.winrateOn === o.v ? ' on' : '');
       b.innerHTML = o.t + '<small>' + o.s + '</small>';
-      b.addEventListener('click', function () { career.set.winrateOn = o.v; saveSet(); sfx.ui(); renderStart(); }, false);
+      b.addEventListener('click', function () { if (!chooseSet('winrateOn', o.v)) return; sfx.ui(); renderStart(); }, false);
       eqSeg.appendChild(b);
     })(eqOpts[i]);
   }
@@ -3119,6 +3139,8 @@ function renderStart() {
   btn.textContent = ok
     ? (gambleNow ? '入座豪赌桌' : '开始生涯')
     : (entryDone ? '本场带入已结算 · 请回大厅重新入场' : '余额不足 · 需 ' + fmt(MIN_BUYIN) + ' CBY');
+  var fee=(Bridge.snapshot()&&Bridge.snapshot().texasRake)||CSH.registry.texasRake();
+  $('#fee-tip').textContent=fee.rateBps?'场供 '+(fee.rateBps/100)+'% · 每手最高 '+fee.cap+' CBY · 见翻牌后收取，未跟注返还免收；收工无额外折扣':'场供已关闭 · 收工无额外折扣';
   var tip = $('#start-tip');
   /* 【2026-10-03】这一段是**状态提示**，不是规则说明 —— 只在"需要玩家改变行为"时给一句，
      其余情况（一切正常）留空。此前无论什么状态都铺两行解释，等于把说明书写在按钮下面。 */
@@ -3239,6 +3261,7 @@ function showStart() {
 }
 
 function startGame() {
+  if (!CSHPage.requireSave()) return;
   if (!canStart()) {
     toast(entryUsed || (Bridge.active && (Bridge.buyIn() | 0) <= 0)
       ? '本次入场的带入已结算 · 请关闭回大厅重新入场'

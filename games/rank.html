@@ -27,6 +27,7 @@
        ⇒ 渲染进程与 iframe 都能 require("http")，裸 socket 不受浏览器策略限制。
      ★ 失败一律**中性文案**：不弹错、不指责、不阻塞页面 —— 作者："不能让来玩的人感觉不适"。 -->
 <script src="../core/csh_selftest.js" data-csh-selftest="auto"></script>
+<script src="../core/csh_net.js"></script>
 <script src="../core/csh_page.js"></script>
 <style>
 :root{
@@ -518,6 +519,7 @@ function rankHighRead() {
   return { cby: 0, merit: 0, seg: "", t: 0 };
 }
 function rankHighMerge(v) {
+  if (!CSHPage.requireSave()) return null;
   var h = rankHighRead();
   var changed = false;
   if (v.cby > h.cby) { h.cby = v.cby; changed = true; }
@@ -525,7 +527,7 @@ function rankHighMerge(v) {
   if (v.seg && v.seg !== h.seg) { h.seg = String(v.seg).slice(0, 12); changed = true; }
   if (changed) {
     h.t = Date.now();
-    try { ls(HIGH_KEY, JSON.stringify(h)); } catch (e) {}
+    if (!ls(HIGH_KEY, JSON.stringify(h))) return null;
   }
   return h;
 }
@@ -538,7 +540,7 @@ function pendRead() {
 function pendSet(cby, merit) {
   try { ls(PEND_KEY, JSON.stringify({ t: Date.now(), cby: cby, merit: merit })); } catch (e) {}
 }
-function pendClear() { try { ls(PEND_KEY, ""); } catch (e) {} }
+function pendClear() { return ls(PEND_KEY, ""); }
 
 /* 本扩展版本（2026-10-18）：随上报一起带上，服务端只记录、不设门槛 ——
    老版本照样能上榜，但榜单可以据此标注「这条是 v4.0.5 的旧口径」。
@@ -599,44 +601,19 @@ var Bridge = (typeof CSHPage !== "undefined" && CSHPage && CSHPage.transport)
   : null;
 
 function ls(k, v) {
-  try { if (v === undefined) return localStorage.getItem(k) || ""; localStorage.setItem(k, v); } catch (e) {}
-  return "";
+  if (v !== undefined) return CSHPage.lsSet(k, v);
+  return CSHPage.lsGet(k) || "";
 }
 function el(id) { return document.getElementById(id); }
 
-/* ---------- ★ 机器指纹（v2）：清了浏览器数据也认得出是同一台 ----------
-   只对 Electron 生效：渲染进程/子框架都能 require("os") / require("crypto")。
-   取 MAC 列表 + 主机名 + CPU 型号 + 平台 + 内存档位 → SHA-256 摘要。
-   ★ 只上传摘要（原始 MAC / 主机名一个字节都不离开本机）；拿不到 Node 就留空，
-     服务端自动退化成"按网络认人"，功能不残。 */
-function machineFp() {
-  try {
-    var req = (typeof window !== "undefined" && window.require) ? window.require : null;
-    if (!req) return "";
-    var os = req("os"), crypto = req("crypto");
-    var macs = [], nis = os.networkInterfaces ? os.networkInterfaces() : {};
-    for (var k in nis) {
-      var arr = nis[k] || [];
-      for (var i = 0; i < arr.length; i++) {
-        var m = arr[i].mac;
-        if (m && m !== "00:00:00:00:00:00" && !arr[i].internal) macs.push(m);
-      }
-    }
-    macs.sort();
-    var cpu = (os.cpus && os.cpus()[0] && os.cpus()[0].model) ? os.cpus()[0].model : "";
-    var gb = (os.totalmem && os.totalmem() > 0) ? Math.round(os.totalmem() / 1073741824) : 0;
-    var raw = [os.platform ? os.platform() : "", os.arch ? os.arch() : "", String(gb),
-      cpu, os.hostname ? os.hostname() : "", macs.join(",")].join("|");
-    if (!raw.replace(/[|,]/g, "").replace(/0/g, "")) return "";
-    return "m-" + crypto.createHash("sha256").update(raw).digest("hex").slice(0, 24);
-  } catch (e) { return ""; }
-}
+/* Optional legacy API field remains empty; no hardware identifiers are collected. */
+function machineFp() { return ""; }
 
 function netInit() {
   NET.uid = ls("csh_net_uid");
   if (!NET.uid) {
-    NET.uid = "csh-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 12);
-    ls("csh_net_uid", NET.uid);
+    var uid = "csh-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 12);
+    if (ls("csh_net_uid", uid)) NET.uid = uid;
   }
   NET.fp = machineFp();
   NET.ver = pageVer();
@@ -682,50 +659,7 @@ applyStaticCopy();
 /* 一次请求：path / method / body(对象) → cb(ok, jsonObj)
    ★ 2026-10-18：只保留 https 单基址 —— E38 实锤：安卓 origin 是 https://localhost，
      明文 http 直连会被混合内容拦掉。真正的"第二通道"必须也是 https（见 docs/ui-kernel.md）。 */
-function netReq(path, method, body, cb) {
-  var base = NET_BASE;
-  var done = false;
-  function fin(ok, o) { if (done) return; done = true; cb(ok, o); }
-  var payload = body ? JSON.stringify(body) : "";
-  var req = null;
-  try { req = (typeof window !== "undefined" && window.require) ? window.require : null; } catch (e0) {}
-  if (req) {
-    try {
-      var http = req(/^https:/.test(base) ? "https" : "http"), url = req("url");
-      var u = url.parse(base + path);
-      var r = http.request({
-        hostname: u.hostname, port: u.port || (/^https:/.test(base) ? 443 : 80), path: u.path, method: method, timeout: 4500,
-        headers: payload ? { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(payload) } : {},
-      }, function (res) {
-        var buf = "";
-        res.setEncoding("utf8");
-        res.on("data", function (d) { buf += d; });
-        res.on("end", function () { try { fin(res.statusCode >= 200 && res.statusCode < 300, JSON.parse(buf)); } catch (e) { fin(false, null); } });
-      });
-      r.on("error", function () { fin(false, null); });
-      r.on("timeout", function () { try { r.destroy(); } catch (e) {} fin(false, null); });
-      if (payload) r.write(payload);
-      r.end();
-      return;
-    } catch (eN) {}
-  }
-  /* 兜底 fetch：手机端（Android 客户端）没有 Node，fetch 是**唯一通道**。
-     ★ 2026-10-15 改：不再"明文 http 直接放弃"—— Electron 的 file:// 下被安全上下文拦掉
-       也只是静默失败（与不试一个效果），但 Android 的 WebView 允许明文 http，
-       提前 return 等于永远掐断手机端联机（作者实机：手机端一直"未连接"）。
-       现在统一"试一下，失败按未连接处理"（E31 纪律：失败静默、提示中性）。 */
-  try {
-    var to = setTimeout(function () { fin(false, null); }, 4500);
-    fetch(base + path, {
-      method: method, cache: "no-store",
-      headers: payload ? { "Content-Type": "application/json" } : undefined, body: payload || undefined,
-    }).then(function (res) {
-      return res.text().then(function (t) { clearTimeout(to); try { fin(res.ok, JSON.parse(t)); } catch (e) { fin(false, null); } });
-    }).catch(function () { clearTimeout(to); fin(false, null); });
-  } catch (e2) { fin(false, null); }
-}
-
-
+function netReq(path, method, body, cb) { CSHNet.request(path,method,body,cb,4500); }
 
 /* 本机成绩：优先问宿主（shell-stats 快照），拿不到就用本地兜底。
    ★ 兜底此前读的是 `csh_wallet_pc` —— 这个键**全扩展无人写入**（真键是 `csh_wallet`，
@@ -764,11 +698,14 @@ function netSnapshot(cb) {
 }
 
 function netPush(manual) {
+  if (!CSHPage.requireSave() || !NET.uid) return;
   netSnapshot(function (v) {
+    if (!CSHPage.requireSave()) return;
     /* ★ 口径：上报「历史最高」而不是「当前余额」。
        余额会花掉、会变低，一旦出现「打出新高 → 没传上去 → 花掉一部分 → 再传」，
        最高值就永久丢了。rankHighMerge 只增不减，本机记得住曾经达到过多少。 */
     var high = rankHighMerge(v);
+    if (!high) return;
     var upCby = Math.max(high.cby, Math.floor(Number(v.cby) || 0));
     var upMerit = Math.max(high.merit, Math.floor(Number(v.merit) || 0));
     if (!manual && upCby <= 0 && upMerit <= 0) { netStat(T.noScore); return; }
@@ -779,6 +716,7 @@ function netPush(manual) {
       /* v4.0.6 起带版本：服务端只记录不设门槛（老服务端忽略未知字段，不会 400） */
       ver: NET.ver
     }, function (ok, r) {
+      if (!CSHPage.requireSave()) return;
       if (!ok) {
         /* 服务端 400 且带原因时，只处理"名字已被占用"这一种；其余照旧给中性文案 */
         if (r && r.error === "name-taken") { netStat(T.nameTaken, true); return; }
@@ -797,9 +735,9 @@ function netPush(manual) {
       }
       /* ★ 服务端可能把这次提交"认领"到已有记录上（同一台机器 / 同一个网络），
          并把最终归属的 uid 回给我们 —— 存下来，之后"我的那条"高亮才对得上。 */
-      if (r && r.uid) { NET.uid = r.uid; ls("csh_net_uid", r.uid); }
+      if (r && r.uid) { if (!ls("csh_net_uid", r.uid)) return; NET.uid = r.uid; }
+      if (!pendClear()) return;
       NET.last = { cby: upCby, merit: upMerit };
-      pendClear();
       var line = fmt(upCby) + " " + T.cbyUnit + " · " + upMerit + " " + T.meritUnit + (NET.seg ? " · " + NET.seg : "");
       /* 留名成功后把这一句题壁也回显出来 —— 让"题壁确实落榜了"当场可见。 */
       if (NET.sig) line += tt("savedSig", { sig: NET.sig });
@@ -818,8 +756,8 @@ function netLoad() {
   var cached = cacheRead();
   var hasCache = !!(cached && cached.kind === NET.kind && cached.rows && cached.rows.length);
   if (hasCache) {
-    NET.rows = cached.rows;
-    NET.me = cached.me || null;
+    NET.rows = CSHNet.board({list:cached.rows}).list;
+    NET.me = cached.me?CSHNet.board({me:cached.me}).me:null;
     NET.total = cached.n || 0;
     netStat(tt("cacheStat", { cached: cacheAgo(cached.ts) }));
     netRender();
@@ -846,9 +784,10 @@ function netLoad() {
       netRender();
       return;
     }
-    NET.rows = r.list || [];
-    NET.me = r.me || null;
-    NET.total = r.n || 0;
+    var safe=CSHNet.board(r);
+    NET.rows = safe.list;
+    NET.me = safe.me;
+    NET.total = safe.n;
     cacheWrite();
     netStat(NET.rows.length
       ? tt("boardStat", { n: r.n, m: NET.rows.length })
@@ -915,7 +854,7 @@ function renderMeBar() {
   var m = NET.me;
   if (!m) { box.innerHTML = ""; return; }
   var val = (NET.kind === "merit") ? (fmt(m.merit) + " " + T.meritUnit) : (fmt(m.cby) + " " + T.cbyUnit);
-  box.innerHTML = '<div>' + tt("meRank", { n: m.rank }) + '</div>'
+  box.innerHTML = '<div>' + tt("meRank", { n: esc(m.rank) }) + '</div>'
     + '<div>' + esc(m.name) + (m.seg ? ' · <span class="seg">' + esc(m.seg) + '</span>' : '') + '</div>'
     + (m.sig ? '<div>壁上：' + esc(m.sig) + '</div>' : '')
     + '<div><span class="myv">' + val + '</span></div>'
@@ -935,7 +874,7 @@ function netRender() {
     /* P6 行头像：玩家不上传头像 ⇒ 姓氏印章圆标（首字 + 稳定金色深浅） */
     var sl = sealOf(row.name || T.noName);
     h += '<div class="row' + (row.uid === NET.uid ? " me" : "") + '">'
-      + '<span class="rk' + (row.rank <= 3 ? " top" : "") + '">' + row.rank + '</span>'
+      + '<span class="rk' + (row.rank <= 3 ? " top" : "") + '">' + esc(row.rank) + '</span>'
       + '<span class="av seal" style="background:' + sl.bg + '">' + esc(sl.ch) + '</span>'
       + '<span class="nm">' + esc(row.name || T.noName)
       + (row.sig ? '<i class="sgr">壁上：' + esc(row.sig) + '</i>' : '') + '</span>'
@@ -984,7 +923,7 @@ function netGirls() {
     /* 带 uid：服务端据此回「我在这只投了多少」（me_amt）与贡献称号档位（tier） */
     netReq("/girls?uid=" + encodeURIComponent(NET.uid), "GET", null, function (ok, r) {
       CHEER.girls = {};
-      if (ok && r && r.ok) for (var i = 0; i < (r.girls || []).length; i++) CHEER.girls[r.girls[i].girl] = r.girls[i];
+      if (ok && r && r.ok) for (var i = 0, girls = CSHNet.girls(r.girls); i < girls.length; i++) CHEER.girls[girls[i].girl] = girls[i];
       netRenderGirls();
     });
   });
@@ -1191,10 +1130,12 @@ function clampAmt(v) {
   return v;
 }
 function readCheerAmt() {
+  if (!CSHPage.requireSave()) return CH.amt;
   var inp = el("chAmt");
-  CH.amt = clampAmt((inp && inp.value) || CH.amt);
+  var next = clampAmt((inp && inp.value) || CH.amt);
+  if (!ls("csh_rank_cheer_amt", String(next))) return CH.amt;
+  CH.amt = next;
   if (inp) inp.value = String(CH.amt);
-  ls("csh_rank_cheer_amt", String(CH.amt));
   return CH.amt;
 }
 /* 缠头待上报队列（2026-10-16 晚 · 作者："缠头没有生效"的治本件之一）：
@@ -1205,36 +1146,45 @@ var CHEERPEND = [];
 try { CHEERPEND = JSON.parse(ls("csh_rank_pending") || "[]") || []; } catch (eP0) { CHEERPEND = []; }
 if (!Array.isArray(CHEERPEND)) CHEERPEND = [];
 function pendPush(entry) {
-  CHEERPEND.push(entry);
-  if (CHEERPEND.length > 20) CHEERPEND = CHEERPEND.slice(-20);
-  ls("csh_rank_pending", JSON.stringify(CHEERPEND));
+  if (!CSHPage.requireSave()) return false;
+  var next = CHEERPEND.concat([entry]).slice(-20);
+  if (!ls("csh_rank_pending", JSON.stringify(next))) return false;
+  CHEERPEND = next;
+  return true;
 }
 function pendShift() {
-  CHEERPEND.shift();
-  ls("csh_rank_pending", JSON.stringify(CHEERPEND));
+  if (!CSHPage.requireSave()) return false;
+  var next = CHEERPEND.slice(1);
+  if (!ls("csh_rank_pending", JSON.stringify(next))) return false;
+  CHEERPEND = next;
+  return true;
 }
 function flushCheer() {
+  if (!CSHPage.requireSave()) return;
   if (!NET.uid || !CHEERPEND.length) return;
   var one = CHEERPEND[0];
   netReq("/cheer", "POST", { uid: NET.uid, name: NET.name, sig: NET.sig, girl: one.girl, amt: one.amt, cid: one.cid }, function (ok, r) {
     if (ok && r && r.ok) {
-      pendShift();
+      if (!pendShift()) return;
       if (CHEERPEND.length) flushCheer();
     }
     /* 失败/被限：留在队列，下次进页继续补（幂等 cid 保证安全） */
   });
 }
 function doCheer(gid, gname, amt) {
+  if (!CSHPage.requireSave()) return;
   if (!NET.name) { netStat(T.needNameCheer, true); return; }
   if (!(Bridge && Bridge.call)) { netStat(T.offline, true); return; }
   var cid = "c-" + String(NET.uid || "x").slice(-8) + "-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 7);
   Bridge.call("shell-cheer", { girl: gid, gname: gname, amt: amt }, function (ok, s) {
+    if (!CSHPage.requireSave()) return;
     if (!ok) { netStat(s && s.reason === "poor" ? T.cheerPoor : T.cheerFail, true); return; }
     /* 每日首次免缠头（v2.2）：宿主判定并回传 free + 实际计入的缠头量（免费 = +1）。
        页面**不自己扣**，只如实把宿主给的量上报服务端做聚合。 */
     var gotFree = !!(s && s.free);
     var credited = (s && s.amt != null) ? Math.max(1, Math.floor(Number(s.amt) || 1)) : amt;
     netReq("/cheer", "POST", { uid: NET.uid, name: NET.name, sig: NET.sig, girl: gid, amt: credited, cid: cid }, function (ok2, r2) {
+      if (!CSHPage.requireSave()) return;
       if (ok2 && r2 && r2.ok && !r2.ignored) {
         netStat(gotFree ? tt("cheerFree", { g: gname }) : tt("cheerOk", { g: gname, amt: fmt(credited) }));
         flushCheer();   /* 顺带把之前的欠账一起补 */
@@ -1265,20 +1215,23 @@ function doCheer(gid, gname, amt) {
   var sgIn = el("sg");
   var sv = el("save");
   function takeSig() {
-    if (!sgIn) return;
-    NET.sig = String(sgIn.value || "").trim().slice(0, 10);
-    ls("csh_net_sig", NET.sig);
+    if (!sgIn || !CSHPage.requireSave()) return false;
+    var next = String(sgIn.value || "").trim().slice(0, 10);
+    if (!ls("csh_net_sig", next)) return false;
+    NET.sig = next;
+    return true;
   }
   if (sgIn) {
     sgIn.addEventListener("input", takeSig, false);
     sgIn.addEventListener("change", takeSig, false);
   }
   if (sv) sv.addEventListener("click", function () {
+    if (!CSHPage.requireSave()) return;
     var nn = String((inp && inp.value) || "").trim().slice(0, 5);
     if (!nn) { netStat(T.needNameList, true); return; }
+    if (!ls("csh_net_name", nn)) return;
     NET.name = nn;
-    ls("csh_net_name", nn);
-    takeSig();
+    if (!takeSig()) return;
     if (sv) sv.textContent = T.submitEdit;
     netPush(true);
   }, false);
