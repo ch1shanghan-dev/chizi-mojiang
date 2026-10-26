@@ -23,3 +23,9 @@ docs/client-mining.md
 docs/*-mining.md
 docs/private/
 _backup/
+
+# Local raw UI captures and probe dumps; publish concise sanitized reports instead.
+docs/audit/ui/
+docs/audit/POOL_ACHV_VM*.json
+docs/audit/ART_UI_PRODUCTION_PROMPTS.json
+docs/audit/requests/

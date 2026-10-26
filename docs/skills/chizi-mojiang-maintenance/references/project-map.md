@@ -2,7 +2,7 @@
 
 ## 定位
 
-本机基线：`D:\noname\resources\app\extension\池子魔将`，宿主 package 1.11.6。
+本机基线：`<NONAME_ROOT>\extension\池子魔将`，宿主 package 1.11.6。
 在其他电脑先定位实际根目录，以下路径均相对扩展根。
 
 2026-10-20 研究时：本地 adcee8d，GitHub b71ccd484fcee48b17e4cf4ebd4dba3f7021a7fb。

@@ -8,7 +8,7 @@
 
 仅在保存函数拒绝不够：签到先改日期与连签，任务先增加进度并占用奖励，世界先改变资金、战绩及关系；保存晚拒绝仍会改变内存，调用方还可能发成功 ACK。市场另有已经排队的 Promise、IDB 同步和重试定时器，钱包有防抖及卸载保存。启动顺序也不能假设迁移模块已加载。
 
-本批以改动前的五个实际文件作负对照，同一专项为 **9 PASS / 58 FAIL**；正对照见下表。旧文件保存在扩展目录之外：`D:/noname-audit-backups/chizi-mojiang/20261022-recovery-guard/`。负对照含新增接口契约，不能把全部失败都解释为独立用户缺陷。
+本批以改动前的五个实际文件作负对照，同一专项为 **9 PASS / 58 FAIL**；正对照见下表。旧文件保存在扩展目录之外：`<LOCAL_EVIDENCE>/20261022-recovery-guard/`。负对照含新增接口契约，不能把全部失败都解释为独立用户缺陷。
 
 ## 修改与契约
 
@@ -31,7 +31,7 @@
 | 命令 | 结果 | 证明范围 |
 | --- | --- | --- |
 | `node tools/probe_recovery_guard.mjs` | **67/0** | 实际钱包/世界/市场/迁移 API、内存和持久状态不变、启动未加载迁移、凭据读失败、防抖/卸载/市场微任务、真实失败恢复与重启、凭据生成前 busy 窗口、可控 CDK 异步时序、实际消息分发的失败 ACK、行囊可达性 |
-| 同专项 `--source-dir D:/noname-audit-backups/chizi-mojiang/20261022-recovery-guard` | **9/58** | 同组保护条件对本批改前代码的负对照；包括新增接口契约 |
+| 同专项 `--source-dir <LOCAL_EVIDENCE>/20261022-recovery-guard` | **9/58** | 同组保护条件对本批改前代码的负对照；包括新增接口契约 |
 | `node tools/probe_migration_failures.mjs --browser` | **56/0 + 9/0 + 3/0** | 原迁移失败、真实 Chromium LS/IDB 与恢复页面点击，临时 profile |
 | `node tools/probe_market_persistence.mjs` | **52/0** | 原市场持仓/余额检查点与异步配置恢复 |
 | `node tools/probe_career_rewards.mjs` | **29/0** | 原职业奖励原子凭据与迁移/回滚/重置 |

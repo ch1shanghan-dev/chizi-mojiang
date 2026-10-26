@@ -1,5 +1,21 @@
 # 验证：行为、界面与宿主
 
+2026-10-26追加资料核查：本轮重新运行主门禁（通过，2项既有告警）、世界188/0、页面防护77/0、恢复67/0、生命周期67/0、迁移56/0、钱包52/0、BOSS实得18/0。日志在外部20261026-review-addenda目录；没有新功能/全平台/生产安全验收结论。武将AI继续暂停。
+
+2026-10-26：新增`node tools/probe_page_save.mjs --browser`77/0，同组`--source <开工备份>/core/csh_page.js --shell-source <开工备份>/core/csh_shell.js --browser`36/41，JSON在外部20261026-recovery目录。原恢复67/0、生命周期67/0、迁移56/0、钱包52/0、市场38/0、主门禁通过、世界188/0。夹具等待市场初始化、保存桩返回与父窗隔离LS按真实接口补齐，未弱化断言；不是全平台实战。
+
+2026-10-23短版指南验证：`probe_match_reward.mjs --browser`98/0（stub钱包+真实配置UI）；`probe_match_reward_wallet.mjs`51/0（实际钱包/迁移/模块+隔离事件）；`probe_host_smoke.mjs --match-until-over`自然身份终局14/0（外部20261023-match-reward/host-natural），胜利2000→2080及收据，成就实际领奖→3580/15后全host刷新保持；非所有模式自然实战。新郝昭按sxrm27真实原画重制，`probe_haozhao_art`需本批--candidates/--baseline/--face-box 120,108,125,132，64/0；真实宿主卡与模块链22/0，外部20261023-haozhao-sxrm/host-ui。技能43/0、Poptip6/0。见CODEX_SHORT_GUIDE_20261023/HAOZHAO_SXRM/MATCH_REWARD报告。主门禁/世界188/0/成就49/0等通过；未发布。
+
+2026-10-23讨伐跨更新：`node tools/probe_bossrecord_upgrade.mjs --scope-before <LOCAL_EVIDENCE>/20261023-bossrecord-upgrade`41/0；同目录`--before`切换改前真实源13/28。原生Chromium IDB/LS+宿主真实清理函数，整个文档重载/迁移故障/观察器三分支/源码改动范围；非完整BOSS实战。外部before/after JSON，详见BOSSRECORD_UPGRADE_20261023.md。原恢复90/0、迁移56/0、市场38/0、主门禁与世界188/0通过；经济共同事务仍未完成。
+
+2026-10-23讨伐恢复：`node tools/probe_bossrecord_recovery.mjs`90/0；`--source <LOCAL_EVIDENCE>/20261023-bossrecord-recovery/csh_bossrecord.js.before`同组7/83，JSON在该外部目录。实际记录/名册模块与隔离存储、配置/经济桩，非BOSS实战；原主门禁及世界188/0通过。未覆盖异步落盘失败/跨ZIP保全，见BOSSRECORD_RECOVERY_20261023.md。
+
+2026-10-23最终增量：操作成就VM49/0（同组本次改前46/3）、页面92/0；完整宿主自然身份局11/0，真实出牌6/伤害累计4→累计出牌进度6/单次最高伤害2，自然解锁op_empty_dodge后实际领取500CBY/5功勋，整个host刷新保持且不重发。三模块艺术最终`--art --full-controls`172/0、188截图，外部20261023-art-final目录；coverage脚本新增--evidence参数，矩阵链接与截图存在均核对。主门禁与世界188/0通过；未据此宣称全部成就/所有平台已实战。
+
+2026-10-22本地续修验收索引：市场升级 `probe_market_upgrade.mjs`38/0；操作成就 `probe_pool_achv_rebuild.mjs`40/0与`probe_pool_achv_browser.mjs`92/0；行囊`probe_bag_flow_rebuild.mjs`19/0；世界入口104/0/人物页80/0；胜率恢复`probe_winrate_recovery.mjs`127/0（改前8/119），原56/0、UI64/0；郝昭实际宿主CSS裁切`probe_haozhao_art.mjs`64/0；三模块艺术样板`probe_art_baseline.mjs --art`68/0，S4继续。互动原夹具已补提取真实世界saveBlocked与隔离LS，121/0。均保留隔离profile/fixture范围，不据此宣称完整游戏实机或所有写入口完成；未发布。报告在docs/audit/WORLD_SYSTEM_REBUILD_20261022.md、WINRATE_RECOVERY_20261022.md、ART_REBUILD_REPORT.md。
+
+4.0.10已发布；发布后affection恢复专项 `tools/probe_affection_recovery.mjs` 97/0（旧5/92），原恢复/生命周期各67/0、世界188/0及主检查通过。本地新补丁未覆盖已发布ZIP，后续审核仍逐模块进行。
+
 2026-10-22郝昭新增：`tools/probe_haozhao.mjs` 执行隔离的本机GameEvent/编译器/用牌结算/changeHp，`tools/probe_haozhao_ui.mjs` 验证官方poptip与立绘预览。完整游戏、联机及真实选将UI仍待实机；不继续旧将AI优化。报告按本次任务书例外放根目录HAOZHAO_IMPLEMENTATION_REPORT.md。
 
 ## 门禁与探针
@@ -61,3 +77,6 @@ DOM/VM 不验证 CSS；独立 HTML 不完整覆盖 Noname 全局样式/缩放；
 2026-10-22并行审核批：新增花鬘/星星甘宁/远古八废实际AI选择链，累计7/99、另8人部分结论，实战未做。三专项67/0、34/0、34/0；交叉审核补真实VCard/实体去重、不屈错误救援与公开不可获得牌。世界生命周期67/0，修UNO多轮去重/离场亲历/零分摊与只读快照采用；迁移故障56/0+Chromium存储9/0+恢复页3/0，严格后端确认、原始恢复凭据、真实卸载防旧钱包复活、跨iframe迟到回包隔离、严格备份读取、钱包/世界内存采用确认。主门禁、世界188/0和既有市场/领奖/互动链通过。原始成就保留、版本4.0.9未发布；世界软存储和迁移恢复期间全局写锁仍待继续。详情见项目docs/audit/HUAMAN_AI_20261022.md、AI审查记录.md、WORLD_LIFECYCLE_20261022.md、MIGRATION_FAILURES_20261022.md。
 
 2026-10-22后续并行批：李曦明仙途→煌元/丹→谒天46/0，明日香22定义/实际形态链51/0，黄盖苦肉/诈降/恢复31/0，累计10/99源码选择链、另8人部分结论，89人及全部实战未完成。交叉审核补朗枪真实次数/距离窗口、黄盖禁止回复时假救援和多点致命失体力，AST签名允许纯AI新增且保留底层事件参数；丹全卡文件只豁免自身ai。恢复守卫67/0（改前9/58）已覆盖钱包/官阶/任务/领奖/市场/世界及壳变更消息，修改内存前拒绝、失败ACK不占GUARD、持久凭据读失败/启动/异步CDK/卸载/微任务均受保护；迁移自身只越busy不能越持久凭据。affection/interact/poolAchv/winrate/bossrecord及页面直接键族仍需后续接入，不称全扩展冻结。共享139/0、原技能45/0、领奖29/0、生命周期67/0、主门禁及世界188/0通过。专题见项目docs/audit/XIANTU_AI_20261022.md、TONGBU_AI_20261022.md、AI审查记录.md、RECOVERY_GUARD_20261022.md。版本4.0.9未发布，原成就/规则/存档结构保留。
+
+
+2026-10-26正式实施4.0.11：页面保存77/0、迁移57/0及浏览器12/0、BOSS事务17/0与升级41/0、羁绊44/0、德州1013/0及UI7/0、妖灵261/0及自然宿主11/0、挑战100种子参数18608/0及宿主5/0、网络17/0。完成范围、尚待服务器/广泛设备/100局实战的边界见docs/audit/AUDIT_4_0_11.md。武将AI继续暂停。

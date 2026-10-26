@@ -6,7 +6,7 @@
 
 旧 `csh_migrate` 的 `lsSet/lsPut/lsDel/cfgSet` 吞掉异常。导入在自动备份写失败、部分数据写失败、宿主配置尚未完成时仍返回成功；回滚和重置同样缺少完成确认。旧重置没有按注册表清全设置与键族，`bounty` 还误走 LS 删除，未删除真实 config 数据。`collect()` 对字符串后端也做 JSON 解析，使原始皮肤字符串导出为 null。
 
-宿主依据是本机 `D:/noname/resources/app`：
+宿主依据是本机 `<NONAME_ROOT>`：
 
 - `noname/game/index.js:9301` 的 `saveConfig` 调用 `save(...).then(callback)`，没有返回内部 Promise。
 - `noname/util/config.js:51` 的 `save`：有 IDB 时使用 `config` object store；没有 IDB 时合并 `${lib.configprefix}config` 的 JSON，再写回同一键。
@@ -55,4 +55,4 @@ LS 写入和删除均读回确认。IDB 配置先读取原值，再将整批写�
 
 本批改前备份：`C:/Users/CHISHA~1/AppData/Local/Temp/chizi-migrate-20261022-003253/`。该临时目录仅用于本机负对照，不是运行依赖。
 
-根线程合并复验：当前56/0、浏览器9/0与3/0均通过；从Git HEAD重建的4.0.9迁移源码对同组基线断言为0/8。可复验基线和已审代码快照另存在扩展目录之外的`D:/noname-audit-backups/chizi-mojiang/20261022-merge/`，不依赖子线程TEMP。原市场52/0、生涯领奖29/0、玩家互动34/0、世界亲历35/0、牌桌生命周期67/0、主门禁及世界188/0通过。
+根线程合并复验：当前56/0、浏览器9/0与3/0均通过；从Git HEAD重建的4.0.9迁移源码对同组基线断言为0/8。可复验基线和已审代码快照另存在扩展目录之外的`<LOCAL_EVIDENCE>/20261022-merge/`，不依赖子线程TEMP。原市场52/0、生涯领奖29/0、玩家互动34/0、世界亲历35/0、牌桌生命周期67/0、主门禁及世界188/0通过。

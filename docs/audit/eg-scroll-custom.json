@@ -1,6 +1,6 @@
 {
   "date": "2026-10-21T09:36:39.015Z",
-  "source": "D:\\noname\\resources\\app\\extension\\池子魔将\\main\\content.js",
+  "source": "<NONAME_ROOT>\\extension\\池子魔将\\main\\content.js",
   "sha256": "293755763968dfd6860f293830f65a7bd3fa69b44159befc5f1396a68ee49b81",
   "scope": "actual faction-scroll functions + native engine CSS + Chromium; not game/Android validation",
   "passed": 56,

@@ -1,0 +1,386 @@
+[
+  {
+    "asset_id": "debug-workshop",
+    "tool": "built-in image_gen__imagegen",
+    "source": "<LOCAL_EVIDENCE>\\20261022-art-rebuild\\ui-source\\debug-workshop-source.png",
+    "source_sha256": "9f7db3f1e2dacd8a7ed75a05dbc79ca6ce54f5a50d67d94e8fec898097e83ff9",
+    "source_size": [
+      1312,
+      1199
+    ],
+    "source_alpha_extrema": [
+      0,
+      255
+    ],
+    "source_visible_bbox": [
+      73,
+      35,
+      1262,
+      1175
+    ],
+    "bbox_alpha_threshold": 8,
+    "file": "image/ui/art-v1/debug-workshop.png",
+    "size": [
+      192,
+      192
+    ],
+    "bytes": 59448,
+    "sha256": "3ffde62e782ed9fa819b5cae1d644e28524ca9274e59deb4d4d86d9d2f51f456",
+    "alpha_extrema": [
+      0,
+      255
+    ]
+  },
+  {
+    "asset_id": "war-record",
+    "tool": "built-in image_gen__imagegen",
+    "source": "<LOCAL_EVIDENCE>\\20261022-art-rebuild\\ui-source\\war-record-source.png",
+    "source_sha256": "154a2d06b9db4e8bd4e9e196c3a0eed8540356eb55e5449c82d293db8ab2063b",
+    "source_size": [
+      1312,
+      1199
+    ],
+    "source_alpha_extrema": [
+      0,
+      255
+    ],
+    "source_visible_bbox": [
+      35,
+      27,
+      1284,
+      1161
+    ],
+    "bbox_alpha_threshold": 8,
+    "file": "image/ui/art-v1/war-record.png",
+    "size": [
+      192,
+      192
+    ],
+    "bytes": 47863,
+    "sha256": "4f500282106fa7fc8cc763c7a3ab2cd95797bd3211b926c20c2205514c084e30",
+    "alpha_extrema": [
+      0,
+      255
+    ]
+  },
+  {
+    "asset_id": "interaction-strategy",
+    "tool": "built-in image_gen__imagegen",
+    "source": "<LOCAL_EVIDENCE>\\20261022-art-rebuild\\ui-source\\interaction-strategy-source.png",
+    "source_sha256": "f92e7cabe8134e984e90a686d8ab0a92f3ef8ba85a2900eed354cb29192d07ca",
+    "source_size": [
+      1312,
+      1199
+    ],
+    "source_alpha_extrema": [
+      0,
+      255
+    ],
+    "source_visible_bbox": [
+      146,
+      10,
+      1298,
+      1191
+    ],
+    "bbox_alpha_threshold": 8,
+    "file": "image/ui/art-v1/interaction-strategy.png",
+    "size": [
+      192,
+      192
+    ],
+    "bytes": 54858,
+    "sha256": "eafa416dd878c556e398e5c47429a21b7fdde176c54a863c5c152cd019f1ecc4",
+    "alpha_extrema": [
+      0,
+      255
+    ]
+  },
+  {
+    "asset_id": "button-primary",
+    "tool": "built-in image_gen__imagegen",
+    "source": "<LOCAL_EVIDENCE>\\20261022-art-rebuild\\ui-source\\button-primary-source.png",
+    "source_sha256": "f6255a25f73615f0db739d7bce3f4b4a1b604bf575ec63cba15c1c35bbef8988",
+    "source_size": [
+      2172,
+      724
+    ],
+    "source_alpha_extrema": [
+      0,
+      255
+    ],
+    "source_visible_bbox": [
+      8,
+      128,
+      2165,
+      559
+    ],
+    "bbox_alpha_threshold": 8,
+    "file": "image/ui/art-v1/button-primary.png",
+    "size": [
+      1024,
+      205
+    ],
+    "bytes": 333323,
+    "sha256": "05dac48677fbffa6d9066953739b5057644f3fb3f98555ab359d6c17a1eb2a0f",
+    "alpha_extrema": [
+      0,
+      255
+    ]
+  },
+  {
+    "asset_id": "button-secondary",
+    "tool": "built-in image_gen__imagegen",
+    "source": "<LOCAL_EVIDENCE>\\20261022-art-rebuild\\ui-source\\button-secondary-source.png",
+    "source_sha256": "6fdda80210710dc2dcfeaba86420e2371eb878c05d7bec6696210ffeeed573b2",
+    "source_size": [
+      2172,
+      724
+    ],
+    "source_alpha_extrema": [
+      0,
+      255
+    ],
+    "source_visible_bbox": [
+      4,
+      122,
+      2170,
+      555
+    ],
+    "bbox_alpha_threshold": 8,
+    "file": "image/ui/art-v1/button-secondary.png",
+    "size": [
+      1024,
+      205
+    ],
+    "bytes": 321609,
+    "sha256": "9c939b5e953ca378d6cb191cd181de67d4f520ba7371d81ffb4aaa92c63f80aa",
+    "alpha_extrema": [
+      0,
+      255
+    ]
+  },
+  {
+    "asset_id": "button-danger",
+    "tool": "built-in image_gen__imagegen",
+    "source": "<LOCAL_EVIDENCE>\\20261022-art-rebuild\\ui-source\\button-danger-source.png",
+    "source_sha256": "8923183a022555b77f40cbed7fb78f692c5a6cda77700ecf4cfc8b7c906b3416",
+    "source_size": [
+      2172,
+      724
+    ],
+    "source_alpha_extrema": [
+      0,
+      255
+    ],
+    "source_visible_bbox": [
+      3,
+      121,
+      2171,
+      562
+    ],
+    "bbox_alpha_threshold": 8,
+    "file": "image/ui/art-v1/button-danger.png",
+    "size": [
+      1024,
+      208
+    ],
+    "bytes": 336402,
+    "sha256": "2385c755031edc1e4330e8a8f4c0511ddea99a62ff04fa810096ba91421d87dc",
+    "alpha_extrema": [
+      0,
+      255
+    ]
+  },
+  {
+    "asset_id": "copy-scroll",
+    "tool": "built-in image_gen__imagegen",
+    "source": "<LOCAL_EVIDENCE>\\20261022-art-rebuild\\ui-source\\copy-scroll-source.png",
+    "source_sha256": "67de0565c88332c60a742408bf9cff988894664da66dce3b7e02cb72bb61fbbf",
+    "source_size": [
+      1312,
+      1199
+    ],
+    "source_alpha_extrema": [
+      0,
+      255
+    ],
+    "source_visible_bbox": [
+      71,
+      58,
+      1272,
+      1161
+    ],
+    "bbox_alpha_threshold": 8,
+    "file": "image/ui/art-v1/copy-scroll.png",
+    "size": [
+      192,
+      192
+    ],
+    "bytes": 55571,
+    "sha256": "28120d57f5813b17723ed3aa8243fe862979c35c0bd81a361c2a1d676dc24240",
+    "alpha_extrema": [
+      0,
+      255
+    ]
+  },
+  {
+    "asset_id": "transfer-chest",
+    "tool": "built-in image_gen__imagegen",
+    "source": "<LOCAL_EVIDENCE>\\20261022-art-rebuild\\ui-source\\transfer-chest-source.png",
+    "source_sha256": "bd92891caee56406794c4cbc4197eed6923effe8206c05982f4fdbd53db3a6d5",
+    "source_size": [
+      1312,
+      1199
+    ],
+    "source_alpha_extrema": [
+      0,
+      255
+    ],
+    "source_visible_bbox": [
+      103,
+      59,
+      1274,
+      1140
+    ],
+    "bbox_alpha_threshold": 8,
+    "file": "image/ui/art-v1/transfer-chest.png",
+    "size": [
+      192,
+      192
+    ],
+    "bytes": 59551,
+    "sha256": "879161c6f5d715711d2e1ddc439a061e89c97aeb08aa79437528f0e775a404c1",
+    "alpha_extrema": [
+      0,
+      255
+    ]
+  },
+  {
+    "asset_id": "search-lens",
+    "tool": "built-in image_gen__imagegen",
+    "source": "<LOCAL_EVIDENCE>\\20261022-art-rebuild\\ui-source\\search-lens-source.png",
+    "source_sha256": "d1c53f4837d01ededb1c9dfa3c5d63651e3759d8960a76193a6a1310411a60e5",
+    "source_size": [
+      1312,
+      1199
+    ],
+    "source_alpha_extrema": [
+      0,
+      255
+    ],
+    "source_visible_bbox": [
+      37,
+      87,
+      1280,
+      1075
+    ],
+    "bbox_alpha_threshold": 8,
+    "file": "image/ui/art-v1/search-lens.png",
+    "size": [
+      192,
+      192
+    ],
+    "bytes": 48280,
+    "sha256": "7095f6897fc40487cc1478a3e55c7e62537ef6bcdc73c3c830bdf0ce061da265",
+    "alpha_extrema": [
+      0,
+      255
+    ]
+  },
+  {
+    "asset_id": "inspect-compass",
+    "tool": "built-in image_gen__imagegen",
+    "source": "<LOCAL_EVIDENCE>\\20261022-art-rebuild\\ui-source\\inspect-compass-source.png",
+    "source_sha256": "0e9a668f03c4b377964ea5c329eb03844be8ca411d2f1a0553386636e8620c04",
+    "source_size": [
+      1312,
+      1199
+    ],
+    "source_alpha_extrema": [
+      0,
+      255
+    ],
+    "source_visible_bbox": [
+      74,
+      53,
+      1273,
+      1168
+    ],
+    "bbox_alpha_threshold": 8,
+    "file": "image/ui/art-v1/inspect-compass.png",
+    "size": [
+      192,
+      192
+    ],
+    "bytes": 58350,
+    "sha256": "29111b779a352fb3200902c3842729ee6a79712f4e8bbce900b192b3f12bbeb5",
+    "alpha_extrema": [
+      0,
+      255
+    ]
+  },
+  {
+    "asset_id": "clear-brazier",
+    "tool": "built-in image_gen__imagegen",
+    "source": "<LOCAL_EVIDENCE>\\20261022-art-rebuild\\ui-source\\clear-brazier-source.png",
+    "source_sha256": "40d2ce94d9426c94b6f335814ba18f6c6dba6c0a886fd512b74750b0081d5cda",
+    "source_size": [
+      1312,
+      1199
+    ],
+    "source_alpha_extrema": [
+      0,
+      255
+    ],
+    "source_visible_bbox": [
+      135,
+      52,
+      1179,
+      1167
+    ],
+    "bbox_alpha_threshold": 8,
+    "file": "image/ui/art-v1/clear-brazier.png",
+    "size": [
+      192,
+      192
+    ],
+    "bytes": 58763,
+    "sha256": "9255758f223fa450a9ddae578efea66d58bd736ab91d7a38509bd72b1d5c0431",
+    "alpha_extrema": [
+      0,
+      255
+    ]
+  },
+  {
+    "asset_id": "target-banner",
+    "tool": "built-in image_gen__imagegen",
+    "source": "<LOCAL_EVIDENCE>\\20261022-art-rebuild\\ui-source\\target-banner-source.png",
+    "source_sha256": "a9c772874e26b6a380eecd46d9cdc7f0954e47f6c9acc6aec66d23b1196aa694",
+    "source_size": [
+      1312,
+      1199
+    ],
+    "source_alpha_extrema": [
+      0,
+      255
+    ],
+    "source_visible_bbox": [
+      94,
+      0,
+      1297,
+      1199
+    ],
+    "bbox_alpha_threshold": 8,
+    "file": "image/ui/art-v1/target-banner.png",
+    "size": [
+      192,
+      192
+    ],
+    "bytes": 43514,
+    "sha256": "13c4085685b790d124d30f1dcfbee40d848d9066cf95eca9b2ef31dbd5be815c",
+    "alpha_extrema": [
+      0,
+      255
+    ]
+  }
+]

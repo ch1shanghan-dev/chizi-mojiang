@@ -73,5 +73,5 @@
     "No publish, version bump or remote changes."
   ],
   "initial_delivery_status": "Verified in isolated checkout; installed D: directory unchanged because it is outside writable sandbox.",
-  "application_backup": "C:/Users/Chishanghan/AppData/Local/Temp/chizi-maintenance-20261021/deliverables/backups/20261021_172004_748224"
+  "application_backup": "<USER_HOME>/AppData/Local/Temp/chizi-maintenance-20261021/deliverables/backups/20261021_172004_748224"
 }

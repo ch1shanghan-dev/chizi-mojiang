@@ -1,0 +1,2 @@
+asset_id,character_id,name,status,file,width,height,source,selection,original_backup,original_sha256,notes
+haozhao-chenchang,csh_haozhao,郝昭,按作者确认蚀心入魔画法重制并通过新裁切64比0,image/csh_haozhao.jpg,400,472,built-in image_gen__imagegen,sxrm-20261023,<LOCAL_EVIDENCE>/20261023-haozhao-sxrm/original-400x472.jpg,4fd2c96e1c283a45765ddaffacd13c36cb271b15a7dec8abe8a1c69f7bda9ac9,仅郝昭；完整源1089×1444；原发布与上一版本地稿均保留；文案另批精简保留原生背水提示；机制与AI不变；宿主原生卡已验；详见HAOZHAO_SXRM_20261023.md
