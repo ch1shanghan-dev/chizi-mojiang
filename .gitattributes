@@ -1,5 +1,5 @@
 # 文本文件交给 git 自动识别、按标准方式换行
-* text=auto
+* text=auto eol=lf
 
 # 二进制资源：禁止任何换行转换与 diff 噪音
 *.png binary

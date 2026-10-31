@@ -187,6 +187,9 @@ for(const reset of ['reset','claimGameStart']){
   h.interaction[reset]();h.api.recordEvent(h.other,h.speaker,'hit');
   check('memory event age restarts after '+reset,retrieve(h)===1);
 }
+{
+ const h=harness();h.interaction.onGameOver(true,1);const n=h.chats.length;h.interaction.onGameOver(true,1);check('duplicate terminal callback speaks once per player',n===3&&h.chats.length===n);h.interaction.onGameStart();const afterOpening=h.chats.length;h.interaction.onGameOver(true,1);check('new game start renews terminal speech permission',h.chats.length===afterOpening+3);
+}
 const failed = results.filter(r => !r.passed);
 console.log(JSON.stringify({ scope: 'actual module in VM; isolated timers/config/players, no real saves or game rendering', passed: results.length - failed.length, failed: failed.length, failures: failed }, null, 2));
 process.exitCode = failed.length ? 1 : 0;

@@ -8,7 +8,7 @@ import { affOf as affLinesOf, AFF_SHAPE, FAV, OATH_LINES } from "./csh_aff_lines
    一句话定位：**把「打招呼 / 说说话 / 摸摸头 / 送礼 / 讨伐 / 持股」六种互动
    折算成一条 0~88000 的亲密度**，再按五档解锁台词、视觉表现与经济回报。
 
-   ★ 数据真源：`csh_affection`（localStorage）
+   ★ 数据真源：钱包 affectionSaved 权威检查点；csh_affection 为兼容镜像
        { id: { v, last, day:{hunt,hold,talk,head,gift}, cnt:{...}, got:{...} } }
    ★ 单一增长口径：所有增长都走 stAdd()（唯一的写入口）——
      六种互动只是"带冷却的一次 stAdd"，不存在第二条写路径。
@@ -157,11 +157,13 @@ function backfillSaw(e) {
 	} catch (err) { return ""; }
 }
 function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
-function lsPut(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+function lsPut(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch (e) { return false; } }
 
 function readStore() {
 	var s = null;
-	try { s = JSON.parse(lsGet(KEY) || "null"); } catch (e0) { s = null; }
+	var W = lib.cshWallet && lib.cshWallet.wallet;
+	if (W && typeof W.affectionSaved === "function") s = W.affectionSaved();
+	if (s == null) { var raw = localStorage.getItem(KEY); s = raw === null ? {} : JSON.parse(raw); }
 	if (!s || typeof s !== "object" || Array.isArray(s)) s = {};
 	for (const k of Object.keys(s)) {
 		const e = s[k];
@@ -182,7 +184,14 @@ function readStore() {
 	}
 	return s;
 }
-function writeStore(s) { lsPut(KEY, s); }
+function writeStore(s, cost, reason) {
+	if (saveBlocked()) return false;
+	var W = lib.cshWallet && lib.cshWallet.wallet;
+	if (W && typeof W.commitAffection === "function") return W.commitAffection(s, cost || 0, reason || "好感记录").ok === true;
+	// Mixed old-wallet installations must not charge without a joint checkpoint.
+	if (cost) return false;
+	return lsPut(KEY, s);
+}
 
 export function levelOf(v) {
 	v = Math.max(0, Math.min(AFF_MAX, Math.round(Number(v) || 0)));
@@ -263,7 +272,7 @@ function moodOf(e) {
 }
 
 /* ---------- 唯一的增长入口 ---------- */
-function stAdd(id, n, src) {
+function stAdd(id, n, src, payment) {
 	try {
 		if (saveBlocked()) return null;
 		if (typeof id !== "string" || !Object.prototype.hasOwnProperty.call(MINIONS, id)) return null;
@@ -282,9 +291,15 @@ function stAdd(id, n, src) {
 		e.saw = dayKey();
 		if (src) {
 			e.day[src] = dayKey();
-			e.cnt[src] = (e.cnt[src] || 0) + 1;
+			e.cnt[src] = (e.cnt[src] || 0) + (payment && payment.units || 1);
 		}
-		writeStore(s);
+        if(payment && payment.giftTxn){
+            e.giftTxn=payment.giftTxn;
+            if(!e.heard||typeof e.heard!=="object")e.heard={};
+            var result=e.giftTxn.result;
+            [["gift",result.gift],["up",result.leveledUp?result.level:""]].forEach(function(pair){if(!pair[1])return;if(!Array.isArray(e.heard[pair[0]]))e.heard[pair[0]]=[];if(e.heard[pair[0]].indexOf(pair[1])<0)e.heard[pair[0]].push(pair[1]);});
+        }
+		if (!writeStore(s, payment && payment.cost, payment && payment.reason)) return null;
 		return { id: id, gain: got, value: e.v, level: levelOf(e.v), leveledUp: levelOf(e.v) !== levelOf(before) };
 	} catch (e2) { return null; }
 }
@@ -298,8 +313,8 @@ function stDay(id, src) {
 		e.last = Date.now();
 		e.saw = dayKey();
 		if (src) { e.day[src] = dayKey(); e.cnt[src] = (e.cnt[src] || 0) + 1; }
-		writeStore(s);
-	} catch (e2) {}
+		return writeStore(s);
+	} catch (e2) { return false; }
 }
 function dailyOk(e, src) {
 	if (!e || !e.day || typeof e.day[src] !== "string") return true;
@@ -448,15 +463,18 @@ function rollGive(id, levelKey, v, act) {
 		if (!(roll > 0)) return { give: 0, line: "" };
 		var W = lib.cshWallet && lib.cshWallet.wallet;
 		if (!W || typeof W.add !== "function") return { give: 0, line: "" };
-		var res = W.add(roll, "她的回礼:" + nameOf(id));
-		if (res === false) return { give: 0, line: "" };
-		var credited = (typeof res === "number" && isFinite(res)) ? Math.max(0, Math.floor(res)) : roll;
+		var credited = typeof W.pc === "function" ? Math.min(roll, Math.max(0, (lib.cshWallet.const.PC_CAP) - W.pc())) : roll;
 		if (!(credited > 0)) return { give: 0, line: "" };
 		var st2 = readStore(), e2 = st2[id];
-		if (e2) {
-			e2.giveSum = (e2.giveSum || 0) + credited;
-			e2.giveN = (e2.giveN || 0) + 1;
-			writeStore(st2);
+		if (!e2) return { give: 0, line: "" };
+		if (typeof W.commitAffection === "function") {
+			e2.giveSum = (e2.giveSum || 0) + credited; e2.giveN = (e2.giveN || 0) + 1;
+			if (!writeStore(st2, -credited, "她的回礼:" + nameOf(id))) return { give: 0, line: "" };
+		} else {
+			var res = W.add(roll, "她的回礼:" + nameOf(id)); if (res === false) return { give: 0, line: "" };
+			credited = typeof res === "number" && isFinite(res) ? Math.max(0, Math.floor(res)) : roll;
+			if (!(credited > 0)) return { give: 0, line: "" };
+			e2.giveSum = (e2.giveSum || 0) + credited; e2.giveN = (e2.giveN || 0) + 1; writeStore(st2);
 		}
 		return { give: credited, line: line(id, "give") };
 	} catch (e) { return { give: 0, line: "" }; }
@@ -529,7 +547,7 @@ export function interact(id, act) {
 		/* 已满档（羁绊 100）：**仍然能互动**——给台词、保留回礼机会，只是不再加好感。
 		   否则 stAdd 在满档时返回 null，"说说话"会变成死按钮（点击毫无反馈）。 */
 		if (cur.v >= AFF_MAX) {
-			stDay(id, act);
+			if (!stDay(id, act)) return { ok: false, reason: "save", value: cur.v, level: cur.level, levelName: cur.levelName };
 			var gM = rollGive(id, cur.level, cur.v, act);
 			return {
 				ok: true, act: act, gain: 0, maxed: true, value: cur.v,
@@ -556,7 +574,7 @@ export function interact(id, act) {
 /* ---------- ★ 契约/誓约（v6.9 · 2026-10-16 深夜三 · 作者拍板方案） ----------
    满羁绊（88000）解锁「结契」：耗 **星砂 ×2 + 她的偏好礼物 ×3**（按当下单点价格）。
    完成后：契约台词 + 图鉴专属称号/立绘框/横幅（页面负责）；数据层只落 e.oath 时间戳。
-   纪律：逐笔扣款皆带 reason；任一笔失败**全数回滚**；未讨伐/未满/已结契各自有明确 reason。 */
+   纪律：结契总价与契约状态同笔落盘；任何提交失败都不扣款；未讨伐/未满/已结契各自有明确 reason。 */
 export const OATH_COST = { stardust: 2, fav: 3 };
 export function oath(id) {
 	try {
@@ -575,17 +593,12 @@ export function oath(id) {
 		for (const it of AFF_GIFTS) { if (it.key === "stardust") star = it; if (it.key === fav) fg = it; }
 		if (!star || !fg) return { ok: false, reason: "fail" };
 		var cost = star.cost * OATH_COST.stardust + fg.cost * OATH_COST.fav;
-		var paid = [];
-		var pay = function (amt, why) { if (W.spend(amt, why)) { paid.push([amt, why]); return true; } return false; };
-		if (!pay(star.cost * OATH_COST.stardust, "结契·星砂×" + OATH_COST.stardust + ":" + name) ||
-			!pay(fg.cost * OATH_COST.fav, "结契·" + fg.name + "×" + OATH_COST.fav + ":" + name)) {
-			for (const p of paid) { try { W.add(p[0], p[1] + "（回滚）"); } catch (eR) {} }
-			return { ok: false, reason: "poor", cost: cost };
-		}
+		if (typeof W.commitAffection !== "function") return { ok: false, reason: "no-wallet" };
+		if (W.pc() < cost) return { ok: false, reason: "poor", cost: cost };
 		var s = readStore();
 		var e = s[id] || (s[id] = { v: 0, last: 0, day: {}, cnt: {} });
 		e.oath = Date.now();
-		writeStore(s);
+		if (!writeStore(s, cost, "结契:" + name)) return { ok: false, reason: "save", cost: cost };
 		return {
 			ok: true, act: "oath", cost: cost, fav: fav, favName: fg.name, oathT: e.oath,
 			line: OATH_LINES[id] || line(id, "top"), value: cur.v,
@@ -603,34 +616,55 @@ export function tableQuip(id) {
 	} catch (e) { return null; }
 }
 
-/* 送礼：先扣钱（走钱包单一账本），扣款成功才加好感 —— 顺序不可颠倒 */
-export function gift(id, giftKey) {
-	try {
-		if (saveBlocked()) return saveRefused();
-		var g = null;
-		for (const it of AFF_GIFTS) if (it.key === giftKey) g = it;
-		if (!g) return { ok: false, reason: "no-gift" };
-		if (!huntedNow(id)) return { ok: false, reason: "need-hunt" };   /* ★ 未讨伐：送礼也锁（同上） */
-		/* ★ 雀魂移植后：礼物**不限次数**（不再查日键；冷却语义取消——作者："礼物也不限次数购买"）。
-		   ★ 偏好 ×1.5：她偏爱的那一档礼物羁绊值 ×1.5（雀魂同款设计，参照人设手工指定）。 */
-		var cur = get(id);
-		if (cur && cur.v >= AFF_MAX) return { ok: false, reason: "max" };
-		var W = lib.cshWallet && lib.cshWallet.wallet;
-		if (!W || typeof W.spend !== "function") return { ok: false, reason: "no-wallet" };
-		var name = nameOf(id);
-		var isFav = (favOf(id) === g.key);
-		var addV = isFav ? Math.round(g.add * 1.5) : g.add;      /* 偏好 ×1.5（雀魂口径） */
-		if (!W.spend(g.cost, "送礼:" + name)) return { ok: false, reason: "poor" };
-		var r = stAdd(id, addV, "gift");
-		if (!r) { try { W.add(g.cost, "送礼回滚:" + name); } catch (eR) {} return { ok: false, reason: "fail" }; }
-		return {
-			ok: true, act: "gift", gift: g.key, giftName: g.name, gain: r.gain, value: r.value,
-			level: r.level.key, levelName: r.level.name, leveledUp: r.leveledUp,
-			cost: g.cost, hint: g.hint, fav: isFav, addBase: g.add,
-			line: (isFav && FAV[id] && FAV[id][1]) ? FAV[id][1] : line(id, "gift", g.key),
-			upLine: r.leveledUp ? line(id, "up", r.level.key) : "",
-		};
-	} catch (e) { return { ok: false, reason: "error" }; }
+/* 数量只决定购买份数；价格/偏爱/封顶仍取现有真源。报价无写入。 */
+export function giftQuote(id,giftKey,quantity) {
+    try {
+        if(saveBlocked())return saveRefused();
+        if(typeof id!=="string"||!Object.prototype.hasOwnProperty.call(MINIONS,id))return {ok:false,reason:"bad-id"};
+        quantity=quantity===undefined?1:quantity;
+        if(!Number.isSafeInteger(quantity)||quantity<1||quantity>100)return {ok:false,reason:"bad-quantity"};
+        var g=AFF_GIFTS.find(function(x){return x.key===giftKey;});
+        if(!g)return {ok:false,reason:"no-gift"};
+        if(!huntedNow(id))return {ok:false,reason:"need-hunt"};
+        var e=readStore()[id]||{v:0},W=lib.cshWallet&&lib.cshWallet.wallet;
+        if(!W||typeof W.commitAffection!=="function"||typeof lib.cshWallet.saveEpoch!=="function")return {ok:false,reason:"no-wallet"};
+        if(e.v>=AFF_MAX)return {ok:false,reason:"max"};
+        var fav=favOf(id)===g.key,unit=fav?Math.round(g.add*1.5):g.add;
+        var count=Math.min(quantity,Math.ceil((AFF_MAX-e.v)/unit));
+        return {ok:true,id:id,gift:g.key,giftName:g.name,quantity:quantity,count:count,cost:g.cost*count,gain:Math.min(AFF_MAX-e.v,unit*count),before:e.v,revision:e.giftTxn?e.giftTxn.revision:0,epoch:lib.cshWallet.saveEpoch(),fav:fav,addBase:g.add};
+    }catch(e){return {ok:false,reason:"save"};}
+}
+function giftRequestKey(q){return JSON.stringify([q.cid,q.id,q.gift,q.quantity,q.count,q.cost,q.gain,q.before,q.revision,q.epoch]);}
+/* 同一报价凭据只扣一次；更老的请求不重放。每人只留最新收据与递增序号，存储有界。 */
+export function gift(id,giftKey,quantity,request) {
+    try {
+        if(saveBlocked())return saveRefused();
+        quantity=quantity===undefined?1:quantity;
+        if(request){
+            if(typeof request!=="object"||typeof request.cid!=="string"||!/^gift-[a-zA-Z0-9-]{8,100}$/.test(request.cid)||request.id!==id||request.gift!==giftKey||request.quantity!==quantity)return {ok:false,reason:"bad-request"};
+            if(!lib.cshWallet||request.epoch!==lib.cshWallet.saveEpoch())return {ok:false,reason:"stale"};
+            var previous=readStore()[id],tx=previous&&previous.giftTxn;
+            if(tx&&tx.request.cid===request.cid){
+                if(giftRequestKey(tx.request)!==giftRequestKey(request))return {ok:false,reason:"request-conflict"};
+                return Object.assign({},tx.result,{replayed:true});
+            }
+        }
+        var q=giftQuote(id,giftKey,quantity);if(!q.ok)return q;
+        if(request){
+            var expected=Object.assign({},q,{cid:request.cid});
+            if(giftRequestKey(expected)!==giftRequestKey(request))return {ok:false,reason:"stale"};
+        }else request=Object.assign({},q,{cid:"gift-"+Date.now().toString(36)+"-"+Math.random().toString(36).slice(2,12)});
+        var W=lib.cshWallet.wallet;
+        if(W.pc()<q.cost)return {ok:false,reason:"poor",cost:q.cost};
+        if(q.revision>=Number.MAX_SAFE_INTEGER-1)return {ok:false,reason:"save"};
+        var g=AFF_GIFTS.find(function(x){return x.key===giftKey;}),after=q.before+q.gain,level=levelOf(after),up=level.key!==levelOf(q.before).key;
+        var lines=affLinesOf(id)||{},result={ok:true,act:"gift",gift:g.key,giftName:g.name,quantity:q.quantity,count:q.count,gain:q.gain,value:after,level:level.key,levelName:level.name,leveledUp:up,cost:q.cost,hint:g.hint,fav:q.fav,addBase:g.add,line:q.fav&&FAV[id]&&FAV[id][1]?FAV[id][1]:(lines.gift&&lines.gift[g.key]||g.hint),upLine:up&&lines.up?lines.up[level.key]||"":""};
+        var stored={};["cid","id","gift","quantity","count","cost","gain","before","revision","epoch"].forEach(function(k){stored[k]=request[k];});
+        var txn={v:1,revision:q.revision+1,request:stored,result:result};
+        var r=stAdd(id,q.gain,"gift",{cost:q.cost,reason:"送礼:"+nameOf(id)+(q.count>1?"×"+q.count:""),units:q.count,giftTxn:txn});
+        if(!r)return {ok:false,reason:"save"};
+        return Object.assign({},result);
+    }catch(e){return {ok:false,reason:"save"};}
 }
 /* 偏好礼物（雀魂 ×1.5 的口径）：真源在 csh_aff_lines 的 FAV 表（逐人考据 · 单一出处） */
 export function favOf(id) {
@@ -710,8 +744,7 @@ export function reset(id) {
 		if (saveBlocked()) return false;
 		var s = readStore();
 		if (id) delete s[id]; else s = {};
-		writeStore(s);
-		return true;
+		return writeStore(s);
 	} catch (e) { return false; }
 }
 
@@ -725,7 +758,7 @@ export function installAffection() {
 			levelOf: levelOf, toNext: toNext, nextLevelOf: nextLevelOf, resolveBondProgress: resolveBondProgress,
 			get: get, list: list, summary: summary,
 			noteHunt: noteHunt, noteHold: noteHold, noteTalk: noteTalk, notePlay: notePlay,
-			gift: gift, interact: interact, line: line, shape: shape, linesOf: linesOf,
+			gift: gift, giftQuote: giftQuote, interact: interact, line: line, shape: shape, linesOf: linesOf,
 			heardOf: heardOf, heardLines: heardLines,
 			perkKeys: perkKeys, feeDiscount: feeDiscount, divBonus: divBonus, heatBonus: heatBonus,
 			reset: reset, canGain: canGain, nameOf: nameOf,

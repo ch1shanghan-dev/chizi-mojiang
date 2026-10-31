@@ -25,6 +25,7 @@ try{for(const [name,width,height,scale] of [['desktop',1200,820,1],['portrait',3
  await p.send('Page.navigate',{url:origin+'/host.html'});
  for(let i=0;i<160;i++){if(await p.evaluate(`!!document.querySelector('iframe')?.contentDocument?.querySelector('[data-id="op_one_slash"]')`))break;await new Promise(r=>setTimeout(r,25));}
  const frame=`document.querySelector('iframe').contentWindow`,doc=`document.querySelector('iframe').contentDocument`;
+ await p.evaluate(`(()=>{const d=${doc};d.getElementById("hero").value="general";d.getElementById("hero").dispatchEvent(new Event("change"));})()`);
  const run=async code=>{const expression=`(()=>{const win=${frame},doc=${doc},rows=[],check=(name,passed,detail)=>rows.push({name,passed:!!passed,detail});${code};return rows;})()`;let r;try{r=await p.evaluate(expression);}catch(e){throw Error(e.message+'\n'+expression);}results.push(...r.map(x=>({viewport:name,...x})));};
  await run(`check('all 80 rows render from real source',doc.querySelectorAll('.row').length===80);check('summary distinguishes pending and claimed',doc.querySelector('#summary').textContent.includes('待领取 1')&&doc.querySelector('#summary').textContent.includes('已领取 1'));check('row exposes condition, numeric progress, reward and status',doc.querySelector('[data-id="op_thunder"]').textContent.includes('3 / 6')&&doc.querySelector('[data-id="op_one_slash"]').textContent.includes('1500 池子币'));check('reset action removed',!doc.querySelector('#reset'));const list=doc.querySelector('#list').getBoundingClientRect();check('list retains at least half the viewport',list.height>=innerHeight*.5,{height:list.height,viewport:innerHeight});check('no horizontal overflow',doc.documentElement.scrollWidth<=innerWidth+1);check('real shell dock does not cover title',doc.querySelector('h1').getBoundingClientRect().right<document.querySelector('#dock').getBoundingClientRect().left);const rowsRect=[...doc.querySelectorAll('.claim')].map(b=>b.getBoundingClientRect());check('claim targets remain at least 44px',rowsRect.every(r=>r.height>=44));`);
  // Exercise native input/search/status events and actual pointer click for payment.
@@ -39,7 +40,8 @@ try{for(const [name,width,height,scale] of [['desktop',1200,820,1],['portrait',3
  for(let i=0;i<100;i++){if(await p.evaluate(`${doc}.querySelector('#message').textContent.includes('已领取')`))break;await new Promise(r=>setTimeout(r,20));}
  await run(`check('success ACK refreshes state and pending filter',doc.querySelectorAll('.row').length===0&&doc.querySelector('#summary').textContent.includes('待领取 0'));`);
  await p.evaluate('audit.navigating=true');await p.send('Page.reload');
- for(let i=0;i<160;i++){if(await p.evaluate(`typeof audit!=='undefined'&&!audit.navigating&&!!${doc}?.querySelector('[data-id="op_one_slash"]')`))break;await new Promise(r=>setTimeout(r,25));}
+ for(let i=0;i<160;i++){if(await p.evaluate(`typeof audit!=='undefined'&&!audit.navigating&&!!${doc}?.querySelector('#hero')`))break;await new Promise(r=>setTimeout(r,25));}
+ await p.evaluate(`(()=>{const d=${doc};d.getElementById("hero").value="general";d.getElementById("hero").dispatchEvent(new Event("change"));})()`);
  await run(`check('closing/reopening restores earned and claimed data',doc.querySelector('[data-id="op_one_slash"] button').textContent==='已领取'&&JSON.parse(localStorage.getItem('csh_wallet')).pc===3500);check('closing/reopening retains partial progress',doc.querySelector('[data-id="op_thunder"]').textContent.includes('3 / 6'));`);
  await p.evaluate(`(()=>{let d=${doc};d.querySelector('#status').value='已领取';d.querySelector('#status').dispatchEvent(new Event('change',{bubbles:true}));})()`);
  await run(`check('claimed filter shows both old and newly claimed',doc.querySelectorAll('.row').length===2);`);
@@ -47,11 +49,12 @@ try{for(const [name,width,height,scale] of [['desktop',1200,820,1],['portrait',3
  await p.evaluate(`(()=>{PA.unlock('op_hit5','identity');audit.failKey='csh_rank';let d=${doc};d.querySelector('#status').value='待领取';d.querySelector('#status').dispatchEvent(new Event('change',{bubbles:true}));})()`);
  const clickClaim=async()=>{const at=await p.evaluate(`(()=>{let b=${doc}.querySelector('.claim'),r=b.getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2};})()`);await p.send('Input.dispatchMouseEvent',{type:'mousePressed',button:'left',clickCount:1,...at});await p.send('Input.dispatchMouseEvent',{type:'mouseReleased',button:'left',clickCount:1,...at});};
  await clickClaim();
- for(let i=0;i<100;i++){if(await p.evaluate('audit.acks.length===1'))break;await new Promise(r=>setTimeout(r,20));}
+ for(let i=0;i<100;i++){if(await p.evaluate(`audit.acks.length===1&&${doc}.querySelector('#message').textContent.length>0`))break;await new Promise(r=>setTimeout(r,20));}
  await run(`check('rank fault reports failure after committing CBY exactly once',audit.acks.length===1&&!audit.acks[0].ok&&JSON.parse(localStorage.getItem('csh_wallet')).pc===5000&&JSON.parse(localStorage.getItem('csh_rank')).merit===15);check('failed ACK releases native claim button for retry',doc.querySelector('.claim')&&!doc.querySelector('.claim').disabled&&doc.querySelector('#message').textContent.includes('功勋待补领'));`);
  await p.evaluate('audit.navigating=true');await p.send('Page.reload');
  for(let i=0;i<160;i++){if(await p.evaluate(`typeof audit!=='undefined'&&!audit.navigating&&!!${doc}?.querySelector('[data-id="op_hit5"]')`))break;await new Promise(r=>setTimeout(r,25));}
  await p.evaluate(`(()=>{let d=${doc};d.querySelector('#status').value='待领取';d.querySelector('#status').dispatchEvent(new Event('change',{bubbles:true}));})()`);
+ await p.evaluate(`(()=>{const d=${doc};d.getElementById("hero").value="general";d.getElementById("hero").dispatchEvent(new Event("change"));})()`);
  await run(`check('reopen retains incomplete reward as pending',doc.querySelectorAll('.row').length===1&&doc.querySelector('.row').dataset.id==='op_hit5');`);
  await clickClaim();
  for(let i=0;i<100;i++){if(await p.evaluate('audit.acks.length===1'))break;await new Promise(r=>setTimeout(r,20));}

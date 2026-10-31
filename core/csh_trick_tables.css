@@ -1,0 +1,49 @@
+/* Two distinct trick-taking tables. Geometry and playing-card sizes stay with their games. */
+body[data-csh-table="doudizhu"]{--trick-text:var(--fs-sm,14px);--trick-note:var(--fs-xs,12px)}
+body[data-csh-table="doudizhu"] #view-game .felt{background:radial-gradient(ellipse at 50% 18%,#284239,#102b25 70%,#0d211d)!important;border-color:#433b2d!important;box-shadow:inset 0 0 0 1px #bca56b55,inset 0 8px 38px #0005!important}
+body[data-csh-table="doudizhu"] #view-game .seat-box{background:linear-gradient(145deg,#202b27f5,#14211df5)!important;border:1px solid #8b927d66!important;border-radius:8px!important;box-shadow:none!important;gap:6px!important}
+body[data-csh-table="doudizhu"] #view-game .seat.turn .seat-box{border-color:var(--gold)!important;box-shadow:inset 3px 0 var(--gold)!important;animation:none!important}
+body[data-csh-table="doudizhu"] #view-game .avatar{border-radius:7px!important;width:32px!important;height:36px!important;border-color:#9ca58c66!important;background:#192820!important;box-shadow:inset 0 0 0 2px #0d191355!important}
+body[data-csh-table="doudizhu"] #view-game .avatar.lord{border-color:var(--gold)!important;background:#3d3523!important}
+body[data-csh-table="doudizhu"] #view-game .sname{font-size:var(--trick-text)!important;color:var(--text)!important;font-weight:600!important;max-width:9em!important;line-height:1.4!important}
+body[data-csh-table="doudizhu"] #view-game .badge{font-size:var(--trick-note)!important;border-radius:4px!important;border-color:#9ca58c55!important;line-height:1.4!important}
+body[data-csh-table="doudizhu"] #view-game .badge.lord{background:var(--gold)!important;color:#292313!important;border-color:var(--gold)!important}
+body[data-csh-table="doudizhu"] #view-game .scount,body[data-csh-table="doudizhu"] #view-game .scount b,body[data-csh-table="doudizhu"] #view-game .act-tag{font-size:var(--trick-note)!important;line-height:1.5!important}
+body[data-csh-table="doudizhu"] #view-game .scount b{font-family:"Times New Roman",serif!important;font-weight:700!important;color:#f0d59c!important}
+body[data-csh-table="doudizhu"] #view-game .mult-badge{border-radius:5px!important;background:#172d26!important;border:1px solid #bca56b77!important;color:#edd6a2!important;box-shadow:none!important}
+body[data-csh-table="doudizhu"] #view-game .play-head,body[data-csh-table="doudizhu"] #view-game .turn-hint{font-size:var(--trick-note)!important;letter-spacing:0!important}
+body[data-csh-table="doudizhu"] #view-game .turn-hint.mine{color:#f0d59c!important}
+body[data-csh-table="doudizhu"] #view-game .play-zone .pcard{filter:drop-shadow(0 3px 4px #0004)}
+body[data-csh-table="uno"]{--trick-text:var(--fs-sm,14px);--trick-note:var(--fs-xs,12px)}
+body[data-csh-table="uno"] #view-game .csh-board{background:radial-gradient(ellipse at 50% 45%,#26323caa,#18212933 75%);border-radius:10px}
+body[data-csh-table="uno"] #view-game .opp{max-width:30%!important;padding:5px 8px!important;gap:6px!important;border:1px solid #8c9aa75c!important;border-radius:7px!important;background:#1c2733f0!important;box-shadow:none!important;animation:none!important;min-height:40px!important}
+body[data-csh-table="uno"] #view-game .opp.turn{border-color:var(--gold)!important;box-shadow:inset 0 -2px var(--gold)!important}
+body[data-csh-table="uno"] #view-game .opp.bot{border-style:solid!important}
+body[data-csh-table="uno"] #view-game .opp .oname{display:block!important;color:#f2eee4!important;font-size:var(--trick-text)!important;font-weight:600!important;line-height:1.4!important;flex:1 1 auto!important;min-width:0!important}
+body[data-csh-table="uno"] #view-game .opp .ocount{color:#c9d3db!important;font-size:var(--trick-note)!important;line-height:1.4!important;flex:none!important}
+body[data-csh-table="uno"] #view-game .opp .ocount b{color:#eee2bd!important;font-size:var(--trick-text)!important}
+body[data-csh-table="uno"] #view-game .opp-av{display:block!important;flex:none!important;width:30px!important;height:30px!important;padding:1px!important;background:#243747!important;border:1px solid #8c9aa766!important;border-radius:6px!important;overflow:hidden!important}
+body[data-csh-table="uno"] #view-game .opp-av svg{display:block!important;width:100%!important;height:100%!important}
+body[data-csh-table="uno"] #view-game .uno-flag{font-size:var(--trick-note)!important;border-radius:4px!important;background:#b93037!important;color:#fff!important;animation:none!important}
+body[data-csh-table="uno"] #view-game .pile{background:linear-gradient(150deg,#253444,#101a25)!important;border-style:solid!important;border-color:#8094a680!important;box-shadow:inset 0 0 0 4px #142131,0 4px 10px #0004!important}
+body[data-csh-table="uno"] #view-game .pile::after{content:"";position:absolute;left:12%;right:12%;bottom:10%;height:3px;background:linear-gradient(90deg,#d2474d 0 25%,#e2b53b 25% 50%,#4eac72 50% 75%,#558fd2 75% 100%);pointer-events:none;border-radius:2px}
+body[data-csh-table="uno"] #view-game .pile .uno-logo{color:#f1e7cd!important;text-shadow:none!important;font-style:italic!important;letter-spacing:.04em!important}
+body[data-csh-table="uno"] #view-game .pile .deckn{font-size:var(--trick-note)!important;color:#d8dfe6!important}
+body[data-csh-table="uno"] #view-game .pile.can{border-color:var(--gold)!important;box-shadow:inset 0 0 0 3px #bca56677,0 4px 10px #0004!important;animation:none!important}
+body[data-csh-table="uno"] #view-game .direction-ind{border-radius:5px!important;background:#1c2c3c!important;border-color:#879aaf66!important;color:#e3e6db!important;font-size:var(--trick-note)!important;font-weight:500!important}
+body[data-csh-table="uno"] #view-game .direction-ind.rev{border-color:#c58d9866!important;color:#edb8c2!important}
+body[data-csh-table="uno"] #view-game .turn-banner{font-size:var(--trick-text)!important;line-height:1.4!important}
+body[data-csh-table="uno"] #view-game .mycount-chip{font-size:var(--trick-note)!important}
+body:is([data-csh-table="doudizhu"],[data-csh-table="uno"]) .trick-reference{width:100%;min-width:0;border-top:1px solid var(--gold-line);margin-top:2px;color:var(--text-dim)}
+body:is([data-csh-table="doudizhu"],[data-csh-table="uno"]) .trick-reference summary{font-size:var(--csh-lfs-sm,12px);min-height:44px;line-height:1.5;align-content:center;cursor:pointer;list-style-position:inside}
+body:is([data-csh-table="doudizhu"],[data-csh-table="uno"]) .trick-reference .tip{margin:0;padding:0 0 8px;font-size:var(--csh-lfs-sm,12px);line-height:1.5}
+@media(orientation:landscape) and (max-height:350px){body[data-csh-table="uno"] #view-game .opp{gap:4px!important;padding:3px 5px!important;min-height:34px!important}body[data-csh-table="uno"] #view-game .opp-av{width:24px!important;height:24px!important}body[data-csh-table="uno"] #view-game .opp .oname{font-size:var(--trick-note)!important}body[data-csh-table="doudizhu"] #view-game .avatar{width:26px!important;height:30px!important}body[data-csh-table="doudizhu"] #view-game .seat-box{gap:4px!important}body[data-csh-table="doudizhu"] #view-game .sname{font-size:var(--trick-note)!important;max-width:6em!important}}
+@media(prefers-reduced-motion:reduce){body:is([data-csh-table="doudizhu"],[data-csh-table="uno"]) #view-game :is(.seat-box,.opp,.uno-flag,.pile){animation:none!important;transition:none!important}}
+@media(forced-colors:active){body:is([data-csh-table="doudizhu"],[data-csh-table="uno"]) #view-game :is(.seat-box,.opp,.pile){background:Canvas!important;color:CanvasText!important;border:1px solid CanvasText!important}}
+
+body:is([data-csh-table="doudizhu"],[data-csh-table="uno"]) .trick-start-actions{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:start;width:100%;min-width:0}
+body:is([data-csh-table="doudizhu"],[data-csh-table="uno"]) .trick-start-actions>#btn-start-game{min-width:0;width:100%}
+body:is([data-csh-table="doudizhu"],[data-csh-table="uno"]) .trick-start-actions>.trick-reference{margin:0;border:0;width:auto}
+body:is([data-csh-table="doudizhu"],[data-csh-table="uno"]) .trick-start-actions>.trick-reference>summary{padding:6px 10px;min-width:88px;border:1px solid var(--gold-line);border-radius:6px;text-align:center}
+body:is([data-csh-table="doudizhu"],[data-csh-table="uno"]) .trick-start-actions>.trick-reference[open]{grid-column:1/-1;width:100%}
+body:is([data-csh-table="doudizhu"],[data-csh-table="uno"]) .trick-start-actions>.trick-reference[open]>.tip{padding:8px 0 0;text-align:left}

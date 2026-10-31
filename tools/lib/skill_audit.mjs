@@ -23,7 +23,12 @@ export function skillsOf(ast){let pack;walk(ast,n=>{if(n.type==='VariableDeclara
 // Explicit AI choices include set('ai'/'processAI'), direct event.ai functions,
 // jiaomeng's helper, and the named activation/button checks below.
 export function ruleSignature(source){
-  const ast=parse(source), pack=skillsOf(ast), excluded=new Set();
+  const ast=parse(source), pack=skillsOf(ast), excluded=new Set(), scopedAiSetters=new Set();
+  const zhansongCheck=property(property(pack,"csh_zhansong"),"check");if(zhansongCheck)excluded.add(zhansongCheck);
+  walk(property(pack,"csh_junchi"),n=>{if(n.type==="CallExpression"&&n.callee.type==="MemberExpression"&&n.callee.property.name==="set"&&n.arguments[0]?.value==="ai2")scopedAiSetters.add(n);});
+  const xiangbinCheck=property(property(pack,"csh_xiangbin"),"check");if(xiangbinCheck)excluded.add(xiangbinCheck);
+  walk(property(pack,"csh_xianghong"),n=>{if(n.type==="CallExpression"&&n.callee.property?.name==="chooseControl"&&n.arguments[0]?.value==="baonue_hp"&&n.arguments[2])excluded.add(n.arguments[2]);});
+  const longhunCheck=property(property(pack,"csh_longhun"),"check");if(longhunCheck)excluded.add(longhunCheck);
   const helper=property(property(pack,'csh_jiaomeng'),'_advantage');if(helper)excluded.add(helper);
   const shequeCheck=property(property(pack,'csh_sheque'),'check');if(shequeCheck)excluded.add(shequeCheck);
   const zuilunCheck=property(property(pack,'csh_hyy_zuilun'),'check');if(zuilunCheck)excluded.add(zuilunCheck);
@@ -40,7 +45,7 @@ export function ruleSignature(source){
     if(excluded.has(value))return {type:'Identifier',name:'__AUDIT_AI__'};
     // A new chained AI setter changes no underlying action or its parameters.
     // Preserve its receiver, including any non-AI setters in that receiver chain.
-    if(value?.type==='CallExpression'&&value.callee.type==='MemberExpression'&&value.callee.property.name==='set'&&['ai','processAI'].includes(value.arguments[0]?.value))return normalize(value.callee.object);
+    if(scopedAiSetters.has(value)||(value?.type==='CallExpression'&&value.callee.type==='MemberExpression'&&value.callee.property.name==='set'&&['ai','processAI'].includes(value.arguments[0]?.value)))return normalize(value.callee.object);
     if(Array.isArray(value))return value.map(normalize);
     if(value&&typeof value==='object')return Object.fromEntries(Object.entries(value).filter(([k])=>!['parent','tokens','comments','loc','range','start','end','raw'].includes(k)).map(([k,v])=>[k,normalize(k==='properties'&&Array.isArray(v)?v.filter(p=>!(p.type==='Property'&&keyOf(p)==='ai')):v)]));
     return value;

@@ -767,7 +767,8 @@ import { MINIONS } from "./csh_bossdata.js";
 	/* 由场上 player 反查世界 id（2026-10-01 恩怨接线）：player.name1 是 translate 名，
 	   与名册 name 同源（§1.2 已证纯文本）。兜底：player.name 若直接命中名册字符串主键亦可。 */
 	function idOfPlayer(player) {
-		try {
+        try {
+            if(player&&player._cshAuxSpirit){var source=player._cshAuxSource||'csh_boss_minion_'+String(player.name||'').replace(/^csh_aux_/,'');return idInRoster(source)?source:null;}
 			var n1 = player && player.name1;
 			if (n1) {
 				for (var i = 0; i < world.ai.length; i++) {

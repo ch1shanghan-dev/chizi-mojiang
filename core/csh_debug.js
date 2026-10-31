@@ -1,4 +1,9 @@
 import { lib, game, ui, get, ai, _status } from "../../../noname.js";
+import "./csh_world_view.js";
+import "./csh_update.js";
+import "./csh_online.js";
+function onlineFetch(url,options){return window.CSHOnline.external(url,options);}
+function onlineLocalFetch(url,options){return window.CSHOnline.local(url,options); }
 // 池子魔将 · 池子调试（从 extension.js 拆出）
 // ========== Phase 2：Debug Core + Logger + Error Collector（旁路）==========
 (function () {
@@ -3634,19 +3639,9 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
             });
             body.appendChild(list);
 
-            /* 玩家入口按任务分组；保留原卡片与接线，整卡仍可直接进入。 */
-            if (document.documentElement.classList.contains("csh-world-view")) {
-                var hero=document.createElement('section');hero.className='csh-world-hero';var seal=document.createElement('span');seal.className='csh-world-seal';seal.textContent='池';var title=document.createElement('h2');title.textContent='一桌牌，续一段江湖。';var summary=document.createElement('p'),facts=lib.cshWorld&&lib.cshWorld.stats?lib.cshWorld.stats():{};summary.textContent=(facts.chars||0)+' 位牌友 · 已相识 '+(facts.playerOpponents||0)+' 人 · 同桌 '+(facts.playerHands||0)+' 手';hero.appendChild(seal);hero.appendChild(title);hero.appendChild(summary);var begin=document.createElement('button');begin.type='button';begin.className='csh-world-start';begin.textContent='即刻上桌';begin.addEventListener('click',function(){openGame('texas');});hero.appendChild(begin);body.insertBefore(hero,list);
-                if(lib.cshWorld&&lib.cshWorld.storylines){var digest=document.createElement('section');digest.className='csh-world-digest';var digestTitle=document.createElement('h3');digestTitle.textContent='池中风向 · 牌友邀约';digest.appendChild(digestTitle);digest.setAttribute('aria-label','池中风向与牌友邀约');lib.cshWorld.storylines(3).forEach(function(story){var card=document.createElement('article'),title=document.createElement('b'),text=document.createElement('p'),action=document.createElement('button');title.textContent=story.title+' · '+story.name;text.textContent=story.text;action.type='button';action.textContent=story.invited?'已邀约 · 去牌桌':'邀下一桌';action.className='csh-dbg-btn';action.addEventListener('click',function(){var result=lib.cshWorld.inviteNext(story.id);if(result.ok){if(lib.cshUI)lib.cshUI.toast('已邀约'+result.name+'，符合带入条件时优先同桌');openGame('texas');}else if(lib.cshUI)lib.cshUI.toast(result.reason);});card.appendChild(title);card.appendChild(text);card.appendChild(action);digest.appendChild(card);});digest.removeChild(digestTitle);digestTitle.className='csh-world-section';list.insertBefore(digest,list.firstChild);list.insertBefore(digestTitle,digest);}
-                var sectionLabel = document.createElement("div");
-                sectionLabel.className = "csh-world-section";
-                sectionLabel.textContent = "生涯与记录";
-                list.insertBefore(sectionLabel,list.querySelector('button.csh-dbg-gamebtn'));
-                var playLabel = document.createElement("div");
-                playLabel.className = "csh-world-section";
-                playLabel.textContent = "休闲与探索";
-                var firstGame = list.querySelector(".gb-table,.gb-goldfish,.gb-codex");
-                if (firstGame) list.insertBefore(playLabel, firstGame);
+            // Player-world composition is isolated from debug actions and economy.
+            if (document.documentElement.classList.contains("csh-world-view") && window.CSHWorldView) {
+                window.CSHWorldView.mount({body:body,list:list,lib:lib,openGame:openGame});
             }
 
             /* —— CBY 兑换斗转星移道具（2026-10-05）——
@@ -6398,6 +6393,10 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                 headMain.appendChild(title);
                 headMain.appendChild(sub);
                 head.appendChild(headMain);
+                var headSettings=document.createElement("button");headSettings.type="button";headSettings.id="csh-dbg-settings-toggle";headSettings.textContent="设置";headSettings.setAttribute("aria-label","面板显示与声音设置");headSettings.setAttribute("aria-expanded","false");
+                function toggleHeadSettings(open){panel.classList.toggle("csh-head-settings-open",open);headSettings.setAttribute("aria-expanded",String(open));if(!open&&typeof skinRow!=="undefined"&&skinRow)skinRow.classList.remove("open");}
+                headSettings.addEventListener("click",function(){toggleHeadSettings(!panel.classList.contains("csh-head-settings-open"));});head.appendChild(headSettings);
+
 
                 /* 皮肤选择器（2026-09-30 第六轮 · chip 化，修「每次弹窗选皮肤」）：
                    原生 <select> 在手机上一点即弹全屏滚轮（用户称之为「弹窗」），
@@ -6541,7 +6540,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                     { id: "char", name: "池子" },
                     { id: "track", name: "追踪" },
                     { id: "diag", name: "诊断" },
-                    { id: "games", name: "池子世界", cls: "game" },
+                    { id: "games", name: "世界", cls: "game" },
                 ];
                 function setTab(id) {
                     TAB = id;
@@ -6686,6 +6685,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                     if (!isTopPanel() || e.isComposing || e.ctrlKey || e.altKey || e.metaKey) return;
                     if (e.key === "Escape" || e.keyCode === 27) {
                         e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
+                        if(panel.classList.contains("csh-head-settings-open")){toggleHeadSettings(false);headSettings.focus({preventScroll:true});return;}
                         closePanel();
                     } else if (e.key === "Tab") {
                         var stops = Array.from(panel.querySelectorAll('button,input,select,textarea,a[href],[tabindex="0"]')).filter(function (node) {
@@ -6774,6 +6774,12 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
         };
 
         var FLOAT_POS_KEY = "extension_池子魔将_csh_debug_float_pos";
+        var floatCleanup = null;
+        function disposeFloat() {
+            if (!floatCleanup) return;
+            var cleanup = floatCleanup; floatCleanup = null;
+            cleanup();
+        }
 
         /** 其他扩展（2026-10-05）：从 GitHub 在线安装精选扩展。
             货单 = 仓库根 store.json（git push 即上架/下架）；离线兜底内置两条。
@@ -6825,6 +6831,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
             (document.head || document.documentElement).appendChild(st);
         }
         lib.cshDebug.openExtStore = function () {
+            if(!window.CSHOnline.enabled()){toast("当前为离线模式，可在联网设置中开启后查看在线扩展");return false;}
             /* 【2026-10-06 修复】样式解耦：不再指望主 CSS（它可能尚未注入/是旧版本），
                面板自带 ensureExtStoreStyle() 独立注入；同时清理残留实例（残留会让
                再次点击变成「点不开」）。 */
@@ -6932,12 +6939,12 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                 var p = (async function () {
                     var branch = entry.branch || "main";
                     var tryFetch = function (b) {
-                        return fetch("https://raw.githubusercontent.com/" + entry.repo + "/" + b + "/" + dirPrefix + "info.json", { cache: "no-store" })
+                        return onlineFetch("https://raw.githubusercontent.com/" + entry.repo + "/" + b + "/" + dirPrefix + "info.json", { cache: "no-store" })
                             .then(function (r) { return r.ok ? r.json() : null; });
                     };
                     var j = await tryFetch(branch);
                     if (!j) {
-                        var ri = await (await fetch("https://api.github.com/repos/" + entry.repo)).json();
+                        var ri = await (await onlineFetch("https://api.github.com/repos/" + entry.repo)).json();
                         branch = ri.default_branch || "master";
                         j = await tryFetch(branch);
                     }
@@ -6981,10 +6988,10 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                 return (async function () {
                     var branch = entry.branch;
                     if (!branch) {
-                        var ri = await (await fetch("https://api.github.com/repos/" + entry.repo)).json();
+                        var ri = await (await onlineFetch("https://api.github.com/repos/" + entry.repo)).json();
                         branch = ri.default_branch || "main";
                     }
-                    var tree = await (await fetch("https://api.github.com/repos/" + entry.repo + "/git/trees/" + branch + "?recursive=1")).json();
+                    var tree = await (await onlineFetch("https://api.github.com/repos/" + entry.repo + "/git/trees/" + branch + "?recursive=1")).json();
                     if (!tree.tree) throw new Error(tree.message || "文件树获取失败");
                     var prefix = entry.dir ? String(entry.dir).replace(/\/+$/, "") + "/" : "";
                     var blobs = tree.tree.filter(function (x) {
@@ -7024,7 +7031,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                     var tries = 0;
                     function attempt() {
                         if (dead) return Promise.reject(dead);
-                        return fetch(url, { cache: "no-store", signal: signal }).then(function (r) {
+                        return onlineFetch(url, { cache: "no-store", signal: signal }).then(function (r) {
                             if (!r.ok) throw new Error("HTTP " + r.status);
                             return r.arrayBuffer();
                         }).then(function (buf) {
@@ -7052,6 +7059,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
             }
 
             function installEntry(entry, btn, prog) {
+                if(_status.gameStarted&&!_status.over){toast("请在本局结束后安装扩展，避免重启打断结算");return;}
                 if (storeTask && storeTask.running) {
                     toast("正在安装「" + storeTask.name + "」，等它结束再装别的");
                     return;
@@ -7111,7 +7119,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                         storeTask.total = total;
                         prog.textContent = "下载中 " + done + " / " + total + " · " + rel;
                     }, ctrl).then(function (data) {
-                        prog.textContent = "正在写入扩展目录…（共 " + man.blobs.length + " 个文件）";
+                        if(_status.gameStarted&&!_status.over)throw Error("新对局已开始，请结束后再继续安装；已下载内容保留");prog.textContent = "正在写入扩展目录…（共 " + man.blobs.length + " 个文件）";
                         btn.textContent = "安装中…";
                         return new Promise(function (res, rej) {
                             Promise.resolve(game.importExtension(data, function () { finish(); res(); })).catch(rej);
@@ -7195,13 +7203,13 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                     }
                 });
             }
-            fetch(REPO_RAW + "store.json", { cache: "no-store" }).then(function (r) {
+            onlineFetch(REPO_RAW + "store.json", { cache: "no-store" }).then(function (r) {
                 if (!r.ok) throw new Error("HTTP " + r.status);
                 return r.json();
             }).catch(function () {
                 /* 本地兜底：随扩展打包的 store.json（file:// 或游戏内相对路径） */
                 var local = (typeof lib !== "undefined" && lib.assetURL ? lib.assetURL : "") + "extension/池子魔将/store.json";
-                return fetch(encodeURI(local)).then(function (r2) {
+                return onlineLocalFetch(encodeURI(local)).then(function (r2) {
                     if (!r2.ok) throw new Error("local " + r2.status);
                     return r2.json();
                 });
@@ -7226,10 +7234,8 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                    会在部分文件失败时照样重启、甚至把 404 正文写进 .js，2026-10-18 已整体替换。）
            ⚠ 为什么不走引擎原生「更新扩展」：本仓库根目录＝扩展内容（见 tools/release.js 注释），
              而引擎按 `<源><扩展名>/…` 拼下载 URL，与本布局不匹配 ⇒ 这里自行拼 URL（去掉扩展名前缀）。
-           文件策略：**代码全量下 + 素材只补缺失**
-             · 代码（.js/.json/.css/.html）= 每次必下（"改代码"是更新的主场景）；
-             · 素材（图片/音频/字体）= 只补本机缺失项（体积大、少变）——
-               走引擎 checkFileList 的语义：它会把已存在的文件就地剪枝，剩下的即"缺失"。
+           文件策略：逐个比对远端SHA-256；相同内容跳过，其余暂存核验并备份后提交。
+           远端缺完整摘要时使用完整包安装；失败保留恢复入口，不承诺强制断电后必然可启动。
            ============================================================ */
         var CSH_UPDATE_SRC = "https://raw.githubusercontent.com/ch1shanghan-dev/chizi-mojiang/main/";
         var CSH_UPDATE_EXT = "extension/池子魔将/";
@@ -7364,7 +7370,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                 to = setTimeout(function () { fin(false, new Error("连接超时")); }, ms);
                 try {
                     if (typeof AbortController === "function") ctrl = new AbortController();
-                    fetch(url, {
+                    onlineFetch(url, {
                         cache: "no-store",
                         referrerPolicy: "no-referrer",
                         signal: ctrl ? ctrl.signal : undefined,
@@ -7471,6 +7477,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
         }
 
         lib.cshDebug.checkUpdate = function () {
+            if(!window.CSHOnline.enabled()){toast("当前为离线模式，可在联网设置中开启后检查更新");return false;}
             try { ensureUpdateStyle(); } catch (eSt) {}
             var staleBg = document.getElementById("csh-update-bg");
             if (staleBg && staleBg.parentNode) staleBg.parentNode.removeChild(staleBg);
@@ -7484,7 +7491,9 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
             bg.id = "csh-update-bg";
             var box = document.createElement("div");
             box.id = "csh-update";
+            var updateController=null,updateTx=null;
             function kill() {
+                if(_cshUpdating&&updateTx&&updateTx.status().phase==='committing'){toast("正在提交并核验文件，请稍候");return;}if(updateController)updateController.abort();
                 try { document.removeEventListener("keydown", box.__esc, true); } catch (eE) {}
                 if (box.parentNode) box.parentNode.removeChild(box);
                 if (bg.parentNode) bg.parentNode.removeChild(bg);
@@ -7636,7 +7645,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                     to = setTimeout(function () { fin(false, new Error("连接超时")); }, ms);
                     try {
                         if (typeof AbortController === "function") ctrl = new AbortController();
-                        fetch(url, {
+                        onlineFetch(url, {
                             cache: "no-store",
                             referrerPolicy: "no-referrer",
                             signal: ctrl ? ctrl.signal : undefined,
@@ -7660,147 +7669,21 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                 }
                 return list;
             }
-            function startUpdate(info, remoteVer, goBtn, closeBtn) {
-                status.textContent = "准备更新到 " + remoteVer + " …（代码重下 + 素材补缺）";
-                var files = (info.files || []).slice();
-                if (files.indexOf("extension.js") < 0) files.push("extension.js");
-                var code = [], mediaLocal = [];
-                for (var i = 0; i < files.length; i++) {
-                    var f = String(files[i]);
-                    if (cshIsCode(f)) code.push(f); else mediaLocal.push(CSH_UPDATE_EXT + f);
-                }
-                function unlock() {
-                    try { if (goBtn) goBtn.disabled = false; } catch (e1) {}
-                    try { if (closeBtn) closeBtn.disabled = false; } catch (e2) {}
-                }
-                function proceed() {
-                    /* mediaLocal 已被 checkFileList 就地剪枝 → 只剩「本机缺失」的素材；转回相对路径 */
-                    var missing = [];
-                    for (var m = 0; m < mediaLocal.length; m++) missing.push(String(mediaLocal[m]).slice(CSH_UPDATE_EXT.length));
-                    var toGet = code.concat(missing);
-
-                    /* 去重：catalog 的 files 与 extension.js 可能重叠，重复项会让进度出现「已完成 > 总数」 */
-                    var _seen = {}, _uniq = [];
-                    for (var u = 0; u < toGet.length; u++) {
-                        var _k = String(toGet[u]);
-                        if (!_seen[_k]) { _seen[_k] = 1; _uniq.push(_k); }
-                    }
-                    toGet = _uniq;
-
-                    if (!toGet.length) { status.textContent = "没有需要更新的文件。"; unlock(); return; }
-                    if (_cshUpdating) { status.textContent = "更新已在进行中，请稍候…"; unlock(); return; }
-                    _cshUpdating = true;
-
-                    var bases = updateBases();
-                    var extRoot = resolveExtRoot();     /* 非空 = PC，可自行校验+落盘 */
-                    var total = toGet.length, cursor = 0, active = 0, doneCnt = 0;
-                    var failed = [], prefBase = 0;      /* prefBase：上次成功的源，下次从它开始试 */
-                    var lastTick = Date.now();          /* 看门狗：长时间无进展即判超时，避免永远停在「下载中」 */
-                    var aborted = false;
-
-                    function shortName(rel) {
-                        var s = String(rel);
-                        return s.slice(s.lastIndexOf("/") + 1);
-                    }
-                    function downloadOne(rel) {
-                        return new Promise(function (resolve) {
-                            var tried = 0;
-                            function attempt() {
-                                if (tried >= bases.length) { resolve(false); return; }
-                                var idxBase = (prefBase + tried) % bases.length;
-                                var base = bases[idxBase];
-                                tried++;
-                                var tag = tried > 1 ? "（换源 " + tried + "/" + bases.length + "）" : "";
-                                status.textContent = "下载中 " + doneCnt + " / " + total + " · " + shortName(rel) + tag;
-                                var url = base + rel;
-                                var go = extRoot
-                                    ? fetchBin(url, 12000).then(function (bytes) {
-                                        if (!bytes || !bytes.length) throw new Error("空文件");
-                                        var p = lib.node.path;
-                                        var full = p.join(extRoot, rel);
-                                        var dir = p.dirname(full);
-                                        try { if (!lib.node.fs.existsSync(dir)) lib.node.fs.mkdirSync(dir, { recursive: true }); } catch (eMk) {}
-                                        /* 直接写 Uint8Array —— 不依赖 Buffer 全局（个别渲染进程上下文没有） */
-                                        lib.node.fs.writeFileSync(full, bytes);
-                                    })
-                                    : new Promise(function (res2, rej2) {
-                                        /* 手机端：只能借引擎通道（它会自己建目录），失败按异常处理 */
-                                        try {
-                                            game.download(url, "extension/" + EXT_DIR_NAME + "/" + rel,
-                                                function () { res2(); }, function () { rej2(new Error("下载失败")); });
-                                        } catch (eD) { rej2(eD); }
-                                    });
-                                go.then(function () {
-                                    prefBase = idxBase;
-                                    resolve(true);
-                                }).catch(function () {
-                                    attempt();
-                                });
-                            }
-                            attempt();
-                        });
-                    }
-                    function finishAll() {
-                        if (_updWd) { clearInterval(_updWd); _updWd = null; }
-                        _cshUpdating = false;
-                        if (aborted) return;    /* 看门狗已判超时并放行 —— 迟到的下载完成不再触发重启 */
-                        if (failed.length) {
-                            var head = "更新未完成：有 " + failed.length + " 个文件没下下来。\n";
-                            var listTxt = failed.slice(0, 6).join("\n");
-                            if (failed.length > 6) listTxt += "\n…";
-                            status.textContent = head + listTxt +
-                                "\n\n已下载的部分会保留，再点「立即更新」只补缺，不会从头再来。\n（本次没有重启，游戏仍是可用的。）";
-                            unlock();
-                            return;
-                        }
-                        status.textContent = "更新完成（" + doneCnt + " 个文件），正在重启游戏…";
-                        /* 版本号写回：引擎那只在「从网址安装」时写一次，本扩展更新完必须自己补。
-                           不补的后果是下一次检查仍报「有新版本」，玩家被反复要求更新、
-                           代码文件被全量重下一遍（面板里的 4.0.6 就是这么来的）。 */
-                        try {
-                            if (typeof game !== "undefined" && typeof game.saveConfig === "function" && remoteVer) {
-                                game.saveConfig("extension_" + EXT_DIR_NAME + "_version", remoteVer);
-                            }
-                        } catch (eSV) {
-                            try { if (lib.config) lib.config["extension_" + EXT_DIR_NAME + "_version"] = remoteVer; } catch (eSV2) {}
-                        }
-                        try {
-                            if (lib.extensionPack && lib.extensionPack[EXT_DIR_NAME]) {
-                                lib.extensionPack[EXT_DIR_NAME].version = remoteVer;
-                            }
-                        } catch (eEP) {}
-                        setTimeout(function () { try { game.reload(); } catch (eR) { location.reload(); } }, 1200);
-                    }
-                    function pump() {
-                        while (active < 3 && cursor < total) {
-                            (function (rel) {
-                                active++;
-                                downloadOne(rel).then(function (ok) {
-                                    active--;
-                                    doneCnt = Math.min(doneCnt + 1, total);
-                                    lastTick = Date.now();
-                                    if (!ok) failed.push(rel);
-                                    pump();
-                                });
-                            })(toGet[cursor++]);
-                        }
-                        if (active === 0 && cursor >= total) finishAll();
-                    }
-                    /* 看门狗：25 秒没有任何文件落地 = 连接挂在半路，而不是"慢"。
-                       旧实现没有这一层，面板会永远停在「下载中 n / m」，玩家只能强退。 */
-                    var _updWd = setInterval(function () {
-                        if (Date.now() - lastTick > 25000 && active > 0) {
-                            clearInterval(_updWd);
-                            aborted = true;
-                            _cshUpdating = false;
-                            status.textContent = "更新超时：还有 " + active + " 个文件没有响应（已完成 " + doneCnt + "/" + total + "）。\n已下载的部分会保留，网络恢复后再点「立即更新」只补缺，不会从头再来。";
-                            unlock();
-                        }
-                    }, 5000);
-                    pump();
-                }
-                /* checkFileList 只负责"素材补缺"；代码项不进这个名单，才能每次都重下 */
-                try { game.checkFileList(mediaLocal, proceed); } catch (eC) { proceed(); }
+            async function startUpdate(info,remoteVer,goBtn,closeBtn){
+                if(_cshUpdating){status.textContent='更新任务正在进行，请稍候';goBtn.disabled=false;return;}
+                if(_status.gameStarted&&!_status.over){status.textContent='请在本局结束后再安装更新，当前文件未改动。';goBtn.disabled=false;closeBtn.disabled=false;return;}
+                _cshUpdating=true;updateController=new AbortController();closeBtn.disabled=false;closeBtn.textContent='取消下载';
+                try{
+                    var engine=window.CSHUpdate,io=engine.hostIO({lib:lib,game:game});updateTx=engine.create(io);await updateTx.recover();
+                    var files=Array.from(new Set((info.files||[]).concat(['extension.js']))),hashes=info.hashes||{},needed=[];if(!files.every(function(rel){return /^[a-f0-9]{64}$/.test(hashes[rel]||'');}))throw Error('更新目录缺少文件摘要，请使用完整安装包');status.textContent='正在核对本机文件…';
+                    for(var i=0;i<files.length;i++){if(updateController.signal.aborted)throw Error('下载已取消，原安装未改动');var rel=engine.safe(String(files[i])),local=await io.read('extension/池子魔将/'+rel);if(!local||(hashes[rel]?await engine.digest(local)!==hashes[rel]:cshIsCode(rel)))needed.push(rel);}
+                    var bases=updateBases();
+                    async function fetchFile(rel,signal){var last;for(var i=0;i<bases.length;i++){if(signal.aborted)throw Error('下载已取消');var ctrl=new AbortController(),timer=setTimeout(function(){ctrl.abort();},12000),abort=function(){ctrl.abort();};signal.addEventListener('abort',abort,{once:true});try{var response=await onlineFetch(bases[i]+encodeURI(rel),{cache:'no-store',referrerPolicy:'no-referrer',redirect:'error',signal:ctrl.signal});if(!response.ok)throw Error('HTTP '+response.status);return new Uint8Array(await response.arrayBuffer());}catch(e){last=e;if(signal.aborted)throw e;}finally{clearTimeout(timer);signal.removeEventListener('abort',abort);}}throw last||Error('文件下载失败');}
+                    if(needed.length)await updateTx.apply(needed,fetchFile,{hashes:hashes,signal:updateController.signal,progress:function(p){var names={'downloading':'下载并核验','backing-up':'备份原文件','committing':'提交并核验','recovering':'恢复原文件'};if(p.phase==='backing-up'&&_status.gameStarted&&!_status.over)throw Error('检测到新对局，安装已取消，原文件未改动');status.textContent=(names[p.phase]||p.phase)+' '+p.done+' / '+p.total;closeBtn.disabled=p.phase==='committing'||p.phase==='recovering';}});
+                    if(info.build)game.saveConfig('extension_池子魔将_build',info.build);game.saveConfig('extension_池子魔将_version',remoteVer);status.textContent='文件已核验并更新完成，正在重启…';
+                    setTimeout(function restart(){if(_status.gameStarted&&!_status.over){status.textContent='更新已完成，本局结束后自动重启。';setTimeout(restart,1000);return;}try{game.reload();}catch(e){location.reload();}},1200);
+                }catch(e){status.textContent=String(e.message||e)+(e.recovery?'。请点击“恢复未完成更新”。':'。已提交文件如发生失败会恢复原文件，可重试。');goBtn.disabled=false;}
+                finally{_cshUpdating=false;updateController=null;closeBtn.disabled=false;closeBtn.textContent='关闭';}
             }
 
             /* 目录解析 + 结果呈现：在线 / 缓存共用一套，避免两份版本比较逻辑漂移。
@@ -7826,7 +7709,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                     status.textContent = head + "本机版本未知；远端最新为 " + remoteVer + "。";
                     return;
                 }
-                if (cshVerCmp(remoteVer, localVer) <= 0) {
+                if (cshVerCmp(remoteVer, localVer) < 0 || cshVerCmp(remoteVer,localVer)===0 && info.build && info.build===lib.config.extension_池子魔将_build) {
                     status.textContent = head + "已是最新版本（当前 " + localVer + "，远端 " + remoteVer + "）。";
                     return;
                 }
@@ -7834,11 +7717,12 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                     status.textContent = head + "本机 " + localVer + " 可更新，但当前网络不可用；联网后重试即可。";
                     return;
                 }
-                status.textContent = "发现新版本 " + remoteVer + "（当前 " + localVer + "）。\n是否在线更新？更新完成后游戏会自动重启。";
+                if(!Array.isArray(info.files)||!info.files.length||!info.hashes||!info.files.concat(['extension.js']).every(function(rel){return /^[a-f0-9]{64}$/.test(info.hashes[rel]||'');})){status.textContent='远端目录未提供完整文件摘要，无法安全逐文件更新。请使用作者提供的完整安装包。';return;}
+                status.textContent = cshVerCmp(remoteVer,localVer)===0?'版本同为 '+localVer+'，可以校验并修复本版本文件；完成后自动重启。':'发现新版本 '+remoteVer+'（当前 '+localVer+'）。更新完成后自动重启。';
                 var goBtn = document.createElement("button");
                 goBtn.type = "button";
                 goBtn.className = "csh-ext-btn";
-                goBtn.textContent = "立即更新";
+                goBtn.textContent = cshVerCmp(remoteVer,localVer)===0?"校验并修复":"立即更新";
                 goBtn.addEventListener("click", function () {
                     goBtn.disabled = true;
                     closeBtn.disabled = true;
@@ -7868,12 +7752,12 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                 cshFetchVer().then(function (v) {
                     _cshUpdBase = v.base || _cshUpdBase;
                     cshVerCacheWrite(v.ver, _cshUpdBase);
-                    if (localVer && cshVerCmp(v.ver, localVer) <= 0) {
-                        /* 最常见的一条路：版本没变，240B 收工，一次都不碰 catalog */
+                    if (localVer && cshVerCmp(v.ver, localVer) < 0) {
+                        /* 远端版本更旧，不降级；同版本继续核对构建目录。 */
                         status.textContent = "已是最新版本（当前 " + localVer + "）。";
                         return;
                     }
-                    status.textContent = "发现新版本 " + v.ver + "，正在获取文件清单…";
+                    status.textContent = "远端版本 " + v.ver + "，正在核对文件清单…";
                     return loadCatalogOnce();
                 }).catch(function () {
                     /* ① info.json 阶段全挂（老仓库没这个文件 / 全源不通）→ 退回 catalog 直拉，行为与旧版一致 */
@@ -7898,6 +7782,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                     });
                 });
             }
+            var recoverBtn=document.createElement('button');recoverBtn.type='button';recoverBtn.className='csh-ext-btn ghost';recoverBtn.textContent='恢复未完成更新';recoverBtn.addEventListener('click',async function(){if(_cshUpdating)return;recoverBtn.disabled=true;try{var tx=window.CSHUpdate.create(window.CSHUpdate.hostIO({lib:lib,game:game}));var result=await tx.recover();status.textContent=result.empty?'没有待恢复的更新。':'原文件已恢复或完整提交凭据已核验，可以重新检查。';}catch(e){status.textContent='更新恢复尚未完成：'+String(e.message||e);}finally{recoverBtn.disabled=false;}});row.appendChild(recoverBtn);
             runCheck();
             return true;
         };
@@ -7932,12 +7817,14 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
             try {
                 if (typeof document === "undefined") return false;
                 if (!canShow()) {
+                    disposeFloat();
                     var dead = document.getElementById("csh-dbg-float-btn");
                     if (dead && dead.parentNode) dead.parentNode.removeChild(dead);
                     return false;
                 }
                 var old = document.getElementById("csh-dbg-float-btn");
                 if (old && old.parentNode) return true;
+                disposeFloat();
                 if (old) {
                     try { old.parentNode.removeChild(old); } catch (e0) {}
                 }
@@ -8002,7 +7889,26 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                     (document.head || document.documentElement).appendChild(st);
                 }
 
+                var bindings = [], disposed = false, sizeObserver = null;
+                function listen(target, name, fn, options) {
+                    target.addEventListener(name, fn, options);
+                    bindings.push([target, name, fn, options]);
+                }
                 var btn = document.createElement("div");
+                floatCleanup = function () {
+                    if (disposed) return;
+                    disposed = true;
+                    if (idleTo) clearTimeout(idleTo);
+                    if (rzTo) clearTimeout(rzTo);
+                    if (sizeObserver) sizeObserver.disconnect();
+                    if (ptr) {
+                        try { if (ptr.id != null && btn.releasePointerCapture) btn.releasePointerCapture(ptr.id); } catch (eRelease) {}
+                        ptr.id = null;
+                    }
+                    bindings.forEach(function (binding) { binding[0].removeEventListener(binding[1], binding[2], binding[3]); });
+                    bindings = [];
+                    if (lib.__cshFloatRz === onViewport) lib.__cshFloatRz = null;
+                };
                 btn.id = "csh-dbg-float-btn";
                 btn.innerHTML = "<span class='csh-dbg-fb-main'>池</span>";
                 btn.title = "短按打开 · 拖动移动 · F1";
@@ -8144,32 +8050,32 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                     // 只有 pointerdown 挂在球上（要取起点）；move/up/cancel 一律挂 document，
                     // 与下面 mouse/touch 分支对齐 —— 不再依赖 setPointerCapture 是否成功。
                     // capture 失败时旧写法收不到 move/up：球不跟手，且 ptr.id 卡死导致彻底没反应。
-                    btn.addEventListener("pointerdown", onDown, true);
-                    document.addEventListener("pointermove", onMove, true);
-                    document.addEventListener("pointerup", onUp, true);
-                    document.addEventListener("pointercancel", onCancel, true);
+                    listen(btn, "pointerdown", onDown, true);
+                    listen(document, "pointermove", onMove, true);
+                    listen(document, "pointerup", onUp, true);
+                    listen(document, "pointercancel", onCancel, true);
                 } else {
-                    btn.addEventListener("mousedown", onDown, true);
-                    document.addEventListener("mousemove", onMove, true);
-                    document.addEventListener("mouseup", onUp, true);
-                    btn.addEventListener("touchstart", function (e) {
+                    listen(btn, "mousedown", onDown, true);
+                    listen(document, "mousemove", onMove, true);
+                    listen(document, "mouseup", onUp, true);
+                    listen(btn, "touchstart", function (e) {
                         var t = e.changedTouches[0];
                         onDown({ pointerId: 1, clientX: t.clientX, clientY: t.clientY, stopPropagation: function () { e.stopPropagation(); } });
                     }, { capture: true, passive: false });
-                    document.addEventListener("touchmove", function (e) {
+                    listen(document, "touchmove", function (e) {
                         var t = e.changedTouches[0];
                         onMove({ pointerId: 1, clientX: t.clientX, clientY: t.clientY, preventDefault: function () { e.preventDefault(); } });
                     }, { capture: true, passive: false });
-                    document.addEventListener("touchend", function (e) {
+                    listen(document, "touchend", function (e) {
                         var t = e.changedTouches[0];
                         onUp({ pointerId: 1, clientX: t.clientX, clientY: t.clientY, preventDefault: function () { e.preventDefault(); }, stopPropagation: function () { e.stopPropagation(); } });
                     }, { capture: true, passive: false });
-                    document.addEventListener("touchcancel", function () { onCancel(); }, true);
+                    listen(document, "touchcancel", function () { onCancel(); }, true);
                 }
 
                 // 原生 click 兜底：与 pointer 是两条独立链路，任一条被吞掉另一条仍能打开。
                 // 此 handler 在 click 已产生之后才执行，preventDefault 仅用于阻止继续冒泡到游戏层。
-                btn.addEventListener("click", function (e) {
+                listen(btn, "click", function (e) {
                     try { e.preventDefault(); e.stopPropagation(); } catch (eP) {}
                     togglePanel();
                 }, false);
@@ -8198,6 +8104,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                    那时候球正在被用，变淡反而是负面反馈。 */
                 var idleTo = 0;
                 function wake() {
+                    if (disposed) return;
                     try { btn.classList.remove("csh-dbg-idle"); } catch (eW) {}
                     if (idleTo) clearTimeout(idleTo);
                     idleTo = setTimeout(function () {
@@ -8207,10 +8114,10 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                         try { btn.classList.add("csh-dbg-idle"); } catch (eI) {}
                     }, 3000);
                 }
-                btn.addEventListener("pointerenter", wake, true);
-                btn.addEventListener("pointerdown", wake, true);
-                btn.addEventListener("mouseenter", wake, true);
-                try { btn.addEventListener("touchstart", wake, { capture: true, passive: true }); } catch (eT) {}
+                listen(btn, "pointerenter", wake, true);
+                listen(btn, "pointerdown", wake, true);
+                listen(btn, "mouseenter", wake, true);
+                try { listen(btn, "touchstart", wake, { capture: true, passive: true }); } catch (eT) {}
                 wake();
 
                 /* ---------- 视口变化重新钳制（2026-10-18） ----------
@@ -8239,6 +8146,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                 }
                 var rzTo = 0;
                 function onViewport() {
+                    if (disposed) return;
                     if (rzTo) clearTimeout(rzTo);
                     /* 旋转/缩放过程会连发十几个事件；稳定下来再算一次就够了 */
                     rzTo = setTimeout(function () { rzTo = 0; reclamp(); }, 120);
@@ -8251,8 +8159,14 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                     }
                 } catch (eRb) {}
                 lib.__cshFloatRz = onViewport;
-                window.addEventListener("resize", onViewport, false);
-                window.addEventListener("orientationchange", onViewport, false);
+                listen(window, "resize", onViewport, false);
+                listen(window, "orientationchange", onViewport, false);
+                /* 美术装饰可能在挂载后的微任务中把38px入口换成48px；用最终尺寸重新钳制。 */
+                if (typeof ResizeObserver !== "undefined") {
+                    sizeObserver = new ResizeObserver(onViewport);
+                    sizeObserver.observe(btn);
+                }
+                onViewport();
 
                 try { console.log("[池子调试] 悬浮球已挂载"); } catch (e1) {}
                 return true;
@@ -8289,6 +8203,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
         function mountAll(reason) {
             try { console.log("[池子调试] mountAll:", reason || ""); } catch (eLog) {}
             if (!canShow()) {
+                disposeFloat();
                 try { console.log("[池子调试] 当前不可用，跳过挂载"); } catch (e1) {}
                 var dead = document.getElementById("csh-dbg-float-btn");
                 if (dead && dead.parentNode) try { dead.parentNode.removeChild(dead); } catch (e3) {}

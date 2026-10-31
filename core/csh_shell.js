@@ -352,7 +352,7 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 		try {
 			var el = document.querySelector("#" + OV_ID + " .csh-sh-pc");
 			if (!el) return;
-			/* 生涯大厅的胶囊隐藏由 body.csh-shell-career 类 + CSS 单一实现
+			/* 生涯大厅的胶囊隐藏由壳自身 data-csh-page 场景 + CSS 实现
 			   （见样式表），此处不再特判——单一真值，不设保险层。 */
 			var W = wallet();
 			el.textContent = W ? (fmt(W.wallet.pc()) + " CBY") : "";
@@ -421,10 +421,10 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 			   胜出；104 = 8 + 96）。★ 勿再插回任何未闭合规则体中间。
 			   ============================================================ */
 			/* 生涯大厅（2026-10-07 设计 · 本次恢复生效）：隐藏 CBY 胶囊（页内官阶卡
-			   已有同值大字）+ 右让 96px。display 不带 !important——该属性必须允许
+			   已有同值大字），关闭保持右侧。display 不带 !important——该属性必须允许
 			   程序意图（行内样式）覆盖（postmortems #18）。 */
-			"body.csh-shell-career #csh-shell-dock .csh-sh-pc{display:none;}",
-			"body.csh-shell-career #csh-shell-dock{right:104px!important;}",
+			"#csh-shell-overlay[data-csh-page=career] #csh-shell-dock .csh-sh-pc{display:none;}",
+			"#csh-shell-overlay[data-csh-page=career] #csh-shell-dock{right:8px!important;}",
 			/* 讨伐录：页眉右侧有页内控件【封面】按钮（.pt-home，right≈12px 起、
 			   宽约 45px）→ dock 右让 96px（封面按钮占 12~57px，让位后 ✕ 左缘在
 			   148px，间隙 91px 无重叠）。胶囊保持显示（余额有参考价值，不同于
@@ -853,6 +853,7 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 			var rawB = localStorage.getItem("csh_texas_best");
 			if (rawB) { var bd = JSON.parse(rawB); out.meBigPot = (bd && bd.biggestPot) || 0; }
 		} catch (eBp) {}
+		try{out.assisted=lib.cshWallet.wallet.assistedStats();}catch(e){out.assisted=null;}
 		return out;
 	}
 	function ackToGame(req, ok, data, reqOverride) {
@@ -883,6 +884,7 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 		   每一项都必须是**真实可核**的字段，禁止任何占位/推算值。
 		   已删除：bank（全仓无写入）、quota（恒 1200）。 */
 		var s = {
+            careerStatsReliable:!!(lib.cshWorld&&typeof lib.cshWorld.list==="function"&&typeof lib.cshWorld.stats==="function"&&typeof lib.cshWorld.gambleStats==="function"&&lib.cshInteract&&typeof lib.cshInteract.stats==="function"&&lib.cshBossRecord&&typeof lib.cshBossRecord.summary==="function"&&lib.cshWallet&&lib.cshWallet.cdk), careerUnlocks:null,
 			pc: 0, pcPeak: 0, streak: 0, signedToday: false,
 			rank: 0, merit: 0, meritToday: 0, segIdx: 0, segName: "",
 			cdkCount: 0, cdkGained: 0, cdkMax: 0,
@@ -896,9 +898,10 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 			nightOwl: false,
 		};
 		/* 夜猫子：真实时间判定（0:00–3:59 之间调用统计即成立） */
-		try { var __h = new Date().getHours(); s.nightOwl = (__h >= 0 && __h < 4); } catch (eH) {}
+		try { var __h = new Date().getHours(); s.nightOwl = (__h >= 0 && __h < 4); } catch (eH) { s.careerStatsReliable=false;}
 		try {
 			var W = wallet();
+            if(!W)s.careerStatsReliable=false;
 			if (W) {
 				var g = W.wallet.get();
 				s.pc = g.pc || 0; s.pcPeak = g.pcPeak || 0; s.streak = g.streak || 0;
@@ -914,7 +917,7 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 					for (var ti = 0; ti < t.defs.length; ti++) if (t.defs[ti].done) s.taskDone++;
 				}
 			}
-		} catch (e0) {}
+		} catch (e0) { s.careerStatsReliable=false;}
 		try {
 			var C = lib.cshWallet && lib.cshWallet.cdk;
 			if (C) {
@@ -928,7 +931,7 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 					if (am > s.cdkMax) s.cdkMax = am;
 				}
 			}
-		} catch (e1) {}
+		} catch (e1) { s.careerStatsReliable=false;}
 		try {
 			var d = lib.config["extension_池子魔将_winrateData"];
 			if (d && typeof d === "object") {
@@ -953,7 +956,7 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 				s.wrChars = 0;
 				for (var c in chars) if (Object.prototype.hasOwnProperty.call(chars, c)) s.wrChars++;
 			}
-		} catch (e3) {}
+		} catch (e3) { s.careerStatsReliable=false;}
 		try {
 			var wl = (lib.cshWorld && lib.cshWorld.list) ? lib.cshWorld.list() : [];
 			s.worldChars = wl.length;
@@ -981,17 +984,17 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 					s.recordsSeen = wst.recordsSeen || 0; s.tierDown = wst.tierDown || 0;
 					s.comebacks = wst.comebacks || 0; s.rivals = wst.rivals || 0; s.grudge8 = wst.grudge8 || 0;
 				}
-			} catch (eWs) {}
+			} catch (eWs) { s.careerStatsReliable=false;}
 			var gs = (lib.cshWorld && lib.cshWorld.gambleStats) ? lib.cshWorld.gambleStats() : null;
 			if (gs) {
 				s.gamblePlays = gs.plays || 0; s.gambleWins = gs.wins || 0;
 				s.gambleNet = gs.net || 0; s.gambleBest = gs.best || 0; s.gambleBust = gs.bust || 0;
 				s.gambleBestStreak = gs.bestStreak || 0;
 			}
-		} catch (e4) {}
+		} catch (e4) { s.careerStatsReliable=false;}
 		try {
 			if (lib.cshInteract && lib.cshInteract.stats) s.interactTotal = lib.cshInteract.stats().playerThrows || 0;
-		} catch (e5) {}
+		} catch (e5) { s.careerStatsReliable=false;}
 		/* BOSS 讨伐（2026-10-13 · 批次 4a）：s.boss 复合体（bossbook 页渲染用）+
 		   扁平 5 字段 + s.bossSeries（成就「挑战」16 条判定用，csh_achv statProg 语法） */
 		try {
@@ -1027,11 +1030,12 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 					var RB = lib.cshBossRecord;
 					if (RB && typeof RB.extRosterAll === "function") extRosterList = RB.extRosterAll() || [];
 					else if (RB && typeof RB.extRoster === "function") extRosterList = RB.extRoster() || [];
-				} catch (eExt) { extRosterList = []; }
+				} catch (eExt) { s.careerStatsReliable=false; extRosterList = []; }
 				s.bossExt = { kill: bs.extKill || 0, total: bs.extTotal || 0, roster: extRosterList };
 			}
-		} catch (e6) {}
-		return s;
+		} catch (e6) { s.careerStatsReliable=false;}
+		try{var bank=wallet();if(bank&&bank.wallet.careerUnlocks)s.careerUnlocks=bank.wallet.careerUnlocks();}catch(eCareer){s.careerStatsReliable=false;}
+        return s;
 	}
 	/* ⚠ 2026-09-29 删除两条**死通道**（架构收敛）：
 	     · buyInCharge()（shell-buyin）—— 带入扣款已统一在入场收费屏 doCharge 内完成，
@@ -1286,8 +1290,9 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 		SAVE_SESSION = captureSaveSession();
 
 		var ov = ensureChrome();
-		/* dock 形态：唯一实现 = body 类 + 样式表规则（声明式，无时序依赖、无保险层）。
-		   career：隐藏 CBY 胶囊（页内官阶卡已有同值大字）+ 右让 96px 防与页内控件重叠。 */
+        ov.setAttribute("data-csh-page",key);
+		/* dock 形态：壳自身 data-csh-page + 样式规则；body旧场景类只保留兼容。
+		   career：隐藏重复 CBY，关闭固定右侧；页内操作保留共享安全区。 */
 		try { document.body.classList.toggle("csh-shell-career", key === "career"); } catch (eDk) {}
 		/* 讨伐录（2026-10-13 · 批次 4a）：场景类预留（纸色版全书样式钩子；胶囊保持显示——
 		   首杀/每日奖励与 CBY 相关，顶带余额有参考价值） */
@@ -1427,12 +1432,14 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 			/* 记下本次真实请求 ID：后续所有 ackToGame 回显它（P0-0 修复） */
 			CUR_REQ = (typeof d.req === "string" && d.req) ? d.req : null;
 			var req0 = CUR_REQ;
+            if(cmd==='shell-close-cancelled'){cancelSelfClose();removeLeave();toast('结算尚未确认，牌桌已保留，可重试');return;}
+            if(cmd==='shell-results-retry'){if(persistenceBlocked()||sessionSaveBlocked()){ackToGame(cmd,false,sessionRefused());return;}var pending=lib.cshWallet&&lib.cshWallet.pending;ackToGame(cmd,!!pending,pending?pending.retry():null);return;}
 			var migReply = typeof cmd === "string" && cmd.indexOf("shell-mig-") === 0 ? captureMigReply(e, req0) : null;
 			/* 这些命令包含进度写入；先拒绝，不能让下层空结果变成成功 ACK。
 			   只读查询、关闭和行囊恢复入口仍可使用。 */
 			var mutatesSave = ["shell-settle", "shell-settle-session", "shell-task-add", "shell-merit",
-				"shell-sign", "shell-relief", "shell-ach-claim", "shell-ach-claim-all", "shell-pool-ach-claim", "shell-trade", "shell-goldfish", "shell-market-new",
-				"shell-aff-do", "shell-cheer", "shell-bounty", "shell-seat", "shell-world-round",
+				"shell-sign", "shell-relief", "shell-career-sync", "shell-ach-claim", "shell-ach-claim-all", "shell-pool-ach-claim", "shell-pool-ach-claim-all", "shell-trade", "shell-goldfish", "shell-market-new",
+				"shell-aff-do", "shell-cheer", "shell-cheer-ack", "shell-cheer-import", "shell-bounty", "shell-seat", "shell-world-round",
 				"shell-world-result"].indexOf(cmd) >= 0 || (cmd === "shell-open" && !(META[d.key] && META[d.key].lobby));
 			// postMessage 可能在导入前发出、导入后才处理；仍须在宿主拒绝旧壳写入。
 			if (mutatesSave && sessionSaveBlocked()) { ackToGame(cmd, false, sessionRefused()); return; }
@@ -1492,8 +1499,10 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 				var AF2 = lib.cshAffection, aout = { ok: false, reason: "no-module" };
 				try {
 					if (AF2 && d && d.act === "gift" && typeof AF2.gift === "function") {
-						aout = AF2.gift(d.id, d.gift) || aout;
-					} else if (AF2 && d && typeof AF2.interact === "function") {
+						aout = AF2.gift(d.id, d.gift, d.quantity, d.request) || aout;
+					} else if (AF2 && d && d.act === "gift-quote" && typeof AF2.giftQuote === "function") {
+                        aout=AF2.giftQuote(d.id,d.gift,d.quantity)||aout;
+                    } else if (AF2 && d && typeof AF2.interact === "function") {
 						aout = AF2.interact(d.id, d.act) || aout;
 					}
 				} catch (eAD) {}
@@ -1521,6 +1530,18 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 			}
 			/* 成就系统（2026-09-28 新增）：聚合各模块统计 → 生涯大厅成就引擎评估。
 			   只读聚合，不写任何状态；解锁奖励走 shell-ach-claim。 */
+            if(cmd==="shell-career-sync"){
+                var careerStats=buildStats(),careerSync={ok:false,reason:"生涯统计尚未就绪"};
+                try{
+                    var careerEngine=window.CSH_ACHV,careerBank=wallet();
+                    if(current!=="career")careerSync.reason="请从生涯大厅查看达成记录";
+                    else if(careerStats.careerStatsReliable===false)careerSync.reason="统计暂未完整读取，本次未记录新达成";
+                    else if(careerEngine&&careerBank&&careerBank.wallet.syncCareerUnlocks){careerSync=careerBank.wallet.syncCareerUnlocks(careerEngine.evalAll(careerStats).filter(function(row){return row.conditionMet;}).map(function(row){return row.key;}));if(careerSync.ok)careerStats.careerUnlocks=careerSync.record;}
+                }catch(eCareerSync){careerSync={ok:false,reason:"生涯达成记录暂不可用，请稍后重试"};}
+                ackToGame(cmd,careerSync.ok,{stats:careerStats,ok:careerSync.ok,reason:careerSync.reason||""});
+                if(careerSync.ok&&careerSync.fresh&&careerSync.fresh.length)try{if(lib.cshUI&&lib.cshUI.achievement)lib.cshUI.achievement(careerSync.fresh.map(function(key){var def=careerEngine.byId(key);return {id:key,source:"career",title:def.label,description:def.desc,pc:def.reward};}),{kind:"unlock"});}catch(eCareerFeedback){}
+                return;
+            }
 			if (cmd === "shell-stats") {
 				var snapS = buildStats();
 				/* 2026-10-17：把「指定讨伐令」当前目标随统计下发（图鉴的未讨伐行要显示「已悬赏」）。
@@ -1565,14 +1586,14 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 			/* 成就领奖：服务端（宿主侧）复核条件 → 入账 → 标记已领。
 			   复核用 window.CSH_ACHV（本档文档里的同一份引擎），防伪造桥消息刷奖励。 */
             if(cmd==="shell-ach-claim-all"){
-                var AC=window.CSH_ACHV,W=wallet(),result={ok:false,count:0,gained:0,remaining:0};
+                var AC=window.CSH_ACHV,W=wallet(),result={ok:false,count:0,gained:0,remaining:0},careerFeedback=[];
                 try{if(!AC||!W||!W.wallet.claimCareer)throw Error("成就或钱包尚未就绪");
                     var processed=Object.create(null),budget=Math.min(1000,AC.defs.length),stop=false;
-                    while(budget>0&&!stop){var ready=AC.evalAll(buildStats()).filter(function(r){return r.done&&!r.claimed&&!processed[r.key];});if(!ready.length)break;
-                        for(var n=0;n<ready.length&&budget>0;n++,budget--){var row=ready[n],paid=W.wallet.claimCareer(row.key,row.reward,row.label);if(!paid.ok){result.reason=paid.reason;stop=true;break;}processed[row.key]=true;AC.markClaimed(row.key);if(!paid.already){result.count++;result.gained+=paid.gained;}}
+                    while(budget>0&&!stop){var batchStats=buildStats(),ready=AC.evalAll(batchStats).filter(function(r){return r.done&&!r.claimed&&!processed[r.key]&&(batchStats.careerStatsReliable!==false||r.recorded);});if(!ready.length)break;
+                        for(var n=0;n<ready.length&&budget>0;n++,budget--){var row=ready[n],paid=W.wallet.claimCareer(row.key,row.reward,row.label);if(!paid.ok){result.reason=paid.reason;stop=true;break;}processed[row.key]=true;AC.markClaimed(row.key);if(!paid.already){result.count++;result.gained+=paid.gained;careerFeedback.push({id:row.key,source:"career",title:row.label,description:row.desc,pc:paid.gained});}}
                     }
                     result.remaining=AC.evalAll(buildStats()).filter(function(r){return r.done&&!r.claimed;}).length;result.ok=result.count>0||result.remaining===0;paintPc();
-                }catch(e){result.reason=String(e.message||e);}ackToGame(cmd,result.ok,result);return;
+                }catch(e){result.reason=String(e.message||e);}ackToGame(cmd,result.ok,result);try{presentAchievement(careerFeedback);}catch(presentationError){}return;
             }
 			if (cmd === "shell-ach-claim") {
 				var AC = (typeof window !== "undefined" && window.CSH_ACHV) || null;
@@ -1593,16 +1614,32 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 							if (rA.ok) {
 								AC.markClaimed(d.key); /* 旧格式兼容镜像；原子凭据已在钱包中 */
 								rA.reward = defA.reward;
-								if (!rA.already) shellToast("成就达成「" + defA.label + "」 +" + fmt(rA.gained) + " CBY");
+								/* Presentation runs after the confirmed ACK below. */
 								paintPc();
 							}
 						}
 					}
 				} catch (eAC) { rA.reason = String(eAC && eAC.message || eAC); }
 				ackToGame("shell-ach-claim", !!rA.ok, rA);
+                if(rA.ok&&!rA.already&&defA)try{presentAchievement([{id:defA.key||d.key,source:"career",title:defA.label,description:defA.desc,pc:rA.gained}]);}catch(presentationError){}
 				return;
 			}
 			/* 池子成就只接受规则ID，奖励与解锁由宿主复核。 */
+            if (cmd === "shell-pool-ach-claim-all") {
+                var pool=window.CSH_POOL_ACHV,bank=wallet(),count=0,gained=0,meritGained=0,reason="",remaining=0,poolFeedback=[];
+                if(!pool||!bank||!bank.wallet.claimPool){ackToGame(cmd,false,{reason:"成就尚未就绪，请稍后重试"});return;}
+                try {
+                    for(var ai0=0;ai0<pool.RULES.length;ai0++){
+                        var ar=pool.RULES[ai0];if(!pool.load().got[ar.id]||pool.isPaid(ar.id))continue;
+                        if(count>=40)break;var award=pool.reward(ar),paid=bank.wallet.claimPool(ar.id,award.pc,award.merit,ar.name);
+                        gained+=Number(paid.gained)||0;meritGained+=Number(paid.meritGained)||0;
+                        if(!paid.ok){reason=paid.reason||"领取未完成，请重试";break;}
+                        pool.recordPaid(ar.id,award.pc,award.merit);if(!paid.already){count++;poolFeedback.push({id:ar.id,source:"pool",title:ar.name,description:ar.desc,rare:ar.rare,pc:paid.gained,merit:paid.meritGained});}
+                    }
+                    pool.reconcile();for(var ai1=0;ai1<pool.RULES.length;ai1++)if(pool.load().got[pool.RULES[ai1].id]&&!pool.isPaid(pool.RULES[ai1].id))remaining++;
+                }catch(poolError){reason="领取未完成，请重试";}
+                var bulk={ok:!reason||count>0||gained>0||meritGained>0,count:count,gained:gained,meritGained:meritGained,remaining:remaining,reason:reason};paintPc();ackToGame(cmd,bulk.ok,bulk);try{presentAchievement(poolFeedback);}catch(presentationError){}return;
+            }
 			if (cmd === "shell-pool-ach-claim") {
 				var PA = window.CSH_POOL_ACHV, rp = {ok:false}, wp = wallet();
 				try {
@@ -1616,7 +1653,7 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 						if (rp.ok) { PA.recordPaid(def.id,rw.pc,rw.merit); paintPc(); }
 					}
 				} catch(e) { rp = {ok:false,reason:String(e.message || e)}; }
-				ackToGame("shell-pool-ach-claim",!!rp.ok,rp); return;
+				ackToGame("shell-pool-ach-claim",!!rp.ok,rp);if(rp.ok&&!rp.already&&def)try{presentAchievement([{id:def.id,source:"pool",title:def.name,description:def.desc,rare:def.rare,pc:rp.gained,merit:rp.meritGained}]);}catch(presentationError){} return;
 			}
 
 			/* 生涯大厅专用桥（§4.1.6 / §G.7 / §I）
@@ -1761,32 +1798,17 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 		     仅计 +1（象征量）。判定权在宿主（扣费在这里，页面不许自己扣）——
 		     日键 `csh_rank_cheer_day` 存本地日期（YYYY-MM-DD，字典序按日切换），
 		     只在本功能内读写，是**临时状态键**（不是玩家资产），故**不入迁移白名单**。 */
-		if (cmd === "shell-cheer") {
-			try {
-				var cGid = String(d.girl || "").replace(/[^0-9a-zA-Z_]/g, "").slice(0, 48);
-				var cAmt = Math.floor(Number(d.amt) || 0);
-				var cGn = String(d.gname || "").slice(0, 12);
-				var W1 = wallet();
-				if (!W1) { ackToGame("shell-cheer", false, { reason: "nowallet" }); return; }
-				if (!cGid || cAmt < 100 || cAmt > 1000000) { ackToGame("shell-cheer", false, { reason: "bad" }); return; }
-				var cFree = false;
-				try {
-					var cToday = cshRankDay();
-					cFree = !!cToday && (localStorage.getItem("csh_rank_cheer_day") || "") !== cToday;
-					if (cFree) localStorage.setItem("csh_rank_cheer_day", cToday);
-				} catch (eDay) { cFree = false; }
-				if (cFree) {
-					paintPc();
-					ackToGame("shell-cheer", true, { pc: W1.wallet.pc(), free: true, amt: 1 });
-					return;
-				}
-				var paid = W1.wallet.spend(cAmt, "缠头:" + (cGn || cGid));
-				if (paid !== true) { paintPc(); ackToGame("shell-cheer", false, { reason: "poor" }); return; }
-				paintPc();
-				ackToGame("shell-cheer", true, { pc: W1.wallet.pc(), free: false, amt: cAmt });
-			} catch (eCh) { logError("shell-cheer", eCh); ackToGame("shell-cheer", false, { reason: "error" }); }
-			return;
-		}
+        if (["shell-cheer","shell-cheer-pending","shell-cheer-ack","shell-cheer-import"].indexOf(cmd)>=0) {
+            var cheer=lib.cshCheer,reply;
+            try {
+                if(!cheer) reply={ok:false,reason:"应援尚未就绪，请关闭后重试"};
+                else if(cmd==="shell-cheer") reply=cheer.enqueue(d);
+                else if(cmd==="shell-cheer-pending") reply=cheer.pending(d);
+                else if(cmd==="shell-cheer-ack") reply=cheer.ack(d);
+                else reply=cheer.importLegacy(d);
+            } catch(cheerError){reply={ok:false,reason:"应援保存未完成，记录已保留"};logError("shell-cheer",cheerError);}
+            paintPc();ackToGame(cmd,!!(reply&&reply.ok),reply);return;
+        }
 		/* 缠头名单（id + 名字）：真源 = csh_bossdata.MINIONS（经 import 单点取用），页面不抄第二份 */
 			if (cmd === "shell-cheer-list") {
 				try {
@@ -1928,6 +1950,7 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 					list: inv || [],
 					excluded: excl,
 					recovery: MV && typeof MV.recoveryState === "function" ? MV.recoveryState() : null,
+                    results:lib.cshWallet&&lib.cshWallet.pending?lib.cshWallet.pending.status():null,
 				});
 				} catch (error) { ackToGame("shell-mig-inventory", false, { err: String(error.message || error) }); }
 				return;
@@ -2013,6 +2036,11 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 	}
 
 	/* 壳内 toast（非 noname 的 ui.toast——那个会被壳遮罩压在底下看不见） */
+    function presentAchievement(items) {
+        if(!items||!items.length)return;
+        try{if(lib.cshUI&&typeof lib.cshUI.achievement==="function"){lib.cshUI.achievement(items,{kind:"claim"});return;}}catch(e){}
+        if(items.length===1)shellToast("成就领奖「"+items[0].title+"」 +"+fmt(items[0].pc)+" CBY");
+    }
 	function shellToast(msg) {
 		try {
 			var ov = document.getElementById(OV_ID);
@@ -2069,7 +2097,7 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 		if (!W || !W.wallet || typeof W.wallet.settleRun !== "function") {
 			/* 钱包不可用时不入账、不谎报：如实返回 0 并留下错误日志 */
 			logError("钱包未加载或缺少 settleRun，结算中止：" + key);
-			res.breakdown = "钱包不可用，未结算";
+			res.ok=false;res.reason="钱包不可用，未结算";res.breakdown = "钱包不可用，未结算";
 			res.balance = 0;
 			return res;
 		}
@@ -2118,7 +2146,8 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 				: ("带入 " + fmt(buyIn) + " 结算 " + fmt(chips) + " → 回收 " + fmt(r.payout) +
 					(aiTotal > 0 ? "（同桌可赢 " + fmt(aiTotal) + "）" : ""));
 		}
-		if (r && typeof r.credited === "number") res.credited = r.credited;
+		if(r&&r.ok===false)return r;
+        if (r && typeof r.credited === "number") res.credited = r.credited;
 		res.balance = W.wallet.pc();
 		/* 功勋入账（见 sessionMeritOf）：结算成功即发，与金额同一幂等守卫。
 		   ★ 2026-09-29：纯退款不发功勋 —— 未开局离场（chips === buyIn，零和）
@@ -2190,8 +2219,8 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 			if (!selfClosing) return;
 			var r = selfClosing; selfClosing = null;
 			if (needsSettleWarn()) { confirmLeave(current, r); return; }
-			doClose(r);
-		}, 1500);
+			if(META[current]&&META[current].settle==='rank'&&!GUARD['|'+current]){toast('结算仍未确认，页面已保留，请重试关闭');return;}doClose(r);
+        }, 6500);
 	}
 	function cancelSelfClose() {
 		if (selfCloseTimer) { clearTimeout(selfCloseTimer); selfCloseTimer = 0; }
@@ -2231,7 +2260,7 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 			if (needsSettleWarn()) { confirmLeave(current, pending); return true; }
 			return doClose(pending);
 		}
-		if ((reason === "user" || reason === "game") && needsSettleWarn()) {
+		if ((reason === "user" || reason === "game") && needsSettleWarn() || reason === "user" && META[current] && META[current].settle === "rank") {
 			requestSelfClose(reason);
 			return true;
 		}

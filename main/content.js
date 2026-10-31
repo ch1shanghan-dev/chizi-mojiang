@@ -404,12 +404,14 @@ export function cshContent(config, pack) { try {
         if (window.CSH_POOL_ACHV && typeof window.CSH_POOL_ACHV.install === "function") {
             window.CSH_POOL_ACHV.install({
                 game: game,
-                lib: lib, status: _status, getMode: function () { return get.mode(); },
+                lib: lib, get: get, status: _status, getMode: function () { return get.mode(); },
                 log: function (m) { try { console.warn("[池子成就] " + m); } catch (e) {} },
                 onUnlock: function (hit) {
                     try {
-                        var names = hit.map(function (r) { return "「" + r.name + "」"; }).join(" ");
-                        if (lib.cshUI && typeof lib.cshUI.toast === "function") {
+                        var names = hit.slice(0,3).map(function (r) { return "「" + r.name + "」"; }).join(" ")+(hit.length>3?" 等 "+hit.length+" 项，进入池子成就查看":"");
+                        if (lib.cshUI && typeof lib.cshUI.achievement === "function") {
+                            lib.cshUI.achievement(hit.map(function(r){var reward=window.CSH_POOL_ACHV.reward(r);return {id:r.id,source:"pool",title:r.name,description:r.desc,rare:r.rare,pc:reward.pc,merit:reward.merit};}),{kind:"unlock"});
+                        } else if (lib.cshUI && typeof lib.cshUI.toast === "function") {
                             lib.cshUI.toast("解锁成就 " + names, { skin: "paper", merge: false });
                         }
                     } catch (eT) {}

@@ -221,7 +221,7 @@ installClock(0);
 installRng(SEED);
 /* v6.1：csh_world.js 现在 import 了 core/csh_bossdata.js（妖灵名册单一真源），
    必须在沙盒里镜像同一份 —— 否则 ERR_MODULE_NOT_FOUND。 */
-["core/csh_world.js", "core/csh_migrate.js", "core/csh_page.js", "core/csh_bossdata.js"].forEach((rel) => mirror(rel));
+["core/csh_world.js", "core/csh_migrate.js", "core/csh_page.js", "core/csh_bossdata.js", "core/csh_bond.js"].forEach((rel) => mirror(rel));
 provideCode("core/voices.js", "export const cshVoices = {};\nexport default {};\n");
 /* 名册来源：真实 character/index.js（完整工程）· 合成名册（--roster N）·
    或都不满足时自动合成 97 人（交付包里没有 character/index.js）—— 三种都在标题行注明。 */

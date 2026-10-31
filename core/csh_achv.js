@@ -494,7 +494,10 @@
 			var df = defs[i], cur = 0, goal = 1;
 			try { var pr = df.prog(stats); cur = Number(pr[0]) || 0; goal = Number(pr[1]) || 1; }
 			catch (e) {}
-			var done = cur >= goal;
+			var conditionMet = cur >= goal;
+            var entries=stats.careerUnlocks&&stats.careerUnlocks.v===1&&stats.careerUnlocks.baseline===true&&stats.careerUnlocks.entries;
+            var recorded=!!(entries&&Object.prototype.hasOwnProperty.call(entries,df.key)&&entries[df.key]&&Number.isSafeInteger(entries[df.key].observedAt)&&entries[df.key].observedAt>=0);
+            var done=recorded||conditionMet;
 			var retired = !!RETIRED[df.key];
 			/* 退休条目：未达成且未领取 → 不出现在列表（软下线） */
 			if (retired && !done && !claimedMap[df.key]) continue;
@@ -502,11 +505,15 @@
 				key: df.key, cat: df.cat, ico: df.ico, label: df.label, desc: df.desc,
 				reward: df.reward, cur: Math.min(cur, goal), goal: goal,
 				done: done, claimed: !!claimedMap[df.key], retired: retired,
+                conditionMet:conditionMet, recorded:recorded, observedAt:recorded?entries[df.key].observedAt:null,
 			});
 		}
 		return out;
 	}
 	function test(def, stats) {
+        var entries=stats&&stats.careerUnlocks&&stats.careerUnlocks.v===1&&stats.careerUnlocks.baseline===true&&stats.careerUnlocks.entries;
+        if(entries&&Object.prototype.hasOwnProperty.call(entries,def.key)&&entries[def.key]&&Number.isSafeInteger(entries[def.key].observedAt)&&entries[def.key].observedAt>=0)return true;
+        if(stats&&stats.careerStatsReliable===false)return false;
 		try { var pr = def.prog(stats); return (Number(pr[0]) || 0) >= (Number(pr[1]) || 1); }
 		catch (e) { return false; }
 	}

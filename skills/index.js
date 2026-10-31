@@ -781,7 +781,7 @@ const cshSkillPack = {
                         .set("cardsx", cards)
                         .set("ai", card => {
                             const target = get.player();
-                            if (target.hasSkillTag("noturn") || target.isTurnedOver() || target.hp <= 1) return -1;
+                            if (target.isTurnedOver() || target.hp <= 1) return -1;
                             return 20 - get.value(card, target) - cards.length * 5;
                         })
                         .forResult();
@@ -796,20 +796,17 @@ const cshSkillPack = {
                     order: 9,
                     result: {
                         player(player, target) {
-                            return 0;
+                            return 0.3;
                         },
                         target(player, target) {
-                            if (!target) return 0;
-                            const n = Math.max(1, ui.selected.cards.length);
-                            const selfAtt = Math.max(1, get.attitude(target, target));
-                            // 目标会选择对自己更有利的一项；翻回正面/免翻面也照常摸牌。
-                            const turn = target.hasSkillTag("noturn") ? 0 : (target.isTurnedOver() ? 2 : -2);
-                            const draw = get.effect(target, { name: "draw" }, target, target) / selfAtt;
-                            const flipDraw = turn + draw * n;
-                            if (target.countCards("he") < n) return flipDraw;
-                            // 实际是失去体力，不应被伤害免疫/受伤收益替代。
-                            const discardHp = get.effect(target, { name: "losehp" }, target, target) / selfAtt - n * 0.5;
-                            return Math.max(flipDraw, discardHp);
+                            const att = get.attitude(player, target);
+                            if (att >= 0) return 0;
+                            let eff = get.damageEffect(target, player, player) * 0.35;
+                            // 手牌少 / 残血更痛；已翻面则翻面收益低
+                            if (target.countCards("h") <= 2) eff -= 0.9;
+                            if (target.hp <= 2) eff -= 0.7;
+                            if (target.isTurnedOver()) eff += 0.6;
+                            return eff - 1.2;
                         },
                     },
                 },
@@ -1321,33 +1318,19 @@ const cshSkillPack = {
                     order: 7.2,
                     result: {
                         target(player, target) {
-                            if (!player || !target || !player.canCompare(target)) return 0;
                             const att = get.attitude(player, target);
                             if (att >= 0) return 0;
-                            const hit = get.damageEffect(target, player, player);
-                            if (hit <= 0) return 0;
-                            // 与当前引擎默认拼点选牌保持同一偏好，避免高点桃被保留后仍按它预测。
-                            let own, best = -Infinity;
-                            for (const c of player.getCards("h")) {
-                                const value = get.value(c, player);
-                                const number = player.hasSkillTag("forceWin", null, { card: c }) ? 13 : (get.number(c, player) || 0);
-                                const score = number - value / 5 - (value >= 8 && get.type(c) !== "equip" ? 6 : 0) - (c.name === "du" ? 5 : 0);
-                                if (score > best) { best = score; own = c; }
-                            }
-                            if (!own) return 0;
-                            const number = player.hasSkillTag("forceWin", null, { card: own }) ? 13 : (get.number(own, player) || 0);
-                            if (number <= 0) return 0;
-                            const known = typeof target.getKnownCards === "function" ? target.getKnownCards(player) : [];
-                            const unknown = Math.max(0, target.countCards("h") - known.length);
-                            const knownMax = known.reduce((max, c) => Math.max(max, get.number(c, target) || 0), 0);
-                            // 暗牌仅按公开张数作 1~13 均匀点数估计，比较其最大值；不读取真实暗牌。
-                            const below = Math.max(0, Math.min(1, (number - 1) / 13));
-                            const atMost = Math.max(0, Math.min(1, number / 13));
-                            const win = knownMax < number ? Math.pow(below, unknown) : 0;
-                            const lose = knownMax > number ? 1 : 1 - Math.pow(atMost, unknown);
-                            const risk = get.damageEffect(player, target, player);
-                            const utility = win * hit + lose * risk - Math.max(0, get.value(own, player)) * 0.15;
-                            return -Math.max(0, utility);
+                            const nums = player.getCards("h").map(c => get.number(c) || 0);
+                            if (!nums.length) return 0;
+                            const maxN = Math.max(...nums);
+                            let teff = get.damageEffect(target, player, player);
+                            if (teff > 0) teff = -teff;
+                            // 有大点才拼
+                            if (maxN >= 11) teff -= 0.6;
+                            else if (maxN >= 8) teff -= 0.2;
+                            else teff += 0.5; // 点小数不拼
+                            if (target.hp <= 2) teff -= 0.5;
+                            return teff;
                         },
                     },
                     tag: { damage: 1 },
@@ -4013,7 +3996,7 @@ const cshSkillPack = {
                     },
                 },
             },
-            
+
             "csh_xiaoxi_hansui": {
                 audio: ["xiaoxi_hansui", 2],
                 group: "csh_xiaoxi_hansui_cda",
@@ -5882,7 +5865,7 @@ const cshSkillPack = {
                     player.addSkill("csh_tianpo");
                     player.removeSkill("csh_jikui");
                     player.removeSkill("csh_pt");
-            
+
                 },
                 derivation: ["csh_tianpo"],
                 markimage: "extension/OLUI/image/player/marks/juexingji.png",
@@ -5959,7 +5942,7 @@ const cshSkillPack = {
                     "step 0"
                     player.awakenSkill('csh_yn');
                     player.removeSkill('csh_ss');
-                    
+
                     "step 1"
                     player.loseMaxHp(10);
                     player.storage.csh_yn=true;
@@ -5969,7 +5952,7 @@ const cshSkillPack = {
                     player.addSkill('csh_olpaoxiao');
                     player.addSkill('csh_yanglai');
                     player.removeSkill("csh_yn");
-                  
+
                 },
                 priority: 2,
                 "audioname2": {
@@ -6263,7 +6246,7 @@ const cshSkillPack = {
                     }
                     game.broadcastAll(function(){lib.inpile.add('juedou')});
                     game.updateRoundNumber();
-            
+
                 },
                 priority: 2,
                 subSkill: {
@@ -6284,7 +6267,7 @@ const cshSkillPack = {
                             }
                             game.broadcastAll(function(){lib.inpile.add('juedou')});
                             game.updateRoundNumber();
-                    
+
                         },
                         "_priority": 0,
                         "skill_id": "csh_mingjue_2",
@@ -6490,7 +6473,7 @@ const cshSkillPack = {
                         forced: true,
                         locked: true,
                         filter(event, player) {
-                            return event.card && event.card.name === "sha" && 
+                            return event.card && event.card.name === "sha" &&
                                    !(event.getParent().directHit && event.getParent().directHit.contains(event.target));
                         },
                         logTarget: "target",
@@ -7180,8 +7163,8 @@ const cshSkillPack = {
                     player.awakenSkill("csh_chengce");
                     player.removeSkill("csh_twjingce");
                     player.addSkill("csh_twjingcen");
-            
-                    
+
+
                     player.addSkill("csh_yuzhang");
                     player.addSkill("csh_qingjiao");        player.removeSkill("csh_chengce");
                 },
@@ -7738,7 +7721,7 @@ const cshSkillPack = {
                   player.removeSkill("csh_rezhuhai");
                     player.addSkill("csh_junxing");
                     player.removeSkill("csh_qianxin");
-                    
+
                 },
                 priority: 3,
                 markimage: "extension/OLUI/image/player/marks/juexingji.png",
@@ -8155,36 +8138,24 @@ const cshSkillPack = {
                     next.set('maxNum',event.name=='oldchengxiang'?14:15);
                     next.set('ai',function(button){
                         var player = _status.event.player;
+                        var card = button.link;
                         var maxNum = _status.event.maxNum || 15;
                         var used = 0;
                         for (var i = 0; i < ui.selected.buttons.length; i++) {
                             used += get.number(ui.selected.buttons[i].link);
                         }
-                        if (used + get.number(button.link) > maxNum) return 0;
-                        function value(card) {
-                            var val = get.value(card, player);
-                            if (get.name(card) === "tao" || get.name(card) === "jiu") val += 3;
-                            if (get.type(card) === "equip") val += 1.2;
-                            if (get.tag(card, "damage")) val += 0.8;
-                            return val;
-                        }
-                        var dialog = _status.event.dialog;
-                        if (typeof dialog === "number" && typeof get.idDialog === "function") dialog = get.idDialog(dialog);
-                        var buttons = dialog && dialog.buttons;
-                        if (!buttons || buttons.length > 8) return value(button.link) / Math.max(0.8, Math.sqrt(get.number(button.link)));
-                        var available = Array.from(buttons).filter(function (b) { return ui.selected.buttons.indexOf(b) < 0; });
-                        // 五张公开牌至多32个组合，直接找总价值最高的合法余集，
-                        // 避免按单牌性价比先拿13点牌，反而错过7+8点的组合。
-                        var best = 0, bestMask = 0;
-                        for (var mask = 1; mask < (1 << available.length); mask++) {
-                            var points = used, total = 0;
-                            for (var j = 0; j < available.length; j++) if (mask & (1 << j)) {
-                                points += get.number(available[j].link); total += value(available[j].link);
-                            }
-                            if (points <= maxNum && total > best) { best = total; bestMask = mask; }
-                        }
-                        var index = available.indexOf(button);
-                        return index >= 0 && (bestMask & (1 << index)) ? 100 + value(button.link) : -1;
+                        var num = get.number(card);
+                        if (used + num > maxNum) return 0;
+                        var val = get.value(card, player);
+                        // 高价值、低点数优先；桃/装备/关键牌额外加权
+                        var eff = val / Math.max(0.8, Math.sqrt(num));
+                        if (get.name(card) === "tao" || get.name(card) === "jiu") eff += 3;
+                        if (get.type(card) === "equip") eff += 1.2;
+                        if (get.tag(card, "damage")) eff += 0.8;
+                        // 额度紧张时更偏向低点数
+                        var remain = maxNum - used;
+                        if (remain <= 5) eff += (6 - num) * 0.35;
+                        return eff;
                     });
                     "step 2"
                     if(result.bool&&result.links){
@@ -8449,29 +8420,29 @@ const cshSkillPack = {
                 check: function (event, player) {
                     if (player.isUnseen()) return false;
                     var target = event.player;
-            
+
                     // 如果双方都有身份且相同，则对队友不发动
                     if (player.identity && target.identity) {
                         if (player.identity === target.identity) return false;
                     }
                     // 若无法判断身份，则默认当作敌人（避免队友误伤，但这里为了保守可设为 true）
                     // 实际上没身份时，可能想对所有人使用，但为了保证不坑队友，我们只对胜率高时发动
-            
+
                     var myCards = player.getCards('h');
                     var targetCards = target.getCards('h');
                     if (myCards.length === 0 || targetCards.length === 0) return false;
-            
+
                     // 计算我方最大点数
                     var myMax = 0;
                     for (var c of myCards) {
                         if (c.number > myMax) myMax = c.number;
                     }
-            
+
                     // 估算胜率：考虑对方手牌数（手牌越少，拼赢概率越高）
                     var winRate = Math.min(1, myMax / 13) * (1 - Math.min(1, targetCards.length / 12));
-            
+
                     if (winRate < 0.55) return false;
-            
+
                     // 期望收益：赢则收益约 2.5（摸3放2，控顶），输则损失约 1.5
                     var expected = winRate * 2.5 - (1 - winRate) * 1.5;
                     return expected > 1.0;
@@ -8533,17 +8504,17 @@ const cshSkillPack = {
                             if (player.identity && target.identity) {
                                 if (player.identity === target.identity) return -100;
                             }
-            
+
                             var myCards = player.getCards('h');
                             var targetCards = target.getCards('h');
                             if (myCards.length === 0 || targetCards.length === 0) return -100;
-            
+
                             var myMax = 0;
                             for (var c of myCards) {
                                 if (c.number > myMax) myMax = c.number;
                             }
                             var winRate = Math.min(1, myMax / 13) * (1 - Math.min(1, targetCards.length / 12));
-            
+
                             // 收益评分：手牌少时控顶效果更好，收益更高
                             var gain = 2.5 + (12 - Math.min(12, targetCards.length)) / 6;
                             var loss = 1.5 + targetCards.length / 8;
@@ -8652,11 +8623,11 @@ const cshSkillPack = {
                             // 必须 return undefined：引擎对 number 返回值按乘数处理（result1 *= temp1），
                             // 返回 0 会把整个响应价值清零 → AI 选完牌后收益检查 check()>0 恒假 →
                             // 取消响应并排除技能 —— 这就是"AI 不会转【闪】"的根因。
-            
+
                             var type = get.type(card);
                             var suit = get.suit(card, player);
                             var value = get.value(card);
-            
+
                             if (suit == 'diamond') {
                                 if (enemies > 0) {
                                     if (player.getEquip('zhuge') || player.getEquip('rewrite_zhuge')) {
@@ -8671,7 +8642,7 @@ const cshSkillPack = {
                                 }
                                 return [0, 0];
                             }
-            
+
                             if (suit == 'heart') {
                                 var hp = player.hp;
                                 var maxHp = player.maxHp;
@@ -8681,17 +8652,17 @@ const cshSkillPack = {
                                 }
                                 return [0, 0];
                             }
-            
+
                             if (suit == 'club') {
                                 if (type == 'equip' && value >= 5) return [0, 0];
                                 return [1, 2];
                             }
-            
+
                             if (suit == 'spade') {
                                 if (type == 'equip' && value >= 6) return [0, 0];
                                 return [1, 1];
                             }
-            
+
                             return;
                         },
                     },
@@ -8771,7 +8742,7 @@ const cshSkillPack = {
                         event.dialog.classList.add('center');
                         event.dialog.videoId=id;
                     },player,event.card,judgestr,event.videoId,get.id());
-            
+
                     game.log(player,'展示了',event.card);
                     game.delay(2);
                     if(get.type(event.card,'trick')==get.type(trigger.getParent().card,'trick')){
@@ -8999,8 +8970,8 @@ const cshSkillPack = {
                     if(num>0) player.recover(num);
                     if(!event.targets.length) event.finish();
                     player.removeSkill("csh_zhiba");
-                
-            
+
+
                 },
                 intro: {
                     content: "limited",
@@ -9235,41 +9206,58 @@ const cshSkillPack = {
                     if(winner.isIn() && loser.isIn()) winner.damage(loser,1);
                 },
                 ai: {
+                    // 丁真拼点：极度激进——默认对敌人开战；自伤权重压低；有桃/大点几乎无脑
                     order: 9.5,
                     expose: 0.55,
                     result: {
-                        // 总收益只放在使用者视角，防止目标态度把伤害收益再次翻转。
-                        target: 0,
+                        target: function (player, target) {
+                            if (get.attitude(player, target) >= 0) return -100;
+                            if (!target.countCards("h")) return 0;
+                            var hs = player.getCards("h");
+                            if (!hs.length) return 0;
+                            var myMax = Math.max.apply(null, hs.map(function (c) { return get.number(c) || 0; }));
+                            var ts = target.getCards("h");
+                            var tarMax = ts.length ? Math.max.apply(null, ts.map(function (c) { return get.number(c) || 0; })) : 7;
+                            var winProb = myMax > tarMax ? 0.85 : (myMax === tarMax ? 0.55 : 0.38);
+                            if (myMax >= 10) winProb = Math.min(0.95, winProb + 0.1);
+                            if (myMax >= 12) winProb = Math.min(0.98, winProb + 0.08);
+                            var hasTao = player.countCards("h", "tao") + player.countCards("h", "jiu");
+                            var life = player.hp + (player.hujia || 0);
+                            // 期望：对敌 2 伤、自己 1 伤；自伤只按 0.35 权重，避免 AI 过度惜命
+                            var hitEnemy = 2 * winProb + 1 * (1 - winProb);
+                            var hitMe = 1 * winProb + 2 * (1 - winProb);
+                            var net = hitEnemy * 1.35 - hitMe * 0.35;
+                            // 保底：对敌人至少给正分，推动发动
+                            net = Math.max(net, 1.2);
+                            if (hasTao > 0) net += 3 + hasTao;
+                            if (myMax >= 9) net += 2;
+                            if (myMax >= 11) net += 2;
+                            if (myMax >= 13) net += 2.5;
+                            if (target.hp + (target.hujia || 0) <= 2) net += 3;
+                            if (target.hp + (target.hujia || 0) <= 3) net += 1.5;
+                            // 仅无桃且必死局才劝退
+                            if (hasTao <= 0 && life <= 1 && winProb < 0.4 && myMax < 9) net = -1;
+                            return net;
+                        },
                         player: function (player, target) {
-                            if (!player || !target || player === target || !player.canCompare(target) || get.attitude(player, target) >= 0) return 0;
-                            var hs = player.getCards("h"), own = null, best = -Infinity;
-                            // 跟随本技能 chooseToCompare 的实际选牌：点数优先、低价值微量破同分。
-                            for (var i = 0; i < hs.length; i++) {
-                                var score = (get.number(hs[i], player) || 0) + (get.value(hs[i], player) < 6 ? 0.15 : 0);
-                                if (score > best) { best = score; own = hs[i]; }
-                            }
-                            if (!own) return 0;
-                            var number = get.number(own, player) || 0;
-                            var known = typeof target.getKnownCards === "function" ? target.getKnownCards(player) : [];
-                            var unknown = Math.max(0, target.countCards("h") - known.length);
-                            var knownMax = known.reduce(function (n, c) { return Math.max(n, get.number(c, target) || 0); }, 0);
-                            var below = Math.max(0, Math.min(1, (number - 1) / 13));
-                            var atMost = Math.max(0, Math.min(1, number / 13));
-                            var win = knownMax < number ? Math.pow(below, unknown) : 0;
-                            var lose = knownMax > number ? 1 : 1 - Math.pow(atMost, unknown);
-                            var hit = get.damageEffect(target, player, player);
-                            if (hit <= 0) return 0;
-                            var risk = get.damageEffect(player, target, player);
-                            var myLife = player.hp + (player.hujia || 0), enemyLife = target.hp + (target.hujia || 0);
-                            var saves = hs.filter(function (c) { return c !== own && (get.name(c) === "tao" || get.name(c) === "jiu"); }).length;
-                            // 赢家先打2点；输家已阵亡不会反击。平局只有拼点牌成本。
-                            var winValue = 2 * hit + (enemyLife > 2 ? risk : 0);
-                            var loseValue = 2 * risk + (myLife > 2 || risk >= 0 ? hit : 0);
-                            if (risk < 0 && !saves) {
-                                if (myLife <= 1 && enemyLife > 2) winValue += 3 * risk;
-                                if (myLife <= 2) loseValue += 3 * risk;
-                            }
-                            return Math.max(0, win * winValue + lose * loseValue - Math.max(0, get.value(own, player)) * 0.15);
+                            if (!game.hasPlayer(function (c) {
+                                return c !== player && player.canCompare(c) && get.attitude(player, c) < 0 && c.countCards("h");
+                            })) return 0;
+                            var hs = player.getCards("h");
+                            if (!hs.length) return 0;
+                            var myMax = Math.max.apply(null, hs.map(function (c) { return get.number(c) || 0; }));
+                            var hasTao = player.countCards("h", "tao") + player.countCards("h", "jiu");
+                            var life = player.hp + (player.hujia || 0);
+                            // 出牌阶段主动分：默认积极
+                            var base = 2.2;
+                            if (hasTao > 0) base += 2.5;
+                            if (myMax >= 8) base += 1.2;
+                            if (myMax >= 10) base += 1.5;
+                            if (myMax >= 12) base += 1.8;
+                            if (target && get.attitude(player, target) < 0 && target.countCards("h")) base += 1.5;
+                            // 无桃且 1 血小点才略降，仍可能发动
+                            if (hasTao <= 0 && life <= 1 && myMax <= 6) base = 0.3;
+                            return base;
                         },
                     },
                     threaten: 2.2,
@@ -9462,9 +9450,9 @@ const cshSkillPack = {
                     effect: {
                         target: function (card, player, target) {
                             if (!get.tag(card, "damage")) return;
-                            // 只有普通1点伤害把2血打到1血，才可能吃到结束阶段回复；
-                            // 1血或多点致命伤害不能因为尚未发生的回复降低斩杀评分。
-                            if (target.hp === 2 && get.tag(card, "damage") === 1 && !target.hasSkillTag("norecover")) return [1, 0.25];
+                            // 打到1血：其回合结束可回1，收益略降
+                            if (target.hp === 1 && target.isDamaged && target.isDamaged()) return [1, 0.55];
+                            if (target.hp === 2 && get.tag(card, "damage") > 1) return [1, 0.25];
                         },
                     },
                 },
@@ -9903,13 +9891,13 @@ const cshSkillPack = {
                     if (!map[idt].shaReq) map[idt].shaReq = {};
                     if (!map[idt].shaReq[id]) map[idt].shaReq[id] = 1;
                     map[idt].shaReq[id]++;
-            
+
                     // ② 选择：随机弃置一张牌回复1点体力（无牌无法选择）或摸一张牌
                     const controls = ["摸一张牌"];
                     if (player.countCards("he") > 0) {
                         controls.unshift("随机弃置一张牌并回复1点体力");
                     }
-            
+
                     const { control } = await player
                         .chooseControl(controls)
                         .set("prompt", "【裸衣】请选择一项")
@@ -9923,7 +9911,7 @@ const cshSkillPack = {
                             return "摸一张牌";
                         })
                         .forResult();
-            
+
                     if (control == "随机弃置一张牌并回复1点体力") {
                         const cards = player.getCards("he");
                         if (cards.length) {
@@ -9937,19 +9925,12 @@ const cshSkillPack = {
                 ai: {
                     "directHit_ai": true,
                     threaten: 1.6,
-                    estimateSha(viewer, target) {
-                        if (!target) return 0;
-                        const known = typeof target.getKnownCards === "function" ? target.getKnownCards(viewer) : [];
-                        const shown = known.filter(card => get.name(card, target) === "sha").length;
-                        /* 与宿主响应估值使用同一未知牌基准，不按牌名查询暗手牌。 */
-                        return shown + Math.max(0, target.countCards("h") - known.length) / 4.8;
-                    },
                     skillTagFilter(player, tag, arg) {
                         if (!arg || !arg.card || arg.card.name != "juedou") return false;
                         // 自己没杀不要当直击
                         if (player.countCards("h", "sha") < 1) return false;
                         if (!arg.target) return false;
-                        return Math.floor(lib.skill.csh_luoyi.ai.estimateSha(player, arg.target) / 2) <= player.countCards("h", "sha");
+                        return Math.floor(arg.target.countCards("h", "sha") / 2) <= player.countCards("h", "sha");
                     },
                     effect: {
                         player: function (card, player, target) {
@@ -9983,24 +9964,21 @@ const cshSkillPack = {
                     expose: 0.3,
                     result: {
                         player: function (player, target) {
-                            if (!target || target === player || get.attitude(player, target) >= 0) return 0;
+                            if (get.attitude(player, target) >= 0) return 0;
                             // 自己没杀：决斗要先出杀，会白亏，禁止
                             var mySha = player.countCards("h", "sha");
                             if (mySha < 1) return 0;
-                            if (get.damageEffect(target, player, player) <= 0) return 0;
-                            var enemySha = lib.skill.csh_luoyi.ai.estimateSha(player, target);
-                            var required = player.hasSkill("csh_luoyi") ? 2 : 1;
-                            if (Math.floor(enemySha / required) >= mySha) return 0;
                             var juedouEff = get.effect(player, { name: "juedou", isCard: true }, target, player);
-                            if (enemySha <= 1) juedouEff += 1.5;
+                            if (target.countCards("h", "sha") <= 1) juedouEff += 1.5;
                             // 裸衣在时对方要多出杀，自己仍至少需1杀保底
-                            if (required === 2 && enemySha < 2) {
+                            if (player.hasSkill("csh_luoyi") && mySha >= 1 && target.countCards("h", "sha") < 2) {
                                 juedouEff += 1.2;
                             }
-                            return Math.max(0, juedouEff);
+                            return juedouEff;
                         },
-                        /* 总收益已由 player 评分；不再另给固定目标奖励绕过成本拒绝。 */
-                        target: 0,
+                        target: function (player, target) {
+                            return get.attitude(player, target) < 0 ? -1.5 : 0;
+                        },
                     },
                     threaten: 1.5,
                 },
@@ -10366,7 +10344,7 @@ const cshSkillPack = {
                             }
                         )
                         .forResult(); // 使用 forResult() 获取结果
-            
+
                     // 如果对方没有弃牌（取消或没有锦囊），则移除自身目标
                     if (!result || !result.bool) {
                         // 从目标列表中移除自己
@@ -10573,8 +10551,9 @@ const cshSkillPack = {
                                 )
                                 .set("ai", card => {
                                     const player = get.event().player;
-                                    if (player.hp !== 1 || player.hasSkillTag("norecover") || get.recoverEffect(player, player, player) <= 0) return 0;
-                                    return 8 - get.value(card, player);
+                                    // 1血且有基本牌：优先保命
+                                    if (player.hp === 1) return 8 - get.value(card);
+                                    return 0;
                                 })
                                 .forResult();
                         },
@@ -10590,11 +10569,23 @@ const cshSkillPack = {
                     effect: {
                         target(card, player, target) {
                             if (!card || !target) return;
-                            const directLoss = get.tag(card, "loseHp"), damage = get.tag(card, "damage");
-                            const loss = directLoss || damage && player && player.hasSkillTag("jueqing", false, target);
-                            const amount = Math.max(1, Number(directLoss || damage) || 1);
-                            // 诈降在失体力结束后才给护甲/牌；普通受伤不触发，也不预支濒死后的收益。
-                            if (loss && target.hp > amount) return [1, (target.hp - amount === 1 ? 0.9 : 1.3) * amount];
+                            if (get.tag(card, "damage")) {
+                                if (player.hasSkillTag("jueqing", false, target)) return [1, 1];
+                                return 1.15;
+                            }
+                            if (get.tag(card, "loseHp")) {
+                                if (target.hp <= 1) return;
+                                const using = typeof target.isPhaseUsing === "function" && target.isPhaseUsing();
+                                if (target.hp <= 2) {
+                                    return [1, player.countCards("h") <= 1 && using ? 2.5 : 1.8];
+                                }
+                                if (target.hasSkill("csh_zhaxiang")) return [1, -1.2];
+                                if (using && target.countCards("h", { name: "sha" })) return [1, 2.5];
+                                return [1, 1.5];
+                            }
+                        },
+                        player(card, player, target) {
+                            if (get.tag(card, "loseHp") && target === player) return [1, 1.2];
                         },
                     },
                 },
@@ -10620,18 +10611,15 @@ const cshSkillPack = {
                     effect: {
                         player: function (card, player, target) {
                             if (get.type(card) == "trick") {
-                                const spent = get.itemtype(card) === "card" ? [card] : Array.isArray(card.cards) ? card.cards : [];
-                                const canRecover = !player.hasSkillTag("norecover") && get.recoverEffect(player, player, player) > 0;
-                                const rescue = canRecover && player.getCards("hs").some(c => !spent.includes(c) && lib.filter.cardSavable(c, player, player));
-                                // 摸两张先结算，但不能把未知新牌当作确定救援；护甲不抵消失体力。
-                                if (player.hp <= 1) return [1, rescue ? -1.8 : -8];
-                                let gain = -0.1; // 两张牌的收益减去1点体力，统一用来源侧效用。
-                                if (player.hasSkill("csh_zhaxiang")) gain += 1.3;
-                                if (player.hp === 2) gain -= rescue ? 0.3 : 0.8;
-                                return [1, gain];
+                                // 苦肉：用锦囊会掉血，低血量时大幅降低优先级，避免把自己弄死
+                                if (player.hp <= 1) return [1, -3];
+                                if (player.hp === 2 && !player.countCards("h", "tao") && !player.countCards("h", "jiu")) return [1, -1.5];
+                                if (player.hp > 3 || player.countCards("h", "tao") > 0 || player.hujia > 0) return [1, 1.2];
+                                return [1, 0.2];
                             }
                         },
                     },
+                    maixie: true,
                 },
                 "skill_id": "csh_kurou",
                 "_priority": 0,
@@ -11003,6 +10991,14 @@ const cshSkillPack = {
                 },
                 ai: {
                     threaten: 1.4,
+                    effect: {
+                        player: function (card, player, target) {
+                            // 鼓励保留手牌以触发补牌
+                            if (get.tag(card, "discard") || get.name(card) == "sha") {
+                                return [1, -0.2];
+                            }
+                        },
+                    },
                 },
                 "_priority": 0,
                 "skill_id": "csh_duolve",
@@ -12315,15 +12311,15 @@ const cshSkillPack = {
                             switch (get.suit(ui.selected.cards[0])) {
                                 case "heart":
                                     if (att > 0) return target.hp <= 2 ? 2.5 : 0.8;
-                                    return 0.5; // 回复保护对目标有利；敌我态度由引擎乘算
+                                    return -0.5;
                                 case "diamond":
                                     if (att > 0) return 1.8 + Math.min(1.5, target.countCards("h") * 0.2);
-                                    return 0.3;
+                                    return -0.3;
                                 case "club":
                                     if (att < 0) return -1.5 - Math.min(2, target.countCards("h", "shan") * 0.6);
                                     return 0.2;
                                 case "spade":
-                                    if (att < 0) return get.damageEffect(target, player, target, "thunder") * 0.9;
+                                    if (att < 0) return get.damageEffect(target, player, player, "thunder") * 0.9;
                                     return -1;
                                 default:
                                     return 0;
@@ -12659,7 +12655,7 @@ const cshSkillPack = {
                 derivation: ["csh_zishu_gai","csh_jixi","csh_qijing22","csh_dccuixin","csh_tuntiangai"],
                 content() {
                     player.awakenSkill("csh_zaoxian");
-                    player.loseMaxHp();   
+                    player.loseMaxHp();
                             player.removeSkill("csh_zishu");
                     player.addSkill("csh_zishu_gai");
                     player.addSkills("csh_jixi");
@@ -13067,7 +13063,7 @@ const cshSkillPack = {
                         onremove: true,
                         content: function () {
                             player.removeSkill("csh_juguan_draw");
-                            if (!trigger.numFixed) trigger.num += 8;   
+                            if (!trigger.numFixed) trigger.num += 8;
                         },
                         group: "csh_juguan_clear",
                         intro: {
@@ -13312,7 +13308,7 @@ const cshSkillPack = {
                             precontent: function () {
                                 player.addMark("csh_jixi", 1);
                             },
-            
+
                         };
                     },
                     prompt(links, player) {
@@ -13538,7 +13534,7 @@ const cshSkillPack = {
                     if (bool1 && bool2) {
                          player.changeHujia();
                         player.chooseUseTarget({ name: "sha" }, "是否视为使用一张【杀】？", false);
-                       
+
                     }
                 },
                 ai: {
@@ -14236,7 +14232,7 @@ const cshSkillPack = {
                             var att = get.attitude(player, target);
                             if (att >= 0) return 0;
                             // 敌方：残血或牌少时逼杀收益高（分值取负，目标态度为 -1 后即为正收益）
-                            var shaEff = get.effect(target, { name: "sha" }, player, target);
+                            var shaEff = get.effect(target, { name: "sha" }, player, player);
                             if (target.hp <= 2 || target.countCards("h") <= 1) return shaEff * 1.1 - 0.8;
                             // 牌多则逼交收益
                             return -1.6 - Math.min(2, target.countCards("he") * 0.25);
@@ -14303,7 +14299,7 @@ const cshSkillPack = {
                                 target(player, target) {
                                     const att = get.attitude(player, target);
                                     if (att >= 0) return 0;
-                                    const shaEff = get.effect(target, { name: "sha" }, player, target);
+                                    const shaEff = get.effect(target, { name: "sha" }, player, player);
                                     // 残血/少牌：逼杀收益
                                     if (target.hp <= 2 || target.countCards("h") <= 1) {
                                         return shaEff * 1.2 - 0.6;
@@ -14377,26 +14373,16 @@ const cshSkillPack = {
                 // 交换价值评估（联机安全：无闭包，挂技能对象供各端 AI 本地调用）
                 // 仅用自己手牌、引擎认可的已知牌及公开牌数；队友按全队交换前后的净收益评估。
                 _advantage: function(player,target){
-                    if(!player||!target||player===target||Math.abs(target.countCards('h')-player.countCards('h'))>1) return 0;
-                    var tgCards=typeof target.getKnownCards==='function'?target.getKnownCards(player):[];
+                    var tgCards=target.getCards('h');
                     var myCards=player.getCards('h');
-                    var ally=get.attitude(player,target)>0;
-                    // get.value(card,target) 还会按对方暗手牌的同名牌数量估值，不能间接偷看。
-                    function publicValue(card){
-                        var info=get.info(card), a=info&&info.ai;
-                        var value=a&&(a.value!==undefined?a.value:(a.basic&&a.basic.value));
-                        if(Array.isArray(value)) value=value[0];
-                        return typeof value==='number'&&isFinite(value)?value:5;
-                    }
-                    // 未知牌按单边价值5估计；不调用 get.value 读取暗牌，也不虚构队友间的价值差。
-                    var num=ally?0:Math.max(0,target.countCards('h')-tgCards.length)*10;
+                    var num=0;
                     for(var i=0;i<tgCards.length;i++){
                         num+=get.value(tgCards[i],player);
-                        num+=(ally?-1:1)*publicValue(tgCards[i]);
+                        num+=get.value(tgCards[i],target);
                     }
                     for(var i=0;i<myCards.length;i++){
                         num-=get.value(myCards[i],player);
-                        num+=(ally?1:-1)*publicValue(myCards[i]);
+                        num-=get.value(myCards[i],target);
                     }
                     return num;
                 },
@@ -14419,7 +14405,6 @@ const cshSkillPack = {
                     },
                     result: {
                         player: function(player,target){
-                            if(!player||!target||player===target) return 0;
                             var att=get.attitude(player,target);
                             var adv=lib.skill.csh_jiaomeng._advantage(player,target);
                             if(att>0){
@@ -14436,12 +14421,11 @@ const cshSkillPack = {
                             return num;
                         },
                         target: function(player,target){
-                            if(!player||!target||player===target) return 0;
                             var att=get.attitude(player,target);
                             var adv=lib.skill.csh_jiaomeng._advantage(player,target);
                             if(adv<=0) return 0;
                             if(att<0) return -Math.min(4,adv/3);
-                            if(att>0) return 0; // 队伍净收益已由 result.player 计入，不再把队友收益当损失。
+                            if(att>0) return -Math.min(1.5,adv/8);
                             return -Math.min(2,adv/5);
                         },
                     },
@@ -15186,7 +15170,7 @@ const cshSkillPack = {
                 "_priority": 0,
                 "skill_id": "csh_guidao129",
             },
-            
+
             "csh_fanghun_basic3": {
                 enable: ["chooseToUse", "chooseToRespond"],
                 filter: function (event, player) {
@@ -15615,9 +15599,9 @@ const cshSkillPack = {
                     const targets = game.filterPlayer(current => {
                         return current !== player && (current.getHistory("useCard").length > 0 || current.getHistory("respond").length > 0);
                     });
-            
+
                     const count = targets.length;
-            
+
                     if (count > 1) {
                         await player.loseHp(2);
                     } else if (count === 1) {
@@ -15635,7 +15619,7 @@ const cshSkillPack = {
                             return current !== player && (current.getHistory("useCard").length > 0 || current.getHistory("respond").length > 0);
                         });
                         const count = targets.length;
-            
+
                         // 2. 根据人数计算不同结果的价值
                         if (count > 1) {
                             // 情况A：失去2点体力 => 净收益为 -2（体力价值固定为1，失去2点即为-2）
@@ -16198,7 +16182,7 @@ const cshSkillPack = {
                 async content(event, trigger, player) {
                     // 观看牌堆顶一张牌
                     const cards = get.cards(1, true);
-            
+
                     let result = await player.chooseToMove_new("方圣：可用一张手牌与牌堆顶的牌交换", true)
                         .set("list", [
                             ["牌堆顶的牌", cards],
@@ -16207,14 +16191,14 @@ const cshSkillPack = {
                         .set("cards", cards)
                         .set("filterMove", function(from, to, moved) {
                             if (typeof to === "number") return false;
-            
+
                             const top = moved[0] || [];
                             const hand = moved[1] || [];
                             const originTop = get.event().cards || [];
-            
+
                             const putCount = top.filter(c => !originTop.includes(c)).length;
                             const gainCount = hand.filter(c => originTop.includes(c)).length;
-            
+
                             return putCount <= 1 && gainCount <= 1 && putCount === gainCount;
                         })
                         .set("processAI", function(list) {
@@ -16249,28 +16233,28 @@ const cshSkillPack = {
                             return [topCards, handCards];
                         })
                         .forResult();
-            
+
                     // ========== 交换处理（重点修复空白卡） ==========
                     if (result?.bool) {
                         const moved = result.moved;
                         const newTop = moved[0];
                         const newHand = moved[1];
-            
+
                         // 找出实际交换的牌
                         const putCard = newTop.find(c => player.getCards("h").includes(c));     // 要放到牌堆顶的手牌
                         const gainCard = newHand.find(c => cards.includes(c));                  // 要拿到手的牌堆顶牌
-            
+
                         // 先处理失去的手牌
                         if (putCard) {
                             player.$throw(putCard, 1000);
                             await player.lose(putCard, ui.ordering).set("getlx", false);
                         }
-            
+
                         // 再获得新牌
                         if (gainCard) {
                             await player.gain(gainCard, "draw").set("getlx", false);
                         }
-            
+
                         // 把最终牌堆顶的牌放回牌堆（防止空白卡）
                         await game.cardsGotoPile(newTop.slice().reverse(), ["insert_card", true]);
                         game.addCardKnower(newTop, player);
@@ -16278,22 +16262,22 @@ const cshSkillPack = {
                         // 取消交换，把牌放回牌堆
                         await game.cardsGotoPile(cards, ["insert_card", true]);
                     }
-            
+
                     // ========== 选择其他角色展示牌堆顶 ==========
                     if (!game.hasPlayer(current => current !== player)) return;
-            
+
                     result = await player.chooseTarget("方圣：选择一名其他角色，令其展示牌堆顶的牌", true)
                         .set("filterTarget", (_, player, target) => target !== player)
                         .set("ai", target => get.effect(target, { name: "sha" }, get.player(), get.player()))
                         .forResult();
-            
+
                     if (result?.bool && result.targets?.length) {
                         const target = result.targets[0];
                         player.line(target, "thunder");
-            
+
                         const top = get.cards(1, true);
                         await target.showCards(top, `${get.translation(target)}因“方圣”展示`).set("delay_time", 3);
-            
+
                         const card = top[0];
                         if (get.name(card) === "sha" && player.canUse(card, target, false, false)) {
                             await player.useCard(card, target, false);
@@ -16896,7 +16880,7 @@ const cshSkillPack = {
                         async content(event, trigger, player) {
                             const storage = player.storage.csh_daxiao_countdown;
                             if (!storage || !storage.length) return;
-            
+
                             // 更新所有印记计数
                             for (let i = 0; i < storage.length / 3; i++) {
                                 if (storage[i * 3 + 1] == get.suit(trigger.card, player)) {
@@ -16908,7 +16892,7 @@ const cshSkillPack = {
                             // 联机同步：计数变化同步到客机
                             player.syncStorage("csh_daxiao_countdown");
                             player.markSkill("csh_daxiao_countdown");
-            
+
                             // 循环处理所有已触发的印记（支持同时多个）
                             while (true) {
                                 // 找第一个计数 ≤ 0 的印记
@@ -16920,7 +16904,7 @@ const cshSkillPack = {
                                     }
                                 }
                                 if (idx === -1) break;
-            
+
                                 // 弹出选择（联机真人/AI都能正常触发）
                                 const choices = [
                                     "减1点体力上限，弃置一张牌",
@@ -16940,9 +16924,9 @@ const cshSkillPack = {
                                         return "减1点体力上限，弃置一张牌";
                                     })
                                     .forResult();
-            
+
                                 const choice = control.control;
-            
+
                                 if (choice === choices[0]) {
                                     // 选项①
                                     player.loseMaxHp();
@@ -16971,7 +16955,7 @@ const cshSkillPack = {
                                         player.tempBanSkill(sealed, { player: "turnOver" });
                                     }
                                 }
-            
+
                                 // 移除当前印记
                                 storage.splice(idx * 3, 3);
                                 // 联机同步：印记移除后同步到客机
@@ -17715,7 +17699,7 @@ const cshSkillPack = {
                         },
                     },
                 },
-                
+
                 "skill_id": "csh_fanghaoqibing",
                 "_priority": 0,
             },
@@ -17833,11 +17817,11 @@ const cshSkillPack = {
                             let card = ui.selected.cards[0];
                             let sub = get.subtype(card);
                             let isDerivative = card.name.indexOf("csh_aoenwu_") === 0;
-            
+
                             let tv = get.value(card, target);
                             let targetEquips = target.getCards("e").filter(c => get.subtype(c) === sub);
                             let hasOld = targetEquips.length > 0;
-            
+
                             let replaceBenefit = 0;
                             if (hasOld) {
                                 let oldValue = Math.min(...targetEquips.map(c => get.value(c, target)));
@@ -17846,25 +17830,25 @@ const cshSkillPack = {
                             } else {
                                 replaceBenefit = tv;
                             }
-            
+
                             let drawBonus = isDerivative ? 4 : 0;
-            
+
                             // 使用实际 AI 态度判断敌我；座位奇偶不能代表身份关系。
                             let isTeammate = get.attitude(player, target) > 0;
-            
+
                             let teammateBonus = isTeammate ? 2 : 0;
                             let emptySlotBonus = hasOld ? 0 : 1;
                             let enemyDisruptBonus = 0;
                             if (!isTeammate && replaceBenefit < -2) {
                                 enemyDisruptBonus = 3;
                             }
-            
+
                             let selfValue = get.value(card, player);
                             let retainPenalty = 0;
                             if (selfValue > tv && !isDerivative) {
                                 retainPenalty = (selfValue - tv) * 0.5;
                             }
-            
+
                             let finalScore = replaceBenefit + drawBonus + teammateBonus + emptySlotBonus + enemyDisruptBonus - retainPenalty;
                             return Math.max(0, Math.round(finalScore * 10));
                         },
@@ -18157,16 +18141,16 @@ const cshSkillPack = {
                             var allies = game.filterPlayer(function(current) {
                                 return current != player && get.attitude(player, current) > 0;
                             });
-            
+
                             // 没有队友，直接不用
                             if (allies.length === 0) return 0;
-            
+
                             var hujia = player.hujia || 0;
-            
+
                             // ====== 核心决策 ======
                             // 大多数情况下至少给自己留2点护甲：仅当护甲≥3时才积极发动
                             if (hujia >= 3) return 1.5;
-            
+
                             // 护甲 = 2：极低优先级，几乎不发动（除非队友极度残血）
                             // 护甲 < 2：filter已拦截，不会到这里
                             return 0.02;
@@ -18174,23 +18158,23 @@ const cshSkillPack = {
                         target: function(player, target) {
                             // 非队友直接0分（不选）
                             if (get.attitude(player, target) <= 0) return 0;
-            
+
                             var value = 0.8; // 摸一张牌的基础价值
-            
+
                             // 根据目标当前护甲计算额外价值（优先给护甲少的）
                             var th = target.hujia || 0;
                             if (th <= 0) value += 1.4;
                             else if (th === 1) value += 1.0;
                             else if (th === 2) value += 0.5;
                             else if (th >= 3) value += 0.1;
-            
+
                             // 残血队友更需要护甲保护
                             if (target.hp <= 1) value += 0.6;
                             else if (target.hp === 2) value += 0.3;
-            
+
                             // 手牌很少的队友，摸牌价值更高
                             if (target.countCards('h') <= 1) value += 0.4;
-            
+
                             return value;
                         },
                     },
@@ -18856,11 +18840,11 @@ const cshSkillPack = {
                             if (typeof game.addTempTag === "function") {
                                 game.addTempTag("csh_qiangu_tag", "千古");
                             }
-            
+
                             player.storage.csh_qiangu_inited = true;
                     if (typeof lib.cshSyncStorage === "function") lib.cshSyncStorage(player, "csh_qiangu_inited");
                             player.addSkill("csh_qiangu_mod");
-            
+
                             const list = game.filterPlayer(current => current !== player).sortBySeat();
                             for (const current of list) {
                                 current.addMark("csh_qiangu_mark", 1);
@@ -18890,7 +18874,7 @@ const cshSkillPack = {
                         async content(event, trigger, player) {
                             player.storage.csh_qiangu_dutyCompleted = true;
                     if (typeof lib.cshSyncStorage === "function") lib.cshSyncStorage(player, "csh_qiangu_dutyCompleted");
-            
+
                             // 清理所有标记
                             game.players.forEach(current => {
                                 if (current.hasMark("csh_qiangu_mark")) {
@@ -18898,7 +18882,7 @@ const cshSkillPack = {
                                     current.unmarkSkill("csh_qiangu_jieshu");
                                 }
                             });
-            
+
                             player.awakenSkill("csh_qiangu");
                             player.addSkill("csh_qiangu_mod");
                             await player.addSkills("csh_fangsheng");
@@ -18927,7 +18911,7 @@ const cshSkillPack = {
                         async content(event, trigger, player) {
                             player.storage.csh_qiangu_dutyFailed = true;
                     if (typeof lib.cshSyncStorage === "function") lib.cshSyncStorage(player, "csh_qiangu_dutyFailed");
-            
+
                             // 清理所有标记
                             game.players.forEach(current => {
                                 if (current.hasMark("csh_qiangu_mark")) {
@@ -18935,10 +18919,10 @@ const cshSkillPack = {
                                     current.unmarkSkill("csh_qiangu_jieshu");
                                 }
                             });
-            
+
                             player.awakenSkill("csh_qiangu");
                             player.addSkill("csh_qiangu_mod");
-            
+
                             if (player.hp < 3) {
                                 await player.recover(3 - player.hp);
                             }
@@ -18989,14 +18973,14 @@ const cshSkillPack = {
                             // 防止同一伤害多次触发
                             if (trigger.csh_qiangu_damaged) return;
                             trigger.csh_qiangu_damaged = true;
-            
+
                             const target = trigger.player;
                             const num = target.countMark("csh_qiangu_mark");
                             if (num > 0) {
                                 target.removeMark("csh_qiangu_mark", num);
                                 target.unmarkSkill("csh_qiangu_jieshu");
                             }
-            
+
                             // 找到所有仍在执行使命的拥有者
                             const owners = game.filterPlayer(
                                 current =>
@@ -19004,7 +18988,7 @@ const cshSkillPack = {
                                     !current.storage.csh_qiangu_dutyCompleted &&
                                     !current.storage.csh_qiangu_dutyFailed
                             );
-            
+
                             for (const owner of owners) {
                                 const cards = await owner.draw(2).forResult();
                                 if (cards && cards.length) {
@@ -19221,8 +19205,8 @@ const cshSkillPack = {
                         player(player) {
                             // 场上至少有两个可拿牌的敌人时才考虑发动
                             const enemies = game.filterPlayer(current => {
-                                return current != player && 
-                                       get.attitude(player, current) < 0 && 
+                                return current != player &&
+                                       get.attitude(player, current) < 0 &&
                                        current.hasGainableCards(player, "he");
                             });
                             if (enemies.length < 2) return 0;
@@ -19248,18 +19232,18 @@ const cshSkillPack = {
                             const player2 = get.player();
                             const att = get.attitude(player2, target);
                             if (att >= 0) return -10; // 绝对不选友方
-            
+
                             // 基础收益：拿牌 + 出杀/决斗
                             let score = get.effect(target, { name: "shunshou_copy2" }, player2, player2) * 1.2;
                             score += get.damageEffect(target, player2, player2) * 0.8;
-            
+
                             // 残血优先
                             if (target.hp <= 1) score += 4;
                             else if (target.hp <= 2) score += 2.5;
-            
+
                             // 牌多优先
                             score += Math.min(3, target.countCards("he") * 0.4);
-            
+
                             // 有卖血/防御技能的目标加分（方便后续决斗）
                             const skills = target.getSkills(null, false, false);
                             for (const skill of skills) {
@@ -19268,7 +19252,7 @@ const cshSkillPack = {
                                     score += 1.5;
                                 }
                             }
-            
+
                             // 第二个目标额外考虑决斗价值
                             if (ui.selected.targets.length) {
                                 const first = ui.selected.targets[0];
@@ -19276,7 +19260,7 @@ const cshSkillPack = {
                                 score += get.effect(player2, { name: "juedou" }, target, player2) * 0.6;
                                 if (target.hp > first.hp) score -= 1; // 尽量让第一个目标更脆
                             }
-            
+
                             return score;
                         }
                     }).set("targetprompt", ["出杀对象", "决斗对象"]).set("multitarget", true).forResult();
@@ -19338,7 +19322,7 @@ const cshSkillPack = {
                     let num = 1;
                     for (const target of targets) {
                         if (!target.isIn()) continue;
-            
+
                         const att = get.attitude(target, player);
                         const result = await target
                             .chooseToDiscard({
@@ -19356,7 +19340,7 @@ const cshSkillPack = {
                             })
                             .set("num", num)
                             .forResult();
-            
+
                         if (result?.bool && result.cards?.length) {
                             num = result.cards.length + 1;
                         } else {
@@ -19414,7 +19398,7 @@ const cshSkillPack = {
                         },
                     },
                 },
-                
+
                 "skill_id": "csh_zhugefencheng",
                 mark: true,
                 intro: {
@@ -19447,7 +19431,7 @@ const cshSkillPack = {
                     if (typeof game.addTempTag === "function") {
                         game.addTempTag("奇门", "奇门");
                     }
-            
+
                     const cards = get.cards(8);
                     for (const card of cards) {
                         card.storage.csh_qimen = true;
@@ -19497,11 +19481,11 @@ const cshSkillPack = {
                                 })
                                 .forResult();
                             if (!discardResult.bool || !discardResult.cards || !discardResult.cards.length) return;
-            
+
                             const num = discardResult.cards.length;
                             let gates = player.getExpansions("奇门");
                             if (gates.length === 0) return;
-            
+
                             if (gates.length > num) {
                                 const choose = await player
                                     .chooseCardButton(gates, num, true, "选择" + get.cnNumber(num) + "张“门”获得")
@@ -19510,14 +19494,14 @@ const cshSkillPack = {
                                 if (!choose.bool || !choose.links.length) return;
                                 gates = choose.links;
                             }
-            
+
                             player.logSkill("csh_qimen_exchange");
-            
+
                             // 关键：通过 gain 事件正确添加 gaintag，保证联机同步和显示
                             const next = player.gain(gates, "draw");
                             next.gaintag.add("奇门");
                             await next;
-            
+
                             for (const card of gates) {
                                 card.storage.csh_qimen = true;
                                 if (!card.hasGaintag("奇门")) card.addGaintag("奇门");
@@ -19544,10 +19528,10 @@ const cshSkillPack = {
                             const hand = player.countCards("h", card => card.storage.csh_qimen || card.hasGaintag("奇门"));
                             const need = 8 - (exp + hand);
                             if (need <= 0) return;
-            
+
                             const cards = get.bottomCards(need);
                             if (!cards.length) return;
-            
+
                             for (const card of cards) {
                                 card.storage.csh_qimen = true;
                                 card.addGaintag("奇门");
@@ -19555,7 +19539,7 @@ const cshSkillPack = {
                             const next = player.addToExpansion(cards, "draw");
                             next.gaintag.add("奇门");
                             await next;
-            
+
                             player.logSkill("csh_qimen_round");
                             game.log(player, "补充了", "#y" + get.cnNumber(cards.length), "张", "#g“门”");
                         },
@@ -19708,7 +19692,7 @@ const cshSkillPack = {
                             const player = get.player();
                             let att = get.attitude(player, target);
                             let score = 0;
-            
+
                             // 1. 给自己额外回合（最高优先级）
                             if (target === player) {
                                 score += 10;
@@ -19731,10 +19715,10 @@ const cshSkillPack = {
                             else {
                                 score -= 12 + Math.abs(att) * 0.8;
                             }
-            
+
                             // 额外判断：目标是否处于较好状态
                             if (target.isTurnedOver() || target.isLinked()) score -= (att > 0 ? 2 : -1);
-            
+
                             return score;
                         })
                         .forResult();
@@ -19750,7 +19734,7 @@ const cshSkillPack = {
                         target.storage["csh_chunqiu_wake"] = [[], [], []];
                     }
                     target.storage["csh_chunqiu_wake"][2].add(next);
-            
+
                     if (!trigger._finished) {
                         trigger.finish();
                         trigger._finished = true;
@@ -19795,7 +19779,7 @@ const cshSkillPack = {
                             }
                         });
                     }
-            
+
                     const nexts = trigger.getParent()?.next;
                     if (nexts?.length) {
                         for (let evt of nexts.slice(0)) {
@@ -19960,7 +19944,7 @@ const cshSkillPack = {
                     ).set("ai", function (target) {
                         const player = _status.event.player;
                         let att = get.attitude(player, target);
-            
+
                         // 优先自己放杀（配合仙道杀招）；仅当场上存在可杀的敌方目标时才给高分
                         if (target === player) {
                             const hasEnemy = game.hasPlayer(current => current !== player && get.attitude(player, current) < 0 && player.canUse({ name: "csh_xiandaoshazhao" }, current, false));
@@ -19983,12 +19967,12 @@ const cshSkillPack = {
                         // 队友低优先
                         return -4;
                     }).forResult();
-            
+
                     if (!bool || !targets || !targets.length) return;
-            
+
                     const target1 = targets[0];
                     const cards = target1.getCards("h").randomGets(1);
-            
+
                     if (cards.length) {
                         // 联机更稳定的置顶写法
                         await target1.lose(cards, ui.cardPile, "insert");
@@ -19996,7 +19980,7 @@ const cshSkillPack = {
                         game.log(target1, "将一张手牌置于了牌堆顶");
                         game.delayx(0.5);
                     }
-            
+
                     // 第二步：选择【仙道杀招】的目标
                     const { bool: bool2, targets: targets2 } = await player.chooseTarget(
                         "仙杀：视为使用【仙道杀招】",
@@ -20007,29 +19991,29 @@ const cshSkillPack = {
                         const player = _status.event.player;
                         if (get.attitude(player, target) > 0) return -10;
                         let eff = get.effect(target, { name: "csh_xiandaoshazhao" }, player, player) + 1.2;
-            
+
                         if (target.countCards("h") <= 1) eff += 2;
                         if (target.hp <= 2) eff += 1.5;
                         if (player.hp === 1) eff -= 2;   // 残血保护
                         return eff;
                     }).forResult();
-            
+
                     if (!bool2 || !targets2 || !targets2.length) return;
-            
+
                     const target2 = targets2[0];
                     // 仅视为使用虚拟【仙道杀招】，不再 createCard 挂进 cards（避免「真牌+虚拟」双图）
                     game.log(player, "视为使用了", "#y【仙道杀招】");
                     const card = { name: "csh_xiandaoshazhao", isCard: true };
-            
+
                     const before = player.getHistory("sourceDamage").filter(evt => evt.card).length;
-            
+
                     const next = player.useCard(card, target2, false);
                     await next;
-            
+
                     // 判断此牌是否造成伤害
                     const after = player.getHistory("sourceDamage").filter(evt => evt.card).length;
                     const causedDamage = after > before;
-            
+
                     if (!causedDamage && player.isIn()) {
                         await player.loseHp();
                         player.gainMaxHp();
@@ -20046,12 +20030,12 @@ const cshSkillPack = {
                             // 敌人门控：身份局开局 attitude 全 0 时找不到敌人，不发动
                             if (!game.hasPlayer(current => current !== player && get.attitude(player, current) < 0 && player.canUse({ name: "csh_xiandaoshazhao" }, current, false))) return 0;
                             if (player.hp <= 2) return 0.35;
-            
+
                             const hasSha = player.countCards("h", { name: "sha" }) > 0;
                             const hasGoodTarget = game.hasPlayer(current => {
                                 return current !== player && get.effect(current, { name: "csh_xiandaoshazhao" }, player, player) > 1.8;
                             });
-            
+
                             if (!hasGoodTarget) return hasSha ? 1.8 : 1.4;
                             return hasSha ? 2.6 : 2.0;
                         },
@@ -20630,7 +20614,7 @@ const cshSkillPack = {
                     },
                 },
                 "_priority": 0,
-                
+
                 "skill_id": "csh_lunjing",
             },
             "csh_yumiao": {
@@ -21076,10 +21060,10 @@ const cshSkillPack = {
                 },
                 async content(event, trigger, player) {
                     const { target, name: skillName } = event;
-            
+
                     // ========== 辅助函数（放在 content 内部，保证作用域） ==========
                     const normIdentity = (id) => (id === "mingzhong" ? "zhong" : id);
-            
+
                     const transformIdentity = (tgt, newIdentity) => {
                         // 本地执行
                         tgt.identity = newIdentity;
@@ -21089,7 +21073,7 @@ const cshSkillPack = {
                             tgt.node.identity.classList.remove("guessing");
                         }
                         tgt.setIdentity(newIdentity);
-            
+
                         // 联机同步
                         game.broadcast(
                             (t, id) => {
@@ -21106,13 +21090,13 @@ const cshSkillPack = {
                         );
                     };
                     // ================================================================
-            
+
                     player.awakenSkill(skillName);
-            
+
                     const isLord = player.identity === "zhu";
                     const targetIsZhong =
                         target.identity === "zhong" || target.identity === "mingzhong";
-            
+
                     let strengthen;
                     if (isLord) {
                         strengthen = targetIsZhong;
@@ -21120,24 +21104,24 @@ const cshSkillPack = {
                         strengthen =
                             normIdentity(target.identity) === normIdentity(player.identity);
                     }
-            
+
                     // 记录目标与原始身份
                     const storageKey = skillName + "_targets";
                     const originKey = skillName + "_origin";
-            
+
                     if (!Array.isArray(player.storage[storageKey])) {
                         player.storage[storageKey] = [];
                     }
                     if (!player.storage[originKey]) {
                         player.storage[originKey] = {};
                     }
-            
+
                     // 只在第一次记录原始身份
                     if (player.storage[originKey][target.playerid] === undefined) {
                         player.storage[originKey][target.playerid] = target.identity;
                     }
                     player.storage[storageKey].add(target.playerid);
-            
+
                     // 联机同步 storage
                     game.broadcast(
                         (pid, sKey, oKey, tPid, originId) => {
@@ -21157,10 +21141,10 @@ const cshSkillPack = {
                         target.playerid,
                         target.identity
                     );
-            
+
                     game.addVideo("storage", player, [storageKey, player.storage[storageKey]]);
                     game.addVideo("storage", player, [originKey, player.storage[originKey]]);
-            
+
                     if (strengthen) {
                         await target.addSkills(["csh_jsrgfeiyang", "csh_jsrgbahu"]);
                         player.line(target);
@@ -21169,7 +21153,7 @@ const cshSkillPack = {
                         transformIdentity(target, newIdentity);
                         player.line(target);
                     }
-            
+
                     // 添加三个子技能
                     player.addSkill(skillName + "_damage");
                     player.addSkill(skillName + "_die");
@@ -21223,7 +21207,7 @@ const cshSkillPack = {
                                     tgt.node.identity.classList.remove("guessing");
                                 }
                                 tgt.setIdentity(newIdentity);
-            
+
                                 game.broadcast(
                                     (t, id) => {
                                         t.identity = id;
@@ -21238,14 +21222,14 @@ const cshSkillPack = {
                                     newIdentity
                                 );
                             };
-            
+
                             const targets = player.getStorage("csh_youhabahe_shengbie_targets");
                             const originMap = player.storage["csh_youhabahe_shengbie_origin"] || {};
-            
+
                             for (const pid of targets) {
                                 const target = game.findPlayer((p) => p.playerid === pid, true);
                                 if (!target) continue;
-            
+
                                 const originalIdentity = originMap[pid];
                                 if (originalIdentity && target.identity !== originalIdentity) {
                                     transformIdentity(target, originalIdentity);
@@ -21258,7 +21242,7 @@ const cshSkillPack = {
                                     }
                                 }
                             }
-            
+
                             // 清理
                             delete player.storage["csh_youhabahe_shengbie_targets"];
                             delete player.storage["csh_youhabahe_shengbie_origin"];
@@ -21297,11 +21281,11 @@ const cshSkillPack = {
                     result: {
                         target(player, target) {
                             if (target.identity === "zhu") return 0;
-            
+
                             const isLord = player.identity === "zhu";
                             const targetIsZhong =
                                 target.identity === "zhong" || target.identity === "mingzhong";
-            
+
                             let strengthen;
                             if (isLord) {
                                 strengthen = targetIsZhong;
@@ -21310,10 +21294,10 @@ const cshSkillPack = {
                                     (target.identity === "mingzhong" ? "zhong" : target.identity) ===
                                     (player.identity === "mingzhong" ? "zhong" : player.identity);
                             }
-            
+
                             const att = get.attitude(player, target);
                             const hpFactor = target.hp * 0.35 + target.countCards("h") * 0.15;
-            
+
                             if (strengthen) {
                                 if (
                                     target.hasSkill("csh_jsrgfeiyang") &&
@@ -22041,34 +22025,9 @@ const cshSkillPack = {
                 },
                 ai: {
                     threaten: 1.4,
-                    // 烈火由宿主随机选牌；仅按来源已知颜色与公开手牌数估计。
-                    liehuoValue(viewer, player) {
-                        if (!lib.card.liehuo || !player.countCards("h")) return 0;
-                        const colors = target => {
-                            const count = target.countCards("h");
-                            if (!count) return null;
-                            const known = typeof target.getKnownCards === "function" ? target.getKnownCards(viewer) : [];
-                            const red = known.filter(card => get.color(card, target) === "red").length;
-                            const black = known.filter(card => get.color(card, target) === "black").length;
-                            const unknown = Math.max(0, count - known.length);
-                            return { red: (red + unknown / 2) / count, black: (black + unknown / 2) / count };
-                        };
-                        const own = colors(player);
-                        let result = 0, noRed = 1, noBlack = 1;
-                        for (const target of game.filterPlayer(target => target !== player && target.countCards("h") > 0)) {
-                            const other = colors(target);
-                            const probability = own.red * other.red + own.black * other.black;
-                            result += probability * get.damageEffect(target, player, player, "fire");
-                            noRed *= 1 - other.red;
-                            noBlack *= 1 - other.black;
-                        }
-                        // 至少一人撞色才弃掉所选牌；未知牌不调用接收方 get.value。
-                        const discardProbability = own.red * (1 - noRed) + own.black * (1 - noBlack);
-                        return result - discardProbability * 0.75;
-                    },
                     effect: {
                         target(card, player, target) {
-                            if (get.name(card) === "nanman") return [0, lib.skill.csh_manyi.ai.liehuoValue(player, target)];
+                            if (get.name(card) === "nanman") return [0, 1];
                         },
                     },
                 },
@@ -22089,7 +22048,7 @@ const cshSkillPack = {
                 selectCard: 2,
                 position: "h",
                 check(card) {
-                    return lib.skill.csh_xiangzhen.ai.cardScore(_status.event.player, card, ui.selected.cards);
+                    return 6 - get.value(card);
                 },
                 // 标记显示当前南蛮伤害基数（1+storage）
                 mark: true,
@@ -22136,101 +22095,21 @@ const cshSkillPack = {
                 },
                 ai: {
                     order: 8.5,
-                    responseChance(player, target) {
-                        if (!lib.filter.cardRespondable({ name: "sha" }, target) || target.hasSkillTag("noSha", null, "respond")) return 0;
-                        const known = typeof target.getKnownCards === "function" ? target.getKnownCards(player) : [];
-                        if (known.some(card => ["sha", "hufu", "yuchanqian"].includes(get.name(card, target)) && lib.filter.cardRespondable(card, target))) return 1;
-                        const unknown = Math.max(0, target.countCards("h") - known.length);
-                        let chance = 1 - Math.pow(1 - 1 / 4.8, unknown);
-                        if (target.hasSkillTag("freeSha", null, { player, card: { name: "nanman" }, type: "respond" })) chance = 1;
-                        else if (target.hasSkillTag("respondSha", true, "respond", true)) chance = Math.max(chance, 0.65);
-                        return chance;
-                    },
-                    blastScore(player, mode) {
-                        let score = 0;
-                        const card = { name: "nanman", isCard: true };
-                        const base = Math.max(0, player.storage.csh_xiangzhen_base || 0) + (mode === "damage+1" ? 1 : 0);
-                        for (const target of game.filterPlayer(target => target !== player)) {
-                            if (!player.canUse(card, target, false)) continue;
-                            // 真实南蛮牌效保留免疫、获牌、身份和敌我收益，不改用裸伤害冒充。
-                            const effect = get.effect(target, card, player, player);
-                            const damage = get.damageEffect(target, player, player);
-                            score += effect;
-                            // 无效或反向牌效不因加伤/直击被误当成可伤害目标。
-                            if (!effect || !damage || effect * damage <= 0) continue;
-                            const response = lib.skill.csh_xiangzhen.ai.responseChance(player, target);
-                            const hit = mode === "unrespond" ? 1 : 1 - response;
-                            score += damage * base * hit;
-                            // 基本牌效已含对手响应消耗，因此只补直击的伤害增量。
-                            if (mode === "unrespond") score += damage * response * 0.65;
-                        }
-                        return score;
-                    },
-                    pairMode(cards) {
-                        const types = cards.map(card => get.type2(card));
-                        const isTrick = type => type === "trick" || type === "delay";
-                        if (types.every(type => type === "basic")) return "usable2";
-                        if (types.every(isTrick)) return "damage+1";
-                        if (types.some(type => type === "basic") && types.some(isTrick)) return "unrespond";
-                        return "";
-                    },
-                    pairScore(player, cards, blasts, prices) {
-                        if (cards.length !== 2) return -Infinity;
-                        const ai = lib.skill.csh_xiangzhen.ai;
-                        const mode = ai.pairMode(cards);
-                        return (blasts ? blasts[mode] : ai.blastScore(player, mode)) - cards.reduce((sum, card) => sum + (prices ? prices.get(card) : Math.max(0, get.value(card, player)) * 0.5), 0);
-                    },
-                    bestPair(player, required) {
-                        const available = player.getCards("h", card => get.type(card) !== "equip" && lib.filter.cardDiscardable(card, player, "csh_xiangzhen"));
-                        const ai = lib.skill.csh_xiangzhen.ai;
-                        if (available.length < 2) return 0;
-                        const blasts = Object.fromEntries(["", "usable2", "damage+1", "unrespond"].map(mode => [mode, ai.blastScore(player, mode)]));
-                        // get.value也可能统计自身同名牌；每张成本在本次搜索中只算一次。
-                        const prices = new Map(available.map(card => [card, Math.max(0, get.value(card, player)) * 0.5]));
-                        const pairs = [];
-                        for (let i = 0; i < available.length; i++) for (let j = i + 1; j < available.length; j++) {
-                            const pair = [available[i], available[j]];
-                            pairs.push({ cards: pair, score: ai.pairScore(player, pair, blasts, prices) });
-                        }
-                        pairs.sort((a, b) => b.score - a.score);
-                        const canRepeat = !player.storage.csh_xiangzhen_double && !(player.getStat("skill").csh_xiangzhen || 0);
-                        // 任意两张已付牌的最优不相交牌对，必在至多七条代表边中：
-                        // 最优(a,b)；各排除a/b的最优；再各排除该边的另一端点。
-                        // 因此每次后续查询只看七条，避免为每一牌对重扫全部牌对。
-                        const follows = new Set();
-                        if (canRepeat && available.length >= 4) {
-                            const best = pairs[0];
-                            follows.add(best);
-                            for (const first of best.cards) {
-                                const one = pairs.find(pair => !pair.cards.includes(first));
-                                if (!one) continue;
-                                follows.add(one);
-                                for (const second of one.cards) {
-                                    const two = pairs.find(pair => !pair.cards.includes(first) && !pair.cards.includes(second));
-                                    if (two) follows.add(two);
-                                }
-                            }
-                        }
-                        const followPairs = Array.from(follows).sort((a, b) => b.score - a.score);
-                        let score = -Infinity;
-                        for (const pair of pairs) {
-                            if (required.some(card => !pair.cards.includes(card))) continue;
-                            let value = pair.score;
-                            // 两基本牌只预留本回合剩余手牌真正支持的第二次发动。
-                            if (canRepeat && ai.pairMode(pair.cards) === "usable2") {
-                                const follow = followPairs.find(other => other.cards.every(card => !pair.cards.includes(card)));
-                                if (follow) value += Math.max(0, follow.score);
-                            }
-                            score = Math.max(score, value);
-                        }
-                        return Number.isFinite(score) ? score : 0;
-                    },
-                    cardScore(player, card, selected) {
-                        return lib.skill.csh_xiangzhen.ai.bestPair(player, Array.from(new Set([...(selected || []), card])));
-                    },
                     result: {
                         player(player) {
-                            return lib.skill.csh_xiangzhen.ai.bestPair(player, []);
+                            // 南蛮伤全体其他人：必须算友伤惩罚
+                            let score = 0;
+                            game.filterPlayer(p => p !== player).forEach(p => {
+                                const att = get.attitude(player, p);
+                                let hit = 1;
+                                if (p.countCards("h", "shan") > 0) hit *= 0.35;
+                                if (p.hp <= 1) hit *= 1.4;
+                                if (att < 0) score += hit * 1.2;
+                                else if (att > 0) score -= hit * 1.6;
+                                else score -= hit * 0.2;
+                            });
+                            if (player.countCards("h") < 2) return 0;
+                            return score;
                         },
                     },
                     threaten: 1.6,
@@ -22643,7 +22522,7 @@ const cshSkillPack = {
                         },
                     },
                 },
-                
+
                 "skill_id": "csh_chuhai",
                 "_priority": 0,
             },
@@ -23505,9 +23384,8 @@ const cshSkillPack = {
                             if (!missing) return -0.5;
                             if (target === player) return Math.min(3, missing * 1.2);
                             if (att > 0) return Math.min(3, missing * 1.1);
-                            // 回复是目标收益；返回负值会被敌对态度再翻成正收益。
-                            if (att < 0) return Math.min(3, 1 + missing * 1.3);
-                            return 0.5;
+                            if (att < 0) return -Math.min(3, 1 + missing * 1.3);
+                            return -0.5;
                         },
                     },
                 },
@@ -23572,7 +23450,7 @@ const cshSkillPack = {
                     },
                 },
             },
-            
+
             "csh_e": {
                 charlotte: true,
                 mark: true,
@@ -26819,7 +26697,7 @@ const cshSkillPack = {
             }
             return [0.5, Math.max(target.countCards("h") / 4, target.countCards("h", "sha") + target.countCards("h", "shan"))];
           }
-        
+
         }
       },
       threaten(player, target) {
@@ -27213,7 +27091,7 @@ const cshSkillPack = {
 					if (target.countCards("j") > 0) score += 1.5;
 					if (target.countCards("h") >= 3) score += 0.6;
 					if (target.hp <= 2) score += 0.4;
-					return -score; // 当前 score 已是发动者视角，目标评分需反向
+					return score;
 				},
 			},
 			tag: {
@@ -27344,7 +27222,7 @@ const cshSkillPack = {
 					// 弃牌代价：目标体力越高越亏，略降分
 					eff -= Math.max(0, target.hp - 1) * 0.35;
 					// 自己牌不够或牌质量很高时再由 check 控；此处只评目标
-					return -eff; // 引擎还会乘目标态度，不能再次返回发动者收益
+					return eff;
 				},
 				player(player, target) {
 					// 若可能触发自掉血（目标被打到濒死且可能存活），略扣
@@ -28628,14 +28506,14 @@ const cshSkillPack = {
                     }
                 },
             },
-            
-            
+
+
 
             // ========== 星甘宁 ==========
 
             // ========== 李曦明 仙途 / 煌元 ==========
-            
-            
+
+
             // ========== 明日香：同步 / 心魔 / 力场 / 朗枪 ==========
             "csh_tongbu": {
                 audio: "ext:池子魔将/audio/skill/csh_asuka_02.mp3",
@@ -28684,9 +28562,8 @@ const cshSkillPack = {
                     "csh_tongbu_phaseClear", "csh_tongbu_dying", "csh_tongbu_reward100", "csh_tongbu_shaDmg"
                 ],
                 ai: {
-                    threaten(player, target) {
-                        const owner = target || player;
-                        const v = typeof owner.storage.csh_tb === "number" ? owner.storage.csh_tb : 60;
+                    threaten(player) {
+                        const v = player.storage.csh_tb || 60;
                         if (v >= 80) return 1.8;
                         if (v >= 60) return 1.45;
                         if (v < 40) return 0.9;
@@ -28694,11 +28571,21 @@ const cshSkillPack = {
                     },
                     effect: {
                         player(card, player, target) {
-                            const v = typeof player.storage.csh_tb === "number" ? player.storage.csh_tb : 60;
+                            const v = player.storage.csh_tb || 60;
                             if (!target || target === player) return;
-                            // 加伤只放大目标的牌效；免伤仍由目标 AI 清零，
-                            // 不给尚未真正造成伤害的攻击固定同步收益。
-                            if (v >= 70 && get.name(card) === "sha" && get.tag(card, "damage")) return [1, 0, 2, 0];
+                            if (get.tag(card, "damage")) {
+                                // 尽量造成伤害维持同步，避免空过-10
+                                if (get.attitude(player, target) < 0) {
+                                    if (v >= 70 && get.name(card) === "sha") return [1, 0.55];
+                                    if (v < 50) return [1, 0.45];
+                                    return [1, 0.3];
+                                }
+                            }
+                        },
+                        target(card, player, target) {
+                            if (!target.hasSkill("csh_tongbu")) return;
+                            // 受伤掉同步，被集火时略敏感
+                            if (get.tag(card, "damage") && get.attitude(player, target) < 0) return [1, 0, 1, -0.15];
                         },
                     },
                 },
@@ -28896,7 +28783,7 @@ const cshSkillPack = {
                     const { control } = await player
                         .chooseControl("回复1点体力", "摸两张牌")
                         .set("prompt", "同步100：选择一项")
-                        .set("ai", () => (get.recoverEffect(player, player, player) > 0 ? "回复1点体力" : "摸两张牌"))
+                        .set("ai", () => (player.isDamaged() ? "回复1点体力" : "摸两张牌"))
                         .forResult();
                     if (control === "回复1点体力") {
                         await player.recover(1);
@@ -29021,13 +28908,7 @@ const cshSkillPack = {
                     game.log(player, "发动", "#g【力场】", "，防止非属性伤害");
                 },
                 group: "csh_lichang_cost",
-                ai: {
-                    effect: {
-                        target(card) {
-                            if (get.tag(card, "damage") && !get.tag(card, "natureDamage") && !get.nature(card)) return "zerotarget";
-                        },
-                    },
-                },
+
             },
             "csh_lichang_cost": {
                 charlotte: true,
@@ -29066,8 +28947,21 @@ const cshSkillPack = {
                         .chooseControl(lib.suit)
                         .set("prompt", "朗枪：选择封印的花色")
                         .set("ai", () => {
-                            const scores = lib.skill.csh_langqiang.ai.suitScores(player);
-                            return Object.keys(scores).sort((a, b) => scores[b] - scores[a])[0] || "spade";
+                            const counts = { heart: 0, diamond: 0, club: 0, spade: 0 };
+                            game.filterPlayer(p => p.isIn() && p !== player).forEach(p => {
+                                const att = get.attitude(player, p);
+                                p.getCards("h").forEach(c => {
+                                    const s = get.suit(c);
+                                    if (counts[s] == null) return;
+                                    // 优先封敌人多的花色；自己同花色多则略减
+                                    counts[s] += att < 0 ? 2.5 : att > 0 ? 0.2 : 0.8;
+                                });
+                            });
+                            player.getCards("h").forEach(c => {
+                                const s = get.suit(c);
+                                if (counts[s] != null) counts[s] -= 0.6;
+                            });
+                            return Object.keys(counts).sort((a, b) => counts[b] - counts[a])[0] || "spade";
                         })
                         .forResult();
                     if (!control) return;
@@ -29087,40 +28981,12 @@ const cshSkillPack = {
                 },
                 ai: {
                     order: 9,
-                    suitScores(player) {
-                        const suits = ["heart", "diamond", "club", "spade"];
-                        const scores = Object.fromEntries(suits.map(s => [s, 0]));
-                        const publicValue = card => {
-                            const raw = get.info(card)?.ai?.basic?.value;
-                            const v = Array.isArray(raw) ? raw[0] : raw;
-                            return typeof v === "number" && Number.isFinite(v) ? Math.max(0, Math.min(20, v)) : 5;
-                        };
-                        for (const p of game.filterPlayer(p => p.isIn() && p !== player)) {
-                            const weight = Math.max(-1, Math.min(1, -get.attitude(player, p) / 4));
-                            if (!weight) continue;
-                            const total = Math.max(0, p.countCards("h"));
-                            const known = typeof p.getKnownCards === "function" ? p.getKnownCards(player).slice(0, total) : [];
-                            for (const c of known) {
-                                const suit = get.suit(c);
-                                if (scores[suit] != null) scores[suit] += weight * publicValue(c) * 0.25;
-                            }
-                            // 未知花色均匀估计；只看公开数量，不读取对方暗牌或接收者估值。
-                            const unknown = Math.max(0, total - known.length);
-                            for (const suit of suits) scores[suit] += weight * unknown * 5 * 0.25 / suits.length;
-                        }
-                        for (const c of player.getCards("h")) {
-                            const suit = get.suit(c), value = get.value(c, player);
-                            if (scores[suit] != null) scores[suit] -= (Number.isFinite(value) ? Math.max(0, Math.min(20, value)) : 5) * 0.25;
-                            // 异花色牌须有真实出牌窗口，才估计使用后的摸牌。
-                            if (player.getUseValue(c, undefined, true) > 0) {
-                                for (const s of suits) if (s !== suit) scores[s] += 0.6;
-                            }
-                        }
-                        return scores;
-                    },
                     result: {
                         player(player) {
-                            return Math.max(...Object.values(lib.skill.csh_langqiang.ai.suitScores(player)));
+                            // 有敌人且手牌有异色可摸时更愿意发动
+                            const enemies = game.countPlayer(p => p !== player && get.attitude(player, p) < 0 && p.countCards("h") > 0);
+                            if (!enemies) return 0;
+                            return 1.2 + Math.min(2, enemies) * 0.15;
                         },
                     },
                 },
@@ -29185,14 +29051,7 @@ const cshSkillPack = {
                 async content(event, trigger, player) {
                     await player.draw();
                 },
-                ai: {
-                    effect: {
-                        player(card, player) {
-                            const suit = player.storage.csh_langqiang_suit;
-                            if (suit && card && get.suit(card) !== suit) return [1, 0.2];
-                        },
-                    },
-                },
+
             },
 
             "csh_xiantu": {
@@ -29309,7 +29168,8 @@ const cshSkillPack = {
                                     .set("prompt", "【胎息·问道】六轮将满，择色问天")
                                     .set("prompt2", "同色：六轮圆成，散尽炁意，踏入练气<br>异色：折损三炁，摸三张牌")
                                     .set("ai", () => {
-                                        // 此境失败只损炁并摸牌，没有失去体力或死亡代价。
+                                        const player = _status.event.player;
+                                        if (player.hp <= 1) return "按兵不动";
                                         return Math.random() < 0.55 ? "赤焰（红）" : "玄冥（黑）";
                                     })
                                     .forResult();
@@ -29324,7 +29184,8 @@ const cshSkillPack = {
                                     .set("prompt2", "同类：散尽炁意，铸就仙基，进入筑基<br>异类：折损五炁，失去1点体力并摸四张牌")
                                     .set("ai", () => {
                                         const player = _status.event.player;
-                                        if (player.hp <= 2) return "按兵不动";
+                                        if (player.hp <= 1) return "按兵不动";
+                                        if ((player.storage.csh_qi || 0) < 12 && player.hp <= 2) return "按兵不动";
                                         return "凡兵（基本）";
                                     })
                                     .forResult();
@@ -29342,9 +29203,10 @@ const cshSkillPack = {
                                     .set("prompt", "【筑基·谒天】煌元关前，择一名问天")
                                     .set("prompt2", "相同：散尽炁意，升入紫府<br>不同：身死道消")
                                     .set("ai", () => {
-                                        // 失败是直接死亡，体力再高也不降低风险；不窥视牌堆赌命。
-                                        // 留在筑基仍保有额外摸牌与煌元，默认保留已有资源。
-                                        return "按兵不动";
+                                        const player = _status.event.player;
+                                        if (player.hp <= 2) return "按兵不动";
+                                        // 偏选牌堆常见：杀/闪
+                                        return Math.random() < 0.5 ? get.translation("sha") : get.translation("shan");
                                     })
                                     .forResult();
                                 if (!result.control || result.control === "按兵不动") {
@@ -29475,7 +29337,8 @@ const cshSkillPack = {
                                     const player = _status.event.player;
                                     const evt = _status.event.getTrigger();
                                     if (!evt || !evt.player) return false;
-                                    return get.damageEffect(evt.player, player, player, evt.nature) > 0;
+                                    if (get.attitude(player, evt.player) >= 0) return false;
+                                    return get.damageEffect(evt.player, player, player) > 0;
                                 })
                                 .forResult();
                         },
@@ -29490,7 +29353,7 @@ const cshSkillPack = {
                     },
                 },
             },
-            
+
             "csh_xiantu_mod": {
                 charlotte: true,
                 forced: true,
@@ -29507,7 +29370,7 @@ const cshSkillPack = {
                 },
             },
 
-            
+
             "csh_yetian": {
                 audio: 2,
                 locked: true,
@@ -29537,25 +29400,7 @@ const cshSkillPack = {
                         player.when("useCardAfter").filter(evt => evt == trigger.getParent(2)).step(async (event2, trigger2, player2) => {
                             let result;
                             if (target.isIn() && target.countDiscardableCards(player2, "he")) {
-                                result = await player2.discardPlayerCard(target, "he", true).set("ai", button => {
-                                    const actor = _status.event.player;
-                                    const owner = _status.event.target;
-                                    const card = button.link;
-                                    const known = owner === actor || get.position(card) !== "h" ||
-                                        (typeof owner.getKnownCards === "function" && owner.getKnownCards(actor).includes(card));
-                                    let value = 5;
-                                    if (known) {
-                                        // 外人估值只取公开基础值，不能由同名暗牌数量间接获知手牌。
-                                        if (owner === actor) value = get.value(card, actor);
-                                        else {
-                                            const ai = get.info(card).ai || {};
-                                            const raw = ai.value === undefined ? ai.basic && ai.basic.value : ai.value;
-                                            value = Array.isArray(raw) ? raw[0] : typeof raw === "number" ? raw : 5;
-                                        }
-                                    }
-                                    if (!Number.isFinite(value)) value = 5;
-                                    return get.attitude(actor, owner) > 0 ? -value : value;
-                                }).forResult();
+                                result = await player2.discardPlayerCard(target, "he", true).forResult();
                                 if (result && result.cards && result.cards.length) game.log(player2, "发动", "#g【谒天】", "，弃置了", target, "一张牌");
                             }
                             if (bool1) {
@@ -29590,7 +29435,7 @@ const cshSkillPack = {
                 position: "h",
                 complexCard: true,
                 check(card) {
-                    return lib.skill.csh_huangyuan.ai.netGain(_status.event.player, card);
+                    return 6 - get.value(card);
                 },
                 prompt: "煌元：弃置一张基本牌和一张锦囊牌，获得一张【丹】",
                 async content(event, trigger, player) {
@@ -29601,28 +29446,12 @@ const cshSkillPack = {
                 },
                 ai: {
                     order: 4,
-                    netGain(player, candidate) {
-                        if (!player || !lib.card.csh_dan) return 0;
-                        const hand = player.getCards("h").filter(card =>
-                            typeof lib.filter.cardDiscardable !== "function" || lib.filter.cardDiscardable(card, player, "csh_huangyuan"));
-                        const selected = candidate ? ui.selected.cards.concat(candidate).filter((card, i, list) => list.indexOf(card) === i) : [];
-                        if (selected.some(card => !hand.includes(card))) return 0;
-                        let cost = 0;
-                        for (const type of ["basic", "trick"]) {
-                            const fixed = selected.filter(card => get.type2(card, player) === type);
-                            if (fixed.length > 1) return 0;
-                            const cards = fixed.length ? fixed : hand.filter(card => get.type2(card, player) === type);
-                            if (!cards.length) return 0;
-                            const values = cards.map(card => get.value(card, player)).filter(Number.isFinite);
-                            if (!values.length) return 0;
-                            cost += Math.min(...values);
-                        }
-                        const gain = get.value({ name: "csh_dan" }, player);
-                        return Number.isFinite(gain) ? gain - cost : 0;
-                    },
                     result: {
                         player(player) {
-                            return lib.skill.csh_huangyuan.ai.netGain(player) / 5;
+                            // 有闲置牌再炼
+                            if (player.hp <= 1 && !player.countCards("h", "tao")) return 2;
+                            if (player.countCards("h") >= 5) return 1.2;
+                            return 0.4;
                         },
                     },
                 },
@@ -29681,7 +29510,7 @@ const cshSkillPack = {
                             const hasColor = function (col) {
                                 return player2.countCards("s", function (c) {
                                     return c.hasGaintag && c.hasGaintag("csh_jinfan") && get.color(c, false) === col;
-                                }) > 0 || ui.selected.cards.some(c => get.color(c, player2) === col);
+                                }) > 0;
                             };
                             const col = get.color(card, player2);
                             if ((col === "red" || col === "black") && !hasColor(col)) score += 4;
@@ -29735,8 +29564,11 @@ const cshSkillPack = {
                 },
                 mod: {
                     aiOrder(player, card, num) {
-                        const draw = lib.skill.csh_jinfan.ai.drawEstimate(player, card);
-                        if (draw > 0) return num + 0.3 * draw;
+                        // 仍可随意使用铃；前两次有摸牌收益时略提高优先级
+                        if (get.itemtype(card) === "card" && card.hasGaintag && card.hasGaintag("csh_jinfan")) {
+                            const used = player.countMark("csh_jinfan_draw") || 0;
+                            if (used < 2) return num + 0.6;
+                        }
                     },
                     // 不限制选中/使用/打出“铃”，仅限制摸牌次数（见 gain）
                     cardEnabled2(card, player) {
@@ -29864,32 +29696,12 @@ const cshSkillPack = {
                     threaten: 1.4,
                     order: 1,
                     result: { player: 1 },
-                    drawEstimate(player, card) {
-                        if ((player.countMark("csh_jinfan_draw") || 0) >= 2) return 0;
-                        // effect收到宿主VCard，gaintag在其cards实体牌上；aiOrder也可能收到实体牌。
-                        const spent = get.itemtype(card) === "card" ? [card] : card && Array.isArray(card.cards) ? card.cards : [];
-                        const rings = player.getCards("s", c => c.hasGaintag && c.hasGaintag("csh_jinfan"));
-                        const drawn = player.storage.csh_jinfan_drawn || {};
-                        const fresh = rings.some(c => {
-                            if (!spent.includes(c)) return false;
-                            // 与gain.getLingCards同一实体键；本回合回收再使用不会再次摸牌。
-                            const id = c.cardid != null ? c.cardid : c.cardID != null ? c.cardID : null;
-                            const key = id != null ? String(id) : String(c.name) + "_" + String(c.suit) + "_" + String(c.number);
-                            return !drawn[key];
-                        });
-                        if (!fresh) return 0;
-                        // 多张实体转化时一起移走，不能将本次消耗的任何铃也算作余色。
-                        const colors = new Set();
-                        rings.filter(c => !spent.includes(c)).forEach(c => {
-                            const color = get.color(c, false);
-                            if (color === "red" || color === "black") colors.add(color);
-                        });
-                        return colors.size;
-                    },
                     effect: {
                         player(card, player) {
-                            const draw = lib.skill.csh_jinfan.ai.drawEstimate(player, card);
-                            if (draw > 0) return [1, 0.2 * draw];
+                            // 鼓励在有铃额度时打出铃
+                            if (get.itemtype(card) === "card" && card.hasGaintag && card.hasGaintag("csh_jinfan")) {
+                                if ((player.countMark("csh_jinfan_used") || 0) < 2) return [1, 0.4];
+                            }
                         },
                     },
                 },
@@ -29906,29 +29718,30 @@ const cshSkillPack = {
                 },
                 logTarget: "player",
                 check(event, player) {
-                    const target = event && event.player;
-                    if (!target || target === player || get.attitude(player, target) >= 0) return false;
-                    const count = target.countCards("h");
-                    if (count < 2) return false;
-                    /* 发动后才能观看手牌；发动决策仅使用已知牌和公开数量。 */
-                    const known = typeof target.getKnownCards === "function" ? target.getKnownCards(player) : [];
-                    const red = known.filter(c => get.color(c, target) === "red");
-                    const black = known.filter(c => get.color(c, target) === "black");
-                    const unknown = Math.max(0, count - known.length);
-                    const chance = red.length && black.length ? 1 : red.length || black.length
-                        ? 1 - Math.pow(0.5, unknown) : Math.max(0, 1 - 2 * Math.pow(0.5, unknown));
-                    if (!chance) return false;
-                    /* 不调用 get.value(card,target)，避免估值器间接遍历对方暗牌。 */
-                    const publicValue = card => {
-                        const info = get.info(card);
-                        let value = info && info.ai && (info.ai.basic ? info.ai.basic.value : info.ai.value);
-                        if (Array.isArray(value)) value = value[0];
-                        return typeof value === "number" && Number.isFinite(value) ? value : 5;
-                    };
-                    const discardVal = (red.length ? Math.max(...red.map(publicValue)) : 5)
-                        + (black.length ? Math.max(...black.map(publicValue)) : 5);
+                    // 深度 AI：敌方、有双色、杀有效才发动
+                    const target = event.player;
+                    if (get.attitude(player, target) >= 0) return false;
+                    const hs = target.getCards("h");
+                    // 联机看不到手牌时：按数量与态度粗判
+                    if (_status.connectMode && player != game.me && !target.isUnderControl(true)) {
+                        const shaEff = get.effect(target, { name: "sha" }, player, player);
+                        return hs.length >= 2 && shaEff > 0;
+                    }
+                    const red = hs.filter(c => get.color(c, target) === "red");
+                    const black = hs.filter(c => get.color(c, target) === "black");
+                    if (!red.length || !black.length) return false;
                     const shaEff = get.effect(target, { name: "sha" }, player, player);
-                    return chance * (shaEff + discardVal * 0.15) > 0;
+                    // 弃两张的收益粗估
+                    const discardVal =
+                        Math.max.apply(
+                            null,
+                            red.map(c => get.value(c, target))
+                        ) +
+                        Math.max.apply(
+                            null,
+                            black.map(c => get.value(c, target))
+                        );
+                    return shaEff + discardVal * 0.15 > 0;
                 },
                 async cost(event, trigger, player) {
                     const target = trigger.player;
@@ -30078,9 +29891,10 @@ const cshSkillPack = {
                         }
                         // 据守：手牌少或能抢牌；已翻面时更值
                         if (s === "csh_bashen_jushou") {
-                            const best = game.filterPlayer(p => p.isIn() && p.countCards("he") > 0)
-                                .reduce((value, target) => Math.max(value, lib.skill.csh_bashen_jushou.ai.targetScore(player, target)), 0);
-                            v += best * 0.6;
+                            if (player.isTurnedOver()) v += 5;
+                            else v += hs <= 2 ? 2.2 : 0.6;
+                            if (enemies.some(e => e.countCards("he") >= 2)) v += 1.5;
+                            if (!player.isTurnedOver() && hp >= 3 && hs >= 4) v -= 1.2; // 满状态翻面亏
                         }
                         // 不屈：残血必带
                         if (s === "csh_bashen_buqu") {
@@ -30164,6 +29978,11 @@ const cshSkillPack = {
                 },
                 ai: {
                     threaten: 1.35,
+                    effect: {
+                        player(card, player, target) {
+                            if (get.tag(card, "damage")) return [1, 0.55];
+                        },
+                    },
                 },
             },
             "csh_bashen_jushou": {
@@ -30175,7 +29994,13 @@ const cshSkillPack = {
                         .chooseTarget("据守：摸两张牌并获得一名角色的两张牌，然后翻面", (card, p, t) => t.countCards("he") > 0)
                         .set("ai", target => {
                             const player = _status.event.player;
-                            return lib.skill.csh_bashen_jushou.ai.targetScore(player, target);
+                            const att = get.attitude(player, target);
+                            if (att >= 0) return -1;
+                            const n = Math.min(2, target.countCards("he"));
+                            let score = -att * n * 1.2;
+                            if (player.isTurnedOver()) score += 3;
+                            if (player.hp <= 1) score -= 2;
+                            return score;
                         })
                         .forResult();
                     if (!result.bool || !result.targets || !result.targets.length) {
@@ -30193,28 +30018,7 @@ const cshSkillPack = {
                     }
                     await player.turnOver();
                 },
-                ai: {
-                    threaten: 1.2,
-                    gainEstimate(player, target) {
-                        if (target === player) return 0;
-                        const known = typeof target.getKnownCards === "function" ? target.getKnownCards(player) : [];
-                        const unknown = Math.max(0, target.countCards("h") - known.length);
-                        // 不遍历暗手牌调用countGainableCards；只核对已知手牌与公开装备的可获得性。
-                        const visible = known.concat(target.getCards("e"));
-                        return Math.min(2, unknown + visible.filter(c => lib.filter.canBeGained(c, player, target, "csh_bashen_jushou")).length);
-                    },
-                    targetScore(player, target) {
-                        if (!target || !target.isIn() || !target.countCards("he")) return 0;
-                        const n = lib.skill.csh_bashen_jushou.ai.gainEstimate(player, target);
-                        const relation = Math.max(-1, Math.min(1, get.attitude(player, target) / 4));
-                        // 两张摸牌固定收益；队友间搬牌不凭空创造资源，自取牌也不算偷牌收益。
-                        let score = 2 + n * (0.75 - relation * 0.75);
-                        const noTurn = player.hasSkillTag("noturn");
-                        if (!noTurn) score += player.isTurnedOver() ? 3 : -4;
-                        if (!noTurn && !player.isTurnedOver() && player.hp <= 1) score -= 1;
-                        return score;
-                    },
-                },
+                ai: { threaten: 1.2 },
             },
             "csh_bashen_buqu": {
                 audio: "gzbuqu",
@@ -30231,6 +30035,10 @@ const cshSkillPack = {
                 },
                 ai: {
                     threaten: 1.5,
+                    save: true,
+                    skillTagFilter(player, tag) {
+                        if (tag === "save") return player.hasSkill("csh_bashen_buqu");
+                    },
                 },
             },
             "csh_bashen_yicong": {
@@ -30311,7 +30119,7 @@ const cshSkillPack = {
                     effect: {
                         target(card, player, target) {
                             if (target.getEquip(2)) return;
-                            if (get.color(card) === "black" && get.tag(card, "damage")) return "zerotarget";
+                            if (get.color(card) === "black" && get.tag(card, "damage")) return "zeroplayertarget";
                         },
                     },
                 },
@@ -30354,9 +30162,9 @@ const cshSkillPack = {
                         .chooseTarget("雷击：令一名角色进行判定，若为黑色则受到1点雷电伤害")
                         .set("ai", target => {
                             const player = _status.event.player;
-                            const effect = get.damageEffect(target, player, player, "thunder");
-                            if (effect <= 0) return 0;
-                            let score = effect * 0.5;
+                            const att = get.attitude(player, target);
+                            if (att >= 0) return 0;
+                            let score = get.damageEffect(target, player, player, "thunder");
                             if (target.hp === 1) score += 2;
                             if (target.countCards("h") === 0) score += 0.5;
                             return score;
@@ -30379,9 +30187,7 @@ const cshSkillPack = {
                     expose: 0.25,
                     effect: {
                         player(card, player, target) {
-                            if (get.name(card) !== "shan") return;
-                            const useful = game.hasPlayer(current => current.isIn() && get.damageEffect(current, player, player, "thunder") > 0);
-                            if (useful) return [1, 0.4];
+                            if (get.name(card) === "shan") return [1, 0.4];
                         },
                     },
                 },
@@ -30401,8 +30207,8 @@ const cshSkillPack = {
                         .set("ai", () => {
                             const player = _status.event.player;
                             const zhi = player.getExpansions("csh_hyy_jizhi") || [];
-                            if (player.countCards("h") <= 1) return "牌堆顶";
                             if (player.hasSkill("csh_hyy_linglong") && zhi.length < 2) return "牌堆底";
+                            if (player.countCards("h") <= 1) return "牌堆顶";
                             if (zhi.length >= 3) return "牌堆顶";
                             return zhi.length < 2 ? "牌堆底" : "牌堆顶";
                         })
@@ -30517,19 +30323,8 @@ const cshSkillPack = {
                             return !ui.selected.buttons.some(but => get.owner(but.link) == get.owner(button.link));
                         })
                         .set("ai", button => {
-                            const player = get.player(), card = button.link, owner = get.owner(card);
-                            if (!owner) return 0;
-                            const known = owner === player || get.position(card) !== "h" ||
-                                (typeof owner.getKnownCards === "function" && owner.getKnownCards(player).includes(card));
-                            // 暗手牌按钮虽为空白，仍持有真实对象；评分不能借此看牌。
-                            let value = 5;
-                            if (known) {
-                                const info = get.info(card), base = info && info.ai && info.ai.basic && info.ai.basic.value;
-                                value = owner === player ? get.value(card, player) : typeof base === "number" ? base : Array.isArray(base) ? base[0] : 5;
-                            }
-                            if (!Number.isFinite(value)) value = 5;
-                            // 自己/友方尽量保留好牌，敌方优先移走公开高价值牌。
-                            return get.attitude(player, owner) < 0 ? value : 10 - value;
+                            // 与 olshandao 相同：优先弃低价值牌
+                            return 1 / (get.value(button.link, get.owner(button.link)) || 0.5);
                         })
                         .forResult();
                     if (!result.bool || !result.links) return;
@@ -30587,10 +30382,7 @@ const cshSkillPack = {
                         }
                     },
                     check(button) {
-                        const player = _status.event.player, event = _status.event.getParent && _status.event.getParent();
-                        if (event && event.type === "phase") return player.getUseValue(get.autoViewAs(button.link, []));
-                        // 合法响应已由 filter 限定，优先用机会成本较低的那一张“智”。
-                        return 1 / (1 + Math.max(0, get.value(button.link, player)));
+                        return get.value(button.link);
                     },
                     backup(links) {
                         return {
@@ -30632,8 +30424,6 @@ const cshSkillPack = {
                     respondSha: true,
                     respondShan: true,
                     skillTagFilter(player, tag) {
-                        const last = player.storage && player.storage.csh_hyy_linglong_roundcount;
-                        if (typeof last === "number" && game.roundNumber - last < 1) return false;
                         const cards = player.getExpansions("csh_hyy_jizhi");
                         if (tag === "respondSha") return cards.some(c => get.name(c) === "sha");
                         if (tag === "respondShan") return cards.some(c => get.name(c) === "shan");
@@ -30819,10 +30609,8 @@ const cshSkillPack = {
                     order: 9,
                     result: {
                         target(player, target) {
-                            if (!player || !target || player === target || !target.countCards("h")) return 0;
                             const att = get.attitude(player, target);
-                            const hand = typeof target.getKnownCards === "function" ? target.getKnownCards(player) : [];
-                            const handCount = target.countCards("h");
+                            const hand = target.getCards("h");
                             const counts = {};
                             for (const c of hand) {
                                 const s = get.suit(c, target);
@@ -30830,8 +30618,8 @@ const cshSkillPack = {
                             }
                             const triples = Object.values(counts).filter(n => n >= 3).length;
                             let score = -0.5;
-                            if (handCount > 3) score -= Math.min(4, 1 + (handCount - 3) * 0.8);
-                            if (handCount === 3) score -= 1.4;
+                            if (hand.length > 3) score -= Math.min(4, 1 + (hand.length - 3) * 0.8);
+                            if (hand.length === 3) score -= 1.4;
                             score -= triples * 1.2;
                             if (att > 0) score *= 0.45;
                             else if (att === 0) score *= 0.7;
@@ -30849,12 +30637,7 @@ const cshSkillPack = {
                     if (player.hasHistory("lose", function (evt) { return evt.type == "discard"; })) num++;
                     if (!player.isMinHandcard()) num++;
                     if (!player.getStat("damage")) num++;
-                    if (num == 3) {
-                        if (player.hp < 2) return false;
-                        const own = get.effect(player, { name: "losehp", isCard: true }, player, player);
-                        return game.hasPlayer(target => target !== player && target.isIn() &&
-                            own + get.effect(target, { name: "losehp", isCard: true }, player, player) > 0);
-                    }
+                    if (num == 3) return player.hp >= 2;
                     return true;
                 },
                 prompt(event, player) {
@@ -30895,9 +30678,6 @@ const cshSkillPack = {
                     chooseToMove.set("num", num);
                     chooseToMove.set("processAI", function (list) {
                         const cards3 = list[0][1].slice(0), tops = [];
-                        const player = _status.event.player;
-                        // 公开三牌中把低价值留顶，保留高价值给自己；不是按原牌序丢前N张。
-                        cards3.sort((a, b) => get.value(a, player) - get.value(b, player));
                         while (tops.length < _status.event.num && cards3.length) {
                             tops.push(cards3.shift());
                         }
@@ -30920,7 +30700,7 @@ const cshSkillPack = {
                         return target != player2;
                     });
                     chooseTarget.ai = function (target) {
-                        return get.effect(target, { name: "losehp", isCard: true }, _status.event.player, _status.event.player);
+                        return -get.attitude(_status.event.player, target);
                     };
                     result = await chooseTarget.forResult();
                     if (result.bool && result.targets && result.targets.length) {
@@ -31046,7 +30826,14 @@ const cshSkillPack = {
                             .chooseTarget("偏助：获得一名角色的一张装备牌", true, (card, p, t) => t.isIn() && t.countCards("e") > 0)
                             .set("ai", target => {
                                 const player = _status.event.player;
-                                return lib.skill.csh_ssx_pianzhu.ai.yinGain(player, target);
+                                let best = 0;
+                                target.getCards("e").forEach(c => {
+                                    const v = get.value(c, player);
+                                    if (v > best) best = v;
+                                });
+                                const att = get.attitude(player, target);
+                                if (att > 0) return best * 0.3;
+                                return best;
                             })
                             .forResult();
                         if (!ownerRes.bool || !ownerRes.targets || !ownerRes.targets.length) {
@@ -31057,7 +30844,7 @@ const cshSkillPack = {
                         if (owner.countCards("e")) {
                             const equipRes = await player
                                 .choosePlayerCard(owner, "e", true, "偏助：获得一张装备牌")
-                                .set("ai", button => lib.skill.csh_ssx_pianzhu.ai.yinGain(get.player(), get.owner(button.link), button.link))
+                                .set("ai", button => get.value(button.link, get.player()))
                                 .forResult();
                             if (equipRes.bool && equipRes.cards && equipRes.cards.length) {
                                 await owner.give(equipRes.cards, player, true);
@@ -31127,38 +30914,21 @@ const cshSkillPack = {
                     await player.chooseUseTarget(vc, true, false).set("addCount", false);
                 },
                 ai: {
-                    yinGain(player, target, card) {
-                        if (!target) return 0;
-                        const cards = card ? [card] : target.getCards("e");
-                        const relation = target === player ? 1 : Math.max(-1, Math.min(1, get.attitude(player, target) / 4));
-                        let best = -Infinity;
-                        for (const c of cards) {
-                            const value = Math.max(0, get.value(c, player));
-                            let gain = value * (1 - relation);
-                            if (player.hasSkill("csh_ssx_xiaoji")) {
-                                gain += 2; /* 自己摸一张；装备栏的长期价值仅作小额公开估计 */
-                                if (_status.currentPhase === player && typeof target.hasEnabledSlot === "function" &&
-                                    [1, 2, 3, 4, 5].some(n => target.hasEnabledSlot(n))) gain -= relation * 2;
-                            }
-                            if (target === player && player.hasSkill("csh_ssx_xiaoji2")) gain += 4;
-                            best = Math.max(best, gain);
-                        }
-                        return Number.isFinite(best) ? best : 0;
-                    },
-                    yinNet(player) {
-                        const hs = player.getCards("h");
-                        if (!hs.length) return 0;
-                        const cost = Math.min(...hs.map(c => Math.max(0, get.value(c, player))));
-                        let best = 0;
-                        for (const owner of game.filterPlayer(c => c.isIn() && c.countCards("e") > 0)) {
-                            best = Math.max(best, lib.skill.csh_ssx_pianzhu.ai.yinGain(player, owner));
-                        }
-                        return Math.max(0, best - cost);
-                    },
                     order(item, player) {
                         if (!player) player = _status.event.player;
                         if (player.storage && player.storage.csh_ssx_pianzhu) {
-                            const best = lib.skill.csh_ssx_pianzhu.ai.yinNet(player);
+                            // 阴：有廉价杀且能拆到有价值的敌装
+                            if (!player.countCards("h", "sha")) return 0;
+                            if (!game.hasPlayer(c => c.countCards("e") > 0)) return 0;
+                            let best = 0;
+                            game.filterPlayer(c => c.countCards("e") > 0).forEach(c => {
+                                const att = get.attitude(player, c);
+                                c.getCards("e").forEach(card => {
+                                    const v = get.value(card, player);
+                                    const score = att > 0 ? v * 0.25 : v;
+                                    if (score > best) best = score;
+                                });
+                            });
                             return best >= 5 ? 7.4 : best >= 3 ? 5.5 : 0.5;
                         }
                         // 阳：优先拆敌手牌
@@ -31169,7 +30939,11 @@ const cshSkillPack = {
                     result: {
                         player(player) {
                             if (player.storage && player.storage.csh_ssx_pianzhu) {
-                                return lib.skill.csh_ssx_pianzhu.ai.yinNet(player);
+                                if (!player.countCards("h", "sha")) return 0;
+                                return game.hasPlayer(c => {
+                                    if (!c.countCards("e")) return false;
+                                    return get.attitude(player, c) < 0 || c === player;
+                                }) ? 1 : 0;
                             }
                             return game.hasPlayer(c => c !== player && get.attitude(player, c) < 0 && c.countCards("h")) ? 1.3 : 0.15;
                         },
@@ -31337,7 +31111,7 @@ const cshSkillPack = {
                                 .set("ai", button => {
                                     const v = { name: "sha", isCard: true };
                                     if (button.link[3]) v.nature = button.link[3];
-                                    try { return get.player().getUseValue(v, false, false); } catch (e) { return 0; }
+                                    try { return get.player().getUseValue(v); } catch (e) { return 1; }
                                 })
                                 .forResult();
                             if (!btn.bool || !btn.links || !btn.links.length) break;
@@ -31353,63 +31127,34 @@ const cshSkillPack = {
                                 return target !== player && target.isIn() && player.canUse(card, target, false);
                             })
                             .set("ai", function (target) {
-                                return get.effect(target, _status.event.card || { name: "sha", isCard: true }, get.player(), get.player());
+                                return get.effect(target, { name: "sha" }, get.player(), get.player());
                             })
                             .forResult();
                         if (!useRes || !useRes.bool) break;
                     }
                 },
                 ai: {
-                    attackValue(player) {
-                        let list = [];
-                        try { list = get.inpileVCardList(info => info[2] === "sha") || []; } catch (e) {}
-                        if (!list.length) list = [["基本", "", "sha"]];
-                        let best = 0;
-                        for (const info of list) {
-                            const card = { name: "sha", isCard: true };
-                            if (info[3]) card.nature = info[3];
-                            if (typeof player.getUseValue === "function") best = Math.max(best, player.getUseValue(card, false, false));
-                            else for (const target of game.filterPlayer(t => t !== player && t.isIn() && player.canUse(card, t, false))) {
-                                best = Math.max(best, get.effect(target, card, player, player));
-                            }
-                        }
-                        return best;
-                    },
                     order(item, player) {
-                        player = player || _status.event.player;
-                        let best = 0;
-                        for (const target of game.filterPlayer(t => t !== player && t.isIn() && player.canCompare(t))) {
-                            best = Math.max(best, lib.skill.csh_ssx_saran.ai.result.player(player, target));
-                        }
-                        return best > 4 ? 7.5 : best > 0 ? 4.5 : 0;
+                        if (!player) player = _status.event.player;
+                        // 手牌点数优势且有攻击窗口时拼
+                        let maxn = 0;
+                        player.getCards("h").forEach(c => { maxn = Math.max(maxn, get.number(c) || 0); });
+                        if (maxn >= 10 && game.hasPlayer(c => c !== player && get.attitude(player, c) < 0 && player.canCompare(c))) return 7.5;
+                        if (maxn >= 8) return 4.5;
+                        return 0.8;
                     },
                     result: {
                         player(player, target) {
-                            if (!player || !target || player === target || !player.canCompare(target)) return 0;
-                            const attack = lib.skill.csh_ssx_saran.ai.attackValue(player);
-                            if (attack <= 0) return 0;
-                            let own = null, best = -Infinity;
-                            for (const card of player.getCards("h")) {
-                                const score = (get.number(card, player) || 0) + (get.value(card, player) < 6 ? 0.15 : 0);
-                                if (score > best) { best = score; own = card; }
-                            }
-                            if (!own) return 0;
-                            const number = get.number(own, player) || 0;
-                            const known = typeof target.getKnownCards === "function" ? target.getKnownCards(player) : [];
-                            const unknown = Math.max(0, target.countCards("h") - known.length);
-                            let win;
-                            if (get.attitude(target, player) > 0) {
-                                // 队友实际响应函数出最小点，未知牌按最小值分布估计。
-                                const min = known.reduce((n, c) => Math.min(n, get.number(c, target) || 0), Infinity);
-                                win = min < number ? 1 : 1 - Math.pow(Math.max(0, Math.min(1, (14 - number) / 13)), unknown);
-                            } else {
-                                const max = known.reduce((n, c) => Math.max(n, get.number(c, target) || 0), 0);
-                                win = max < number ? Math.pow(Math.max(0, Math.min(1, (number - 1) / 13)), unknown) : 0;
-                            }
-                            const times = Math.max(0, Number(player.storage && player.storage.csh_ssx_saran_wins) || 0) + 1;
-                            return Math.max(0, win * attack * times - Math.max(0, get.value(own, player)) * 0.15);
+                            if (!target) return 0;
+                            let max1 = 0, max2 = 0;
+                            player.getCards("h").forEach(c => { max1 = Math.max(max1, get.number(c) || 0); });
+                            target.getCards("h").forEach(c => { max2 = Math.max(max2, get.number(c) || 0); });
+                            if (max1 <= max2) return 0;
+                            return get.attitude(player, target) < 0 ? 1.5 : 0.2;
                         },
-                        target: 0,
+                        target(player, target) {
+                            return get.attitude(player, target) < 0 ? -0.8 : 0;
+                        },
                     },
                     expose: 0.25,
                 },
@@ -32446,7 +32191,7 @@ const cshSkillPack = {
             "csh_zishu_draw_info": "",
             "csh_zishu": "耒耜",
             "csh_zishu_info": "锁定技。<br>①你的手牌上限-1。<br>②当你于回合内不因此技能而得到牌后，你摸一张牌。",
-            
+
             "csh_risheng": "日升",
             "csh_risheng_info": "锁定技，一轮开始时，若〖世一〗已失败，将其恢复为未失败。",
             "csh_gangbei": "钢背",

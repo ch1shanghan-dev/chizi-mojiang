@@ -117,8 +117,12 @@ import GEN_LINES from "./csh_interact_lines_gen.js";
 	//   · 不真垃圾：每句都值得对面看完翻白眼，而不是尴尬。
 	// 词典分类清单（单一来源）：customLines / getCustom / mergedLines 共用，
 	// 新增分类只改这一处，避免三处硬编码数组走失。
-	var CATS = ["flower", "wine", "egg", "shoe", "eggHard", "relentless", "lowHp", "hurtSelf", "ctrl", "rivalry", "memHit", "memSaved", "memHitBack", "assistHit", "assistPraise", "crowd", "hitBack", "win", "lose", "dying", "rescue", "judge", "equip", "grudge"];
+	var CATS = ["flower", "wine", "egg", "shoe", "eggHard", "relentless", "lowHp", "hurtSelf", "ctrl", "rivalry", "memHit", "memSaved", "memHitBack", "assistHit", "assistPraise", "crowd", "hitBack", "win", "lose", "dying", "rescue", "judge", "equip", "grudge", "memAid", "friendlyFire", "emptyHand", "returning", "endNeutral"];
 	var LINES = {
+        memAid: ['刚才那口补给，我记着呢。','多谢搭把手，接着来。','这回合有你照应，稳多了。','你给的支援可没白费。','先前那份照应，心领了。','下一手，我也照应你。'],
+        friendlyFire: ['这一下打偏了，下一手看准。','自己人，手下留点情。','先稳住，别把阵脚打乱。','这份误伤先记在牌桌上。','下次留神，咱们还得并肩。','别急，先分清目标。'],
+        emptyHand: ['手里暂时空了，心里还有数。','空手也得把这一轮撑住。','下一张牌，就是转机。','牌少了，出手更得算准。','这一轮先守住阵脚。','手里没牌，也不能乱了心。'],
+        returning: ['牌桌上的熟面孔，今天又遇见了。','前几桌见过你，这回再过两招。','又见面了，今天看看谁更稳。','牌桌上的旧相识，这次也别留手。','这张熟面孔，我还记得。','熟人入席，这局有意思了。'],
 		flower: [
 			"多谢", "好兄弟", "干得漂亮", "这波稳", "军师厉害", "大腿抱紧了",
 			"配合默契", "还得是你", "稳住别浪", "有内味了", "今天必赢", "这局稳了",
@@ -275,7 +279,8 @@ import GEN_LINES from "./csh_interact_lines_gen.js";
 			"这笔利息不低", "上次没躲开，这次你也别躲", "来而不往非礼也",
 		],
 		// memSaved：这人刚救过我 —— 再互动时先谢恩。
-		memSaved: [
+		endNeutral:["这一局打完了，下一桌再见。","收好牌，下次再会。","牌局落定，稍歇一会儿。"],
+        memSaved: [
 			"刚才那条命是你给的", "救命之恩，无以为报", "你救的我，记着呢",
 			"刚拉了我一把，谢了", "这份情，牌桌上还", "刚捡回一条命，谢谢你",
 			"还欠你一条命", "恩情记下了",
@@ -561,10 +566,10 @@ import GEN_LINES from "./csh_interact_lines_gen.js";
 		/* 二级反思（2026-10-07 · T1）：按重要度表加权累计（reflect.py 的
 		   importance_trigger 语义）——恩/怨各自累计，|累计| ≥ 16 固化"印象"
 		   （怨 → 克星，恩 → 恩人）。权重：hit 3 / hitBack 2 / saved 8 / killed 10。 */
-		var impW = { killed: 10, saved: 8, hit: 3, hitBack: 2 };
+		var impW = { killed: 10, saved: 8, helped: 4, hit: 3, hitBack: 2 };
 		if (impW[kind]) {
 			var imp = pairImp.get(k) || 0;
-			imp += (kind === "saved") ? impW[kind] : -impW[kind];   // 恩为正，怨为负
+			imp += (kind === "saved" || kind === "helped") ? impW[kind] : -impW[kind];   // 恩为正，怨为负
 			pairImp.set(k, Math.max(-99, Math.min(99, imp)));
 		}
 	}
@@ -1081,12 +1086,13 @@ import GEN_LINES from "./csh_interact_lines_gen.js";
 		var mem = lastEvent.get(pairKey(target, player));
 		var memS = statOf(target, player);
 		var recency = memoryRecency(target, player);
-		var impT = { killed: 10, saved: 8, hit: 3, hitBack: 2 };
+		var impT = { killed: 10, saved: 8, helped: 4, hit: 3, hitBack: 2 };
 		var importance = (impT[mem] || 2) / 10;
 		var score3 = 0.5 * recency + 3 * 1.0 + 2 * importance;   /* gw=[0.5,3,2]，relevance=1 */
 		var memW = 0.2 + Math.min(0.42, (score3 / 7.5) * 0.42);
 		if ((mem === "hit" || mem === "hitBack") && Math.random() < memW) sayName = "memHit";
 		else if (mem === "saved" && Math.random() < 0.35 + importance * 0.3) sayName = "memSaved";
+        else if(mem === "helped" && Math.random() < 0.45) sayName = "memAid";
 		/* 反思（第三批）+ 二级反思·印象（T1）：计数 ≥3 或 印象"克星"（重要度累计 ≤−16，
 		   被救之恩的负向折算也计入）都算固化宿敌；世界恩怨 ≥8 仍最高优先 */
 		if ((isNemesis(target, player) || impressionOf(target, player) === "克星") && LINES.grudge && LINES.grudge.length) sayName = "grudge";
@@ -1212,7 +1218,13 @@ import GEN_LINES from "./csh_interact_lines_gen.js";
 			RIVALRY = null;
 			return true;
 		},
-		onGameStart: function () {
+		onGameStart: function () { terminalSpoken=false;
+            try {
+                var archive=lib.cshWorld&&lib.cshWorld.raw&&lib.cshWorld.raw(),greet=null;
+                if(archive&&Array.isArray(archive.ai))greet=game.players.find(function(p){if(!isAI(p))return false;var id=lib.cshWorld.idOfPlayer(p),row=archive.ai.find(function(a){return a.id===id;});return !!(row&&row.withPlayer&&row.withPlayer.hands>=3);});
+                if(greet)queueScene(function(){speak(greet,'returning',0.8,true);},1600,greet,game.me,true);
+            }catch(eFamiliar){}
+
 			/* 取本局宿敌快照（situCat 消费，避免逐次抛掷 raw() 克隆全档） */
 			try {
 				if (lib.cshWorld && lib.cshWorld.raw) {
@@ -1270,6 +1282,8 @@ import GEN_LINES from "./csh_interact_lines_gen.js";
 			} catch (eRv) { logError("宿敌开场", eRv); }
 		},
 		onPhaseBegin: function (player) {
+            if(!isEnabled()||!isAI(player)||!usable(player))return;
+            if(player.countCards&&player.countCards("h")===0&&speak(player,"emptyHand",0.45,true))return;
 			/* 语境化（2026-10-09）：回合开始的随机社交先看状态 ——
 			   · controlled：本回合被锦囊压着，不主动出手（被控者还活跃砸蛋很怪），
 			     改 40% 概率吐槽自己的处境（ctrl 池）；
@@ -1289,9 +1303,10 @@ import GEN_LINES from "./csh_interact_lines_gen.js";
 			fire(player, t, relation(player, t), rate().phase);
 		},
 		onDamageEnd: function (player, source) {
+            if(!isEnabled())return;
 			if (!usable(source) || source === player) return;
 			var k = relation(player, source);
-			if (k === "ally") return; // 被友军误伤不还手
+			if (k === "ally") { speak(player,"friendlyFire",0.4,true);return; } // Friendly fire gets a restrained line, never revenge or grudge.
 			fire(player, source, k === "neutral" ? "enemy" : k, BASE.damage);
 			/* 情境补刀（2026-10-06）：挨了打，但出手的人自己也只剩 1 血站场 ——
 			   台词知道牌局事实，嘲讽才成立。不走 canPlay（与上面的 fire 共享 3s
@@ -1307,12 +1322,13 @@ import GEN_LINES from "./csh_interact_lines_gen.js";
 			} catch (eLh) {}
 		},
 		onRecoverEnd: function (player, source) {
+            if(!isEnabled())return;
 			if (!usable(source) || source === player) return;
 			if (relation(player, source) !== "ally") return;
 			fire(player, source, "ally", BASE.recover);
-			/* 记忆记账（2026-10-06 第二批）：把"救"记进配对账本——被救者此后与救
-			   自己的人互动会说 memSaved（"刚才那条命是你给的"）；围观者小概率夸一句。 */
-			recordEvent(source, player, "saved");
+			/* 普通治疗只记支援；跨过濒死线的救命之恩由 onRescue 记录——被救者此后与救
+			   普通治疗记作 helped / memAid；真正的濒死救援另由 onRescue 记录。 */
+			recordEvent(source, player, "helped");
 			chorus(player, source, "assistPraise");
 		},
 		// 从 changeHp 事件反查「谁治的」。必须是 lib 上的方法：技能 filter/content
@@ -1359,7 +1375,9 @@ import GEN_LINES from "./csh_interact_lines_gen.js";
 			} catch (eCd) {}
 		},
 		// 获救：从非正血量被拉回正血量（判定条件在技能 filter 里按 hp 前后值算出，无需额外状态）。
-		onRescue: function (player) {
+		onRescue: function (player,source) {
+            if(!isEnabled())return;
+            if(usable(source)&&source!==player)recordEvent(source,player,"saved");
 			speak(player, "rescue", 0.6, true);
 		},
 		// 判定：自己的判定牌结算完毕，吐一句牌运。
@@ -1373,33 +1391,31 @@ import GEN_LINES from "./csh_interact_lines_gen.js";
 		// 终局：全员各说一句。一局仅一次，故不走 canPlay（3s 全局间隔会拦掉大半人），
 		// 直接 say(force) —— 靠「终局只发生一次」天然防刷屏。
 		// 说话者不做 isAI 判定：终局时 isIn 可能已失效，改用「有渲染节点且非玩家本人」。
-		onGameOver: function (win, meSide) {
-			clearSceneTasks();
-			if (win === undefined) return;
-			if (!isEnabled()) return;
-			game.players.forEach(function (p) {
-				if (!p || p === game.me) return;
-				if (!p.node || !p.node.avatar) return;
-				var sameSide = meSide !== undefined && p.side === meSide;
-				var pWin = (win === true) === sameSide;
-				say(p, pWin ? "win" : "lose", true);
-			});
-		},
+		onGameOver: function(win,meSide,outcomes){if(terminalSpoken)return;terminalSpoken=true;clearSceneTasks();if(win===undefined||!isEnabled())return;game.players.forEach(function(p){if(!p||p===game.me||!p.node||!p.node.avatar)return;var item=outcomes&&outcomes.find(function(x){return x.player===p;}),value=item?item.win:terminalOutcome(p,game.me,win,meSide);say(p,value===true?'win':value===false?'lose':'endNeutral',true);});},
 	};
 
 	// 终局发言（2026-09-29）：引擎没有 gameEnd 全局时机（实测只有 gameStart / gameDrawBegin / gameDrawAfter），
 	// 改为幂等包装 game.over。包装前先取 meSide（over 内部会 swapPlayer，事后再读会变），
 	// 原样透传 this 与返回值；已包装过则跳过，避免多次进游戏重复套娃。
-	var overHooked = false;
+	var terminalSpoken=false;
+    function terminalOutcome(p,me,win,meSide){
+        if(typeof win!=='boolean')return null;
+        try{if(typeof game.checkOnlineResult==='function'){var result=game.checkOnlineResult(p);if(typeof result==='boolean')return result;}}catch(e){}
+        var mode;try{mode=get.mode?get.mode():lib.config.mode;}catch(e){}
+        if(mode==='identity'&&game.zhu){if(['zhu','zhong','mingzhong'].indexOf(p.identity)>=0)return game.zhu.isAlive?game.zhu.isAlive():null;if(p.identity==='fan'&&me&&me.identity==='fan')return win;return null;}
+        if(mode==='doudizhu'&&me&&p.identity&&me.identity)return (p.identity==='zhu')===(me.identity==='zhu')?win:!win;
+        if(meSide!==undefined&&p.side!==undefined)return p.side===meSide?win:!win;return null;
+    }
+    var overHooked = false;
 	function hookGameOver() {
 		if (overHooked || typeof game.over !== "function") return;
 		var orig = game.over;
 		game.over = function (result, bool) {
-			var meSide = game.me && game.me.side;
-			var ret = orig.apply(this, arguments);
+			var me=game.me,meSide=me&&me.side,outcomes=(game.players||[]).slice().map(function(p){return {player:p,win:terminalOutcome(p,me,result,meSide)};});
+            var ret = orig.apply(this, arguments);
 			try {
 				if (lib.cshInteract && typeof lib.cshInteract.onGameOver === "function") {
-					lib.cshInteract.onGameOver(result, meSide);
+					lib.cshInteract.onGameOver(result, meSide, outcomes);
 				}
 			} catch (e) {
 				logError("game.over hook", e);
@@ -1523,7 +1539,7 @@ import GEN_LINES from "./csh_interact_lines_gen.js";
 				return player.hp > 0 && player.hp - event.num <= 0;
 			},
 			content: function () {
-				lib.cshInteract.onRescue(player);
+				lib.cshInteract.onRescue(player,lib.cshInteract.recoverSource(trigger));
 			},
 		});
 

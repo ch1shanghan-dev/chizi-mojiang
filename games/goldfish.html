@@ -7,10 +7,10 @@
      · 数据双通道：桥 shell-goldfish / shell-trade → 兜底父窗 CSH.market
      · 视觉：暗金 × 深底（与讨伐录同档精品页面标准）
      ============================================================ -->
-<html lang="zh-CN">
+<html lang="zh-CN" data-csh-palette="portrait">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>金鳞市</title>
 <script src="../core/csh_selftest.js" data-csh-selftest="auto"></script>
 <script src="../core/csh_page.js"></script>
@@ -264,6 +264,49 @@ body{background:
 .affhint.good{color:var(--up)} .affhint.bad{color:var(--ink-dim)}
 </style>
 <link rel="stylesheet" href="../core/csh_experience.css">
+<style id="market-layout-repair">
+body{--pfs-card-title:18px;--pfs-compact-title:20px;--pfs-panel-title:26px;--ink:#F1EBDD;--ink-dim:#C8C7B8;--ink-faint:#B4B9AC;--line-2:rgba(216,189,122,.25)}
+#app{padding:12px 16px 8px;gap:8px}
+#app .topbar{display:grid;grid-template-columns:minmax(130px,1fr) minmax(360px,2.5fr);align-items:center;gap:14px;min-height:48px;padding-right:190px}
+#app .brand{min-width:0;white-space:nowrap;font-size:var(--pfs-panel-title);line-height:1.2;letter-spacing:.08em}
+#app .brand small{display:block;white-space:normal;margin:5px 0 0;font-size:var(--pfs-sm);line-height:1.4;letter-spacing:.04em;color:var(--ink-dim)}
+#app .stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));min-width:0;margin:0;gap:6px;font-size:var(--pfs-sm)}
+#app .stat{min-width:0;padding:5px 9px;border-radius:10px;white-space:normal;line-height:1.4;color:var(--ink-dim)}
+#app .stat b{display:block;color:var(--ink);font-size:var(--pfs-xl);white-space:nowrap;font-variant-numeric:tabular-nums}
+#app .stat .up{color:var(--up)}#app .stat .down{color:var(--down)}
+#app .face::after{pointer-events:none}
+#app .cinfo{z-index:1;background:#171D19F2;color:#F1EBDD;min-height:40px;align-items:center}
+#app .cname{color:#F1EBDD;font-size:var(--pfs-card-title);line-height:1.4;text-shadow:none}
+#app .cprice{color:#E4C985;font-size:var(--pfs-xl);line-height:1.4;text-shadow:none}
+#app .hold-tag,#app .heat-tag{z-index:1;color:#E4C985}
+#app .card{display:block;width:100%;padding:0;color:inherit;font:inherit;text-align:left}
+#app .card:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+body[data-market-ready="true"] #storageStatus,body[data-market-ready="true"] #retryMarket{display:none}
+#retryMarket,#startNewMarket{font:inherit;padding:8px 14px;border:1px solid var(--line);border-radius:8px;color:var(--ink);background:var(--panel2)}
+#app .foot{flex-wrap:wrap;gap:3px 12px;font-size:var(--pfs-sm);line-height:1.5;letter-spacing:0;color:var(--ink-dim)}
+#app .foot .dot{display:none}
+#panel{padding:58px 12px 12px;background:rgba(9,14,12,.94)}
+#panel .pwrap{width:100%;max-width:1100px;height:100%;max-height:none;margin:0 auto;flex-direction:row}
+#panel .pstage{flex:0 0 38%;min-width:0;min-height:0}
+#panel .pinfo{min-height:0;padding:0;gap:0;overflow:hidden}
+#panel .pcontent{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:16px 18px 12px;scrollbar-gutter:stable}
+#panel .pcontent>div{margin-bottom:12px}
+#panel .pname{font-size:var(--pfs-2xl3);line-height:1.4;padding-right:42px;color:var(--ink)}
+#panel .ptag,#panel .pbio{font-size:var(--pfs-lg);color:var(--ink-dim);line-height:1.6}
+#panel .fact .k{font-size:var(--pfs-sm);color:var(--ink-dim)}#panel .fact .v{font-size:var(--pfs-card-title)}
+#panel .ops{flex:0 0 auto;margin:0;padding:12px 18px;background:var(--bg2);border-top:1px solid var(--line);gap:8px}
+#panel .qty{gap:6px}#panel .qbtn{min-height:36px;font-size:var(--pfs-lg2);padding:5px 12px;color:var(--ink)}
+#panel .qbtn.on{color:#171C16;background:#D9BC79}
+#panel .cost-hint{font-size:var(--pfs-md);line-height:1.5;text-align:left;color:var(--ink-dim)}
+#panel .act button{height:44px;font-size:var(--pfs-xl);letter-spacing:.05em}
+#panel .pclose{width:44px;height:44px;top:8px;right:8px;color:#F1EBDD;font-size:var(--pfs-2xl3);background:#1C211DEB}
+#toast:empty{display:none}
+@media(max-width:899px){#app .topbar{display:block;padding-right:0}#app .brand{min-height:44px;padding-right:184px}#app .stats{margin-top:8px}}
+@media(max-width:420px){#app{padding:10px}.stats{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
+@media(max-width:720px) and (orientation:portrait){#panel .pwrap{flex-direction:column}#panel .pstage{flex:0 0 26%}#panel .pinfo{flex:1 1 auto}#panel .pcontent{padding:12px}#panel .ops{padding:10px 12px}}
+@media(max-height:450px){#app{padding-top:8px;gap:4px}#panel{padding-top:52px;padding-bottom:8px}#panel .pstage{flex-basis:32%}#panel .pcontent{padding:10px 12px}#panel .ops{padding:8px 12px;gap:5px}#panel .qbtn{min-height:32px}#panel .pname{font-size:var(--pfs-compact-title)}#panel .say{min-height:0;padding:8px;font-size:var(--pfs-lg)}}
+</style>
+
 </head>
 <body class="csh-experience">
 <div id="app">
@@ -284,11 +327,12 @@ body{background:
   </div>
 </div>
 
-<div id="panel">
+<div id="panel" role="dialog" aria-modal="true" aria-labelledby="pname">
   <div class="pwrap">
     <button class="pclose" id="pclose" type="button">✕</button>
     <div class="pstage"><img id="pimg" alt=""></div>
     <div class="pinfo">
+      <div class="pcontent">
       <div>
         <div class="pname" id="pname">—</div>
         <div class="ptag" id="ptag"></div>
@@ -303,6 +347,7 @@ body{background:
         <div class="fact"><div class="k">我的持仓</div><div class="v" id="fHold">—</div></div>
         <div class="fact"><div class="k">成本</div><div class="v" id="fCost">—</div></div>
         <div class="fact"><div class="k">浮动盈亏</div><div class="v" id="fPnL">—</div></div>
+      </div>
       </div>
       <div class="ops">
         <div class="qty" id="qty"></div>
@@ -351,11 +396,13 @@ function loadSnap(cb) {
   cb = function (snap) {
     $("#startNewMarket").hidden = !(snap && snap.missingState);
     if (!snap || snap.ready === false || snap.ok === false) {
+      document.body.dataset.marketReady = "false";
       $("#storageStatus").textContent = (snap && snap.saveError) || "暂未读到市场存档，请重试。读取失败不会新建或清空持仓。";
       Data.unavailable = true; updateTradeAvailability();
       receive(Data.snap || null); return;
     }
     Data.unavailable = false; updateTradeAvailability();
+    document.body.dataset.marketReady = String(!snap.saveError);
     $("#storageStatus").textContent = snap.saveError || "存档已就绪";
     if (snap.saveError) toast(snap.saveError);
     receive(snap);
@@ -465,7 +512,8 @@ function renderGrid() {
     return;
   }
   list.forEach(function (it) {
-    var c = el("div", "card");
+    var c = el("button", "card");
+    c.type = "button"; c.setAttribute("aria-haspopup", "dialog"); c.setAttribute("aria-label", it.name + " · 查看行情与交易");
     c.setAttribute("data-id", it.id);
     var f = el("div", "face");
     var img = el("img");
@@ -654,7 +702,9 @@ function pickLine(girl, it) {
 }
 
 /* ---------- galgame 角色面板 ---------- */
+var detailReturnId = null;
 function openGirl(id) {
+  detailReturnId = id;
   var s = Data.snap || { list: [] };
   var it = (s.list || []).filter(function (x) { return x.id === id; })[0];
   if (!it) return;
@@ -670,6 +720,8 @@ function openGirl(id) {
   renderQty();
   renderPanelAff(it);
   $("#panel").classList.add("on");
+  $(".pcontent").scrollTop = 0;
+  $("#pclose").focus({ preventScroll: true });
 }
 function sayLine(force) {
   var it = Data.cur; if (!it) return;
@@ -679,7 +731,10 @@ function sayLine(force) {
   var say = $("#psay");
   say.style.animation = "none"; void say.offsetWidth; say.style.animation = "";
 }
-function closeGirl() { $("#panel").classList.remove("on"); }
+function closeGirl() {
+  var panel = $("#panel"), wasOpen = panel.classList.contains("on"); panel.classList.remove("on");
+  if (wasOpen && detailReturnId) { var cards = $("#grid").querySelectorAll(".card"); for (var i=0;i<cards.length;i++) if(cards[i].getAttribute("data-id")===detailReturnId){cards[i].focus({preventScroll:true});break;} }
+}
 
 function renderFacts() {
   var it = Data.cur; if (!it) return;
@@ -762,7 +817,15 @@ $("#pclose").addEventListener("click", closeGirl, false);
 $("#panel").addEventListener("click", function (e) { if (e.target === $("#panel")) closeGirl(); }, false);
 $("#bBuy").addEventListener("click", function () { tradeAct("buy"); }, false);
 $("#bSell").addEventListener("click", function () { tradeAct("sell"); }, false);
-document.addEventListener("keydown", function (e) { if (e.key === "Escape") closeGirl(); }, false);
+document.addEventListener("keydown", function (e) {
+  var panel = $("#panel"); if(!panel.classList.contains("on"))return;
+  if(e.key === "Escape"){e.preventDefault();closeGirl();return;}
+  if(e.key !== "Tab")return;
+  var items = Array.prototype.filter.call(panel.querySelectorAll("button:not([disabled]),a[href],input:not([disabled]),select:not([disabled]),[tabindex]"),function(n){return n.tabIndex>=0 && n.getBoundingClientRect().height>0;});
+  if(!items.length)return;var first=items[0],last=items[items.length-1];
+  if(e.shiftKey && (document.activeElement===first || !panel.contains(document.activeElement))){e.preventDefault();last.focus();}
+  else if(!e.shiftKey && (document.activeElement===last || !panel.contains(document.activeElement))){e.preventDefault();first.focus();}
+}, false);
 
 /* ---------- 启动 ---------- */
 $("#startNewMarket").addEventListener("click", function () {

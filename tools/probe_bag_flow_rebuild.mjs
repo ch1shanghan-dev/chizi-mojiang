@@ -67,7 +67,7 @@ try{
   await poll(`!!document.querySelector('#csh-ui-confirm')`);
   await click('#csh-ui-confirm button.ok',true);
   await poll(`lib.cshWallet.wallet.pc()===3234`);
-  check('third native action confirms import, creates backup, adopts stored wallet',await child(`w.document.getElementById('msg').textContent.includes('已倒进来')`)&&(await page.evaluate('M.backups().length'))===1);
+  check('third native action confirms import, creates backup, adopts stored wallet',await child(`w.document.getElementById('msg').textContent.includes('导入完成')`)&&(await page.evaluate('M.backups().length'))===1);
   await page.evaluate('reopen()');await ready();
   check('closing and reopening page reads persisted import and backup',await page.evaluate(`lib.cshWallet.wallet.pc()===3234&&M.backups().length===1`)&&await child(`w.document.getElementById('bklist').textContent.includes('3,334')`));
   await child(`(w.document.getElementById('bklist').closest('details')&&(w.document.getElementById('bklist').closest('details').open=true),true)`);

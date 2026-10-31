@@ -42,141 +42,421 @@ import { lib } from "../../../noname.js";
        新增皮肤只改这里；两套 Node 工具（csh_debug_panel_selftest.cjs /
        csh_panel_shots.cjs）都从本文件解析 SKINS，不手抄第二份。 */
     var SKINS = {
-        /* ① 三国杀 · 木纹鎏金（默认）：贴合宿主氛围的深棕木 + 米黄纸 + 朱金，
-              顺带把"大面积近白眩光"整个拿掉 */
-        sgs: {
-            label: "三国杀 · 木纹鎏金",
-            colors: {
-                bg:          { hex: "#E8D9B8", rgb: "232,217,184" },  // 米黄墨（深底上的正文字）
-                bgDeep:      { hex: "#0B0805", rgb: "11,8,5" },       // 遮罩基色（恒暗）
-                inkPlate:     { hex: "#0E0B07", rgb: "13,11,7" },   // 恒暗墨底（「黄字压墨底」chip 专用，深色皮肤下也不能翻面）
-                accentInk:    { hex: "#141008", rgb: "20,16,8" },   // 彩色底（金/蓝/红/绿）上压的深字
-                colorInk:     { hex: "#141008", rgb: "20,16,8" },   // 蓝/红/绿底上的字（浅皮肤=白，深皮肤=深）
-                fg:          { hex: "#2E2418", rgb: "46,36,24" },     // 卡片面
-                accent:      { hex: "#E0A93B", rgb: "224,169,59" },   // 鎏金
-                accentDark:  { hex: "#C08A24", rgb: "192,138,36" },   // 深金
-                gray: { hex: "#C3A782", rgb: "195,167,130" },  // 次级文字/描边
-                graySoft: { hex: "#9F8B6B", rgb: "159,139,107" },   // 弱化文字
-                blue: { hex: "#6399C2", rgb: "99,153,194" },   // 魏蓝
-                light:       { hex: "#372B1D", rgb: "55,43,29" },     // 浮起表面
-                paper:       { hex: "#241B12", rgb: "36,27,18" },     // 面板底
-                paper2:      { hex: "#1B140D", rgb: "27,20,13" },     // 下沉表面
-                red: { hex: "#FC5F50", rgb: "252,95,80" },    // 蜀红
-                green: { hex: "#6BA06F", rgb: "107,160,111" },    // 吴绿
+    "sgs": {
+        "label": "三国杀 · 木纹鎏金",
+        "colors": {
+            "bg": {
+                "hex": "#F1E6D1",
+                "rgb": "241,230,209"
             },
-        },
-        /* ② 暖宣 · 护眼：仍然是浅色，但把底降到 L≈80% 的暖灰、墨字提亮到 #26241F，
-              弱化灰提到 ≥4.5:1 —— 保留"纸感"又不刺眼 */
-        warm: {
-            label: "暖宣 · 护眼",
-            colors: {
-                bg:          { hex: "#26241F", rgb: "38,36,31" },
-                bgDeep:      { hex: "#100E0B", rgb: "16,14,11" },
-                inkPlate:     { hex: "#18181B", rgb: "24,24,27" },   // 恒暗墨底（「黄字压墨底」chip 专用，深色皮肤下也不能翻面）
-                accentInk:    { hex: "#18181B", rgb: "24,24,27" },   // 彩色底（金/蓝/红/绿）上压的深字
-                colorInk:     { hex: "#FFFFFF", rgb: "255,255,255" },   // 蓝/红/绿底上的字（浅皮肤=白，深皮肤=深）
-                fg:          { hex: "#F5F2EA", rgb: "245,242,234" },
-                accent:      { hex: "#F5B301", rgb: "245,179,1" },
-                accentDark:  { hex: "#EBA600", rgb: "235,166,0" },
-                gray: { hex: "#57544C", rgb: "87,84,76" },
-                graySoft: { hex: "#69655C", rgb: "105,101,92" },
-                blue: { hex: "#2F5C8F", rgb: "47,92,143" },
-                light:       { hex: "#F0ECE2", rgb: "240,236,226" },
-                paper:       { hex: "#E9E5DA", rgb: "233,229,218" },
-                paper2:      { hex: "#DFDACE", rgb: "223,218,206" },
-                red: { hex: "#AB382C", rgb: "171,56,44" },
-                green: { hex: "#2F6B52", rgb: "47,107,82" },
+            "bgDeep": {
+                "hex": "#0B0805",
+                "rgb": "11,8,5"
             },
-        },
-        /* ③ 纸白 · 原版（2026-09-29 之前的外观，原样保留供对比/回滚） */
-        paper: {
-            label: "纸白 · 原版",
-            colors: {
-                bg:          { hex: "#18181B", rgb: "24,24,27" },
-                bgDeep:      { hex: "#101012", rgb: "16,16,18" },
-                inkPlate:     { hex: "#18181B", rgb: "24,24,27" },   // 恒暗墨底（「黄字压墨底」chip 专用，深色皮肤下也不能翻面）
-                accentInk:    { hex: "#18181B", rgb: "24,24,27" },   // 彩色底（金/蓝/红/绿）上压的深字
-                colorInk:     { hex: "#FFFFFF", rgb: "255,255,255" },   // 蓝/红/绿底上的字（浅皮肤=白，深皮肤=深）
-                fg:          { hex: "#FFFFFF", rgb: "255,255,255" },
-                accent:      { hex: "#F5B301", rgb: "245,179,1" },
-                accentDark:  { hex: "#EBA600", rgb: "235,166,0" },
-                gray:        { hex: "#5C5C60", rgb: "92,92,96" },
-                graySoft:    { hex: "#8C8C90", rgb: "140,140,144" },
-                blue:        { hex: "#2255B8", rgb: "34,85,184" },
-                light:       { hex: "#F7F7F4", rgb: "247,247,244" },
-                paper:       { hex: "#F6F6F3", rgb: "246,246,243" },
-                paper2:      { hex: "#F2F2EF", rgb: "242,242,239" },
-                red:         { hex: "#CC3A2E", rgb: "204,58,46" },
-                green:       { hex: "#1B6B4F", rgb: "27,107,79" },
+            "inkPlate": {
+                "hex": "#0E0B07",
+                "rgb": "13,11,7"
             },
-        },
-        /* ④ 夜间：低亮度、无纯白（正文字压到 L≈40% 的冷灰蓝），适合暗环境长看 */
-        night: {
-            label: "夜间 · 低亮",
-            colors: {
-                bg:          { hex: "#AAB2BF", rgb: "170,178,191" },
-                bgDeep:      { hex: "#080A0D", rgb: "8,10,13" },
-                inkPlate:     { hex: "#0A0C10", rgb: "10,12,16" },   // 恒暗墨底（「黄字压墨底」chip 专用，深色皮肤下也不能翻面）
-                accentInk:    { hex: "#0E1116", rgb: "14,17,22" },   // 彩色底（金/蓝/红/绿）上压的深字
-                colorInk:     { hex: "#0E1116", rgb: "14,17,22" },   // 蓝/红/绿底上的字（浅皮肤=白，深皮肤=深）
-                fg:          { hex: "#1F232A", rgb: "31,35,42" },
-                accent:      { hex: "#C79A3C", rgb: "199,154,60" },
-                accentDark:  { hex: "#A87F28", rgb: "168,127,40" },
-                gray: { hex: "#A2ACC2", rgb: "162,172,194" },
-                graySoft: { hex: "#828B9D", rgb: "130,139,157" },
-                blue: { hex: "#6594CB", rgb: "101,148,203" },
-                light:       { hex: "#262B33", rgb: "38,43,51" },
-                paper:       { hex: "#171A1F", rgb: "23,26,31" },
-                paper2:      { hex: "#12151A", rgb: "18,21,26" },
-                red: { hex: "#EA685B", rgb: "234,104,91" },
-                green: { hex: "#5B9F77", rgb: "91,159,119" },
+            "accentInk": {
+                "hex": "#141008",
+                "rgb": "20,16,8"
             },
-        },
-        /* ⑤ 青瓷 · 水墨：青灰纸面 + 墨青正文 + 青瓷绿强调（中式素雅） */
-        celadon: {
-            label: "青瓷 · 水墨",
-            colors: {
-                bg:          { hex: "#1F2B28", rgb: "31,43,40" },
-                bgDeep:      { hex: "#0D1412", rgb: "13,20,18" },
-                inkPlate:     { hex: "#0A1210", rgb: "10,18,16" },   // 恒暗墨底（「黄字压墨底」chip 专用，深色皮肤下也不能翻面）
-                accentInk:    { hex: "#14201D", rgb: "20,32,29" },   // 彩色底（金/蓝/红/绿）上压的深字
-                colorInk:     { hex: "#FFFFFF", rgb: "255,255,255" },   // 蓝/红/绿底上的字（浅皮肤=白，深皮肤=深）
-                fg:          { hex: "#EDF2EF", rgb: "237,242,239" },
-                accent:      { hex: "#3F7F6D", rgb: "63,127,109" },
-                accentDark: { hex: "#3A7A63", rgb: "58,122,99" },
-                gray: { hex: "#495654", rgb: "73,86,84" },
-                graySoft: { hex: "#596865", rgb: "89,104,101" },
-                blue: { hex: "#2F5D7A", rgb: "47,93,122" },
-                light:       { hex: "#E7EDE9", rgb: "231,237,233" },
-                paper:       { hex: "#DFE6E2", rgb: "223,230,226" },
-                paper2:      { hex: "#D3DBD6", rgb: "211,219,214" },
-                red: { hex: "#A14037", rgb: "161,64,55" },
-                green: { hex: "#2F6B52", rgb: "47,107,82" },
+            "colorInk": {
+                "hex": "#141008",
+                "rgb": "20,16,8"
             },
-        },
-        /* ⑥ 鎏金黑：与五个小游戏自己的「深底 + 鎏金」完全一致（面板与游戏同语汇） */
-        gold: {
-            label: "鎏金黑 · 同游戏",
-            colors: {
-                bg:          { hex: "#F0E0B4", rgb: "240,224,180" },
-                bgDeep:      { hex: "#060504", rgb: "6,5,4" },
-                inkPlate:     { hex: "#080604", rgb: "8,6,4" },   // 恒暗墨底（「黄字压墨底」chip 专用，深色皮肤下也不能翻面）
-                accentInk:    { hex: "#120E06", rgb: "18,14,6" },   // 彩色底（金/蓝/红/绿）上压的深字
-                colorInk:     { hex: "#120E06", rgb: "18,14,6" },   // 蓝/红/绿底上的字（浅皮肤=白，深皮肤=深）
-                fg:          { hex: "#1E1A12", rgb: "30,26,18" },
-                accent:      { hex: "#D8B46A", rgb: "216,180,106" },
-                accentDark:  { hex: "#C29A4E", rgb: "194,154,78" },
-                gray: { hex: "#B19F78", rgb: "177,159,120" },
-                graySoft: { hex: "#92825E", rgb: "146,130,94" },
-                blue: { hex: "#5F8EB9", rgb: "95,142,185" },
-                light:       { hex: "#282319", rgb: "40,35,25" },
-                paper:       { hex: "#14110C", rgb: "20,17,12" },
-                paper2:      { hex: "#100D08", rgb: "16,13,8" },
-                red: { hex: "#E85B4B", rgb: "232,91,75" },
-                green: { hex: "#61956A", rgb: "97,149,106" },
+            "fg": {
+                "hex": "#30281F",
+                "rgb": "48,40,31"
             },
-        },
-    };
+            "accent": {
+                "hex": "#E0A93B",
+                "rgb": "224,169,59"
+            },
+            "accentDark": {
+                "hex": "#C08A24",
+                "rgb": "192,138,36"
+            },
+            "gray": {
+                "hex": "#D2C4AC",
+                "rgb": "210,196,172"
+            },
+            "graySoft": {
+                "hex": "#BAAB92",
+                "rgb": "186,171,146"
+            },
+            "blue": {
+                "hex": "#A7C9E1",
+                "rgb": "167,201,225"
+            },
+            "light": {
+                "hex": "#3B3125",
+                "rgb": "59,49,37"
+            },
+            "paper": {
+                "hex": "#221D17",
+                "rgb": "34,29,23"
+            },
+            "paper2": {
+                "hex": "#191511",
+                "rgb": "25,21,17"
+            },
+            "red": {
+                "hex": "#FFB2A5",
+                "rgb": "255,178,165"
+            },
+            "green": {
+                "hex": "#B7D4A3",
+                "rgb": "183,212,163"
+            }
+        }
+    },
+    "warm": {
+        "label": "暖宣 · 护眼",
+        "colors": {
+            "bg": {
+                "hex": "#302B24",
+                "rgb": "48,43,36"
+            },
+            "bgDeep": {
+                "hex": "#100E0B",
+                "rgb": "16,14,11"
+            },
+            "inkPlate": {
+                "hex": "#18181B",
+                "rgb": "24,24,27"
+            },
+            "accentInk": {
+                "hex": "#18181B",
+                "rgb": "24,24,27"
+            },
+            "colorInk": {
+                "hex": "#FFFFFF",
+                "rgb": "255,255,255"
+            },
+            "fg": {
+                "hex": "#F8F2E8",
+                "rgb": "248,242,232"
+            },
+            "accent": {
+                "hex": "#D8B76C",
+                "rgb": "216,183,108"
+            },
+            "accentDark": {
+                "hex": "#B38F43",
+                "rgb": "179,143,67"
+            },
+            "gray": {
+                "hex": "#5F584D",
+                "rgb": "95,88,77"
+            },
+            "graySoft": {
+                "hex": "#655B4A",
+                "rgb": "101,91,74"
+            },
+            "blue": {
+                "hex": "#2F5C8F",
+                "rgb": "47,92,143"
+            },
+            "light": {
+                "hex": "#F3EADC",
+                "rgb": "243,234,220"
+            },
+            "paper": {
+                "hex": "#EDE4D4",
+                "rgb": "237,228,212"
+            },
+            "paper2": {
+                "hex": "#E4D8C5",
+                "rgb": "228,216,197"
+            },
+            "red": {
+                "hex": "#AB382C",
+                "rgb": "171,56,44"
+            },
+            "green": {
+                "hex": "#2F6B52",
+                "rgb": "47,107,82"
+            }
+        }
+    },
+    "paper": {
+        "label": "纸白 · 原版",
+        "colors": {
+            "bg": {
+                "hex": "#26322D",
+                "rgb": "38,50,45"
+            },
+            "bgDeep": {
+                "hex": "#101012",
+                "rgb": "16,16,18"
+            },
+            "inkPlate": {
+                "hex": "#18181B",
+                "rgb": "24,24,27"
+            },
+            "accentInk": {
+                "hex": "#18181B",
+                "rgb": "24,24,27"
+            },
+            "colorInk": {
+                "hex": "#FFFFFF",
+                "rgb": "255,255,255"
+            },
+            "fg": {
+                "hex": "#FAF8F2",
+                "rgb": "250,248,242"
+            },
+            "accent": {
+                "hex": "#D1AB5D",
+                "rgb": "209,171,93"
+            },
+            "accentDark": {
+                "hex": "#AF873D",
+                "rgb": "175,135,61"
+            },
+            "gray": {
+                "hex": "#515E5A",
+                "rgb": "81,94,90"
+            },
+            "graySoft": {
+                "hex": "#5E6965",
+                "rgb": "94,105,101"
+            },
+            "blue": {
+                "hex": "#2255B8",
+                "rgb": "34,85,184"
+            },
+            "light": {
+                "hex": "#F5F1E8",
+                "rgb": "245,241,232"
+            },
+            "paper": {
+                "hex": "#EFEAE0",
+                "rgb": "239,234,224"
+            },
+            "paper2": {
+                "hex": "#E5E0D5",
+                "rgb": "229,224,213"
+            },
+            "red": {
+                "hex": "#CC3A2E",
+                "rgb": "204,58,46"
+            },
+            "green": {
+                "hex": "#1B6B4F",
+                "rgb": "27,107,79"
+            }
+        }
+    },
+    "night": {
+        "label": "夜间 · 低亮",
+        "colors": {
+            "bg": {
+                "hex": "#E5EBF4",
+                "rgb": "229,235,244"
+            },
+            "bgDeep": {
+                "hex": "#080A0D",
+                "rgb": "8,10,13"
+            },
+            "inkPlate": {
+                "hex": "#0A0C10",
+                "rgb": "10,12,16"
+            },
+            "accentInk": {
+                "hex": "#0E1116",
+                "rgb": "14,17,22"
+            },
+            "colorInk": {
+                "hex": "#0E1116",
+                "rgb": "14,17,22"
+            },
+            "fg": {
+                "hex": "#222C3A",
+                "rgb": "34,44,58"
+            },
+            "accent": {
+                "hex": "#DFBD7B",
+                "rgb": "223,189,123"
+            },
+            "accentDark": {
+                "hex": "#C6A25D",
+                "rgb": "198,162,93"
+            },
+            "gray": {
+                "hex": "#C6D2E2",
+                "rgb": "198,210,226"
+            },
+            "graySoft": {
+                "hex": "#ACBDD4",
+                "rgb": "172,189,212"
+            },
+            "blue": {
+                "hex": "#B0D1FF",
+                "rgb": "176,209,255"
+            },
+            "light": {
+                "hex": "#2B3645",
+                "rgb": "43,54,69"
+            },
+            "paper": {
+                "hex": "#151E2B",
+                "rgb": "21,30,43"
+            },
+            "paper2": {
+                "hex": "#101825",
+                "rgb": "16,24,37"
+            },
+            "red": {
+                "hex": "#FFB4A8",
+                "rgb": "255,180,168"
+            },
+            "green": {
+                "hex": "#A4D3BC",
+                "rgb": "164,211,188"
+            }
+        }
+    },
+    "celadon": {
+        "label": "青瓷 · 水墨",
+        "colors": {
+            "bg": {
+                "hex": "#213C34",
+                "rgb": "33,60,52"
+            },
+            "bgDeep": {
+                "hex": "#0D1412",
+                "rgb": "13,20,18"
+            },
+            "inkPlate": {
+                "hex": "#0A1210",
+                "rgb": "10,18,16"
+            },
+            "accentInk": {
+                "hex": "#14201D",
+                "rgb": "20,32,29"
+            },
+            "colorInk": {
+                "hex": "#FFFFFF",
+                "rgb": "255,255,255"
+            },
+            "fg": {
+                "hex": "#EFF5F0",
+                "rgb": "239,245,240"
+            },
+            "accent": {
+                "hex": "#76A795",
+                "rgb": "118,167,149"
+            },
+            "accentDark": {
+                "hex": "#598C78",
+                "rgb": "89,140,120"
+            },
+            "gray": {
+                "hex": "#496258",
+                "rgb": "73,98,88"
+            },
+            "graySoft": {
+                "hex": "#526E63",
+                "rgb": "82,110,99"
+            },
+            "blue": {
+                "hex": "#2F5D7A",
+                "rgb": "47,93,122"
+            },
+            "light": {
+                "hex": "#E6F0E9",
+                "rgb": "230,240,233"
+            },
+            "paper": {
+                "hex": "#DDE9E1",
+                "rgb": "221,233,225"
+            },
+            "paper2": {
+                "hex": "#D1DED5",
+                "rgb": "209,222,213"
+            },
+            "red": {
+                "hex": "#A14037",
+                "rgb": "161,64,55"
+            },
+            "green": {
+                "hex": "#2F6B52",
+                "rgb": "47,107,82"
+            }
+        }
+    },
+    "gold": {
+        "label": "鎏金黑 · 同游戏",
+        "colors": {
+            "bg": {
+                "hex": "#F6EDDA",
+                "rgb": "246,237,218"
+            },
+            "bgDeep": {
+                "hex": "#060504",
+                "rgb": "6,5,4"
+            },
+            "inkPlate": {
+                "hex": "#080604",
+                "rgb": "8,6,4"
+            },
+            "accentInk": {
+                "hex": "#120E06",
+                "rgb": "18,14,6"
+            },
+            "colorInk": {
+                "hex": "#120E06",
+                "rgb": "18,14,6"
+            },
+            "fg": {
+                "hex": "#2A261E",
+                "rgb": "42,38,30"
+            },
+            "accent": {
+                "hex": "#D8B46A",
+                "rgb": "216,180,106"
+            },
+            "accentDark": {
+                "hex": "#C29A4E",
+                "rgb": "194,154,78"
+            },
+            "gray": {
+                "hex": "#D8CFB8",
+                "rgb": "216,207,184"
+            },
+            "graySoft": {
+                "hex": "#C1B79B",
+                "rgb": "193,183,155"
+            },
+            "blue": {
+                "hex": "#AACBE5",
+                "rgb": "170,203,229"
+            },
+            "light": {
+                "hex": "#343026",
+                "rgb": "52,48,38"
+            },
+            "paper": {
+                "hex": "#181711",
+                "rgb": "24,23,17"
+            },
+            "paper2": {
+                "hex": "#12120E",
+                "rgb": "18,18,14"
+            },
+            "red": {
+                "hex": "#FFAAA0",
+                "rgb": "255,170,160"
+            },
+            "green": {
+                "hex": "#AED7BA",
+                "rgb": "174,215,186"
+            }
+        }
+    }
+};
 
     var K_SKIN = "csh_panel_skin";
     var DEFAULT_SKIN = "sgs";
@@ -217,7 +497,7 @@ import { lib } from "../../../noname.js";
             ["md", "13px"], ["md2", "13.5px"],
             ["lg", "14px"], ["lg2", "15px"],
             ["xl", "16px"], ["xl2", "17px"], ["xl3", "18px"], ["xl4", "19px"],
-            ["2xl", "22px"], ["3xl", "28px"], ["3xl2", "30px"], ["4xl", "34px"]
+            ["title", "20px"], ["2xl", "22px"], ["display", "24px"], ["lead", "26px"], ["3xl", "28px"], ["3xl2", "30px"], ["4xl", "34px"]
         ];
         for (var fi = 0; fi < LFS.length; fi++) lines.push("    --csh-lfs-" + LFS[fi][0] + ": " + LFS[fi][1] + ";");
         /* 【2026-10-20 · 层级表】与皮肤无关，是全扩展**唯一**的浮层层级真值。
@@ -273,24 +553,22 @@ import { lib } from "../../../noname.js";
         var set = (has(name) ? SKINS[name] : SKINS[DEFAULT_SKIN]).colors;
         function h(k) { return set[k] ? set[k].hex : "#000000"; }
         function g(k) { return set[k] ? set[k].rgb : "0,0,0"; }
-        var lines = [
-            "  --ink-0: " + h("bgDeep") + ";",            /* 背景渐变外圈（恒暗） */
-            "  --ink-1: " + h("paper2") + ";",            /* 背景中圈（下沉表面） */
-            "  --ink-2: " + h("paper") + ";",             /* 背景中心（主表面） */
-            "  --gold: " + h("accent") + ";",             /* 金调主色 → 皮肤强调色 */
-            "  --gold-hi: " + h("accent") + ";",          /* 亮金高光 → 强调色 */
-            "  --gold-soft: rgba(" + g("accent") + ", .55);",
-            "  --gold-line: rgba(" + g("accent") + ", .28);",
-            "  --gold-fill: rgba(" + g("accent") + ", .07);",
-            "  --text: " + h("bg") + ";",                 /* 墨字：浅皮肤深 / 深皮肤浅 */
-            "  --text-dim: " + h("graySoft") + ";",
-            "  --danger: " + h("red") + ";",
-            "  --ok: " + h("green") + ";"
+        function luminance(hex) { var a = hex.replace("#", "").match(/../g).map(function(v){var n=parseInt(v,16)/255;return n<=.04045?n/12.92:Math.pow((n+.055)/1.055,2.4);});return a[0]*.2126+a[1]*.7152+a[2]*.0722; }
+        function contrast(a,b) { var x=luminance(a),y=luminance(b);return (Math.max(x,y)+.05)/(Math.min(x,y)+.05); }
+        var light = luminance(h("paper")) > .4;
+        var accent = h("accent");
+        if (contrast(accent,h("paper2")) < 4.5) accent = contrast(h("accentDark"),h("paper2")) >= 4.5 ? h("accentDark") : h("bg");
+        var chrome = [
+            "--ink-0:"+h("paper")+";", "--ink-1:"+h("paper2")+";", "--ink-2:"+h("fg")+";", "--ink-3:"+h("light")+";",
+            "--gold:"+accent+";", "--gold-hi:"+accent+";", "--gold-soft:rgba("+g("accent")+",.55);", "--gold-line:rgba("+g("bg")+",.24);", "--gold-fill:rgba("+g("accent")+",.10);",
+            "--text:"+h("bg")+";", "--text-dim:"+h("gray")+";", "--danger:"+h("red")+";", "--ok:"+h("green")+";", "--warn:"+h("red")+";", "--line:rgba("+g("bg")+",.20);"
         ];
-        /* 【2026-10-20 · 层级表】与皮肤无关，是全扩展**唯一**的浮层层级真值。
-           以前 22 处裸魔数（2147483000/2999/3050…）散在 7 个文件里，
-           两个浮层同时打开时谁盖谁纯看数字大小和书写顺序 —— 叠层错乱的根源。
-           现在只允许 var(--csh-z-*)，门禁会拦住新写的裸 2147xxxx。 */
+        var portrait = [
+            "--bg:"+h("paper2")+";", "--bg2:"+h("paper")+";", "--panel:"+h("fg")+";", "--panel2:"+h("light")+";",
+            "--ink:"+h("bg")+";", "--ink-dim:"+h("gray")+";", "--ink-faint:"+h("graySoft")+";", "--gold:"+accent+";", "--gold-2:"+h("accentDark")+";",
+            "--line:rgba("+g("bg")+",.24);", "--line-2:rgba("+g("bg")+",.16);", "--ok:"+h("green")+";", "--warn:"+h("red")+";", "--danger:"+h("red")+";"
+        ];
+        var lines = ["--csh-page-accent:"+h("accent")+";", "--csh-page-accent-ink:"+h("accentInk")+";"];
         var Z = [
             ["dock", 25],          /* 壳的悬浮控制组（游戏页内） */
             ["sheet", 200],        /* 页面内的详情层 */
@@ -309,8 +587,18 @@ import { lib } from "../../../noname.js";
             ["toast", 2147483050],  /* 提示必须在任何面板与壳之上 */
             ["top", 2147483080]     /* 最高优先（强制确认、全屏接管、系统级） */
         ];
-        for (var zi = 0; zi < Z.length; zi++) lines.push("    --csh-z-" + Z[zi][0] + ": " + Z[zi][1] + ";");
-        return ":root {\n" + lines.join("\n") + "\n}";
+        for (var zi = 0; zi < Z.length; zi++) lines.push("--csh-z-" + Z[zi][0] + ":" + Z[zi][1] + ";");
+        var chromeScope=':root[data-csh-palette="chrome"]', portraitScope=':root[data-csh-palette="portrait"]';
+        return ":root{"+lines.join("\n")+"}\n"
+            +chromeScope+","+chromeScope+" body{"+chrome.join("\n")+"}\n"
+            +portraitScope+","+portraitScope+" body{"+portrait.join("\n")+"}\n"
+            +":root[data-csh-palette]{color-scheme:"+(light?"light":"dark")+";}\n"
+            +chromeScope+" #view-game{--ink-0:#0B0A08;--ink-1:#15110C;--ink-2:#1E1811;--ink-3:#282219;--text:#ECE5D6;--text-dim:#C8BEA9;--gold:#D8B46A;--gold-hi:#F4DFA8;--gold-soft:rgba(216,180,106,.55);--gold-line:rgba(216,180,106,.28);--gold-fill:rgba(216,180,106,.07);--danger:#D66E7C;--ok:#7FD8C4;color:var(--text);}\n"
+            +portraitScope+" .affbtn{color:var(--ink);}"+portraitScope+" .affbtn.gold{color:var(--gold);}\n"
+            +(light?portraitScope+" .afftitle{background:none;-webkit-text-fill-color:currentColor;color:var(--ink);}\n":"")
+            +chromeScope+" .felt{--text:#F1EBDD;--text-dim:#CFD5CF;--gold:#D8BD7A;--gold-hi:#ECD394;color:var(--text);}\n"
+            +chromeScope+" .ach .aclaim:not(.got),"+portraitScope+" .primary,"+portraitScope+" .pinbtn.on{background:var(--csh-page-accent);color:var(--csh-page-accent-ink);}\n"
+            +chromeScope+" .hint-tag,"+chromeScope+" .sdot.done{background:var(--csh-page-accent);color:var(--csh-page-accent-ink);}";
     }
 
     /* —— 作用域皮肤覆写（2026-10-07 · T2）：为单个浮层/页面提供「局部皮肤」——
@@ -365,6 +653,7 @@ import { lib } from "../../../noname.js";
         try { document.documentElement.setAttribute("data-csh-skin", name); } catch (e) {}
         /* 广播皮肤变更给所有游戏 iframe（csh_page.js 监听后重注入 chrome 变量） */
         try { if (typeof window !== "undefined" && window.postMessage) window.postMessage({ __csh: "csh-skin-change", skin: name }, "*"); } catch (e) {}
+        try { var frame=document.getElementById("csh-shell-frame");if(frame&&frame.contentWindow)frame.contentWindow.postMessage({__csh:"csh-skin-change",skin:name},"*"); } catch (eFrame) {}
         return true;
     }
     function currentSkin() { return active; }

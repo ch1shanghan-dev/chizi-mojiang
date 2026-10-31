@@ -425,7 +425,9 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 	function flushSave(options) {
 		if (_saveTimer) { clearTimeout(_saveTimer); _saveTimer = 0; }
 		/* 迁移只可在尚无恢复凭据时刷新旧钱包；busy 标志不能令它自锁。 */
-		return syncSave(!!(options && options.migration));
+		var saved = syncSave(!!(options && options.migration));
+		if(saved && !(options && options.migration))flushCheckpoints();
+		return saved;
 	}
 	function syncSave(forMigration) {
 		if (saveBlocked(forMigration)) return false;
@@ -650,6 +652,77 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 		} catch (e) { wallet = before; logError("金鳞市检查点待清理", e); return false; }
 	}
 
+
+	/* Paid side domains: wallet balance and authoritative state share one strict write.
+	   The old affection key is a compatibility mirror, never the authority after adoption. */
+	function validateAffectionState(value) {
+		if(value==null)return null;
+		if(typeof value!=="object"||Array.isArray(value))throw Error("好感检查点格式异常");
+		var json=JSON.stringify(value);if(json.length>2000000)throw Error("好感检查点过大");
+		var state=JSON.parse(json),ids=Object.keys(state);if(ids.length>128)throw Error("好感检查点人数异常");
+		ids.forEach(function(id){var e=state[id];if(!id||id.length>64||["__proto__","constructor","prototype"].indexOf(id)>=0||!e||typeof e!=="object"||Array.isArray(e)||!Number.isFinite(e.v)||e.v<0||e.v>88000)throw Error("好感检查点条目异常");});
+		ids.forEach(function(id){var tx=state[id].giftTxn;if(tx==null)return;
+            var q=tx.request,r=tx.result;
+            if(tx.v!==1||!q||!r||!Number.isSafeInteger(tx.revision)||tx.revision<1||tx.revision>=Number.MAX_SAFE_INTEGER||q.revision!==tx.revision-1||typeof q.cid!=="string"||!/^gift-[a-zA-Z0-9-]{8,100}$/.test(q.cid)||q.id!==id||["wine","rose","relic","stardust"].indexOf(q.gift)<0||!Number.isSafeInteger(q.quantity)||q.quantity<1||q.quantity>100||!Number.isSafeInteger(q.epoch)||q.epoch<0||!Number.isSafeInteger(q.before)||q.before<0||q.before>=88000||!Number.isSafeInteger(q.count)||q.count<1||q.count>q.quantity||!Number.isSafeInteger(q.cost)||q.cost<1||q.cost>68000000||!Number.isSafeInteger(q.gain)||q.gain<1||q.before+q.gain>88000||r.ok!==true||r.act!=="gift"||r.gift!==q.gift||r.count!==q.count||r.quantity!==q.quantity||r.cost!==q.cost||r.gain!==q.gain||r.value!==q.before+q.gain||["D","C","B","A","S"].indexOf(r.level)<0||typeof r.leveledUp!=="boolean")throw Error("赠礼凭据异常");
+            ["giftName","levelName","line","upLine","hint"].forEach(function(k){if(typeof r[k]!=="string"||r[k].length>500)throw Error("赠礼凭据文案异常");});
+        });
+		return state;
+	}
+	function validateCheerState(value) {
+		if(value==null)return null;
+		var x=JSON.parse(JSON.stringify(value));
+		if(x.v!==1||typeof x.freeDate!=="string"||(x.freeDate!==""&&!/^\d{4}-\d{2}-\d{2}$/.test(x.freeDate))||!Array.isArray(x.pending)||x.pending.length>100||!Array.isArray(x.acked)||x.acked.length>4096)throw Error("应援检查点格式异常");
+		var seen={};function text(v,n,required){return typeof v==="string"&&v.length<=n&&(!required||v.length>0);}
+		function identity(e){if(!e||!text(e.cid,120,true)||!/^[A-Za-z0-9_.:-]+$/.test(e.cid)||!text(e.uid,100,true)||!Number.isSafeInteger(e.t)||e.t<0)throw Error("应援凭据异常");var key=JSON.stringify([e.uid,e.cid]);if(seen[key])throw Error("应援凭据重复");seen[key]=true;}
+		x.pending.forEach(function(e){identity(e);if(!text(e.name,40,false)||!text(e.sig,160,false)||!text(e.gname,12,false)||typeof e.girl!=="string"||!/^csh_boss_minion_[a-z0-9_]{1,40}$/.test(e.girl)||!Number.isSafeInteger(e.amt)||e.amt<1||e.amt>1000000||typeof e.free!=="boolean")throw Error("应援待报条目异常");});
+		x.acked.forEach(identity);
+		if(x.legacyImported!=null&&(!Array.isArray(x.legacyImported)||x.legacyImported.length>4096||x.legacyImported.some(function(id){return !text(id,120,true)||!/^[A-Za-z0-9_.:-]+$/.test(id);})||new Set(x.legacyImported).size!==x.legacyImported.length))throw Error("旧应援迁入凭据异常");
+		return x;
+	}
+	function affectionSaved(){return validateAffectionState(wallet.affectionSaved);}
+	function cheerState(){return validateCheerState(wallet.cheerState);}
+	function validateCheckpointLedger(value) {
+		if(value==null)return [];
+		if(!Array.isArray(value)||value.length>100)throw Error("付费操作流水检查点异常");
+		var entries=JSON.parse(JSON.stringify(value)),seen={};entries.forEach(function(e){if(!e||typeof e.checkpointTx!=="string"||!/^[a-zA-Z0-9-]{8,120}$/.test(e.checkpointTx)||seen[e.checkpointTx]||!Number.isSafeInteger(e.t)||e.t<0||!Number.isSafeInteger(e.d)||!e.d||Math.abs(e.d)>PC_CAP||!Number.isSafeInteger(e.b)||e.b<0||e.b>PC_CAP||typeof e.r!=="string"||!e.r||e.r.length>40||typeof e.c!=="string"||e.c.length>16)throw Error("付费操作流水条目异常");seen[e.checkpointTx]=true;});return entries;
+	}
+	function flushCheckpointLedger() {
+		if(saveBlocked())return false;
+		var pending;try{pending=validateCheckpointLedger(wallet.checkpointPending);}catch(e){return false;}if(!pending.length)return true;
+		var before=wallet;
+		try {
+			var list=JSON.parse(localStorage.getItem(K_LEDGER)||"[]");if(!Array.isArray(list))throw Error("流水格式异常");
+			pending.forEach(function(e){if(!list.some(function(r){return r&&r.checkpointTx===e.checkpointTx;}))list.unshift(e);});
+			localStorage.setItem(K_LEDGER,JSON.stringify(list.sort(function(a,b){return b.t-a.t;}).slice(0,LEDGER_MAX)));
+			var next=JSON.parse(JSON.stringify(before));delete next.checkpointPending;next._sig=sigOf(next);localStorage.setItem(K_WALLET,JSON.stringify(next));wallet=next;return true;
+		}catch(e){wallet=before;logError("付费操作流水待恢复",e);return false;}
+	}
+	function flushCheckpoints() {
+		if(saveBlocked())return false;
+		var ledgerOK=flushCheckpointLedger(),mirrorOK=true;
+		try {if(wallet.affectionSaved!=null)localStorage.setItem("csh_affection",JSON.stringify(affectionSaved()));}catch(e){mirrorOK=false;}
+		return ledgerOK&&mirrorOK;
+	}
+	function commitCheckpoint(field,state,charge,reason) {
+		if(saveBlocked())return saveRefused();
+		if(!Number.isSafeInteger(charge)||typeof reason!=="string"||!reason.trim()||reason.length>120||charge>PC_CAP||charge< -SINGLE_ADD_CAP)return {ok:false,reason:"付费操作参数无效"};
+		if(charge>0&&wallet.pc<charge)return {ok:false,reason:"poor",balance:wallet.pc};
+		if(charge<0&&wallet.pc-charge>PC_CAP)return {ok:false,reason:"余额空间不足",balance:wallet.pc};
+		var safe;try{safe=field==="affectionSaved"?validateAffectionState(state):field==="cheerState"?validateCheerState(state):field==="dailyTaskSaved"?validateTaskState(state):null;if(!safe)throw Error("empty");}catch(e){return {ok:false,reason:"付费操作状态无效"};}
+		try{validateCheckpointLedger(wallet.checkpointPending);}catch(e){return {ok:false,reason:"付费操作流水检查点异常"};}
+		flushCheckpointLedger();
+		if(charge&&Array.isArray(wallet.checkpointPending)&&wallet.checkpointPending.length>=100)return {ok:false,reason:"历史流水正在恢复，请稍后重试"};
+		var before=wallet;
+		try {
+			wallet=JSON.parse(JSON.stringify(before));wallet[field]=safe;wallet.pc-=charge;wallet.pcPeak=Math.max(wallet.pcPeak,wallet.pc);
+			if(charge){appendChain(-charge);wallet.checkpointSeq=(Number.isSafeInteger(wallet.checkpointSeq)?wallet.checkpointSeq:0)+1;var id="cp-"+Date.now().toString(36)+"-"+wallet.checkpointSeq+"-"+Math.random().toString(36).slice(2,10);if(!Array.isArray(wallet.checkpointPending))wallet.checkpointPending=[];wallet.checkpointPending.push({t:Date.now(),d:-charge,r:reason.slice(0,40),c:catOf(reason),b:wallet.pc,checkpointTx:id});}
+			wallet._sig=sigOf(wallet);if(saveBlocked())throw Error("save blocked");localStorage.setItem(K_WALLET,JSON.stringify(wallet));
+		}catch(e){wallet=before;return {ok:false,reason:"存档写入失败，本次操作未完成",balance:wallet.pc};}
+		flushCheckpoints();return {ok:true,balance:wallet.pc,charged:charge,ledgerPending:!!(wallet.checkpointPending&&wallet.checkpointPending.length)};
+	}
+	function commitAffection(state,cost,reason){return commitCheckpoint("affectionSaved",state,cost,reason);}
+	function commitCheerState(state,charge,reason){if(!Number.isSafeInteger(charge)||charge<0||charge>1000000)return {ok:false,reason:"应援金额无效"};return commitCheckpoint("cheerState",state,charge,reason);}
+
 	/* 生涯成就：余额和一次性领奖凭据共用一个原子钱包写入。
 	   旧的 csh_career_achv 仍作兼容镜像；镜像失败不能重新发奖。
 	   流水随凭据留下待恢复项，避免奖励已入账但账本写失败后永久漏记。 */
@@ -673,6 +746,37 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 			return true;
 		} catch (e) { wallet = before; logError("成就流水待恢复", e); return false; }
 	}
+
+    /* First observed career completion is separate from reward receipts. No money moves here. */
+    function validateCareerUnlocks(value) {
+        if(value==null)return null;
+        if(typeof value!=="object"||Array.isArray(value)||value.v!==1||value.baseline!==true||!value.entries||typeof value.entries!=="object"||Array.isArray(value.entries))throw Error("生涯达成记录格式异常");
+        var keys=Object.keys(value.entries);if(keys.length>16384)throw Error("生涯达成记录过多");
+        var out={v:1,baseline:true,entries:{}};
+        keys.forEach(function(key){var item=value.entries[key];if(!/^[a-zA-Z0-9_]{1,60}$/.test(key)||["__proto__","prototype","constructor"].includes(key)||!item||typeof item!=="object"||Array.isArray(item)||!Number.isSafeInteger(item.observedAt)||item.observedAt<0||item.observedAt>8640000000000000)throw Error("生涯达成条目格式异常");out.entries[key]={observedAt:item.observedAt};});
+        return out;
+    }
+    function careerUnlocks(){return validateCareerUnlocks(wallet.careerUnlocks);}
+    function syncCareerUnlocks(keys) {
+        if(saveBlocked())return saveRefused();
+        var before=wallet;
+        try {
+            if(!Array.isArray(keys)||keys.length>16384||keys.some(function(k){return typeof k!=="string"||!/^[a-zA-Z0-9_]{1,60}$/.test(k)||["__proto__","prototype","constructor"].includes(k);}))throw Error("生涯达成候选无效");
+            var record=careerUnlocks(),initial=!record;record=record||{v:1,baseline:true,entries:{}};
+            var raw=localStorage.getItem("csh_career_achv"),legacy=raw?JSON.parse(raw):{};
+            if(!legacy||typeof legacy!=="object"||Array.isArray(legacy))throw Error("旧生涯领奖记录无法读取");
+            var claims=wallet.careerClaims||{};if(typeof claims!=="object"||Array.isArray(claims))throw Error("生涯领奖凭据格式异常");
+            var paid=Object.create(null),fresh=[],changed=initial,stamp=Date.now();[legacy,claims].forEach(function(source){Object.keys(source).forEach(function(k){if(source[k])paid[k]=1;});});
+            Object.keys(paid).forEach(function(k){if(!paid[k])return;if(!/^[a-zA-Z0-9_]{1,60}$/.test(k)||["__proto__","prototype","constructor"].includes(k))throw Error("旧生涯领奖条目无效");if(!Object.prototype.hasOwnProperty.call(record.entries,k)){record.entries[k]={observedAt:0};changed=true;}});
+            keys.forEach(function(k){if(!Object.prototype.hasOwnProperty.call(record.entries,k)){record.entries[k]={observedAt:initial?0:stamp};if(!initial)fresh.push(k);changed=true;}});
+            record=validateCareerUnlocks(record);
+            if(!changed)return {ok:true,record:record,fresh:[],baseline:false};
+            var next=JSON.parse(JSON.stringify(before));next.careerUnlocks=record;next._sig=sigOf(next);
+            localStorage.setItem(K_WALLET,JSON.stringify(next));wallet=next;
+            return {ok:true,record:validateCareerUnlocks(record),fresh:fresh,baseline:initial};
+        } catch(e){wallet=before;return {ok:false,reason:"生涯达成记录未保存，请恢复存储后重试"};}
+    }
+
 	function claimCareer(key, amount, label) {
 		if (saveBlocked()) return saveRefused();
 		if (typeof key !== "string" || !/^[a-zA-Z0-9_]{1,60}$/.test(key) ||
@@ -945,7 +1049,18 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 		if (saveBlocked()) return Object.assign(saveRefused(), { credited: 0, balance: wallet.pc });
 		opts = opts || {};
 		var r = settle(gameKey, opts.buyIn, opts.netWin, opts.aiStakeTotal, opts.players);
-		var credited = r.payout > 0 ? addPC(r.payout, "结算/" + gameKey) : 0;
+		/* A successful ACK requires durable balance, even when the ledger mirror is temporarily unavailable. */
+        var credited=0,before=wallet;
+        try {
+            validateCheckpointLedger(wallet.checkpointPending);flushCheckpointLedger();
+            if(Array.isArray(wallet.checkpointPending)&&wallet.checkpointPending.length>=100)throw Error('ledger pending');
+            wallet=JSON.parse(JSON.stringify(wallet));
+            credited=r.payout>SINGLE_ADD_CAP?0:Math.max(0,Math.min(r.payout,PC_CAP-wallet.pc));
+            wallet.pc+=credited;wallet.pcPeak=Math.max(wallet.pcPeak,wallet.pc);
+            if(credited){appendChain(credited);wallet.checkpointSeq=(Number.isSafeInteger(wallet.checkpointSeq)?wallet.checkpointSeq:0)+1;if(!Array.isArray(wallet.checkpointPending))wallet.checkpointPending=[];wallet.checkpointPending.push({t:Date.now(),d:credited,r:'结算/'+gameKey,c:catOf('结算/'+gameKey),b:wallet.pc,checkpointTx:'cp-'+Date.now().toString(36)+'-'+wallet.checkpointSeq+'-'+Math.random().toString(36).slice(2,10)});}
+            wallet._sig=sigOf(wallet);if(saveBlocked())throw Error('save blocked');localStorage.setItem(K_WALLET,JSON.stringify(wallet));
+        }catch(e){wallet=before;return {ok:false,credited:0,balance:wallet.pc,reason:'结算尚未保存，请保留页面后重试'};}
+        flushCheckpoints();snapshot();r.ok=true;
 		r.credited = credited;
 		/* ★ 2026-10-18（第二十二批审计）：原来 `r.clamped` 只被赋值、全项目无人读（死字段）。
 		   它不是和 discarded 重复 —— discarded 是"算法按封顶丢掉"，clamped 是"钱包层按
@@ -969,81 +1084,44 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 	     · 生涯大厅 shell-tasks 只读渲染，领奖也走这里（宿主侧复核）。
 	   日期串字典序比较；系统时间回拨不会重置进度、不会重复领奖。
 	   ============================================================ */
-	var DEFAULT_TASK = function () { return { day: "", hands: 0, wins: 0, bigPot: 0, claimed: [] }; };
-	var taskData = lsJSON(K_TASK, null);
-	if (!taskData || typeof taskData !== "object") taskData = DEFAULT_TASK();
-	if (typeof taskData.day !== "string") taskData.day = "";
-	taskData.hands = Math.max(0, Math.floor(taskData.hands || 0));
-	taskData.wins = Math.max(0, Math.floor(taskData.wins || 0));
-	taskData.bigPot = Math.max(0, Math.floor(taskData.bigPot || 0));
-	if (!Array.isArray(taskData.claimed)) taskData.claimed = [];
+    var DEFAULT_TASK = function () { return { day:"",hands:0,wins:0,bigPot:0,claimed:[] }; };
+    function validateTaskState(o){
+        if(!o||typeof o!=="object"||Array.isArray(o)||typeof o.day!=="string"||o.day!==""&&!/^\d{4}-\d{2}-\d{2}$/.test(o.day))throw Error("每日任务存档无效");
+        var s={day:o.day,claimed:[]};["hands","wins","bigPot"].forEach(function(k){var n=o[k]==null?0:o[k];if(!Number.isSafeInteger(n)||n<0||n>1000000000)throw Error("每日任务进度无效");s[k]=n;});
+        if(!Array.isArray(o.claimed)||o.claimed.some(function(k){return ["hands","wins","bigPot"].indexOf(k)<0;}))throw Error("每日任务凭据无效");s.claimed=o.claimed.filter(function(k,i,a){return a.indexOf(k)===i;});return s;
+    }
+    function readTaskState(){try{return validateTaskState(wallet.dailyTaskSaved||lsJSON(K_TASK,null)||DEFAULT_TASK());}catch(e){logError("任务读取失败",e);return DEFAULT_TASK();}}
+    var taskData=readTaskState();
+    function taskTier(){return rankData.rank>=30?2:rankData.rank>=10?1:0;}
+    function taskDefs(t){t=t==null?taskTier():t;return [
+        {key:"hands",label:"打满手数",goal:[10,20,30][t],reward:[300,500,800][t],unit:"手"},
+        {key:"wins",label:"赢下手数",goal:[3,5,8][t],reward:[500,800,1200][t],unit:"胜"},
+        {key:"bigPot",label:"赢下大池",goal:[2000,20000,200000][t],reward:[800,1500,3000][t],unit:"CBY"}
+    ];}
+    function mergeTask(a,b){if(a.day!==b.day)return a.day>b.day?a:b;var s=validateTaskState(a);["hands","wins","bigPot"].forEach(function(k){s[k]=Math.max(a[k],b[k]);});s.claimed=a.claimed.concat(b.claimed).filter(function(k,i,x){return x.indexOf(k)===i;});return s;}
+    function commitTaskResult(payload){
+        var next;try{next=validateTaskState(payload.state);if(!Number.isInteger(payload.tier)||payload.tier<0||payload.tier>2)throw Error("tier");next=mergeTask(readTaskState(),next);}catch(e){return {ok:false,reason:"每日任务结果无效"};}
+        var awards=[],sum=0;taskDefs(payload.tier).forEach(function(d){if(next[d.key]>=d.goal&&next.claimed.indexOf(d.key)<0){awards.push({key:d.key,label:d.label,reward:d.reward,gained:d.reward});sum+=d.reward;next.claimed.push(d.key);}});
+        var r=commitCheckpoint("dailyTaskSaved",next,-sum,"每日任务"+(awards.length?"/"+awards.map(function(a){return a.label;}).join("、"):"进度"));
+        if(!r.ok)return r;
+        taskData=mergeTask(taskData,next);try{localStorage.setItem(K_TASK,JSON.stringify(next));}catch(e){}
+        return {ok:true,completed:awards,gained:sum};
+    }
+    function saveTask(){
+        if(saveBlocked())return {ok:false};
+        return pendingResults.put("task","task-"+Date.now().toString(36)+"-"+Math.random().toString(36).slice(2),{state:taskData,tier:taskTier()});
+    }
+    function taskEnsureDay(t){if(saveBlocked())return false;t=t||today();if(taskData.day===t||taskData.day&&t<taskData.day)return false;taskData=DEFAULT_TASK();taskData.day=t;saveTask();return true;}
+    function taskProgressOf(key){return Number(taskData[key])||0;}
+    function taskAdd(kind,n){
+        if(saveBlocked()||["hands","wins","bigPot"].indexOf(kind)<0)return [];taskEnsureDay();n=Math.floor(Number(n)||0);if(n<=0)return [];
+        taskData[kind]=Math.min(1000000000,kind==="bigPot"?Math.max(taskData[kind],n):taskData[kind]+n);var r=saveTask();return r.ok?r.completed||[]:[];
+    }
+    function taskState(){
+        taskEnsureDay();if(!saveBlocked())resultRetry();var defs=taskDefs().map(function(d){return Object.assign({},d,{cur:Math.min(taskData[d.key],d.goal),done:taskData[d.key]>=d.goal,claimed:taskData.claimed.indexOf(d.key)>=0});});
+        return {day:taskData.day||today(),tier:taskTier(),defs:defs,pending:defs.some(function(d){return d.done&&!d.claimed;})};
+    }
 
-	function saveTask() {
-		if (saveBlocked()) return;
-		try { lsPut(K_TASK, taskData); } catch (e) {}
-	}
-	function taskTier() { return rankData.rank >= 30 ? 2 : (rankData.rank >= 10 ? 1 : 0); }
-	function taskDefs() {
-		var t = taskTier();
-		return [
-			{ key: "hands", label: "打满手数", goal: [10, 20, 30][t], reward: [300, 500, 800][t], unit: "手" },
-			{ key: "wins", label: "赢下手数", goal: [3, 5, 8][t], reward: [500, 800, 1200][t], unit: "胜" },
-			{ key: "bigPot", label: "赢下大池", goal: [2000, 20000, 200000][t], reward: [800, 1500, 3000][t], unit: "CBY" },
-		];
-	}
-	/* 日刷新：跨天清零（回拨时 today < day → 不重置，防刷） */
-	function taskEnsureDay(t) {
-		if (saveBlocked()) return false;
-		t = t || today();
-		if (taskData.day === t) return false;
-		if (taskData.day && t < taskData.day) return false;   // 时间被回拨
-		taskData = DEFAULT_TASK();
-		taskData.day = t;
-		saveTask();
-		return true;
-	}
-	function taskProgressOf(key) {
-		if (key === "hands") return taskData.hands;
-		if (key === "wins") return taskData.wins;
-		if (key === "bigPot") return taskData.bigPot;
-		return 0;
-	}
-	/* 上报进度：返回本次新完成（并已入账）的任务列表 */
-	function taskAdd(kind, n) {
-		if (saveBlocked()) return [];
-		taskEnsureDay();
-		n = Math.floor(Number(n) || 0);
-		if (n <= 0) return [];
-		if (kind === "hands") taskData.hands += n;
-		else if (kind === "wins") taskData.wins += n;
-		else if (kind === "bigPot") taskData.bigPot = Math.max(taskData.bigPot, n);
-		else return [];
-		var done = [], defs = taskDefs();
-		for (var i = 0; i < defs.length; i++) {
-			var d = defs[i];
-			if (taskProgressOf(d.key) >= d.goal && taskData.claimed.indexOf(d.key) < 0) {
-				taskData.claimed.push(d.key);
-				var got = addPC(d.reward, "每日任务/" + d.label);
-				done.push({ key: d.key, label: d.label, reward: d.reward, gained: got });
-			}
-		}
-		saveTask();
-		return done;
-	}
-	function taskState() {
-		taskEnsureDay();
-		var defs = taskDefs(), out = [];
-		for (var i = 0; i < defs.length; i++) {
-			var d = defs[i];
-			out.push({
-				key: d.key, label: d.label, goal: d.goal, reward: d.reward, unit: d.unit,
-				cur: Math.min(taskProgressOf(d.key), d.goal),
-				done: taskProgressOf(d.key) >= d.goal,
-				claimed: taskData.claimed.indexOf(d.key) >= 0,
-			});
-		}
-		return { day: taskData.day || today(), tier: taskTier(), defs: out };
-	}
 
 	/* ============================================================
 	   4. 签到（§F.4）
@@ -1852,13 +1930,16 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 	   会在导入的无签名钱包上把旧内存重新写回，丢掉新余额和领奖凭据。 */
 	function reloadSave(snapshot, options) {
 		if (!(snapshot && options && options.memoryOnly) && saveBlocked()) return saveRefused();
-		try { if (lib.cshMatchReward && typeof lib.cshMatchReward.invalidate === "function") lib.cshMatchReward.invalidate(); } catch (e) { logError("对局奖励会话重置异常",e); }
-		adoptedSaveEpoch++;
-		bossEventCache = new WeakMap();
 		var supplied = snapshot && typeof snapshot === "object";
 		var memoryOnly = supplied && options && options.memoryOnly;
-		if (_saveTimer) { clearTimeout(_saveTimer); _saveTimer = 0; }
 		var raw = supplied ? snapshot.wallet : lsJSON(K_WALLET, null);
+        if(raw&&raw.careerUnlocks!=null)validateCareerUnlocks(raw.careerUnlocks);
+		try { if (lib.cshMatchReward && typeof lib.cshMatchReward.invalidate === "function") lib.cshMatchReward.invalidate(); } catch (e) { logError("对局奖励会话重置异常",e); }
+		adoptedSaveEpoch++; resultInvalidate();
+		bossEventCache = new WeakMap();
+
+		if (_saveTimer) { clearTimeout(_saveTimer); _saveTimer = 0; }
+
 		wallet = raw && typeof raw === "object" && !Array.isArray(raw) ? raw : walletDef();
 		wallet.pc = clampNum(wallet.pc, 0, PC_CAP);
 		wallet.pcPeak = clampNum(Math.max(Number(wallet.pcPeak) || 0, wallet.pc), 0, PC_CAP);
@@ -1872,7 +1953,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 		rankData.merit = clampNum(rankData.merit, 0, 999999999);
 		rankData.meritToday = clampNum(rankData.meritToday, 0, 999999999);
 		if (typeof rankData.meritDate !== "string") rankData.meritDate = "";
-		var td = supplied ? snapshot.dailyTask : lsJSON(K_TASK, null);
+		var td = wallet.dailyTaskSaved || (supplied ? snapshot.dailyTask : lsJSON(K_TASK, null));
 		taskData = td && typeof td === "object" && !Array.isArray(td) ? td : DEFAULT_TASK();
 		if (typeof taskData.day !== "string") taskData.day = "";
 		["hands", "wins", "bigPot"].forEach(function (key) { taskData[key] = clampNum(taskData[key], 0, 999999999); });
@@ -1881,7 +1962,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 		   容错读盘，也不在确认前补签名/补流水；之后正常保存会签名新对象。 */
 		if (memoryOnly) return { ok: true, action: "adopt-memory", pc: wallet.pc };
 		var result = integrityCheck();
-		flushCareerLedger(); flushPoolLedger();
+		flushCareerLedger(); flushPoolLedger(); flushCheckpoints();
 		return result;
 	}
 
@@ -1935,9 +2016,55 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 	/* ============================================================
 	   9. 对外导出
 	   ============================================================ */
+	    /* Local result journal. Intents survive reload; each consumer commits its own receipt. */
+    var K_RESULTS = "csh_pending_results_v1", resultHandlers = {}, volatileResults = [], resultTimer = null, resultBusy = false, resultError = "";
+    function resultRead() {
+        var raw=localStorage.getItem(K_RESULTS);if(raw==null)return [];
+        var data=JSON.parse(raw);if(!data||data.v!==1||!Array.isArray(data.entries)||data.entries.length>64)throw Error("待保存记录格式异常，请先备份恢复");
+        var seen={};data.entries.forEach(function(e){if(!e||!["match","assisted","pool","task"].includes(e.kind)||typeof e.id!=="string"||!/^[a-zA-Z0-9_-]{10,100}$/.test(e.id)||seen[e.id]||!e.data||typeof e.data!=="object"||Array.isArray(e.data)||!Number.isSafeInteger(e.t)||e.t<0)throw Error("待保存记录损坏");seen[e.id]=1;});return data.entries;
+    }
+    function resultWrite(entries) { var value=JSON.stringify({v:1,entries:entries});if(value.length>524288)throw Error("待保存内容过多，请先恢复存储");if(entries.length)localStorage.setItem(K_RESULTS,value);else localStorage.removeItem(K_RESULTS); }
+    function resultSchedule() {if(resultTimer!==null||typeof setTimeout!=="function")return;resultTimer=setTimeout(function(){resultTimer=null;resultRetry();},2000);}
+    function resultStatus() {try{var a=resultRead(),ids=a.map(function(e){return e.id;});return {count:a.length+volatileResults.filter(function(e){return ids.indexOf(e.id)<0;}).length,volatile:volatileResults.length,error:resultError,items:a.map(function(e){return {id:e.id,kind:e.kind,t:e.t};})};}catch(e){return {count:volatileResults.length,volatile:volatileResults.length,error:String(e.message||e),items:[]};}}
+    function resultRetry() {
+        if(resultBusy||saveBlocked())return resultStatus();resultBusy=true;
+        try {
+            var entries=resultRead();volatileResults.forEach(function(e){if(!entries.some(function(x){return x.id===e.id;}))entries.push(e);});
+            if(entries.length>64)throw Error("待保存记录已满，请先恢复存储");
+            if(volatileResults.length){resultWrite(entries);volatileResults=[];}
+            for(var i=0;i<entries.length;){
+                var job=entries[i],fn=resultHandlers[job.kind];if(!fn){i++;continue;}
+                var answer=fn(job.data,job.id);if(!answer||answer.ok!==true){resultError=answer&&answer.reason||"结果尚未保存";break;}
+                var next=entries.slice();next.splice(i,1);resultWrite(next);entries=next;
+            }
+            if(!entries.length)resultError="";
+        }catch(e){resultError=String(e.message||e);}finally{resultBusy=false;}
+        var state=resultStatus();if(state.count||state.error)resultSchedule();return state;
+    }
+    function resultPut(kind,id,data) {
+        if(saveBlocked())return {ok:false,durable:false,reason:SAVE_BLOCK_REASON};
+        if(!["match","assisted","pool","task"].includes(kind)||typeof id!=="string"||!/^[a-zA-Z0-9_-]{10,100}$/.test(id))return {ok:false,durable:false,reason:"结果标识无效"};
+        var job={kind:kind,id:id,data:JSON.parse(JSON.stringify(data)),t:Date.now()};
+        try{var entries=resultRead();if(!entries.some(function(e){return e.id===id;}))entries.push(job);if(entries.length>64)throw Error("待保存记录已满");resultWrite(entries);volatileResults=volatileResults.filter(function(e){return e.id!==id;});}
+        catch(e){if(!volatileResults.some(function(e){return e.id===id;})&&volatileResults.length<64)volatileResults.push(job);resultError=String(e.message||e);resultSchedule();return {ok:false,durable:false,reason:"结果未能写入本机，请保持页面打开并恢复存储"};}
+        var answer=null,original=resultHandlers[kind];if(original)resultHandlers[kind]=function(payload,key){var r=original(payload,key);if(key===id)answer=r;return r;};
+        try{resultRetry();}finally{if(original)resultHandlers[kind]=original;}
+        return answer&&answer.ok?Object.assign({durable:true},answer):{ok:false,durable:true,pending:true,reason:resultError||"已保留，存储恢复后自动补记"};
+    }
+    function resultRegister(kind,fn){resultHandlers[kind]=fn;var state=resultStatus();if((state.count||state.error)&&resultTimer===null&&typeof setTimeout==="function")resultTimer=setTimeout(function(){resultTimer=null;resultRetry();},0);}
+    function resultInvalidate(){volatileResults=[];resultError="";if(resultTimer!==null){clearTimeout(resultTimer);resultTimer=null;}}
+    var pendingResults={KEY:K_RESULTS,put:resultPut,retry:resultRetry,status:resultStatus,register:resultRegister};
+    resultRegister("match",function(d,id){return settleMatch(id,d.mode,d.win,d.amount);});
+    resultRegister("assisted",function(d,id){return settleAssisted(id,d.win);});
+    resultRegister("task",commitTaskResult);
+
+
 	var CSH = {
+        pending: pendingResults,
+        validateTaskState: validateTaskState,
 		version: "1.1.0",
 		validateBossRewards: validateBossRewards,
+        validateCareerUnlocks: validateCareerUnlocks,
 		saveEpoch: function () { return adoptedSaveEpoch; },
 		saveGuard: { blocked: function () { return saveBlocked(); }, reason: SAVE_BLOCK_REASON },
 		/* 存储键名唯一真值（§5.5.3）。csh_migrate 的导入导出由此取键名，
@@ -1972,7 +2099,9 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 			peak: function () { return wallet.pcPeak; },
 			add: addPC, spend: spendPC, SINGLE_ADD_CAP: SINGLE_ADD_CAP,
 			claimCareer: claimCareer,
+            careerUnlocks: careerUnlocks, syncCareerUnlocks: syncCareerUnlocks,
 			claimPool: claimPool, poolClaimed: poolClaimed, poolPending: function(id) { return !!(wallet.poolClaims && wallet.poolClaims[id] && !poolClaimed(id)); },
+			affectionSaved: affectionSaved, commitAffection: commitAffection, cheerState: cheerState, commitCheerState: commitCheerState, flushCheckpoints: flushCheckpoints,
 			commitMarket: commitMarket, marketPending: marketPending, marketSaved: marketSaved, completeMarket: completeMarket,
 			bossSaved: bossSaved, preserveBoss: preserveBoss, commitBossEvent: commitBossEvent, bossRewardState: bossRewardState, flushBossRewards: flushBossRewards,
 			assistedStats: assistedStats, settleAssisted: settleAssisted,
@@ -2019,7 +2148,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 			pubkeys: function () { return CSH_PUBKEYS.slice(); },
 			setPubkeys: function (arr) { CSH_PUBKEYS = Array.isArray(arr) ? arr : []; },
 		},
-	sign, flushSave, reloadSave,
+	pending: pendingResults, validateTaskState: validateTaskState, sign, flushSave, reloadSave, validateAffectionState: validateAffectionState, validateCheerState: validateCheerState, validateCheckpointLedger: validateCheckpointLedger,
 	integrity: { check: integrityCheck, crossCheck: crossCheck },
 		migrate: { legacy: legacyMigrate },
 	_sig: { sign: sigOf, verify: verifySig, fnv1a: fnv1a, verifyRSA: verifyPKCS1v15, sha256: _sha256 },

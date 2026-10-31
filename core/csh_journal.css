@@ -1,0 +1,181 @@
+body[data-csh-journal]{--jp-note-size:var(--csh-lfs-sm,12px);--jp-label-size:var(--csh-lfs-md,13px);--jp-body-size:var(--csh-lfs-lg,14px);--jp-section-size:var(--csh-lfs-lg2,15px);--jp-title-size:var(--csh-lfs-xl,16px);--jp-rank-size:var(--csh-lfs-xl3,18px);--jp-icon-size:var(--csh-lfs-2xl,22px);--jp-balance-small:var(--csh-lfs-2xl,23px);--jp-balance-medium:var(--csh-lfs-lead,26px);--jp-balance-size:var(--csh-lfs-display,30px)}
+/* Scoped composition for three journals. Color values remain owned by each page/skin. */
+body[data-csh-journal]{--jp-radius:8px;--jp-title:"Noto Serif SC","Source Han Serif SC",SimSun,serif;--jp-accent:var(--csh-page-accent,var(--gold,#d2b57a));--jp-accent-ink:var(--csh-page-accent-ink,#292215);font-size:var(--jp-body-size)}
+body[data-csh-journal="pool"],body[data-csh-journal="save"]{--jp-surface:var(--panel);--jp-text:var(--ink);--jp-muted:var(--muted,var(--ink-dim));--jp-line:var(--line)}
+body[data-csh-journal="career"]{--jp-surface:var(--ink-1);--jp-text:var(--text);--jp-muted:var(--text-dim);--jp-line:var(--gold-line);--fs-tiny:var(--jp-note-size);--fs-cap:var(--jp-note-size);--fs-label:var(--jp-note-size)}
+body[data-csh-journal] .journal-header{display:flex;align-items:center;gap:12px;min-height:48px;flex:none;border-bottom:1px solid var(--jp-line);padding:4px 0 8px;margin:0;color:var(--jp-text)}
+body[data-csh-journal] .journal-header h1{font:600 var(--jp-title-size)/1.4 var(--jp-title);letter-spacing:.04em;margin:0;white-space:nowrap}
+body[data-csh-journal] :is(button,input,select,summary,textarea){font-size:var(--jp-body-size)}
+body[data-csh-journal] :is(button,select,summary){min-height:44px}
+body[data-csh-journal] .journal-header button{margin:0;align-self:center}
+body[data-csh-journal] details>summary{cursor:pointer;list-style-position:inside;line-height:1.5;align-content:center}
+body[data-csh-journal] .journal-muted{color:var(--jp-muted);font-size:var(--jp-note-size);line-height:1.5}
+/* Pool achievements: catalogue first; secondary filters are a sidebar/disclosure. */
+body[data-csh-journal="pool"]{display:flex;flex-direction:column;overflow:hidden;padding:8px 16px 12px;gap:10px}
+body[data-csh-journal="pool"] header.journal-header{padding-right:var(--csh-dock-safe,clamp(150px,20vw,200px));gap:14px}
+body[data-csh-journal="pool"] .journal-title{min-width:0;flex:1}
+body[data-csh-journal="pool"] #summary{margin:2px 0 0;font-size:var(--jp-note-size);line-height:1.5}
+body[data-csh-journal="pool"] #claim-all{font-size:var(--jp-note-size);max-width:180px;padding:6px 10px;min-height:44px;background:var(--jp-accent);color:var(--jp-accent-ink);border:0;border-radius:6px;flex:none}
+body[data-csh-journal="pool"] #claim-all:disabled{background:var(--jp-surface);color:var(--jp-muted);border:1px solid var(--jp-line)}
+body[data-csh-journal="pool"] .journal-workspace{position:relative;display:grid;grid-template-columns:210px minmax(0,1fr);gap:18px;min-height:0;flex:1}
+body[data-csh-journal="pool"] .journal-sidebar{min-width:0;overflow-y:auto;overscroll-behavior:contain;padding-right:16px;border-right:1px solid var(--jp-line)}
+body[data-csh-journal="pool"] .filters{display:grid;grid-template-columns:minmax(0,1fr);gap:8px;min-width:0}
+body[data-csh-journal="pool"] .filters :is(input,select){width:100%;min-width:0;max-width:100%;min-height:44px;flex:none;padding:8px 10px;background:var(--jp-surface)}
+body[data-csh-journal="pool"] .filters label{display:grid;gap:5px;color:var(--jp-muted);font-size:var(--jp-note-size);min-width:0}
+body[data-csh-journal="pool"] #pool-options{margin-top:12px;color:var(--jp-text)}
+body[data-csh-journal="pool"] #pool-options>summary{font-size:var(--jp-note-size);border-bottom:1px solid var(--jp-line)}
+body[data-csh-journal="pool"] .journal-filter-content{padding-top:12px}
+body[data-csh-journal="pool"] #rule-note,body[data-csh-journal="pool"] #collection-note{font-size:var(--jp-note-size);line-height:1.6;color:var(--jp-muted);margin:12px 0 0}
+body[data-csh-journal="pool"] #goal-bar{margin-top:12px;max-height:none;overflow:visible}
+body[data-csh-journal="pool"] .journal-results{display:flex;flex-direction:column;min-width:0;min-height:0}
+body[data-csh-journal="pool"] #message{margin:0;min-height:0;font-size:var(--jp-note-size);line-height:1.6;flex:none}
+body[data-csh-journal="pool"] #message:not(:empty){padding:8px 10px;margin-bottom:8px;border:1px solid var(--jp-line);border-left:3px solid var(--jp-accent);border-radius:4px}
+body[data-csh-journal="pool"] #list{display:grid;grid-template-columns:minmax(0,1fr);gap:10px;align-content:start;min-width:0;min-height:0;overflow-y:auto;flex:1;padding:1px 4px 12px 1px}
+body[data-csh-journal="pool"] #list .row{grid-template-columns:minmax(0,1fr) 124px;align-items:center;gap:14px;padding:12px;border:1px solid var(--jp-line);border-radius:var(--jp-radius);background:var(--jp-surface);min-width:0}
+body[data-csh-journal="pool"] .achievement-main{min-width:0}
+body[data-csh-journal="pool"] .name{font-size:var(--jp-section-size);line-height:1.5;align-items:flex-start}
+body[data-csh-journal="pool"] .name .meta{display:block;margin:3px 0 0;font-size:var(--jp-note-size);line-height:1.5}
+body[data-csh-journal="pool"] .condition{font-size:var(--jp-body-size);line-height:1.6;margin-top:8px;font-weight:400}
+body[data-csh-journal="pool"] .progress{margin-top:8px;gap:8px;flex-wrap:wrap}
+body[data-csh-journal="pool"] .progress progress{width:72px;height:5px}
+body[data-csh-journal="pool"] .achievement-actions{display:grid;gap:6px;align-content:center;min-width:0;border-left:1px solid var(--jp-line);padding-left:12px}
+body[data-csh-journal="pool"] .achievement-actions .reward{font-size:var(--jp-note-size);line-height:1.6;color:var(--jp-muted);margin:0 0 2px;overflow-wrap:anywhere}
+body[data-csh-journal="pool"] .achievement-actions button{width:100%;min-height:44px;font-size:var(--jp-note-size);white-space:normal;margin:0}
+body[data-csh-journal="pool"] .row[data-claimable="true"]{border-color:var(--jp-accent)}
+body[data-csh-journal="pool"] .claim.ready{background:var(--jp-accent);color:var(--jp-accent-ink)}
+@media(min-width:900px){body[data-csh-journal="pool"] #list{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:1199px),(max-height:599px){
+ body[data-csh-journal="pool"] .journal-workspace{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr);gap:10px}
+ body[data-csh-journal="pool"] .journal-sidebar{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;gap:8px;overflow:visible;border:0;padding:0}
+ body[data-csh-journal="pool"] .journal-sidebar>.filters{grid-template-columns:minmax(140px,1fr) 124px}
+ body[data-csh-journal="pool"] #pool-options{margin:0}
+ body[data-csh-journal="pool"] #pool-options>summary{display:flex;align-items:center;justify-content:center;min-height:44px;padding:6px 12px;border:1px solid var(--jp-line);border-radius:5px;font-size:var(--jp-note-size);background:var(--jp-surface)}
+ body[data-csh-journal="pool"] #pool-options[open]>summary{border-color:var(--jp-accent)}
+ body[data-csh-journal="pool"] #pool-options[open] .journal-filter-content{position:absolute;left:0;right:0;top:54px;z-index:5;max-height:calc(100% - 54px);overflow:auto;padding:14px;background:var(--jp-surface);border:1px solid var(--jp-line);border-radius:8px;box-shadow:0 12px 24px #0006}
+ body[data-csh-journal="pool"] .journal-filter-content>.filters{grid-template-columns:repeat(3,minmax(0,1fr))}
+ body[data-csh-journal="pool"] #list .row{padding:10px;gap:10px;grid-template-columns:minmax(0,1fr) 112px}
+ body[data-csh-journal="pool"] .hint:not(.feat-live){display:none}
+}
+/* Career: navigation, a modest page header, a compact identity strip, then today's actions. */
+body[data-csh-journal="career"] .career-workspace{display:flex;flex-direction:column;flex:1;min-width:0;min-height:0;height:100%;overflow:hidden}
+body[data-csh-journal="career"] #career-top{padding:4px 72px 4px 16px;gap:10px;background:var(--ink-0);min-height:48px}
+body[data-csh-journal="career"] #career-page-title{font-size:var(--jp-title-size)}
+body[data-csh-journal="career"] #tabs{flex-basis:124px;flex-shrink:0;padding:12px 8px;background:var(--ink-1);border-right:1px solid var(--jp-line)}
+body[data-csh-journal="career"] #tabs .tab{font:500 var(--jp-body-size)/1.4 var(--ff-body);letter-spacing:0;min-height:44px;padding:10px 8px;border-radius:5px;border-left:0}
+body[data-csh-journal="career"] #tabs .tab::before{display:none}
+body[data-csh-journal="career"] #tabs .tm{display:none}
+body[data-csh-journal="career"] #body,body[data-csh-journal="career"] #app.career-collection #body{width:auto;min-width:0;min-height:0;flex:1;overflow:auto;padding:14px 18px 18px}
+body[data-csh-journal="career"] .page{max-width:1280px;margin-inline:auto}
+body[data-csh-journal="career"] #p-overview.on{display:grid!important;grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);gap:18px;align-items:start;min-width:0}
+body[data-csh-journal="career"] #p-overview #rankFocus{grid-column:1/-1;display:grid;grid-template-columns:134px minmax(0,1fr) auto;align-items:center;gap:20px;width:100%;min-width:0;margin:0;padding:16px;border:1px solid var(--jp-line);border-radius:8px;background:var(--ink-1);min-height:100px;box-shadow:none}
+body[data-csh-journal="career"] #rankFocus .rf-id{display:flex;flex-direction:row;align-items:center;justify-content:flex-start;gap:10px;min-width:0}
+body[data-csh-journal="career"] #rankFocus .badge{width:44px;height:44px;flex:none;margin:0}
+body[data-csh-journal="career"] #rankFocus .badge svg{width:44px;height:44px}
+body[data-csh-journal="career"] #rankFocus .name{font:600 var(--jp-rank-size)/1.4 var(--jp-title);white-space:normal;margin:0}
+body[data-csh-journal="career"] #rankFocus .rf-main{display:grid;grid-template-columns:minmax(0,1fr);gap:6px;min-width:0}
+body[data-csh-journal="career"] #rankFocus .rf-main .bar{margin:0;height:5px}
+body[data-csh-journal="career"] #rankFocus .foot{display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px 8px;position:static;font-size:var(--jp-note-size);line-height:1.5;margin:0}
+body[data-csh-journal="career"] #rankFocus>.pc-big{position:static;margin:0;display:flex;flex-direction:column;gap:2px;text-align:right;min-width:0;font-family:var(--ff-num)}
+body[data-csh-journal="career"] #rankFocus>.pc-big>span{font-size:var(--jp-balance-size);line-height:1.1;font-weight:600;overflow-wrap:anywhere}
+body[data-csh-journal="career"] #rankFocus>.pc-big small{font:400 var(--jp-note-size)/1.5 var(--ff-body);color:var(--jp-muted)}
+body[data-csh-journal="career"] #p-overview>.ov-col{display:flex!important;flex-direction:column;gap:16px;min-width:0;width:auto;flex:initial;order:initial}
+body[data-csh-journal="career"] #p-overview .ov-today{order:0}
+body[data-csh-journal="career"] #p-overview .ov-assets{order:1}
+body[data-csh-journal="career"] #p-overview .sect{width:100%;min-width:0;margin:0}
+body[data-csh-journal="career"] #p-overview .sect>h3{font:600 var(--jp-label-size)/1.5 var(--ff-body);color:var(--jp-muted);border:0;padding:0;margin:0 0 8px;letter-spacing:.04em}
+body[data-csh-journal="career"] #p-overview .card{margin:0;padding:12px;border:1px solid var(--jp-line);border-radius:8px;background:var(--ink-1)}
+body[data-csh-journal="career"] #ov-today{font-size:var(--jp-label-size);line-height:1.65;margin:0 0 10px}
+body[data-csh-journal="career"] #p-overview .btnrow{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+body[data-csh-journal="career"] #p-overview .btnrow button{flex:1;min-height:44px}
+body[data-csh-journal="career"] .journal-context{margin-top:8px;border-top:1px solid var(--jp-line)}
+body[data-csh-journal="career"] .journal-context>summary{font-size:var(--jp-note-size);color:var(--jp-muted)}
+body[data-csh-journal="career"] #p-overview .wallet{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+body[data-csh-journal="career"] #p-overview .wallet .wl{padding:10px;background:transparent;border:1px solid var(--jp-line);border-radius:6px;min-width:0}
+body[data-csh-journal="career"] #p-overview .wallet .k{font-size:var(--jp-note-size);color:var(--jp-muted)}
+body[data-csh-journal="career"] #p-overview .wallet .v{font-size:var(--jp-rank-size);line-height:1.4}
+body[data-csh-journal="career"] #ov-tasks{display:grid;gap:8px}
+body[data-csh-journal="career"] #ov-tasks .task{padding:12px;min-height:64px;background:var(--ink-1);border:1px solid var(--jp-line);border-radius:7px}
+body[data-csh-journal="career"] #ov-tasks .tk-lab,body[data-csh-journal="career"] #ov-tasks .tk-num{font-size:var(--jp-note-size);min-width:0}
+body[data-csh-journal="career"] #ov-tasks .tk-main{min-width:0;gap:8px}
+body[data-csh-journal="career"] #ov-tasks .tk-rw{font-size:var(--jp-note-size);flex:none}
+body[data-csh-journal="career"] #ov-tasks-note{font-size:var(--jp-note-size);margin-top:8px;color:var(--jp-muted)}
+body[data-csh-journal="career"] #p-ach .ach-header{padding:0;margin:0 0 10px;min-height:44px}
+body[data-csh-journal="career"] #p-ach #ach-title{font-size:var(--jp-label-size);color:var(--jp-muted);font-family:var(--ff-body)}
+body[data-csh-journal="career"] #p-ach .agrid{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+body[data-csh-journal="career"] #p-ach .ach{min-width:0;padding:14px;border-radius:8px;background:var(--ink-1);border:1px solid var(--jp-line);box-shadow:none}
+body[data-csh-journal="career"] #p-ach .ach.on{border-color:var(--gold-soft)}
+body[data-csh-journal="career"] #p-ach .adetail{display:flex;align-items:center;gap:9px;padding:0;min-height:44px;border:0;background:transparent;text-align:left;width:100%}
+body[data-csh-journal="career"] #p-ach .adetail .ico{font-size:var(--jp-icon-size);width:32px;min-width:32px;margin:0}
+body[data-csh-journal="career"] #p-ach .adetail strong{font:600 var(--jp-section-size)/1.5 var(--jp-title);overflow-wrap:anywhere}
+body[data-csh-journal="career"] #p-ach .ach .adesc{font-size:var(--jp-label-size);line-height:1.6;margin:6px 0 10px}
+body[data-csh-journal="career"] #p-ach .ach :is(.alab,.aclaim,.csh-goal-pin){font-size:var(--jp-note-size)}
+body[data-csh-journal="career"] #p-ach .ach :is(.aclaim,.csh-goal-pin){min-height:44px;border-radius:5px}
+@media(max-height:500px){body[data-csh-journal="career"] #tabs{flex-basis:94px;padding:4px}body[data-csh-journal="career"] #tabs .tab{padding:8px 6px;font-size:var(--jp-label-size)}body[data-csh-journal="career"] #career-top{padding:2px 64px 2px 12px;min-height:48px}body[data-csh-journal="career"] #body,body[data-csh-journal="career"] #app.career-collection #body{padding:8px 12px 14px}body[data-csh-journal="career"] #p-overview.on{gap:12px}body[data-csh-journal="career"] #p-overview #rankFocus{padding:10px 12px;min-height:88px;grid-template-columns:118px minmax(0,1fr) auto;gap:12px}body[data-csh-journal="career"] #rankFocus>.pc-big>span{font-size:var(--jp-balance-medium)}body[data-csh-journal="career"] #p-overview>.ov-col{gap:12px}body[data-csh-journal="career"] #ov-tasks .task{padding:10px;min-height:58px}body[data-csh-journal="career"] #p-ach .ach{padding:10px}}
+@media(max-width:760px) and (orientation:landscape){body[data-csh-journal="career"] #p-overview.on{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}body[data-csh-journal="career"] #p-overview #rankFocus{grid-template-columns:100px minmax(0,1fr) auto;gap:8px}body[data-csh-journal="career"] #rankFocus .name{font-size:var(--jp-section-size)}body[data-csh-journal="career"] #rankFocus .badge,body[data-csh-journal="career"] #rankFocus .badge svg{width:34px;height:34px}body[data-csh-journal="career"] #rankFocus>.pc-big>span{font-size:var(--jp-balance-small)}body[data-csh-journal="career"] #p-ach .agrid{grid-template-columns:minmax(0,1fr)}body[data-csh-journal="career"] #ov-tasks .tk-main{flex-wrap:wrap}body[data-csh-journal="career"] #ov-tasks .tk-main .bar{min-width:48px}body[data-csh-journal="career"] #ov-tasks .task{gap:6px}}
+/* Bag: take a file away; restore only when requested; visible failure/retry stays above both. */
+body[data-csh-journal="save"] #app{padding:8px 18px 14px}
+body[data-csh-journal="save"] .topbar{padding:0 var(--csh-dock-safe,180px) 8px 0;min-height:40px;border-bottom:1px solid var(--jp-line);margin-bottom:12px}
+body[data-csh-journal="save"] .brand{font:600 var(--jp-title-size)/1.5 var(--jp-title);letter-spacing:.06em}
+body[data-csh-journal="save"] .brand small{font:400 var(--jp-note-size)/1.5 var(--ff-body);letter-spacing:0}
+body[data-csh-journal="save"] #assets{display:none}
+body[data-csh-journal="save"] #board{padding:0 2px 12px;max-width:1280px;width:100%;margin:auto;min-height:0}
+body[data-csh-journal="save"] .workspace{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(210px,.8fr);align-items:start;gap:18px}
+body[data-csh-journal="save"] .work-actions{grid-column:1;grid-row:1}
+body[data-csh-journal="save"] .work-data{grid-column:2;grid-row:1}
+body[data-csh-journal="save"] .card{padding:16px;border-radius:8px;border:1px solid var(--line-2);background:var(--panel);margin:0}
+body[data-csh-journal="save"] .card h3{font:600 var(--jp-body-size)/1.5 var(--ff-body);letter-spacing:0;color:var(--ink);margin:0}
+body[data-csh-journal="save"] .card h3 span{font-size:var(--jp-note-size);font-weight:400;line-height:1.5;margin-left:6px}
+body[data-csh-journal="save"] .work-heading{gap:6px;margin:0 0 12px}
+body[data-csh-journal="save"] .work-heading .scope{font-size:var(--jp-note-size);color:var(--ink-dim)}
+body[data-csh-journal="save"] #b-bk{margin:0;font-size:var(--jp-note-size);padding:6px 9px}
+body[data-csh-journal="save"] .rowbtn{gap:8px;margin-top:10px;flex-wrap:wrap}
+body[data-csh-journal="save"] .rowbtn button{font-size:var(--jp-label-size);min-height:44px;min-width:0}
+body[data-csh-journal="save"] #b-pack{min-width:140px}
+body[data-csh-journal="save"] .result{padding:10px 0;margin:0;border:0}
+body[data-csh-journal="save"] #msg{font-size:var(--jp-label-size);line-height:1.6;min-height:20px}
+body[data-csh-journal="save"] #journal-import{margin-top:8px;padding-top:6px;border-top:1px solid var(--line-2)}
+body[data-csh-journal="save"] #journal-import>summary{font-size:var(--jp-body-size);color:var(--ink);min-height:44px}
+body[data-csh-journal="save"] .restore-heading{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin:6px 0}
+body[data-csh-journal="save"] .restore-heading .code-label{margin:0;font-size:var(--jp-note-size)}
+body[data-csh-journal="save"] #code{min-height:100px;max-height:180px;font-size:var(--jp-note-size);line-height:1.6;margin-top:6px;background:var(--bg2);border-radius:5px;resize:vertical}
+body[data-csh-journal="save"] #selection{font-size:var(--jp-note-size);line-height:1.6;color:var(--ink-dim);margin:0 0 8px}
+body[data-csh-journal="save"] .inv-core{display:grid;grid-template-columns:minmax(0,1fr);gap:0}
+body[data-csh-journal="save"] .iv{padding:7px 0;border-bottom:1px solid var(--line-2);gap:8px;min-width:0}
+body[data-csh-journal="save"] .iv :is(.iv-k,.iv-v,.iv-x){font-size:var(--jp-note-size);line-height:1.5}
+body[data-csh-journal="save"] .iv .iv-k{flex-basis:84px;min-width:0}
+body[data-csh-journal="save"] .inv-extra{margin-top:8px;border:0}
+body[data-csh-journal="save"] .inv-extra summary{font-size:var(--jp-note-size);line-height:1.5;padding:6px 0;min-height:44px}
+body[data-csh-journal="save"] #invnote{font-size:var(--jp-note-size);line-height:1.6;margin:8px 0 0}
+body[data-csh-journal="save"] .journal-storage-tools{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:16px}
+body[data-csh-journal="save"] .journal-storage-tools>details.card{margin:0;padding:4px 12px;min-width:0;background:transparent}
+body[data-csh-journal="save"] .journal-storage-tools>details.card>summary{font:500 var(--jp-label-size)/1.5 var(--ff-body);padding:10px 0;letter-spacing:0;color:var(--ink-dim);min-height:44px}
+body[data-csh-journal="save"] .journal-storage-tools>details.card>summary>span{display:none}
+body[data-csh-journal="save"] .journal-storage-tools>details[open]{grid-column:1/-1;background:var(--panel)}
+body[data-csh-journal="save"] .journal-storage-tools>details.danger>summary{color:var(--warn)}
+body[data-csh-journal="save"] .recovery{font-size:var(--jp-label-size);line-height:1.6;margin-bottom:12px}
+@media(min-width:1200px){body[data-csh-journal="save"] .inv-core{grid-template-columns:repeat(2,minmax(0,1fr));gap:0 18px}}
+@media(max-height:500px){body[data-csh-journal="save"] #app{padding:4px 12px 8px}body[data-csh-journal="save"] .topbar{min-height:40px;margin-bottom:8px;padding-bottom:4px}body[data-csh-journal="save"] .workspace{gap:12px}body[data-csh-journal="save"] .card{padding:12px}body[data-csh-journal="save"] .work-heading{margin-bottom:8px}body[data-csh-journal="save"] .iv{padding:4px 0}body[data-csh-journal="save"] .journal-storage-tools{margin-top:12px}body[data-csh-journal="save"] #code{min-height:80px}}
+@media(forced-colors:active){body[data-csh-journal] :is(.row,.card,.ach){border:1px solid CanvasText!important}body[data-csh-journal="pool"] .journal-filter-content{background:Canvas!important;color:CanvasText!important}}
+
+/* Resolved against the actual host dock and legacy overview order. */
+body[data-csh-journal="pool"] header.journal-header{padding-right:max(150px,var(--csh-dock-safe,150px))}
+body[data-csh-journal="pool"]{padding-top:6px;gap:8px}
+body[data-csh-journal="pool"] .journal-header{padding-bottom:4px;min-height:48px}
+body[data-csh-journal="career"] #p-overview #rankFocus{order:-1;grid-row:1}
+body[data-csh-journal="career"] #p-overview>.ov-col{grid-row:2}
+body[data-csh-journal="career"] #p-overview .btnrow{margin:0 0 10px}
+body[data-csh-journal="career"] #p-overview .ov-today .card>.journal-context{margin-top:8px}
+body[data-csh-journal="save"] .journal-actions-column{grid-column:1;grid-row:1;display:grid;gap:12px;min-width:0}
+body[data-csh-journal="save"] .journal-actions-column>.journal-storage-tools{margin-top:0}
+body[data-csh-journal="save"] .journal-storage-tools>details.danger>summary>span{display:block;margin:0;font-size:var(--jp-note-size);color:var(--warn)}
+
+body[data-csh-journal] .btn:disabled{background:transparent;color:var(--jp-muted);border:1px dashed var(--jp-line);box-shadow:none;cursor:default}
+
+/* The catalogue uses the global header for claiming; no second title row. */
+body[data-csh-journal="career"] #career-page-title{flex:1;min-width:0}
+body[data-csh-journal="career"] #career-top #ach-title{margin:0;font-size:var(--jp-note-size);line-height:1.5;color:var(--jp-muted);font-family:var(--ff-body);flex:none}
+body[data-csh-journal="career"] #career-top #ach-claim-all{position:static;min-height:44px;max-width:210px;flex:none;margin:0;padding:6px 10px;font-size:var(--jp-note-size);line-height:1.4}
+body[data-csh-journal="career"] #app:not(.career-collection) #career-top :is(#ach-title,#ach-claim-all){display:none}
+body[data-csh-journal="career"] #p-ach .ach-controls{margin:0 0 8px}
+
+body[data-csh-journal="pool"] .journal-mode{display:inline-block;margin-left:12px;font:400 var(--jp-note-size)/1.5 system-ui,"Microsoft YaHei",sans-serif;color:var(--jp-muted);letter-spacing:0}

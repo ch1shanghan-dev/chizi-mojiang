@@ -125,6 +125,11 @@ import { lib } from "../../../noname.js";
             if(button.tagName==="BUTTON"&&button.classList.contains("dis")){button.disabled=true;button.setAttribute("data-csh-art-disabled","1");}
             else if(button.getAttribute("data-csh-art-disabled")==="1"){button.disabled=false;button.removeAttribute("data-csh-art-disabled");}
             var label=button.textContent.trim(),act=button.getAttribute("data-act"),tab=button.matches(TABS);
+            if(button.classList.contains("csh-dbg-tab")){
+                if(button.classList.contains("csh-art-primary"))button.classList.remove("csh-art-primary","csh-art-tab","csh-art-selected","csh-art-slim");
+                var pressed=String(button.classList.contains("on"));if(button.getAttribute("aria-pressed")!==pressed)button.setAttribute("aria-pressed",pressed);
+                return;
+            }
             if(button.classList.contains("csh-pick-card"))button.classList.add("csh-art-cardtile");
             if(button.id==="csh-dbg-skin")button.classList.add("csh-art-slim");
             if(/^(×|✕|✖|X|‹|›)$/.test(label)||button.classList.contains("del")||button.id==="csh-dbg-close"){button.classList.add("csh-art-compact");if(!button.getAttribute("aria-label"))button.setAttribute("aria-label",button.title||(button.classList.contains("del")?"删除台词":"关闭"));return;}

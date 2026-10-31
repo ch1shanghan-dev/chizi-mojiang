@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-csh-palette="chrome">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -26,6 +26,7 @@
      牌力评估 + 底池分层 + 资格判定 + 平分余数 + 玩家账本 + 守恒校验都在里面，
      本页只读它的输出（G.ledger），不再自己算一分钱。 -->
 <script src="../../core/csh_pots.js"></script>
+<script src="../../core/csh_texas_ai.js"></script>
 <!-- 统一布局系统（《UI 布局重构规范 v2.0》§18/§19/§20）：骨架 / 安全区 / 响应式 / Dock / 结算层。
      放在本页 <style> 之前，本页只写"这游戏长什么样"，不再各自声明尺寸体系。 -->
 <link rel="stylesheet" href="../../core/csh_layout.css">
@@ -36,7 +37,7 @@
        - 尺寸全部走 clamp(vh)，1280×720 ~ 2560×1440 自适应
        - 不使用 vw 视口单位；vh 取的是 iframe 自身高度，正好铺满
        - 扑克牌为 DOM + CSS 绘制，无任何外部资源（离线可用）
-     设计依据：C:\Users\Administrator\Desktop\小游戏设计方案.md §6.1
+     设计依据：本地小游戏设计方案 §6.1
      ============================================================ */
   :root {
     --ink-0: #0b0a08;
@@ -66,7 +67,7 @@
   --pfs-micro: 9.5px;
   --pfs-micro2: 10px;
   --pfs-micro3: 10.5px;
-  --pfs-cap: 11.5px;
+  --pfs-cap: 12px;
   --pfs-sm: 12px;
 }
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
@@ -637,10 +638,48 @@
     #start-tip.tip, .tip { font-size:var(--pfs-micro2); line-height: 1.4; }
     .medal { font-size:var(--pfs-micro); padding: 1px 6px; }
   }
+/* Compact table costs; no new heading or permanent toolbar. */
+  .pl-blind #tb-ante { display:block; margin-top:4px; font-size:var(--fs-xs); color:var(--text-dim); white-space:nowrap; }
+  .seat[hidden] { display:none!important; }
+@media (orientation:landscape) and (max-height:330px) {
+    #view-game .seat-box { height:40px; padding:3px 6px; gap:4px; }
+    #view-game .seat-info { gap:0; }
+    #view-game .seat-line { line-height:16px; }
+    #view-game .seat-av { width:24px; height:24px; }
+    #view-game .csh-center { top:55%; }
+    #view-game .seat.dealer .seat-box::before { top:-2px; right:-2px; }
+  }
+#view-game { --texas-seat-w:clamp(156px,20vw,210px); }
+  #view-game .seat { width:var(--texas-seat-w); }
+  #view-game .seat-box { width:100%; max-width:100%; }
+  #view-game .seat-info { flex:1 1 auto; }
+  #view-game .seat-tag { flex:0 0 auto; }
+  #view-game .seat-cards { flex:0 0 auto; }
+  #view-game .seat-line { min-height:16px; }
+@media (orientation:landscape) and (max-height:430px) {
+    #view-game .seat[data-band="upper-right"] { top:80px!important; }
+    #view-game .seat[data-band="side"] { top:calc(100% - 32px)!important; }
+    #view-game .reveal-all .seat-av { display:none; }
+    #view-game .reveal-all .seat-box { padding-left:6px; padding-right:6px; }
+  }
+@media (orientation:landscape) { .start-card > .subtitle { display:none; } }
+  #fee-details { margin:0; font-size:var(--fs-xs); line-height:1.5; }
+  #fee-details summary { cursor:pointer; color:var(--gold); }
+  #fee-details > div { padding-top:6px; }
+@media (orientation:landscape) and (max-height:330px) {
+    #view-game .seat[data-band="side"] { top:calc(100% - 22px)!important; }
+  }
 </style>
 <link rel="stylesheet" href="../../core/csh_experience.css">
+<style id="readable-ui-410">
+:root{--ui-readable:12px}
+.start-card>.subtitle,.life-bank-top .k,.life-quota,.life-cell .k,.field .lab .t,.field .lab .h,.seg-btn small,.task .tk-lab,.task .tk-num,.task .tk-rw,.medal,#start-tip,.tip{font-size:var(--ui-readable)!important;line-height:1.4}
+.seat-box .seat-stack,.seat-box .seat-bet,.seat-box .seat-tag{font-size:var(--ui-readable)!important}
+</style>
+<link rel="stylesheet" href="../../core/csh_tables.css">
+<link rel="stylesheet" href="../../core/csh_duel_tables.css">
 </head>
-<body class="csh-experience">
+<body class="csh-experience" data-csh-table="texas">
 
 <!-- ★ 2026-09-29：移除页面自带浮动「关闭」—— 壳顶带已有关闭，双按钮纯属冗余。
      关闭链路保留：壳顶带按钮 / Esc / 收工结算横幅。 -->
@@ -689,7 +728,7 @@
       <div class="seg" id="seg-ai"></div>
     </div>
 
-    <div class="field">
+    <div class="field" id="eq-field">
       <div class="lab"><span class="t">胜率条</span><span class="h">关了更像真牌桌</span></div>
       <div class="seg" id="seg-eq"></div>
     </div>
@@ -701,9 +740,10 @@
 
     <button class="btn" id="btn-start-game" type="button">开始生涯</button>
 
+    <details class="table-extra" id="table-records"><summary>记录与牌桌偏好</summary></details>
     <div class="medals" id="medals"></div>
     <div class="tip" id="start-tip"></div>
-    <div class="tip" id="fee-tip" style="grid-column:1/-1"></div>
+    <details class="tip" id="fee-details" style="grid-column:1/-1"><summary id="fee-tip"></summary><div>前注每人最低1筹码，不足则全下；它进入可争夺的底池，计入本手投入。翻牌后场供只收实际争夺部分，未跟注返还免收；收工不再折扣。</div></details>
   </div>
 </div>
 
@@ -737,7 +777,7 @@
 
     <!-- ④ 玩家区：左翼盲注 · 中间手牌 · 右侧我的状态（顶部条已删，信息就近安放） -->
     <div class="csh-player">
-      <div class="pl-blind">盲注 <b id="tb-blind">10/20</b></div>
+      <div class="pl-blind">盲注 <b id="tb-blind">10/20</b><span id="tb-ante"></span></div>
       <div class="my-hand" id="my-hand"></div>
       <div class="pl-brief">
         <div class="pl-line" id="my-line1"><b>你</b></div>
@@ -839,6 +879,11 @@ function later(fn, ms) {
 function clearAllTimers() {
   for (var i = 0; i < timers.length; i++) clearTimeout(timers[i]);
   timers = [];
+  /* Cancelled timers cannot remove their old DOM later. Clear the associated presentation now. */
+  if (typeof document !== 'undefined') {
+    var toastBox = document.getElementById('toasts'); if (toastBox) toastBox.textContent = '';
+    document.querySelectorAll('#seats .say').forEach(function (n) { n.remove(); });
+  }
 }
 function rndMs(a, b) { return a + Math.random() * (b - a); }
 /* ==TURNER-END== */
@@ -1247,6 +1292,7 @@ career.bank.cap = CAP;
 if (!career.best.achievements || !career.best.achievements.length) career.best.achievements = [];
 if (typeof career.set.aiCount !== 'number') career.set.aiCount = 3;
 if (!career.set.pacing) career.set.pacing = 'long';
+delete career.set.difficulty; /* 旧难度偏好退出运行态，世界牌技不受玩家档位影响。 */
 if (typeof career.set.buyIn !== 'number') career.set.buyIn = 1000;
 if (typeof career.set.winrateOn !== 'boolean') career.set.winrateOn = true;
 
@@ -1539,7 +1585,7 @@ function makeSession() {
       nm = [ws.surname, ws.name];
       pk = mapPersona(ws.persona);
       chips = Math.max(1, Math.floor(ws.stake || buyIn));
-      skill = (typeof ws.skill === 'number') ? ws.skill : 0.75;
+      skill = typeof ws.effSkill === 'number' ? ws.effSkill : (typeof ws.skill === 'number' ? ws.skill : 0.75);
       wid = ws.id; mult = ws.mult || 1;
     } else {
       /* 无桥（独立调试）兜底：同带入的一次性对手 */
@@ -1551,7 +1597,8 @@ function makeSession() {
       id: i, isHuman: false, name: nm[1], surname: nm[0],
       chips: chips, bet: 0, contrib: 0, hole: [], folded: false, allin: false, acted: false,
       out: false, persona: pk, tag: displayTag(pk), reveal: false,
-      skill: skill, worldId: wid, mult: mult,       /* ★ 牌技 + 世界身份 */
+      worldState: ws ? { mood: ws.mood, fatigue: ws.fatigue, form: ws.form } : {},
+      skill: skill, worldId: wid, mult: mult, seed: ws ? (ws.seed || ws.id) : nm[1],       /* ★ 牌技 + 世界身份 */
     };
     players.push(p);
     seats.push({ id: wid, name: nm[1], stake: chips, skill: skill, mult: mult });
@@ -1594,15 +1641,28 @@ function actablePlayers() {
 
 /* 盲注档位：按已完成的手数翻倍（§4.1.1 基础 bb = max(20, round(带入/50))） */
 function applyBlinds() {
-  var lv = Math.floor(G.handNo / G.pacing.every);
+  var lv = Math.floor(Math.max(0, G.handNo - 1) / G.pacing.every);
   G.level = lv;
   var mult = Math.pow(2, lv);
   var baseBB = Math.max(20, Math.round((G.buyIn || 0) / 50));
   G.bb = Math.round(baseBB * mult);
   G.sb = Math.max(1, Math.round(G.bb / 2));
 }
-function sbSeat() { return G.n === 2 ? G.dealer : (G.dealer + 1) % G.n; }
-function bbSeat() { return G.n === 2 ? (G.dealer + 1) % G.n : (G.dealer + 2) % G.n; }
+function occupiedSeats() {
+  return G.players.filter(function (p) { return !p.out; }).map(function (p) { return p.id; });
+}
+function nextOccupied(from) {
+  for (var k = 1; k <= G.n; k++) { var i = (from + k) % G.n; if (!G.players[i].out) return i; }
+  return -1;
+}
+function sbSeat() { return occupiedSeats().length === 2 ? G.dealer : nextOccupied(G.dealer); }
+function bbSeat() { return nextOccupied(sbSeat()); }
+/* A short all-in requires a response, but only a full cumulative raise reopens raising. */
+function canPlayerRaise(p) {
+  if (!p || p.out || p.folded || p.allin || p.bet + p.chips <= G.currentBet) return false;
+  if (!G.players.some(function (q) { return q !== p && !q.out && !q.folded && !q.allin && q.chips > 0; })) return false;
+  return p.actionAt == null || G.currentBet - p.actionAt >= G.minRaise;
+}
 /* 庄家位轮换（2026-10-13 修复）：此前 G.dealer 开局随机一次后整场不再变化 ⇒
    盲注位固定，非盲注座位每手弃牌零成本、可无限滞留（用户实测：约 1 个盲注量的
    AI 长期留在牌局、牌局僵持）。现在每手前移到下一个还有筹码的座位，盲注随之轮换。 */
@@ -1649,7 +1709,7 @@ function startHand() {
   G.handNo++;
   applyBlinds();
   /* 庄家/盲注位轮换：首手沿用随机起点，此后每手前移（见 moveDealer 注释） */
-  if (G.handNo > 1) moveDealer();
+  if (G.handNo > 1 || G.players[G.dealer].chips <= 0) moveDealer();
   /* 【2026-10-03 牌桌拟人】开场第一手，让一位同桌说句话（整场只说一次） */
   if (!quippedGreet && worldSeats && worldSeats.length) {
     quippedGreet = true;
@@ -1660,6 +1720,7 @@ function startHand() {
   G.currentBet = 0;
   G.minRaise = G.bb;
   G.street = 'pre';
+  G.lastAggressor = -1;
   G.over = false;
   G.revealAll = false;
   G.winners = [];
@@ -1670,12 +1731,15 @@ function startHand() {
   var i, p;
   for (i = 0; i < G.n; i++) {
     p = G.players[i];
-    p.bet = 0; p.contrib = 0; p.hole = [];
-    p.folded = false; p.allin = false; p.acted = false;
+    p.bet = 0; p.contrib = 0; p.antePaid = 0; p.hole = [];
+    p.folded = false; p.allin = false; p.acted = false; p.actionAt = null;
     p.reveal = p.isHuman;
-    if (p.chips <= 0) { p.out = true; p.folded = true; }
+    p.out = p.chips <= 0; if (p.out) p.folded = true;
   }
 
+  var os = G.opStats || (G.opStats = { hands: 0, vpip: 0, raises: 0 });
+  if (!G.players[0].out) os.hands++;
+  G.players.forEach(function (q) { q.vpipThisHand = false; q.raisedThisHand = false; });
   G.deck = shuffle(newDeck());
 
   var start = sbSeat();
@@ -1688,6 +1752,12 @@ function startHand() {
     }
   }
 
+  G.ante = CSH.registry.texasAnte(G.rake, G.bb);
+  G.players.forEach(function (q) {
+    if (q.out || !G.ante) return;
+    q.antePaid = payChips(q, G.ante);
+    q.bet = 0; /* 前注只入池，不抵本街盲注或跟注。 */
+  });
   postBlind(sbSeat(), G.sb);
   postBlind(bbSeat(), G.bb);
   G.currentBet = G.bb;
@@ -1697,6 +1767,7 @@ function startHand() {
   if (G.toAct < 0) G.toAct = firstToActPostflop();
 
   sfx.deal();
+  if (roundDone()) { nextStreet(); return; }
   render();
   scheduleAI();
 }
@@ -1714,6 +1785,11 @@ function nextActor(from) {
 function roundDone() {
   if (livePlayers().length <= 1) return true;
   var act = actablePlayers();
+  if (act.length === 1) {
+    var otherBet = 0;
+    G.players.forEach(function (p) { if (p !== act[0] && !p.out && !p.folded) otherBet = Math.max(otherBet, p.bet); });
+    if (act[0].bet >= otherBet) return true;
+  }
   for (var i = 0; i < act.length; i++) {
     if (!act[i].acted) return false;
     if (act[i].bet < G.currentBet) return false;
@@ -1725,21 +1801,16 @@ function roundDone() {
    行动与推进（四轮下注）
    ============================================================ */
 function applyAction(idx, act, amount) {
-  /* 对手建模·记账（方案 §16-1 最小版，2026-10-07）：只统计**人类玩家**的翻前行为——
-     hands=参与的翻前手数，vpip=主动入池（跟/加/全下），raises=加注。
-     三个数只在会话内存里（不落盘），AI 在 aiDecide 中消费。 */
-  if (idx === 0 && G && G.community && G.community.length === 0) {
-    var os = G.opStats || (G.opStats = { hands: 0, vpip: 0, raises: 0 });
-    os.hands++;
-    if (act === 'call' || act === 'raise' || act === 'allin') os.vpip++;
-    if (act === 'raise' || act === 'allin') os.raises++;
-  }
   if (!G || G.over || G.sessionOver) return;
   var p = G.players[idx];
   if (!p || p.out || p.folded || p.allin) return;
   if (G.toAct !== idx) return;
 
   var toCall = Math.max(0, G.currentBet - p.bet);
+  if (["fold","check","call","raise","allin"].indexOf(act) < 0) return;
+  if ((act === "raise" || (act === "allin" && p.bet + p.chips > G.currentBet)) && !canPlayerRaise(p)) return;
+  if (act === "raise" && amount != null && !Number.isFinite(Number(amount))) return;
+  var actionBetBefore = G.currentBet;
   var actual = act;
   if (act === 'check' && toCall > 0) actual = 'call';   /* 有人下注时"过牌"即跟注 */
 
@@ -1756,15 +1827,19 @@ function applyAction(idx, act, amount) {
     payChips(p, to - p.bet);
     var inc = to - G.currentBet;
     if (inc >= G.minRaise) G.minRaise = inc;
-    if (to > G.currentBet) G.currentBet = to;
-    for (var i = 0; i < G.n; i++) {
-      var q = G.players[i];
-      if (i !== idx && !q.out && !q.folded && !q.allin && q.chips > 0) q.acted = false;
-    }
+    if (to > G.currentBet) { G.currentBet = to; G.lastAggressor = idx; }
+    /* nextActor sees unmatched bets; retain each player’s last action level. */
     p.acted = true;
     sfx.raise();
   }
 
+  p.actionAt = G.currentBet;
+  if (idx === 0 && G.community.length === 0) {
+    var os = G.opStats || (G.opStats = { hands: 0, vpip: 0, raises: 0 });
+    var raised = (actual === 'raise' || actual === 'allin') && p.bet > actionBetBefore;
+    if (!p.vpipThisHand && ((actual === 'call' && toCall > 0) || raised)) { os.vpip++; p.vpipThisHand = true; }
+    if (!p.raisedThisHand && raised) { os.raises++; p.raisedThisHand = true; }
+  }
   if (idx === 0) recordHuman(actual, toCall);
   /* ★ 2026-09-29：AI 行动气泡 —— 让玩家看清每个对手做了什么（跟注/加注/弃牌/全下） */
   if (idx !== 0) {
@@ -1796,8 +1871,9 @@ function nextStreet() {
   if (G.street === 'river') { showdown(); return; }
   G.street = G.street === 'pre' ? 'flop' : (G.street === 'flop' ? 'turn' : 'river');
   G.currentBet = 0;
+  G.lastAggressor = -1;
   G.minRaise = G.bb;
-  for (var i = 0; i < G.n; i++) { G.players[i].bet = 0; G.players[i].acted = false; }
+  for (var i = 0; i < G.n; i++) { G.players[i].bet = 0; G.players[i].acted = false; G.players[i].actionAt = null; }
   var need = G.street === 'flop' ? 3 : 1;
   for (var k = 0; k < need; k++) G.community.push(G.deck.pop());
   eqDirty = true;
@@ -1915,7 +1991,7 @@ function settleHand() {
     players: G.players.map(function (p) {
       return {
         id: p.id, name: p.isHuman ? '你' : p.name, isHuman: !!p.isHuman,
-        contrib: p.contrib, folded: !!p.folded, out: !!p.out,
+        contrib: p.contrib, antePaid: p.antePaid || 0, folded: !!p.folded, out: !!p.out,
         hole: (p.hole && p.hole.length === 2) ? p.hole.slice() : [],
       };
     }),
@@ -2074,81 +2150,44 @@ function recordHuman(actual, toCall) {
 }
 
 /* ============================================================
-   AI：起手牌表（翻牌前）+ 蒙特卡洛胜率（翻牌后）+ 三种人格
-   性能：150 次模拟 × 4 人 × 21 组合 ≈ 1.2 万次评估，单次 <0.05ms → 总耗时 <30ms
+   AI：公开观测快照 + 独立离线策略 + 世界牌技与性格
+   翻后96次采样，性能以专项探针实测记录为准；不读取对手暗牌或剩余牌堆
    ============================================================ */
-function aiEquityOf(idx) {
-  var p = G.players[idx];
-  var nOpp = 0;
-  for (var i = 0; i < G.n; i++) {
-    var q = G.players[i];
-    if (i !== idx && !q.out && !q.folded) nOpp++;
+function aiObservation(idx) {
+  var p = G.players[idx], own = p.hole.slice(), board = G.community.slice();
+  var opponents = 0, contestablePot = 0, call = Math.min(p.chips, Math.max(0, G.currentBet - p.bet));
+  var cap = p.contrib + call, ahead = 0, behind = 0;
+  G.players.forEach(function (q) {
+    contestablePot += Math.min(q.contrib, cap);
+    if (q !== p && !q.out && !q.folded) opponents++;
+  });
+  for (var k = 1; k <= G.n; k++) {
+    var q = G.players[(G.dealer + k) % G.n];
+    if (q.id === idx) break;
+    if (!q.out && !q.folded) ahead++;
   }
-  nOpp = Math.max(1, nOpp);
-  if (G.community.length === 0) return preflopScore(p.hole[0], p.hole[1]);
-  return equity(p.hole[0], p.hole[1], G.community, nOpp, 150);
-}
-
-function aiBetSize(p, per) {
-  var f = (per.key === 'loose')
-    ? [0.40, 0.50][Math.floor(Math.random() * 2)]
-    : [0.50, 0.66, 1.00][Math.floor(Math.random() * 3)];
-  var toCall = Math.max(0, G.currentBet - p.bet);
-  var target = Math.round(((G.pot + toCall) * f) / 10) * 10;
-  var minTo = G.currentBet + G.minRaise;
-  var maxTo = p.bet + p.chips;
-  return Math.min(maxTo, Math.max(minTo, target + G.currentBet));
-}
-
-function aiDecide(idx) {
-  var p = G.players[idx];
-  var per = PERSONAS[p.persona] || PERSONAS.tag;
-  var toCall = Math.max(0, G.currentBet - p.bet);
-  var eq = aiEquityOf(idx);
-  var sk = (typeof p.skill === 'number') ? Math.max(0.5, Math.min(1, p.skill)) : 0.75;
-  var r = Math.random();
-
-  /* ★ 2026-09-29 牌技接入（关键纪律：**只影响决策质量，绝不读牌堆**）
-     1) 胜率估计误差：低技能高估/低估自己的牌力，高技能几乎无偏
-        err 幅度 = (1 − skill) × 0.35，方向随机 —— 不是"变傻"，是"看不准"
-     2) 阈值纪律：低技能容易被情绪带偏（阈值抖动大）
-     3) 赔率纪律：高技能要求更严格的赔率才跟注（poK 从 1.20 收紧至 0.92）
-     4) 诈唬选择：高技能的诈唬更克制也更精准
-     发牌函数（shuffle/deal）不读 skill，牌堆不含任何 AI 偏向 —— 有断言守护。*/
-  var err = (1 - sk) * 0.35 * (Math.random() * 2 - 1);
-  eq = Math.max(0.02, Math.min(0.98, eq + err));
-  var noise = (1 - sk) * 0.12 * (Math.random() * 2 - 1);
-  var thr = per.thr + noise;
-  var poK = 1.20 - 0.28 * sk;                       /* 1.20 → 0.92（越强越苛刻） */
-  var bl = per.bluff * (0.6 + 0.8 * sk);            /* 高技能诈唬更克制 */
-  var potOdds = toCall > 0 ? toCall / (G.pot + toCall) : 0;
-  var canRaise = (p.bet + p.chips) > G.currentBet;
-
-  /* 对手建模·消费（方案 §16-1 最小版，2026-10-07）：人类玩家的三统计量
-     （手数/VPIP/加注率）在样本 ≥6 手后微调阈值——
-     疯子（VPIP≥0.7 或激进≥0.5）的加注可信度降（thr−0.04，AI 更敢跟）；
-     石头（VPIP≤0.25 且激进≤0.2）的加注可信度升（thr+0.04，AI 更早弃）。
-     只动阈值 ±0.04：不读牌、不改发牌，样本不足零修正（信息公平红线）。 */
-  (function () {
-    var os = G.opStats;
-    if (!os || os.hands < 6) return;
-    var vp = os.vpip / os.hands, ag = os.raises / os.hands;
-    if (toCall > 0 && (vp >= 0.7 || ag >= 0.5)) thr -= 0.04;
-    else if (toCall > 0 && vp <= 0.25 && ag <= 0.2) thr += 0.04;
-  })();
-
-  if (toCall === 0) {
-    if (canRaise && (eq > thr + 0.14 || r < bl * 0.5)) return { act: 'raise', amount: aiBetSize(p, per) };
-    return { act: 'check' };
+  behind = opponents - ahead;
+  var strength = preflopScore(own[0], own[1]);
+  var eq = board.length ? equity(own[0], own[1], board, Math.max(1, opponents), 96)
+    : Math.pow(.28 + .60 * strength, 1 + .65 * Math.max(0, opponents - 1));
+  var suits = {}, ranks = {}, all = own.concat(board), hasDraw = false;
+  all.forEach(function (c) { suits[c & 3] = (suits[c & 3] || 0) + 1; ranks[c >> 2] = true; if ((c >> 2) === 14) ranks[1] = true; });
+  if (board.length >= 3 && board.length < 5) {
+    hasDraw = Object.keys(suits).some(function (s) { return suits[s] === 4 && own.some(function (c) { return String(c & 3) === s; }); });
+    for (var low = 1; low <= 10; low++) { var n = 0; for (var j = low; j < low + 5; j++) if (ranks[j]) n++;
+      if (n === 4 && own.some(function (c) { var rank = c >> 2; return rank >= low && rank < low + 5; })) hasDraw = true;
+    }
   }
-  if (canRaise && eq >= thr + 0.18 && r > 0.35) return { act: 'raise', amount: aiBetSize(p, per) };
-  if (eq >= thr || eq > potOdds * poK) {
-    if (toCall >= p.chips && eq < thr + 0.10) return { act: 'fold' };
-    return { act: 'call' };
-  }
-  if (canRaise && r < bl) return { act: 'raise', amount: aiBetSize(p, per) };
-  return { act: 'fold' };
+  return { hole: own, board: board, strength: strength, equity: eq, opponents: opponents,
+    pot: G.pot, contestablePot: contestablePot, toCall: Math.max(0, G.currentBet - p.bet), chips: p.chips,
+    bb: G.bb, ante: G.ante || 0, currentBet: G.currentBet, minTo: G.currentBet + G.minRaise,
+    maxTo: p.bet + p.chips, canRaise: canPlayerRaise(p), latePosition: behind <= 1,
+    hasDraw: hasDraw, scaryBoard: board.some(function (c) { return (c >> 2) >= 13; }),
+    persona: p.persona, skill: p.skill, worldState: Object.assign({}, p.worldState || {}),
+    aggressorStats: G.lastAggressor === 0 && G.opStats ? Object.assign({}, G.opStats) : null };
 }
+function aiEquityOf(idx) { return aiObservation(idx).equity; }
+function aiDecide(idx) { return window.CSHTexasAI.decide(aiObservation(idx), Math.random); }
 
 function scheduleAI() {
   if (!G || G.over || G.sessionOver) return;
@@ -2156,9 +2195,11 @@ function scheduleAI() {
   var p = G.players[G.toAct];
   if (!p || p.isHuman) { render(); return; }
   if (p.folded || p.allin || p.out) return;
+  var session = G, hand = G.handNo, actor = G.toAct;
+  var ticket = G.aiTicket = (G.aiTicket || 0) + 1;
   later(function () {
-    if (!G || G.over || G.sessionOver) return;
-    var q = G.players[G.toAct];
+    if (G !== session || G.handNo !== hand || G.toAct !== actor || G.aiTicket !== ticket || G.over || G.sessionOver) return;
+    var q = G.players[actor];
     if (!q || q.isHuman || q.folded || q.allin || q.out) return;
     var d = aiDecide(G.toAct);
     applyAction(G.toAct, d.act, d.amount);
@@ -2184,7 +2225,7 @@ function announceAction(idx, text) {
   var halfH = (el.firstChild && el.firstChild.offsetHeight) ? Math.ceil(el.firstChild.offsetHeight / 2) : 22;
   var b = document.createElement('div');
   b.className = 'say';
-  b.textContent = p.surname + ' · ' + text;
+  b.textContent = text;
   seats.appendChild(b);
   /* 【2026-10-13 边界定位修】默认悬于座位上方（.say = translate(-50%,-100%)）；
      顶排座位上方空间不足时翻到座位下方（此前顶排气泡超出屏幕被裁）。
@@ -2331,6 +2372,7 @@ function renderHud() {
   if (!G) return;
   $('#street-tag').textContent = streetName(G.street) + (G.level > 0 ? ' ×' + Math.pow(2, G.level) : '');
   $('#tb-blind').textContent = G.sb + '/' + G.bb;
+  $('#tb-ante').textContent = G.ante ? '每人前注 ' + fmt(G.ante) + ' · 入池' : '本场无前注';
 }
 
 function renderFelt() {
@@ -2342,11 +2384,14 @@ function renderFelt() {
      （那条规则让手机用户在摊牌时也看不到任何人的牌 —— 见 CSS 注释）。 */
   if (G.revealAll) felt.classList.add('reveal-all'); else felt.classList.remove('reveal-all');
 
-  var pos = AI_POS[G.aiCount] || AI_POS[3];
+  var visibleAI = G.players.filter(function (p) { return !p.isHuman && !p.out; });
+  var pos = AI_POS[visibleAI.length] || AI_POS[3], visibleIndex = 0;
   for (i = 0; i < G.players.length; i++) {
     var p = G.players[i];
-    if (p.isHuman) continue;          /* 自己的信息在玩家区，不再占用牌桌（规范 §8.1） */
-    seats.appendChild(buildSeat(p, pos[i - 1] || [50, 14]));
+    if (p.isHuman) continue;
+    var seat = buildSeat(p, pos[visibleIndex] || [50, 14]);
+    if (p.out) seat.hidden = true; else visibleIndex++;
+    seats.appendChild(seat);
   }
 
   /* §4.7.2 ③ 底池数值 300ms 滚动（不再是瞬变）；取不到共用层就退回瞬时赋值 */
@@ -2370,7 +2415,8 @@ function renderFelt() {
 function buildSeat(p, xy) {
   var el = document.createElement('div');
   el.className = 'seat';
-  el.style.left = xy[0] + '%';
+  el.dataset.band = xy[1] >= 50 ? 'side' : xy[0] >= 70 ? 'upper-right' : 'upper';
+  el.style.left = 'clamp(calc(var(--texas-seat-w) / 2 + 8px), ' + xy[0] + '%, calc(100% - var(--texas-seat-w) / 2 - 8px))';
   el.style.top = xy[1] + '%';
   if (p.folded && !p.out) el.className += ' folded';
   if (p.allin) el.className += ' allin';
@@ -2389,6 +2435,9 @@ function buildSeat(p, xy) {
      不带 seed 时同姓 + 同性格头像完全一样（撞脸），带上后 seed%72 同姓组内零碰撞。 */
   if (CRD) { try { av.innerHTML = CRD.avatar(p.surname, p.persona, 34, p.seed); } catch (e) { av.textContent = p.surname; } }
   else av.textContent = p.surname;
+  av.title = p.name + (p.tag ? ' · ' + p.tag : '');
+  av.setAttribute('role', 'img');
+  av.setAttribute('aria-label', av.title);
   box.appendChild(av);
 
   /* 【2026-09-30 横版改造】把「名字 + 标签」并成第一行、「筹码 + 下注」并成第二行，
@@ -2405,7 +2454,7 @@ function buildSeat(p, xy) {
   nm.className = 'seat-name';
   nm.textContent = p.isHuman ? '你' : p.name;
   line1.appendChild(nm);
-  if (p.tag) {
+  if (p.tag && !p.folded && !p.allin && !G.revealAll) {
     var tg = document.createElement('span');
     tg.className = 'seat-tag';
     tg.textContent = p.tag;
@@ -2422,9 +2471,9 @@ function buildSeat(p, xy) {
   var st = document.createElement('div');
   st.className = 'seat-bet num';
   if (p.out) st.textContent = '已出局';
-  else if (p.bet > 0) st.textContent = '下注 ' + fmt(p.bet);
   else if (p.folded) st.textContent = '已弃牌';
-  else if (p.allin) st.textContent = '全下';
+  else if (p.allin) st.textContent = '全下 ' + fmt(p.bet);
+  else if (p.bet > 0) st.textContent = '下注 ' + fmt(p.bet);
   else st.textContent = '—';
   line2.appendChild(st);
   info.appendChild(line2);
@@ -2446,14 +2495,12 @@ function buildSeat(p, xy) {
     if (G.revealAll && !p.folded && !p.out) {
       var hn = handNameOf(p);
       if (hn) {
-        var hb = document.createElement('div');
-        hb.className = 'seat-hand';
-        hb.textContent = hn;
-        box.appendChild(hb);
+        st.textContent = hn; st.title = hn;
       }
     }
   }
 
+  el.setAttribute('aria-label', (p.isHuman ? '你' : p.name) + '，筹码 ' + fmt(p.chips) + '，' + st.textContent + (G.toAct === p.id && !G.over ? '，正在行动' : ''));
   el.appendChild(box);
   return el;
 }
@@ -2481,7 +2528,7 @@ function renderMyArea() {
 
   var hn = '—';
   if (me.hole.length === 2) {
-    if (G.community.length >= 3) hn = heNameOf(heBest7(me.hole.concat(G.community)));
+    if (G.community.length >= 3) hn = heNameOf(heBestN(me.hole.concat(G.community), me.hole.length + G.community.length));
     else hn = '起手 ' + RANK_LABEL[cardRank(me.hole[0])] + RANK_LABEL[cardRank(me.hole[1])];
   }
   $('#my-handname').textContent = hn;
@@ -2496,13 +2543,14 @@ function renderMyArea() {
   var nOpp = 0;
   for (var j = 0; j < G.n; j++) { var q = G.players[j]; if (j !== 0 && !q.out && !q.folded) nOpp++; }
   var eq = 0;
-  if (G.community.length === 0) { eq = preflopScore(me.hole[0], me.hole[1]); lastEquity = eq; }
+  if (G.community.length === 0) { eq = Math.pow(.28 + .60 * preflopScore(me.hole[0], me.hole[1]), 1 + .65 * Math.max(0, nOpp - 1)); lastEquity = eq; }
   else if (nOpp > 0) {
-    if (eqDirty) { eq = equity(me.hole[0], me.hole[1], G.community, nOpp, 200); lastEquity = eq; eqDirty = false; }
+    var key = me.hole.join(',') + ':' + G.community.join(',') + ':' + nOpp;
+    if (eqDirty || G.equityViewKey !== key) { eq = equity(me.hole[0], me.hole[1], G.community, nOpp, 200); lastEquity = eq; eqDirty = false; G.equityViewKey = key; }
     else eq = lastEquity;
   }
   var pct = Math.round(eq * 100);
-  eqTxt.innerHTML = '<em>·</em><em>胜率</em><b>' + pct + '%</b>';
+  eqTxt.innerHTML = '<em>·</em><em>估算</em><b>' + pct + '%</b>';
   $('#eq-fill').style.width = pct + '%';
   $('#eq-bar').className = 'eq-bar' + (eq < 0.40 ? ' low' : '');
 }
@@ -2561,7 +2609,7 @@ function renderActions() {
        · 筹码不足跟进 → 只给「跟注 全下」
      加注档位用「½ 池 / ⅔ 池 / 全下 / 微调」，两颗档位算出同一个数时只留一颗。 */
   var raiseBtns = [];
-  if (maxTo > G.currentBet) {
+  if (canPlayerRaise(me)) {
     var halfTo = raiseTo(0.5, me);
     var twoTo = raiseTo(0.66, me);
     if (halfTo === twoTo) raiseBtns.push(mkBtn('加注到 ' + fmt(halfTo), 'btn ghost', function () { applyAction(0, 'raise', halfTo); }));
@@ -2603,7 +2651,7 @@ function openRaisePanel() {
   var sl = $('#raise-slider');
   /* 按钮文案是「微调」，就不能在不可加注时悄悄改成全下（文案与动作必须一致）。
      renderActions 已在 maxTo ≤ 当前注时藏起这颗按钮，这里只是兜底：如实提示，不越权下注。 */
-  if (maxTo <= minTo) { toast('筹码不足以加注（可跟注或全下）', 'bad'); return; }
+  if (!canPlayerRaise(me) || maxTo <= minTo) { toast('筹码不足以加注（可跟注或全下）', 'bad'); return; }
   var def = raiseTo(0.5, me);
   sl.min = String(minTo);
   sl.max = String(maxTo);
@@ -2796,7 +2844,7 @@ function showHandBanner() {
   boxLed.innerHTML = '';
   if (meLed) {
     boxLed.innerHTML =
-      '<div class="rs-row"><div class="rs-name">本手投入</div><div class="rs-hand">牌局中投入的全部筹码</div><div class="rs-gain">-' + fmt(meLed.committed) + '</div></div>' +
+      '<div class="rs-row"><div class="rs-name">本手投入</div><div class="rs-hand">全部投入（含前注 ' + fmt(meLed.antePaid || 0) + '，不另扣）</div><div class="rs-gain">-' + fmt(meLed.committed) + '</div></div>' +
       '<div class="rs-row"><div class="rs-name">底池获奖</div><div class="rs-hand">场供扣除前</div><div class="rs-gain">+' + fmt(meLed.payout) + '</div></div>' +
       '<div class="rs-row"><div class="rs-name">未跟注返还</div><div class="rs-hand">原路退回，不计获奖</div><div class="rs-gain">+' + fmt(meLed.uncalledRefund) + '</div></div>' +
       '<div class="rs-row"><div class="rs-name">本手场供</div><div class="rs-hand">整场不再额外折扣 · 系统共收 ' + fmt(led.systemCollected) + '</div><div class="rs-gain">-' + fmt(meLed.rakePaid) + '</div></div>' +
@@ -3070,10 +3118,11 @@ function renderStart() {
       buySeg.appendChild(b);
     })(tiers[i]);
   }
+  if (Bridge.active) { buySeg.textContent = ''; var selected = document.createElement('button'); selected.type = 'button'; selected.disabled = true; selected.className = 'seg-btn on'; selected.textContent = fmt(activeBuyIn) + ' CBY'; selected.title = '带入已在大厅确认，开局不再扣款'; buySeg.appendChild(selected); }
   $('#hint-buyin').textContent = Bridge.active
     ? (entryUsed
         ? '本场已结算 · 回大厅重新入场'
-        : '带入 ' + fmt(activeBuyIn) + ' CBY（已在入场时扣除）')
+        : '大厅已确认')
     : '当前余额 ' + fmt(bank) + ' CBY';
 
   var pacSeg = $('#seg-pacing');
@@ -3085,7 +3134,7 @@ function renderStart() {
       var b = document.createElement('button');
       b.type = 'button';
       b.className = 'seg-btn' + (career.set.pacing === k ? ' on' : '');
-      b.innerHTML = P.label + '<small>' + P.hint + '</small>';
+      b.innerHTML = P.label + '<small>' + P.every + '手升盲</small>';
       b.addEventListener('click', function () { if (!chooseSet('pacing', k)) return; sfx.ui(); renderStart(); }, false);
       pacSeg.appendChild(b);
     })(pk[i]);
@@ -3141,7 +3190,7 @@ function renderStart() {
     ? (gambleNow ? '入座豪赌桌' : '开始生涯')
     : (entryDone ? '本场带入已结算 · 请回大厅重新入场' : '余额不足 · 需 ' + fmt(MIN_BUYIN) + ' CBY');
   var fee=(Bridge.snapshot()&&Bridge.snapshot().texasRake)||CSH.registry.texasRake();
-  $('#fee-tip').textContent=fee.rateBps?'场供 '+(fee.rateBps/100)+'% · 无金额上限 · 见翻牌后收取，未跟注返还免收；收工无额外折扣':'场供已关闭 · 收工无额外折扣';
+  $('#fee-tip').textContent = (fee.anteBbBps ? '每手前注 '+(fee.anteBbBps/100)+'%大盲入池' : '本场无前注') + ' · 翻牌后场供 '+(fee.rateBps/100)+'%（无上限） · 不重复扣费';
   var tip = $('#start-tip');
   /* 【2026-10-03】这一段是**状态提示**，不是规则说明 —— 只在"需要玩家改变行为"时给一句，
      其余情况（一切正常）留空。此前无论什么状态都铺两行解释，等于把说明书写在按钮下面。 */
@@ -3204,29 +3253,14 @@ function switchView(id) {
 var _landMq = (window.matchMedia ? window.matchMedia('(orientation: landscape)') : null);
 function layoutStartRail() {
   var card = document.querySelector('#view-start .start-card');
-  if (!card) return;
-  var side = document.getElementById('start-side');
-  if (!side) {
-    side = document.createElement('div');
-    side.id = 'start-side';
-    side.className = 'start-side';
-    card.parentNode.insertBefore(side, card.nextSibling);
-  }
-  var tf = document.getElementById('task-field');
-  var md = document.getElementById('medals');
-  var land = !!(window.innerWidth > window.innerHeight);
-  try { document.body.classList.toggle('vp-landscape', land); } catch (eCls) {}
-  if (land) {
-    if (tf && tf.parentNode !== side) side.appendChild(tf);
-    if (md && md.parentNode !== side) side.appendChild(md);
-  } else {
-    if (tf && tf.parentNode === side) card.appendChild(tf);   // 回主卡原位（末尾之前）
-    if (md && md.parentNode === side) {
-      var tip = document.getElementById('start-tip');
-      if (tip && tip.parentNode === card) card.insertBefore(md, tip);
-      else card.appendChild(md);
-    }
-  }
+  var extra = document.getElementById('table-records');
+  if (!card || !extra) return;
+  /* Move existing nodes once; IDs, rendering, rewards and option handlers remain native. */
+  var nodes = [document.querySelector('#view-start .life'), document.getElementById('task-field'), document.getElementById('medals'), document.getElementById('eq-field')];
+  for (var i = 0; i < nodes.length; i++) if (nodes[i] && nodes[i].parentNode !== extra) extra.appendChild(nodes[i]);
+  var fee = document.getElementById('fee-details'), start = document.getElementById('btn-start-game');
+  if (fee && start) card.insertBefore(fee, start);
+  document.body.classList.toggle('vp-landscape', window.innerWidth > window.innerHeight);
 }
 if (_landMq) {
   var _onLand = function () { try { layoutStartRail(); } catch (eL) {} };

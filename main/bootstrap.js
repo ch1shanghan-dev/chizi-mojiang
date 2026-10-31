@@ -7,6 +7,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
    必须**最先**加载：csh_wallet（门票）/ csh_shell（META、回收率）/ csh_games（卡片清单）
    全部改为从它派生，杜绝「加一款游戏要改四处」的重复副本。 */
 import "../core/csh_registry.js";
+import "../core/csh_online.js";
 import "../core/csh_sfx.js";
 /* BGM 音乐引擎（2026-09-30）：零 import，只把引擎挂到 window.CSH_BGM。
    与 csh_sfx 同一套双载模式 —— 主页面在这里转挂到 lib.cshBgm，
@@ -21,6 +22,7 @@ import "../core/csh_svggen.js";
    主页面（ESM，无 currentScript）由 csh_debug.js 在面板渲染完后显式调 auto(overlay)。 */
 import "../core/csh_selftest.js";
 import "../core/csh_wallet.js";
+import { installCheer } from "../core/csh_cheer.js";
 import "../core/csh_match_reward.js";
 import { installAuxSpirit } from "../core/csh_aux_spirit.js";
 import { installUIKit } from "../core/csh_uikit.js";
@@ -41,6 +43,7 @@ import "../core/csh_achv.js";
 /* 池子成就（2026-10-20）：操作型成就引擎，零 import 双载——
    主文档这份负责局内事件采集（install 由 content.js 调），成就页用经典 <script> 引同一份源码渲染。 */
 import "../core/csh_pool_achv.js";
+try { installCheer(lib); } catch(eCheer) { console.warn("[池子魔将] 应援模块未就绪",eCheer); }
 try { installAuxSpirit({lib,game,get,ui,status:_status}); } catch(eAux) { console.warn('[池子魔将] 妖灵守护安装失败',eAux); }
 /* Normal match CBY observes host events only; the wallet owns atomic receipts. */
 try {

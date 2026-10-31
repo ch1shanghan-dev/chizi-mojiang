@@ -3,63 +3,122 @@
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
 <title>池子成就</title>
-<script src="../core/csh_pool_achv.js"></script><script src="../core/csh_page.js"></script>
+<script src="../core/csh_pool_achv.js"></script><script src="../core/csh_page.js"></script><script src="../core/csh_goals.js"></script><script src="../core/csh_achievement_badges.js"></script>
 <style>
 :root{color-scheme:dark;--bg:#171919;--panel:#202323;--line:#3c4141;--ink:#edf0eb;--muted:#bbc2bb;--accent:#ddc88e;--pfs-sm:12px;--pfs-md:14px;--pfs-lg:18px}
 *{box-sizing:border-box}html,body{height:100%;margin:0}body{display:flex;flex-direction:column;overflow:hidden;padding:8px 12px;background:var(--bg);color:var(--ink);font:var(--pfs-md)/1.45 system-ui,"Microsoft YaHei",sans-serif}
 button,input,select{font:inherit;color:inherit;border:1px solid var(--line);background:var(--panel);border-radius:5px}button{cursor:pointer;min-height:44px;padding:6px 12px}button:disabled{cursor:default;color:var(--muted)}button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-header{display:flex;align-items:center;gap:12px;min-height:44px;flex-shrink:0;padding-right:var(--csh-dock-safe,clamp(150px,20vw,200px))}h1{font-size:var(--pfs-lg);margin:0;white-space:nowrap}#summary{color:var(--muted);font-size:var(--pfs-sm);margin:5px 0 7px}.filters{display:flex;gap:8px;flex-wrap:wrap;flex-shrink:0}.filters input{flex:1 1 160px;width:140px;min-width:100px;padding:7px 9px;min-height:44px}.filters select{padding:5px;min-height:44px;max-width:100%}.note{margin:6px 0;color:var(--muted);font-size:var(--pfs-sm)}#message{color:var(--accent);min-height:18px;font-size:var(--pfs-sm);flex-shrink:0}#list{min-height:0;overflow:auto;flex:1;overscroll-behavior:contain;padding-bottom:8px}.row{display:grid;grid-template-columns:minmax(0,1fr) 176px;gap:6px 18px;padding:10px 2px;border-bottom:1px solid var(--line);align-items:center}.name{font-weight:700;font-size:var(--pfs-md)}.meta{font-size:var(--pfs-sm);font-weight:400;color:var(--muted);margin-left:10px}.condition{margin-top:2px;overflow-wrap:anywhere}.progress{display:flex;align-items:center;gap:8px;margin-top:4px;font-size:var(--pfs-sm);color:var(--muted)}progress{width:100px;height:7px;accent-color:var(--accent)}.reward{font-size:var(--pfs-sm);margin-bottom:4px}.claim{width:100%;min-height:44px}.claim.ready{border-color:var(--accent);color:var(--accent)}.claim.done{background:transparent;border-color:transparent}.hint{font-size:var(--pfs-sm);color:var(--muted);margin-top:2px}.empty{padding:30px 10px;color:var(--muted)}
+header{display:flex;align-items:center;gap:12px;min-height:44px;flex-shrink:0;padding-right:var(--csh-dock-safe,clamp(150px,20vw,200px))}h1{font-size:var(--pfs-lg);margin:0;white-space:nowrap}#claim-all{margin:0 0 8px;align-self:flex-start}#summary{color:var(--muted);font-size:var(--pfs-sm);margin:5px 0 7px}.filters{display:flex;gap:8px;flex-wrap:wrap;flex-shrink:0}.filters input{flex:1 1 160px;width:140px;min-width:100px;padding:7px 9px;min-height:44px}.filters select{padding:5px;min-height:44px;max-width:100%}.note{margin:6px 0;color:var(--muted);font-size:var(--pfs-sm)}#message{color:var(--accent);min-height:18px;font-size:var(--pfs-sm);flex-shrink:0}#list{min-height:0;overflow:auto;flex:1;overscroll-behavior:contain;padding-bottom:8px}.row{display:grid;grid-template-columns:minmax(0,1fr) 176px;gap:6px 18px;padding:10px 2px;border-bottom:1px solid var(--line);align-items:center}.name{font-weight:700;font-size:var(--pfs-md)}.meta{font-size:var(--pfs-sm);font-weight:400;color:var(--muted);margin-left:10px}.condition{margin-top:2px;overflow-wrap:anywhere}.progress{display:flex;align-items:center;gap:8px;margin-top:4px;font-size:var(--pfs-sm);color:var(--muted)}progress{width:100px;height:7px;accent-color:var(--accent)}.reward{font-size:var(--pfs-sm);margin-bottom:4px}.claim{width:100%;min-height:44px}.claim.ready{border-color:var(--accent);color:var(--accent)}.claim.done{background:transparent;border-color:transparent}.hint{font-size:var(--pfs-sm);color:var(--muted);margin-top:2px}.empty{padding:30px 10px;color:var(--muted)}
 @media(max-width:540px){body{padding:6px 9px}.row{grid-template-columns:minmax(0,1fr) 120px;gap:8px}.meta{display:block;margin:0}.reward{font-size:var(--pfs-sm)}.filters{gap:5px}.filters input{flex-basis:100%;width:100%}.filters select{flex:1;min-width:0}header{gap:8px}h1{font-size:var(--pfs-md)}}
-@media(max-height:430px) and (min-width:541px){body{padding-top:3px}.row{padding:6px 2px}.note{margin:3px 0}.hint{display:none}#summary{margin:2px 0 4px}}
+@media(max-height:430px) and (min-width:541px){body{padding-top:3px}.row{padding:6px 2px}.note{margin:3px 0}.hint{display:none}.hint.feat-live{display:block}#summary{margin:2px 0 4px}}
+/* Tracking must leave room for browsing; short screens use one document scroll. */
+#goal-bar{max-height:220px;overflow-y:auto;flex-shrink:0;overscroll-behavior:contain}
+@media(max-height:430px){html{overflow:hidden}body{display:block;overflow-y:auto}#list{overflow:visible;min-height:0}#goal-bar{max-height:none;overflow:visible}#claim-all{display:block}#message:empty{min-height:0}}
+.load-more{display:block;margin:12px auto;min-height:44px}.filters #hero{max-width:230px}#summary{line-height:1.5}header h1{font-family:system-ui,"Microsoft YaHei",sans-serif}
+header #claim-all{margin:0;align-self:center;flex:0 0 auto}@media(min-width:900px){#list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 20px;align-content:start}.row{grid-template-columns:minmax(0,1fr) 124px;gap:6px 12px}.load-more,.empty{grid-column:1/-1}}
+.row .name{display:flex;align-items:center;gap:8px;min-width:0}.achievement-name-text{min-width:0;overflow-wrap:anywhere}
+.earned-time{font-size:var(--pfs-sm);color:var(--muted);margin-top:3px;overflow-wrap:anywhere}
 </style>
 <link rel="stylesheet" href="../core/csh_experience.css">
-</head><body class="csh-experience">
-<header><h1>池子成就</h1></header>
-<div id="summary"></div>
-<div class="filters" aria-label="成就筛选">
-<input id="search" type="search" placeholder="搜索名称或条件" aria-label="搜索名称或条件">
-<select id="category" aria-label="分类"><option>全部分类</option><option>操作</option><option>连击</option><option>逆境</option><option>模式</option><option>武将</option></select>
-<select id="status" aria-label="状态"><option>全部状态</option><option>待领取</option><option>未解锁</option><option>已领取</option></select>
-<select id="sort" aria-label="排序"><option>待领优先</option><option>进度优先</option><option>原始顺序</option></select>
+<link rel="stylesheet" href="../core/csh_achievement_badges.css">
+<link rel="stylesheet" href="../core/csh_journal.css">
+</head><body class="csh-experience" data-csh-journal="pool">
+<header class="journal-header"><div class="journal-title"><h1>池子成就<span class="journal-mode">单机 · 身份 / 斗地主 / 对决</span></h1><div id="summary"></div></div><button id="claim-all" type="button">领取已达成</button></header>
+<div class="journal-workspace">
+ <aside class="journal-sidebar" aria-label="成就查找与目标">
+  <div class="filters" aria-label="查找成就"><input id="search" type="search" placeholder="搜索成就，如：郝昭 史诗" aria-label="搜索名称、条件、稀有度或模式；空格分隔多个关键词"><select id="status" aria-label="状态"><option>全部状态</option><option>待领取</option><option>未解锁</option><option>已领取</option></select></div>
+  <details id="pool-options"><summary>筛选与目标</summary><div class="journal-filter-content">
+   <div class="filters"><label>武将<select id="hero" aria-label="武将专属成就"><option value="all">全部</option><option value="general">通用</option></select></label><label>分类<select id="category" aria-label="分类"><option>全部分类</option><option>操作</option><option>连击</option><option>逆境</option><option>模式</option><option>武将</option><option>专属</option><option>同局挑战</option></select></label><label>排序<select id="sort" aria-label="排序"><option>待领优先</option><option>进度优先</option><option>最近达成</option><option>原始顺序</option></select></label></div>
+   <p id="collection-note"></p><p class="note" id="rule-note"></p>
+   <section id="goal-bar" aria-label="正在追踪的操作成就" hidden></section>
+  </div></details>
+ </aside>
+ <section class="journal-results" aria-label="成就目录"><div id="message" role="status" aria-live="polite"></div><main id="list" aria-label="成就列表"></main></section>
 </div>
-<div class="note">单机身份、斗地主、对决中记录；单局条件显示历史最佳，武将胜场跨局累计。</div>
-<div id="message" role="status" aria-live="polite"></div>
-<main id="list" aria-label="成就列表"></main>
 <script>
 (function(){
 "use strict";
-var PA=window.CSH_POOL_ACHV,T=window.CSHPage.transport({closeName:"achv-close",timeout:3500}),pending={},store;
+var PA=window.CSH_POOL_ACHV,T=window.CSHPage.transport({closeName:"achv-close",timeout:3500}),pending={},store,bulkPending=false,rowLimit=80;
 var $=function(id){return document.getElementById(id);},mode={identity:"身份",doudizhu:"斗地主",versus:"对决"};
 function el(tag,cls,text){var n=document.createElement(tag);if(cls)n.className=cls;if(text!=null)n.textContent=text;return n;}
 if(!PA){$("message").textContent="成就未就绪，请关闭后重开";return;}
+(PA.PROFILES||[]).forEach(function(p){var option=el("option","",p.name+" · "+PA.RULES.filter(function(r){return r.hero===p.id;}).length+" 项");option.value=p.id;$("hero").appendChild(option);});
+function isSameMatch(r){return r.scope==="feat"||!!r.tactic;}
+function rarityName(r){return r&&[1,2,3].indexOf(r.rare)>=0?["","普通","稀有","史诗"][r.rare]:"未标注";}
+function searchText(value){return String(value||"").normalize("NFKC").toLowerCase();}
+function matchesSearch(r,tokens){
+ var text=searchText([r.name,r.desc,r.cat,r.heroName||"",rarityName(r),(r.modes.length?r.modes:Object.keys(mode)).map(function(m){return mode[m]||m;}).join(" "),isSameMatch(r)?"同局挑战":""].join(" "));
+ return tokens.every(function(token){return text.indexOf(token)>=0;});
+}
+function clearFilters(){
+ $("search").value="";$("hero").value="all";$("category").value="全部分类";$("status").value="全部状态";$("sort").value="待领优先";rowLimit=80;render();$("search").focus();
+}
+function earnedRecord(record){
+ var raw=record&&typeof record==="object"&&!Array.isArray(record)?record.t:null;
+ var number=typeof raw==="number"||typeof raw==="string"&&raw.trim()!==""?Number(raw):NaN;
+ var date=Number.isSafeInteger(number)&&number>0?new Date(number):null;
+ if(!date||!Number.isFinite(date.getTime()))return null;
+ function pad(n){return n<10?"0"+n:String(n);}
+ return {stamp:number,iso:date.toISOString(),label:date.getFullYear()+"-"+pad(date.getMonth()+1)+"-"+pad(date.getDate())+" "+pad(date.getHours())+":"+pad(date.getMinutes())};
+}
+function appendEarned(main,r){
+ if(!store.got[r.id]&&!store.seen[r.id])return;
+ var record=store.got[r.id],date=earnedRecord(record),line=el("div","earned-time");
+ if(date){line.appendChild(document.createTextNode("达成于 "));var time=el("time","",date.label);time.setAttribute("datetime",date.iso);time.title="按本机时间显示";line.appendChild(time);}
+ else line.textContent="达成时间未记录";
+ if(record&&Object.prototype.hasOwnProperty.call(mode,record.m))line.appendChild(document.createTextNode(" · "+mode[record.m]));
+ main.appendChild(line);
+}
+var originalOrder=Object.create(null);PA.RULES.forEach(function(r,i){originalOrder[r.id]=i;});
 function state(r){return pending[r.id]?"待领取":store.seen[r.id]?"已领取":store.got[r.id]?"待领取":"未解锁";}
 function render(){
- PA.reconcile();store=PA.load();var total=PA.RULES.length,got=0,paid=0;
+ PA.reconcile();store=PA.load();var total=PA.RULES.length,general=PA.RULES.filter(function(r){return !r.hero;}).length,got=0,paid=0;
  PA.RULES.forEach(function(r){if(store.got[r.id])got++;if(store.got[r.id]&&store.seen[r.id]&&!pending[r.id])paid++;});
- $("summary").textContent="已解锁 "+got+" / "+total+" · 待领取 "+(got-paid)+" · 已领取 "+paid;
+ $("summary").textContent="已解锁 "+got+" / "+total+" · 待领取 "+(got-paid)+" · 已领取 "+paid;$("collection-note").textContent="通用 "+general+" 项 · "+(PA.PROFILES||[]).length+" 位武将专属 "+(total-general)+" 项";
+ $("hero").options[0].textContent="全部 · "+total+" 项";$("hero").options[1].textContent="通用 · "+general+" 项";
+ var ready=got-paid,bulk=$("claim-all");bulk.disabled=bulkPending||!ready;bulk.textContent=bulkPending?"领取中…":"领取全部已达成"+(ready?" · "+ready+"枚":"");
+ if(window.CSHGoals)CSHGoals.paint($("goal-bar"),"pool",PA.RULES.map(function(r){var p=PA.progress(r,store);return {id:r.id,label:r.name,description:r.desc,current:p.value,target:p.target,done:!!store.got[r.id],claimed:!!store.seen[r.id]};}),render);
  if(PA.storageError())$("message").textContent=PA.storageError();
- var q=$("search").value.trim(),cat=$("category").value,st=$("status").value;
- var rows=PA.RULES.filter(function(r){return (cat==="全部分类"||r.cat===cat)&&(st==="全部状态"||state(r)===st)&&(!q||(r.name+" "+r.desc+" "+r.cat).indexOf(q)>=0);});
- var sort=$("sort").value;
- rows.sort(function(a,b){if(sort==="待领优先")return (state(a)==="待领取"?-1:state(a)==="未解锁"?0:1)-(state(b)==="待领取"?-1:state(b)==="未解锁"?0:1);if(sort==="进度优先"){var pa=PA.progress(a,store),pb=PA.progress(b,store);return pb.value/pb.target-pa.value/pa.target;}return 0;});
+ var q=searchText($("search").value).trim().split(/\s+/).filter(Boolean),cat=$("category").value,st=$("status").value,hero=$("hero").value;
+ var rows=PA.RULES.filter(function(r){return (hero==="all"||(hero==="general"?!r.hero:r.hero===hero))&&(cat==="全部分类"||(cat==="同局挑战"?isSameMatch(r):r.cat===cat))&&(st==="全部状态"||state(r)===st)&&matchesSearch(r,q);});
+ $("rule-note").textContent=cat==="同局挑战"?"同局挑战 · "+rows.length+" 项；须在同一局满足全部条件，不合并不同对局。":"单机身份、斗地主、对决中记录；单局条件显示历史最佳，武将胜场跨局累计。";
+ var sort=$("sort").value,recent=Object.create(null);
+ if(sort==="最近达成")rows.forEach(function(r){var date=earnedRecord(store.got[r.id]);recent[r.id]={group:date?0:store.got[r.id]||store.seen[r.id]?1:2,stamp:date?date.stamp:0};});
+ rows.sort(function(a,b){if(sort==="最近达成"){var ra=recent[a.id],rb=recent[b.id];return ra.group-rb.group||rb.stamp-ra.stamp||originalOrder[a.id]-originalOrder[b.id];}if(sort==="待领优先")return (state(a)==="待领取"?-1:state(a)==="未解锁"?0:1)-(state(b)==="待领取"?-1:state(b)==="未解锁"?0:1);if(sort==="进度优先"){var pa=PA.progress(a,store),pb=PA.progress(b,store);return pb.value/pb.target-pa.value/pa.target;}return 0;});
  var list=$("list");list.textContent="";
- if(!rows.length){list.appendChild(el("div","empty","没有匹配的成就，试试其他筛选条件。"));return;}
- rows.forEach(function(r){
-  var row=el("article","row"),main=el("div"),aside=el("div"),nm=el("div","name",r.name),rw=PA.reward(r),pr=PA.progress(r,store);
-  row.dataset.id=r.id;nm.appendChild(el("span","meta",r.cat+" · "+(r.modes.length?r.modes.map(function(m){return mode[m];}).join(" / "):"三种模式")));main.appendChild(nm);
+ if(!rows.length){var empty=el("div","empty","没有匹配的成就，试试其他筛选条件。");var reset=el("button","clear-filters","清除筛选");reset.type="button";reset.addEventListener("click",clearFilters);empty.appendChild(el("div","","")).appendChild(reset);list.appendChild(empty);return;}
+ var totalMatching=rows.length,lastGroup='';rows.slice(0,rowLimit).forEach(function(r){
+  if(hero!=='all'&&hero!=='general'&&r.hero){var profile=PA.PROFILES.find(function(p){return p.id===r.hero;}),path=profile&&profile.paths.find(function(p){return p.metric===r.metric;}),group=r.scope==='wins'?'长期里程碑':r.scope==='feat'?'同局组合挑战':'成长路线 · '+(path?path.title:'特色操作');if(group!==lastGroup){var heading=el('h2','route-heading',group);heading.style.cssText='grid-column:1/-1;font-size:var(--pfs-md);margin:14px 0 4px';list.appendChild(heading);lastGroup=group;}}
+
+  var row=el("article","row"),main=el("div"),aside=el("div"),nm=el("div","name"),nameText=el("span","achievement-name-text",r.name),rw=PA.reward(r),pr=PA.progress(r,store);
+  main.className="achievement-main";aside.className="achievement-actions";row.dataset.claimable=String(!!store.got[r.id]&&!store.seen[r.id]);row.dataset.id=r.id;try{if(window.CSHAchievementBadges)nm.appendChild(window.CSHAchievementBadges.create(r,document));}catch(badgeError){}var meta=el("span","meta"),rarity=el("span","rarity-label",rarityName(r));rarity.setAttribute("aria-label","稀有度："+rarityName(r));meta.appendChild(rarity);meta.appendChild(document.createTextNode(" · "+(isSameMatch(r)?"同局挑战 · ":"")+r.cat+" · "+(r.modes.length?r.modes.map(function(m){return mode[m];}).join(" / "):"三种模式")));nameText.appendChild(meta);nm.appendChild(nameText);main.appendChild(nm);
   main.appendChild(el("div","condition",r.desc));
   var pg=el("div","progress"),bar=el("progress");bar.max=pr.target;bar.value=pr.value;bar.setAttribute("aria-label",r.name+"进度");pg.appendChild(bar);pg.appendChild(el("span","",pr.label+" "+pr.value+" / "+pr.target));main.appendChild(pg);
+  appendEarned(main,r);
   if(r.hint)main.appendChild(el("div","hint",r.hint));
+  if(r.scope==='feat'){var live=null;try{if(window.parent&&window.parent.CSH_POOL_ACHV&&window.parent.CSH_POOL_ACHV.live)live=window.parent.CSH_POOL_ACHV.live(r.hero);}catch(e){}if(live){var complete=live.steps.filter(function(step){return step.current>=step.target;}).length;main.appendChild(el('div','hint feat-live',(live.ended?'刚结束的一局':'本局')+' · 已满足 '+complete+'/'+live.steps.length+' 个条件（不同局不合并）'));live.steps.forEach(function(step){main.appendChild(el('div','hint feat-live',(step.current>=step.target?'✓ ':'· ')+step.label+' · '+Math.min(step.current,step.target)+' / '+step.target));});}}
+
   aside.appendChild(el("div","reward",rw.pc+" 池子币 · "+rw.merit+" 基础功勋"));
   var stateNow=state(r),button=el("button","claim"+(stateNow==="待领取"?" ready":stateNow==="已领取"?" done":""),pending[r.id]?"领取中…":stateNow==="待领取"?"领取奖励":stateNow);
-  button.type="button";button.disabled=stateNow!=="待领取"||!!pending[r.id];button.addEventListener("click",function(){claim(r);});aside.appendChild(button);row.appendChild(main);row.appendChild(aside);list.appendChild(row);
+  button.type="button";button.disabled=stateNow!=="待领取"||!!pending[r.id];button.addEventListener("click",function(){claim(r);});aside.appendChild(button);if(window.CSHGoals)aside.appendChild(CSHGoals.button("pool",r.id,r.name,render,function(msg){$("message").textContent=msg;}));row.appendChild(main);row.appendChild(aside);list.appendChild(row);
  });
+ if(totalMatching>rowLimit){var more=el("button","load-more","继续查看 · 还有 "+(totalMatching-rowLimit)+" 项");more.type="button";more.addEventListener("click",function(){rowLimit+=80;render();});list.appendChild(more);}
 }
 function claim(r){
  if(pending[r.id])return;pending[r.id]=true;$("message").textContent="";render();
  T.call("shell-pool-ach-claim",{key:r.id},function(ok,data){delete pending[r.id];$("message").textContent=ok?(data&&data.already?"已领取过该奖励":"已领取「"+r.name+"」奖励"):(data&&data.reason||"领取未完成，请回主界面后重试");render();var row=$("list").querySelector('[data-id="'+r.id+'"] button');if(row&&!row.disabled)row.focus();});
 }
-["category","status","sort"].forEach(function(id){$(id).addEventListener("change",render);});$("search").addEventListener("input",render);
+$("claim-all").addEventListener("click",function(){
+ if(bulkPending)return;bulkPending=true;var total={count:0,gained:0,meritGained:0},lastRemaining=-1;render();
+ function finish(ok,data){bulkPending=false;$("message").textContent=ok?"已领取 "+total.count+" 枚 · +"+total.gained+" CBY / +"+total.meritGained+" 功勋"+(data.remaining?" · 仍有 "+data.remaining+" 枚待领，可重试":"")+(data.reason?" · "+data.reason:""):data.reason||"领取未完成，资格已保留";render();}
+ function next(){if(!window.CSHPage.requireSave()){finish(total.count>0,{reason:"存档已更新，请重新进入",remaining:lastRemaining>0?lastRemaining:0});return;}
+  T.call("shell-pool-ach-claim-all",{},function(ok,data){data=data||{};total.count+=Number(data.count)||0;total.gained+=Number(data.gained)||0;total.meritGained+=Number(data.meritGained)||0;
+   if(ok&&data.remaining>0&&!data.reason&&data.remaining!==lastRemaining){lastRemaining=data.remaining;$("message").textContent="已领取 "+total.count+" 枚，继续领取中…";render();setTimeout(next,0);}else finish(ok||total.count>0,data);
+  });
+ }next();
+});
+["hero","category","status","sort"].forEach(function(id){$(id).addEventListener("change",function(){rowLimit=80;if(id==="hero")$("category").value="全部分类";if(id==="category"&&$("category").value==="专属"&&$("hero").value==="general")$("hero").value="all";render();});});$("search").addEventListener("input",function(){rowLimit=80;render();});
 window.addEventListener("storage",function(e){if(!e.key||[PA.KEY,PA.PAY_KEY,"csh_wallet","csh_rank"].indexOf(e.key)>=0)render();});render();
+var layout=typeof window.matchMedia==="function"?window.matchMedia("(min-width:1200px) and (min-height:600px)"):null;function syncLayout(){ $("pool-options").open=!!(layout&&layout.matches); }syncLayout();if(layout){if(layout.addEventListener)layout.addEventListener("change",syncLayout);else layout.addListener(syncLayout);}
 })();
 </script></body></html>

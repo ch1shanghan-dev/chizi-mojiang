@@ -1,0 +1,76 @@
+/* Texas: green tournament felt. Blackjack: midnight blue dealer duel. Cards stay native. */
+body[data-csh-table="texas"] #view-game .felt{background:radial-gradient(ellipse at 50% 36%,#214a3c,#112e25 72%,#0a211a)!important;border-color:#363b2f!important}
+body[data-csh-table="texas"] #view-game .seat-box{background:linear-gradient(145deg,#203b30f5,#11271ff5)!important;border-color:#9eae9270!important}
+body[data-csh-table="texas"] #view-game .seat-name{color:#f6f0db!important;font-weight:700!important}
+body[data-csh-table="texas"] #view-game .seat-av{border-radius:6px!important;background:#1d3024!important;border-color:#c4b68c99!important}
+body[data-csh-table="texas"] #view-game .seat-tag{background:transparent!important;border:0!important;padding:0!important;color:#c4d2c8!important}
+body[data-csh-table="texas"] #view-game .seat-chips{font-size:var(--table-label)!important;color:#ead4a2!important;font-weight:600!important}
+body[data-csh-table="texas"] #view-game .seat-bet{color:#d2dbcf!important}
+body[data-csh-table="texas"] #view-game .seat.folded{opacity:.72}
+body[data-csh-table="texas"] #view-game .seat.allin .seat-box{border-color:#dca566!important;box-shadow:inset 3px 0 #dca566!important}
+body[data-csh-table="texas"] #view-game .pot{background:#0f251ee6!important;border:1px solid #bca37088!important;border-radius:6px!important;color:#f1d9a4!important}
+body[data-csh-table="texas"] #view-game .street-tag{letter-spacing:.08em;color:#d6ddd1!important}
+body[data-csh-table="texas"] #view-start:not(.hidden){display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:flex-start!important;padding:12px 20px!important;overflow:auto!important;gap:0!important}
+body[data-csh-table="texas"] #view-start .start-card{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;gap:10px 18px!important;width:min(920px,100%)!important;max-width:100%!important;flex:none!important;margin:auto 0!important;padding:18px!important}
+body[data-csh-table="texas"] #view-start .start-card>.title{grid-column:1/-1;text-align:left;line-height:1.3!important;text-shadow:none}
+body[data-csh-table="texas"] #view-start .start-card>.field:has(#seg-buyin){grid-column:1/-1}
+body[data-csh-table="texas"] #view-start .field{min-width:0;gap:4px}
+body[data-csh-table="texas"] #view-start .lab{min-height:17px;gap:6px;flex-wrap:wrap}
+body[data-csh-table="texas"] #view-start .seg{gap:6px}
+body[data-csh-table="texas"] #view-start .seg-btn{font-size:var(--table-label)!important;padding:5px 8px;min-width:44px}
+body[data-csh-table="texas"] #view-start :is(#fee-details,#btn-start-game){grid-column:auto!important;margin:0!important;align-self:center}
+body[data-csh-table="texas"] #view-start #fee-details{font-size:var(--table-note);line-height:1.5;text-align:left}
+body[data-csh-table="texas"] #view-start #fee-details[open]{grid-column:1/-1!important}
+body[data-csh-table="texas"] #view-start :is(#table-records,#start-tip){grid-column:1/-1!important}
+body[data-csh-table="texas"] #view-start #start-tip:empty{display:none}
+body[data-csh-table="texas"] #view-start #table-records{order:10}
+body[data-csh-table="texas"] #view-start #table-records[open]{display:grid;gap:12px}
+body[data-csh-table="texas"] #view-start #table-records .life{margin:0!important;grid-template-columns:1.5fr 1fr 1fr;padding:10px;gap:8px}
+body[data-csh-table="texas"] #view-start #table-records .life-bank{grid-column:auto}
+body[data-csh-table="texas"] #view-start #table-records .life-bank-top .v{font-size:var(--table-title)}
+body[data-csh-table="texas"] #view-start #table-records .medals{justify-content:flex-start}
+body[data-csh-table="blackjack"] #view-game .felt{background:radial-gradient(ellipse at 50% 38%,#254753,#142f3b 70%,#10242f)!important;border-color:#27343c!important;box-shadow:inset 0 0 0 1px #9aacae88,inset 0 18px 38px #0004!important}
+body[data-csh-table="blackjack"] #view-game .felt::after{border-color:#a6bdbb28!important}
+body[data-csh-table="blackjack"] #view-game .side-h{font-size:var(--table-label)!important;color:#dce7e4!important;letter-spacing:.02em;line-height:1.4}
+body[data-csh-table="blackjack"] #view-game .opp-av{background:#1e3b48!important;width:28px;height:28px;border-color:#b5c8bd88!important;border-radius:6px!important}
+body[data-csh-table="blackjack"] #view-game .side-v{color:#e7ddbc!important;font-size:var(--table-body)!important}
+body[data-csh-table="blackjack"] #view-game .felt::before{border-radius:10px!important;border-color:#a6bdbb28!important}
+body[data-csh-table="blackjack"] #view-game .bj-div{background:linear-gradient(90deg,transparent,#b1c7c555,transparent)!important}
+body[data-csh-table="blackjack"] #view-game .fc-chip{background:#0e2431dd!important;border:1px solid #b1c7c544!important;border-radius:6px!important;color:#e9e4d4!important}
+body[data-csh-table="blackjack"] #view-game .fc-gold{border-color:#d5ba7a99!important;color:#f1d795!important}
+body[data-csh-table="blackjack"] #view-game .fc-gold :is(.tb-k,.tb-v){color:#f1d795!important}
+body[data-csh-table="blackjack"] #view-game .felt{border-radius:18px!important}
+body[data-csh-table="blackjack"] #view-start{padding:12px 20px!important;justify-content:flex-start!important;overflow:auto!important}
+body[data-csh-table="blackjack"] #view-start .start-card{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-areas:"title dealer" "rules rules" "bet bet" "difficulty hint" "start how" "note note" "records records";gap:10px 18px!important;width:min(920px,100%)!important;margin:auto 0!important;padding:18px!important}
+body[data-csh-table="blackjack"] #view-start .sc-title{text-align:left;align-self:center;text-shadow:none;line-height:1.3!important}
+body[data-csh-table="blackjack"] #view-start :is(.sc-sub,.sc-sec:has(#bet-chips),#dealer-records,.sc-note){grid-column:1/-1}
+body[data-csh-table="blackjack"] #view-start .sc-sub{margin:0;text-align:left;font-size:var(--table-note)!important;line-height:1.5}
+body[data-csh-table="blackjack"] #view-start .sc-sec{justify-content:flex-start;gap:8px;flex-wrap:nowrap;min-width:0}
+body[data-csh-table="blackjack"] #view-start .sc-k{font-size:var(--table-note);min-width:3em;letter-spacing:0}
+body[data-csh-table="blackjack"] #view-start :is(.chip-btn,.seg-btn){font-size:var(--table-label)!important;min-height:44px;padding:6px 9px}
+body[data-csh-table="blackjack"] #view-start .dealer-preview{display:flex;gap:8px;align-items:center;justify-self:start;min-width:0;font-size:var(--table-label);color:var(--text)}
+body[data-csh-table="blackjack"] #view-start .dealer-preview .opp-av{display:block;flex:none;width:34px;height:34px;border:1px solid var(--gold-line);border-radius:7px;overflow:hidden;background:var(--ink-2)}
+body[data-csh-table="blackjack"] #view-start #bj-entry-funds{font-size:var(--table-note);color:var(--text-dim);line-height:1.5}
+body[data-csh-table="blackjack"] #view-start #dealer-records{order:10}
+body[data-csh-table="blackjack"] #view-start .sc-title{grid-area:title}
+body[data-csh-table="blackjack"] #view-start .dealer-preview{grid-area:dealer}
+body[data-csh-table="blackjack"] #view-start .sc-sub{grid-area:rules}
+body[data-csh-table="blackjack"] #view-start .sc-sec:has(#bet-chips){grid-area:bet}
+body[data-csh-table="blackjack"] #view-start .sc-sec:has(#diff-seg){grid-area:difficulty}
+body[data-csh-table="blackjack"] #view-start .sc-sec:has(#hint-seg){grid-area:hint}
+body[data-csh-table="blackjack"] #view-start #btn-start-game{grid-area:start}
+body[data-csh-table="blackjack"] #view-start #btn-rules{grid-area:how}
+body[data-csh-table="blackjack"] #view-start .sc-note{grid-area:note}
+body[data-csh-table="blackjack"] #view-start #dealer-records{grid-area:records}
+body[data-csh-table="blackjack"] #view-start .sc-best{font-size:var(--table-note);line-height:1.65;text-align:left;margin:4px 0}
+@media(orientation:landscape) and (max-height:430px){
+ body:is([data-csh-table="texas"],[data-csh-table="blackjack"]) #view-start{padding:6px 12px!important}
+ body:is([data-csh-table="texas"],[data-csh-table="blackjack"]) #view-start .start-card{padding:10px 12px!important;gap:6px 12px!important}
+ body[data-csh-table="blackjack"] #view-game .opp-av{width:22px;height:22px}
+}
+@media(orientation:landscape) and (max-height:330px){
+ body[data-csh-table="blackjack"] #view-game .csh-center{gap:1px!important}
+ body[data-csh-table="blackjack"] #view-game .bj-side{gap:1px!important}
+ body[data-csh-table="blackjack"] #view-game .hand-box{padding:0 4px;gap:1px}
+ body[data-csh-table="blackjack"] #view-game .bj-div{margin:1px 0}
+}

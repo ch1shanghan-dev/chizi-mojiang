@@ -1056,23 +1056,7 @@ const skill = {
 			}).randomGet();
 			if (t) await player.useCard({ name: "sha", isCard: true }, t, false).set("addCount", false);
 		},
-		ai: {
-			order: 6,
-			result: {
-				player(player) {
-					var foes = game.filterPlayer(function (cur) {
-						return cur.side === false && cur.isIn() && player.inRange(cur);
-					});
-					if (!foes.length) return 0;
-					/* 目标由规则随机决定，按全部候选的平均收益判断是否发动。 */
-					var value = 0;
-					foes.forEach(function (cur) {
-						value += get.effect(cur, { name: "sha", isCard: true }, player, player);
-					});
-					return value / foes.length;
-				},
-			},
-		},
+		ai: { order: 6, result: { player: 1 } },
 		group: ["csh_boss_bailie_clear"],
 	},
 	csh_boss_bailie_clear: {
@@ -1114,26 +1098,7 @@ const skill = {
 			var pr = pairs.randomGet();
 			await pr[0].useCard({ name: "sha", isCard: true }, pr[1], false).set("addCount", false);
 		},
-		ai: {
-			order: 6,
-			result: {
-				player(player) {
-					var foes = game.filterPlayer(function (cur) { return cur.side === false && cur.isIn(); });
-					if (!foes.length) return 0;
-					if (foes.length === 1) return 1; /* 保留单体压制分支的原估值。 */
-					var value = 0, count = 0;
-					foes.forEach(function (from) {
-						foes.forEach(function (to) {
-							if (from === to || !from.inRange(to)) return;
-							/* 出杀者是被支配的挑战者；收益观察者才是技能发动者。 */
-							value += get.effect(to, { name: "sha", isCard: true }, from, player);
-							count++;
-						});
-					});
-					return count ? value / count : 0;
-				},
-			},
-		},
+		ai: { order: 6, result: { player: 1 } },
 		group: ["csh_boss_zhipei_clear"],
 	},
 	csh_boss_zhipei_clear: {

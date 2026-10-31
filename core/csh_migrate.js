@@ -1,3 +1,4 @@
+import "./csh_bond.js";
 import { lib, game } from "../../../noname.js";
 /*
  * 池子魔将 · 数据迁移与存档（§J）
@@ -59,10 +60,17 @@ import { lib, game } from "../../../noname.js";
 	/* 故意不带（边界清单 · 页面会如实展示给玩家）：
 	     · 键名             —— 为什么 */
 	var EXCLUDED = [
+        ["csh_achievement_ui_v1", "本机成就反馈开关、动效和声音偏好（不是成就进度，不随他人存档导入）"],
+        ["csh_online_policy_v1", "本机联网与发布偏好（默认离线，导入他人存档不会代为开启）"],
+        ["csh_online_backoff_v1", "本机网络退避记录（不影响本地游戏，不跨设备补发）"],
+        ["csh_rank_cache_v2", "按服务、类别与身份分槽的社区榜缓存（非玩家资产，不随行囊迁移）"],
+        ["extension_池子魔将_build", "本机已安装文件摘要（随安装生成，不随玩家存档迁移）"],
+        ["csh_pending_results_v1", "本机待保存结果（导出前自动恢复，换档时取消旧局待办，不跨设备执行）"],
+		["csh_goal_pins_v1", "界面追踪目标偏好（每组至多3项，不是资产；换设备可重新选择，不随行囊迁移）"],
 		[K_RECOVERY, "本机未完成的存档恢复凭据（恢复完成前保留，不随行囊迁移）"],
 		[K_DEVICE_ID, "本机设备 ID（CDK 设备绑定的凭据，跨设备带走等于两台机器共用一个身份）"],
 		[K_DEV_BIND, "CDK 序号 ↔ 设备 ID 绑定表（同上，属安全边界，不是玩家资产）"],
-		[K_NET_UID, "天下榜本机身份（换机后由服务端按机器指纹/网络重新认领，带过去会撞号）"],
+		[K_NET_UID, "天下榜本机标识（不是认证凭据，不采硬件指纹；换机归属须独立验证）"],
 		[K_FLOAT_POS, "调试悬浮球坐标（跟着屏幕大小走，换设备会落在奇怪的位置）"],
 		[K_CHEER_DAY, "每日首次免缠头的日键（按机器按天，跨设备带过去会白送/吞掉一次）"],
 		[K_MIG_FLAG, "内部迁移标记（本机一次性开关，与新机器无关）"],
@@ -368,11 +376,15 @@ import { lib, game } from "../../../noname.js";
 			streak: clampNum(o.streak, 0, 9999),
 			reliefDate: clampStr(o.reliefDate, 20),
 			careerClaims: cleanAchv(o.careerClaims) || {},
+            careerUnlocks:o.careerUnlocks==null?null:lib.cshWallet.validateCareerUnlocks(o.careerUnlocks),
 			poolClaims: cleanPoolClaims(o.poolClaims),
 			matchRewardConfig: cleanMatchRewardConfig(o.matchRewardConfig),
 			matchClaims: cleanMatchClaims(o.matchClaims),
 			bossRewards: cleanBossRewards(o.bossRewards),
 			assistedStats: cleanAssisted(o.assistedStats),
+            dailyTaskSaved:o.dailyTaskSaved==null?null:lib.cshWallet.validateTaskState(o.dailyTaskSaved),
+			affectionSaved: o.affectionSaved == null ? null : lib.cshWallet.validateAffectionState(o.affectionSaved),
+			cheerState: o.cheerState == null ? null : lib.cshWallet.validateCheerState(o.cheerState),
 		};
 	}
 	function cleanRank(o) {
@@ -382,7 +394,7 @@ import { lib, game } from "../../../noname.js";
 			merit: clampNum(o.merit, 0, 999999999),
 			meritToday: clampNum(o.meritToday, 0, 999999999),
 			meritDate: clampStr(o.meritDate, 20),
-			poolClaims: numMap(o.poolClaims, 100, 0, 1000) || {},
+			poolClaims: numMap(o.poolClaims, 8192, 0, 1000) || {},
 			bossReceipt: cleanBossReceipt(o.bossReceipt),
 		};
 	}
@@ -689,15 +701,21 @@ import { lib, game } from "../../../noname.js";
 	   认不出的 id 留着无副作用，丢掉反而会把玩家进度吃回去）。 */
 	function cleanPoolClaims(o) {
 		var out = {}; if (!o || typeof o !== "object") return out;
-		Object.keys(o).slice(0,100).forEach(function(id){ var r=o[id]; if (!/^[a-zA-Z0-9_]{1,60}$/.test(id) || !r || typeof r!=="object") return;
+		Object.keys(o).slice(0,8192).forEach(function(id){ var r=o[id]; if (!/^[a-zA-Z0-9_]{1,60}$/.test(id) || !r || typeof r!=="object") return;
 			out[id]={pc:clampNum(r.pc,0,5000),merit:clampNum(r.merit,0,40),t:isPastStamp(r.t)};
 		}); return out;
 	}
+    function cleanCharacterMastery(value) {
+        var out={};if(!value||typeof value!=='object'||Array.isArray(value))return out;
+        Object.keys(value).slice(0,3000).forEach(function(id){if(!/^csh_[a-zA-Z0-9_]{1,50}$/.test(id))return;var rec=value[id];if(!rec||typeof rec!=='object'||Array.isArray(rec))return;
+            var dst={totals:{},peaks:{}};['totals','peaks'].forEach(function(field){var metrics=rec[field];if(!metrics||typeof metrics!=='object'||Array.isArray(metrics))return;Object.keys(metrics).slice(0,64).forEach(function(key){var n=metrics[key];if(/^(s:csh_[a-zA-Z0-9_]+|[cdgrleqp]:[a-zA-Z0-9_.]+)$/.test(key)&&key.length<=100&&Number.isFinite(n)&&n>=0)dst[field][key]=Math.min(1000000000,Math.floor(n));});});out[id]=dst;
+        });return out;
+    }
 	function cleanPoolAchv(o) {
 		if (!o || typeof o !== "object") return null;
-		var out = { v: 2, got: {}, seen: {}, chars: numMap(o.chars, 3000, 0, 999999) || {}, progress: numMap(o.progress, 100, 0, 999999) || {} };
+		var out = { v: 2, got: {}, seen: {}, results:Array.isArray(o.results)?o.results.filter(function(id){return typeof id==="string"&&/^[a-zA-Z0-9_-]{10,100}$/.test(id);}).slice(-64):[], chars: numMap(o.chars, 3000, 0, 999999) || {}, progress: numMap(o.progress, 8192, 0, 1000000000) || {}, mastery: cleanCharacterMastery(o.mastery) };
 		var src = (o.got && typeof o.got === "object") ? o.got : {};
-		var keys = Object.keys(src).slice(0, 800);
+		var keys = Object.keys(src).slice(0, 8192);
 		for (var i = 0; i < keys.length; i++) {
 			var id = clampStr(keys[i], 48);
 			var rec = src[keys[i]];
@@ -709,7 +727,7 @@ import { lib, game } from "../../../noname.js";
 			};
 		}
 		var seen = (o.seen && typeof o.seen === "object") ? o.seen : {};
-		var sk = Object.keys(seen).slice(0, 800);
+		var sk = Object.keys(seen).slice(0, 8192);
 		for (var j = 0; j < sk.length; j++) out.seen[clampStr(sk[j], 48)] = 1;
 		return out;
 	}
@@ -718,7 +736,7 @@ import { lib, game } from "../../../noname.js";
 		if (!o || typeof o !== "object") return null;
 		var out = { v: 1, paid: {} };
 		var src = (o.paid && typeof o.paid === "object") ? o.paid : {};
-		var keys = Object.keys(src).slice(0, 800);
+		var keys = Object.keys(src).slice(0, 8192);
 		for (var i = 0; i < keys.length; i++) {
 			var id = clampStr(keys[i], 48);
 			var rec = src[keys[i]];
@@ -800,7 +818,7 @@ import { lib, game } from "../../../noname.js";
 			var A = (lib && lib.cshAffection && lib.cshAffection.AFF_MAX);
 			if (typeof A === "number" && A > 0) return A;
 		} catch (e) {}
-		return 100;
+		return (typeof window !== "undefined" && window.CSHBond && window.CSHBond.MAX) || 88000;
 	}
 	/* 通用：字符串键 → 数值（限量 + 钳制）。用于"id → 数字"类表。 */
 	function numMap(o, maxKeys, lo, hi, floorIt) {
@@ -862,6 +880,7 @@ import { lib, game } from "../../../noname.js";
 				giveN: clampNum(e.giveN, 0, 999999),
 				oath: isPastStamp(e.oath),            /* ★ v6.9：契约时间戳（导入导出必须带） */
 			};
+            if(e.giftTxn!=null){var checked=lib.cshWallet.validateAffectionState({[id]:e});rec.giftTxn=checked[id].giftTxn;}
 			var day = {}, dn = 0;
 			if (e.day && typeof e.day === "object") {
 				for (var j = 0; j < AFF_DAILY_KEYS.length; j++) {
@@ -872,6 +891,16 @@ import { lib, game } from "../../../noname.js";
 			if (dn) rec.day = day;
 			var cnt = numMap(e.cnt, 24, 0, 999999);
 			if (cnt) rec.cnt = cnt;
+			if (e.heard && typeof e.heard === "object" && !Array.isArray(e.heard)) {
+				var heard = {};
+				Object.keys(e.heard).slice(0,32).forEach(function(kind){
+					if(!/^[a-zA-Z0-9_]{1,32}$/.test(kind))return;
+					var val=e.heard[kind];
+					if(Array.isArray(val))heard[kind]=val.slice(0,512).filter(function(v){return (typeof v==="string"&&v.length<=80)||(Number.isSafeInteger(v)&&v>=0);});
+					else if(val===1||val===true)heard[kind]=1;
+				});
+				if(Object.keys(heard).length)rec.heard=heard;
+			}
 			out[id] = rec; n++;
 		}
 		return n ? out : null;
@@ -956,6 +985,7 @@ import { lib, game } from "../../../noname.js";
 				r: clampStr(e.r, 40), c: clampStr(e.c, 16),
 				b: clampNum(e.b, 0, PC_CAP()),
 				bossTx: typeof e.bossTx === "string" && /^[a-zA-Z0-9-]{8,120}$/.test(e.bossTx) ? e.bossTx : undefined,
+				checkpointTx: typeof e.checkpointTx === "string" && /^[a-zA-Z0-9-]{8,120}$/.test(e.checkpointTx) ? e.checkpointTx : undefined,
 			});
 		}
 		return out.length ? out : null;
@@ -1065,6 +1095,19 @@ import { lib, game } from "../../../noname.js";
 			} else {
 				body[k] = collectJSON(lsKey, strict);
 			}
+		}
+        return resolveCollectedBody(body);
+    }
+    function resolveCollectedBody(body){
+		/* Paid side-domain checkpoints beat stale compatibility keys. */
+        if(body.wallet&&body.wallet.dailyTaskSaved!=null)body.dailyTask=lib.cshWallet.validateTaskState(body.wallet.dailyTaskSaved);
+		if(body.wallet && body.wallet.affectionSaved != null) body.affection = lib.cshWallet.validateAffectionState(body.wallet.affectionSaved);
+		var checkpointPending=body.wallet && body.wallet.checkpointPending;
+		if(checkpointPending!=null)checkpointPending=lib.cshWallet.validateCheckpointLedger(checkpointPending);
+		if(Array.isArray(checkpointPending)){
+			var checkpointLedger=Array.isArray(body.ledger)?body.ledger.slice():[];
+			checkpointPending.forEach(function(e){if(e&&e.checkpointTx&&!checkpointLedger.some(function(r){return r&&r.checkpointTx===e.checkpointTx;}))checkpointLedger.unshift(e);});
+			body.ledger=checkpointLedger.sort(function(a,b){return b.t-a.t;});
 		}
 		/* 讨伐副本已在钱包中确认，ZIP清掉或异步未同步的config不能覆盖它。
 		   按原有三个域扁平化，旧行囊格式不增加重复展示的内部域。 */
@@ -1215,8 +1258,8 @@ import { lib, game } from "../../../noname.js";
 		}
 
 	}
-	async function applyAll(body, replaceMissing) {
-		var plan = { local: {}, config: [] };
+	function buildImportPlan(body, replaceMissing) {
+		var plan = { local: {csh_pending_results_v1:null}, config: [] };
 		for (var i = 0; i < KEY_DEFS.length; i++) {
 			var def = KEY_DEFS[i];
 			var k = def[0], lsKey = def[1], store = def[3];
@@ -1270,6 +1313,20 @@ import { lib, game } from "../../../noname.js";
 				plan.local[K_WALLET] = JSON.stringify(marketWallet);
 			}
 		}
+		/* Importing affection alone updates its wallet copy in the same journal;
+		   wallet-only imports retain the current unspecified affection domain. */
+		if(body.affection != null || replaceMissing || Object.prototype.hasOwnProperty.call(plan.local,K_WALLET)){
+			var affectionWalletText=Object.prototype.hasOwnProperty.call(plan.local,K_WALLET)?plan.local[K_WALLET]:localStorage.getItem(K_WALLET);
+			if(affectionWalletText!==null){
+				var affectionWallet=JSON.parse(affectionWalletText),previousWallet=collectJSON(K_WALLET,true),localAffection;
+				if(!affectionWallet||typeof affectionWallet!=="object"||Array.isArray(affectionWallet))throw Error("钱包格式异常，未覆盖好感存档");
+				if(body.affection!=null)localAffection=body.affection;
+				else if(!replaceMissing)localAffection=previousWallet&&previousWallet.affectionSaved!=null?lib.cshWallet.validateAffectionState(previousWallet.affectionSaved):collectJSON(K_AFFECTION,true);
+				if(localAffection!=null){affectionWallet.affectionSaved=copyValue(localAffection);plan.local[K_AFFECTION]=JSON.stringify(localAffection);}
+				else delete affectionWallet.affectionSaved;
+				delete affectionWallet._sig;plan.local[K_WALLET]=JSON.stringify(affectionWallet);
+			}
+		}
 		/* 讨伐域单独导入也同步钱包保全副本；钱包单独导入则保留本机未指定的
 		   讨伐域。所有新增钱包写入与原值一起进入commitPlan/journal。 */
 		if (replaceMissing || BOSS_SAVED_FIELDS.some(function (entry) { return body[entry[0]] != null; }) || Object.prototype.hasOwnProperty.call(plan.local, K_WALLET)) {
@@ -1291,19 +1348,26 @@ import { lib, game } from "../../../noname.js";
 				plan.local[K_WALLET] = JSON.stringify(bossWallet);
 			}
 		}
-		validateBossSelection(body,replaceMissing);
-		// A display-record-only import never reopens historical first-kill eligibility.
+		if(body.dailyTask!=null||replaceMissing||Object.prototype.hasOwnProperty.call(plan.local,K_WALLET)){
+            var text=Object.prototype.hasOwnProperty.call(plan.local,K_WALLET)?plan.local[K_WALLET]:localStorage.getItem(K_WALLET);
+            if(text){var nextWallet=JSON.parse(text),previous=collectJSON(K_WALLET,true),task=body.dailyTask!=null?cleanDailyTask(body.dailyTask):replaceMissing?null:previous&&previous.dailyTaskSaved||collectJSON(K_DAILY_TASK,true);
+                if(task)nextWallet.dailyTaskSaved=lib.cshWallet.validateTaskState(task);else delete nextWallet.dailyTaskSaved;delete nextWallet._sig;plan.local[K_WALLET]=JSON.stringify(nextWallet);}
+        }
+        validateBossSelection(body,replaceMissing);
+        // A display-record-only import never reopens historical first-kill eligibility.
 		if(!body.wallet&&body.bossKill&&Object.prototype.hasOwnProperty.call(plan.local,K_WALLET)&&plan.local[K_WALLET]){
 			var mergedWallet=JSON.parse(plan.local[K_WALLET]);
 			if(mergedWallet.bossRewards){Object.keys(body.bossKill.map||{}).forEach(function(id){if(/^csh_boss_[a-zA-Z0-9_]+$/.test(id)&&body.bossKill.map[id].n>0)mergedWallet.bossRewards.first[id]=true;});plan.local[K_WALLET]=JSON.stringify(mergedWallet);}
 		}
-		await commitPlan(plan);
+		return plan;
 	}
+    async function applyAll(body,replaceMissing){return commitPlan(buildImportPlan(body,replaceMissing));}
 
 	/* LS 多键与宿主 config 无法组成同一数据库事务。写前保存原始值（包括
 	   “不存在”），确认两边完成后才删除凭据；任何失败都恢复原值。恢复本身
 	   失败时留下凭据，下一次恢复先完成，禁止继续覆盖半套存档。 */
 	function flushForMigration() {
+        var Q=lib.cshWallet&&lib.cshWallet.pending;if(Q){var pending=Q.retry();if(pending.count||pending.error)throw Error("仍有待保存结果，请先在行囊恢复后再操作存档");}
 		if (lib.cshWallet && lib.cshWallet.flushSave && lib.cshWallet.flushSave({ migration: true }) === false) {
 			throw new Error("钱包尚未保存，请先恢复未完成操作或腾出存储空间后重试");
 		}
@@ -1410,8 +1474,9 @@ import { lib, game } from "../../../noname.js";
 		if (redemptionBusy()) {
 			return { ok: false, err: "兑换码正在验证，请完成后再操作存档" };
 		}
-		mutating = true;
-		try {
+		var Q=lib.cshWallet&&lib.cshWallet.pending;if(Q&&!recoveryState().pending){var state=Q.retry();if(state.count||state.error)return {ok:false,err:'仍有待保存结果，请先恢复后再更换存档'};}
+        mutating = true;
+        try {
 			await recoverPending();
 			if (marketBusy()) return { ok: false, err: "市场存档正在同步，请稍后重试" };
 			return await work();
@@ -1420,7 +1485,7 @@ import { lib, game } from "../../../noname.js";
 			try { pending = localStorage.getItem(K_RECOVERY) !== null; } catch (readError) {}
 			logMsg("存档操作失败：" + String(error && error.message || error));
 			return { ok: false, err: String(error && error.message || error), recovery: pending };
-		} finally { mutating = false; Promise.resolve().then(function(){var W=lib.cshWallet&&lib.cshWallet.wallet;if(W&&W.flushBossRewards)W.flushBossRewards();}); }
+		} finally { mutating = false; Promise.resolve().then(function(){var W=lib.cshWallet&&lib.cshWallet.wallet;if(W&&W.flushBossRewards)W.flushBossRewards();if(W&&W.flushCheckpoints)W.flushCheckpoints();}); }
 	}
 	function recover() {
 		return mutation(async function () { return { ok: true, recovered: true }; });
@@ -1484,7 +1549,7 @@ import { lib, game } from "../../../noname.js";
 		var clean = { meta: obj.meta };
 		for (var i = 0; i < KEY_DEFS.length; i++) {
 			var def = KEY_DEFS[i];
-			var cleaned = def[2](obj[def[0]]);
+			var cleaned; try { cleaned = def[2](obj[def[0]]); } catch (error) { return {ok:false,err:"存档内容无效（"+def[0]+"）："+String(error.message||error)}; }
 			if (cleaned !== null && cleaned !== undefined) clean[def[0]] = cleaned;
 		}
 		return { ok: true, meta: obj.meta, data: clean, summary: summaryOf(clean) };
@@ -1637,27 +1702,25 @@ import { lib, game } from "../../../noname.js";
 
 	/* 差异摘要（§J.4#5）—— v3 加了战绩/讨伐/羁绊三行，**只给"变了"的行**，
 	   免得确认框上列 28 行让人直接点确定。 */
-	function diffOf(clean) {
-		var cur = collect();
-		var cw = cleanWallet(cur.wallet) || { pc: 0 };
-		var cr = cleanRank(cur.rank) || { rank: 0, merit: 0 };
-		var out = {
-			pc: { from: cw.pc, to: clean.wallet ? clean.wallet.pc : cw.pc },
-			rank: { from: cr.rank, to: clean.rank ? clean.rank.rank : cr.rank },
-			merit: { from: cr.merit, to: clean.rank ? clean.rank.merit : cr.merit },
-		};
-		var curWr = wrTotals(cleanWinrate(cur.winrate));
-		var newWr = wrTotals(clean.winrate);
-		if (newWr.games !== curWr.games) out.matches = { from: curWr.games, to: newWr.games };
-		var curK = cleanFightMap((cleanBossKill(cur.bossKill) || {}).map, true);
-		var newK = cleanFightMap((clean.bossKill || {}).map, true);
-		var ckn = curK ? Object.keys(curK).length : 0, nkn = newK ? Object.keys(newK).length : 0;
-		if (nkn !== ckn) out.kills = { from: ckn, to: nkn };
-		var curG = cleanAffection(cur.affection), newG = clean.affection;
-		var cgn = curG ? Object.keys(curG).length : 0, ngn = newG ? Object.keys(newG).length : 0;
-		if (ngn !== cgn) out.girls = { from: cgn, to: ngn };
-		return out;
-	}
+	function diffOf(clean){
+        var cur=collect(),plan=buildImportPlan(clean,false),effective=copyValue(cur);
+        KEY_DEFS.forEach(function(def){var k=def[0],key=def[1],store=def[3];
+            if(store===3){var entry=plan.config.find(function(e){return e.key===key;});if(entry)effective[k]=entry.exists?copyValue(entry.value):null;}
+            else if(store===4){var group=Object.assign({},effective[k]||{}),touched=false;(GROUP_MEMBERS[k]||[]).forEach(function(m){if(Object.prototype.hasOwnProperty.call(plan.local,m[1])){touched=true;if(plan.local[m[1]]==null)delete group[m[0]];else group[m[0]]=plan.local[m[1]];}});if(touched)effective[k]=group;}
+            else if(store===2){var group=Object.assign({},effective[k]||{}),touched=false;Object.keys(plan.local).forEach(function(name){if(name===K_BGM_ON||name.indexOf(K_BGM_ON+'_')===0){touched=true;if(plan.local[name]==null)delete group[name];else group[name]=plan.local[name];}});if(touched)effective[k]=group;}
+            else if(Object.prototype.hasOwnProperty.call(plan.local,key))effective[k]=plan.local[key]==null?null:store===1?plan.local[key]:JSON.parse(plan.local[key]);
+        });
+        effective=resolveCollectedBody(effective);
+        var cw=cleanWallet(cur.wallet)||{pc:0},cr=cleanRank(cur.rank)||{rank:0,merit:0};
+        var out={pc:{from:cw.pc,to:clean.wallet?clean.wallet.pc:cw.pc},rank:{from:cr.rank,to:clean.rank?clean.rank.rank:cr.rank},merit:{from:cr.merit,to:clean.rank?clean.rank.merit:cr.merit},domains:[]};
+        if(clean.winrate!=null){var a=wrTotals(cleanWinrate(cur.winrate)),b=wrTotals(clean.winrate);if(a.games!==b.games)out.matches={from:a.games,to:b.games};}
+        if(clean.bossKill!=null){var a=Object.keys((cleanBossKill(cur.bossKill)||{}).map||{}).length,b=Object.keys(clean.bossKill.map||{}).length;if(a!==b)out.kills={from:a,to:b};}
+        if(clean.affection!=null){var a=Object.keys(cleanAffection(cur.affection)||{}).length,b=Object.keys(clean.affection||{}).length;if(a!==b)out.girls={from:a,to:b};}
+        function canonical(v){if(v==null)return null;if(Array.isArray(v))return v.map(canonical);if(typeof v==='object'){var x={};Object.keys(v).sort().forEach(function(k){x[k]=canonical(v[k]);});return x;}return v;}
+        function decreases(a,b,depth){if(depth>12)return false;if(typeof a==='number'&&a>0)return typeof b!=='number'||b<a;if(a&&typeof a==='object')return Object.keys(a).some(function(k){if(['t','last','first','time','day','_sig'].indexOf(k)>=0)return false;return b==null||!Object.prototype.hasOwnProperty.call(b,k)||decreases(a[k],b[k],depth+1);});return false;}
+        KEY_DEFS.forEach(function(def){var k=def[0],before=cur[k],next=effective[k],differs=JSON.stringify(canonical(before))!==JSON.stringify(canonical(next)),selected=clean[k]!=null||differs,action=selected?'replace':'keep';if(selected&&(k==='cdkUsed'||def[3]===2||def[3]===4))action='merge';
+            var changed=selected&&JSON.stringify(canonical(before))!==JSON.stringify(canonical(next));out.domains.push({key:k,action:action,changed:changed,mayDecrease:changed&&action!=='merge'&&decreases(before,next,0)});});return out;
+    }
 
 	/* 2026-09-29 修复（契约族实例 4）：
 	   此前 `CSH.wallet.integrity` 指向不存在的字段（当年 wallet 的 integrity 挂在 CSH 顶层，
@@ -1688,7 +1751,7 @@ import { lib, game } from "../../../noname.js";
 		if (!ins.ok) return ins;
 		try { validateBossSelection(ins.data,false); } catch(error) { return {ok:false,err:String(error.message||error)}; }
 		var diff = diffOf(ins.data);
-		if (opts.dryRun) return { ok: true, dryRun: true, diff: diff, summary: ins.summary };
+		if (opts.dryRun) return { ok: true, dryRun: true, meta:ins.meta, diff: diff, summary: ins.summary };
 		if (marketBusy()) return { ok: false, err: "市场存档正在同步，请稍后重试" };
 		return mutation(async function () {
 			var stamp = pushBackup();
@@ -1783,7 +1846,7 @@ import { lib, game } from "../../../noname.js";
 		   ============================================================ */
 		/* ① 好感度：值钳到 AFF_MAX · 非法 saw 清空 · 非法记录丢弃 */
 		var af = cleanAffection({
-			a: { v: 9999, last: Date.now() + 86400000 * 30, saw: "乱码", giveSum: -5, giveN: 1e9, day: { talk: "2026-01-01" }, cnt: { x: 3 } },
+			a: { v: affMax() + 9999, last: Date.now() + 86400000 * 30, saw: "乱码", giveSum: -5, giveN: 1e9, day: { talk: "2026-01-01" }, cnt: { x: 3 } },
 			b: "not-an-object",
 		});
 		ok("好感度：值钳到 AFF_MAX", af && af.a.v === affMax());
@@ -1848,7 +1911,7 @@ import { lib, game } from "../../../noname.js";
 			wallet: { pc: 1234 }, rank: { rank: 3, merit: 99 },
 			/* 真实形状：顶层是模式键，玩家自己那份在 me.chars */
 			winrate: { identity: { 甲: { games: 20, win: 12, lose: 8 } }, me: { chars: { 甲: { games: 4, win: 3, lose: 1 } } } },
-			affection: { g1: { v: 100 }, g2: { v: 0 } },
+			affection: { g1: { v: affMax() }, g2: { v: 0 } },
 			bossKill: { map: { m1: { n: 1 } }, minions: { a: { n: 2 }, b: { n: 1 } } },
 			goldfish: { hold: { x: 1 }, cost: { x: 20 } },
 			names: { netName: "甲乙" },

@@ -150,6 +150,52 @@
 	};
 
 	/* 旧名 → 新名（各游戏原来的短名，避免一次性改动过大出错；新代码请用点号名） */
+  /* 纸牌声音第二版：短纸张/木质瞬态，温和共振；关键事件保留独立音型。 */
+  Object.assign(RECIPES, {
+    'ui.tap':[N(.025,1800,.7,.045),T(420,'sine',.045,.035,0,310)],
+    'ui.warn':[T(440,'triangle',.10,.065),T(520,'sine',.12,.045,.13)],
+    'ui.error':[T(294,'triangle',.13,.065),T(220,'sine',.18,.055,.10)],
+    'card.deal':[N(.045,3500,.6,.08,0,1900,'highpass'),N(.035,1100,.7,.04,.028)],
+    'card.hit':[N(.045,3200,.7,.08),N(.04,1700,.8,.055,.045)],
+    'card.flip':[N(.06,2600,.7,.085,0,1300),T(210,'sine',.045,.025,.018)],
+    'card.play':[N(.04,1300,.8,.10),T(155,'sine',.065,.07,0,105)],
+    'card.draw':[N(.075,3000,.6,.075,0,1100,'highpass')],
+    'card.fold':[N(.08,1800,.6,.07,0,700),N(.04,900,.7,.035,.05)],
+    'card.pass':[T(240,'sine',.08,.045,0,180)],
+    'card.check':[N(.018,1100,1.4,.06),T(190,'sine',.05,.055,0,130)],
+    'card.raise':[N(.035,2300,2.4,.08),T(1250,'triangle',.08,.045),N(.035,2600,2.1,.065,.065),T(1580,'sine',.10,.035,.065)],
+    'chip.bet':[N(.03,2400,2.8,.08),T(1760,'sine',.075,.04),N(.025,2800,2.6,.065,.055),T(2200,'sine',.07,.035,.055)],
+    'bomb':[T(90,'sine',.30,.17,0,35),N(.28,850,.7,.15,0,120,'lowpass'),N(.10,2400,.8,.06,.02,700)],
+    'win':[T(523,'triangle',.16,.07),T(659,'sine',.20,.07,.10),T(784,'triangle',.22,.07,.20),T(1047,'sine',.42,.09,.30),N(.12,4200,.7,.025,.3)],
+    'lose':[T(330,'triangle',.18,.065),T(294,'sine',.23,.06,.15),T(220,'sine',.32,.055,.30)],
+    'uno':[T(660,'triangle',.10,.075),T(880,'triangle',.16,.075,.11)],
+    'uno.reverse':[T(480,'sine',.14,.065,0,760),T(760,'sine',.16,.055,.10,380)],
+    'uno.skip':[N(.03,1200,1,.07),T(360,'triangle',.07,.05,.04)],
+    'uno.draw':[N(.05,2200,.7,.08),N(.05,2500,.7,.07,.08),T(440,'sine',.12,.045,.10)],
+    'ddz.straight':[N(.10,1800,.8,.08,0,3400),T(440,'triangle',.10,.045),T(660,'triangle',.15,.05,.08)],
+    'ddz.plane':[N(.22,650,.8,.095,0,2200),T(180,'sine',.22,.07,0,420)],
+    'assist.on':[T(440,'triangle',.08,.045),T(660,'sine',.12,.045,.075)],
+    'assist.off':[T(660,'sine',.08,.045),T(440,'triangle',.12,.045,.075)],
+    'bust':[N(.10,900,.8,.07,0,240),T(196,'triangle',.15,.065),T(147,'sine',.22,.055,.12)],
+    'bj':[T(523,'triangle',.13,.07),T(784,'sine',.18,.075,.11),T(1047,'triangle',.32,.075,.22)],
+    'allin':[N(.28,350,1,.075,0,1900),T(165,'sine',.24,.075,0,330),T(990,'triangle',.18,.045,.20)],
+    'lord':[T(392,'triangle',.12,.065),T(523,'triangle',.14,.065,.12),T(659,'sine',.28,.075,.24)],
+    'quota':[T(330,'triangle',.12,.055),T(294,'sine',.18,.05,.12)],
+    'cap.warn':[T(294,'triangle',.12,.06),T(330,'sine',.14,.045,.15)],
+    'rank.seg':[N(.12,180,.8,.12),T(70,'sine',.16,.10),T(392,'triangle',.20,.07,.16),T(523,'triangle',.22,.07,.26),T(659,'sine',.24,.07,.36),T(784,'sine',.36,.08,.46)],
+    'ddz.rocket':[T(80,'sine',.32,.15,0,34),N(.32,900,.8,.14,0,100,'lowpass'),T(620,'triangle',.18,.055,.10,1100)]
+  });
+  var voices=[], recent=Object.create(null), MAX_VOICES=24;
+  function releaseVoice(v) {
+    try { v.source.stop(); } catch(e) {}
+    v.nodes.forEach(function(n){try{n.disconnect();}catch(e){}});
+  }
+  function trackVoice(source,nodes) {
+    while(voices.length>=MAX_VOICES)releaseVoice(voices.shift());
+    var v={source:source,nodes:nodes};voices.push(v);
+    source.onended=function(){var i=voices.indexOf(v);if(i>=0)voices.splice(i,1);nodes.forEach(function(n){try{n.disconnect();}catch(e){}});};
+  }
+  function stopAll() { var old=voices;voices=[];old.forEach(releaseVoice);recent=Object.create(null);if(wet)try{wet.gain.value=0;}catch(e){} }
 	var ALIAS = {
 		shot: "bow.fire", flight: "arrow.fly", body: "hit.body", head: "hit.head",
 		shield: "hit.shield", reload: "bow.nock", friendly: "friendly.hit",
@@ -194,7 +240,7 @@
 	function enabled() { return lsGet(swKey(), "1") !== "0"; }
 	function setEnabled(b) {
 		lsSet(swKey(), b ? "1" : "0");
-		if (b) unlock();
+		if (b) unlock(); else stopAll();
 		return !!b;
 	}
 	function volume() {
@@ -207,7 +253,7 @@
 		if (LEVELS.indexOf(v) < 0) v = DEFAULT_VOL;
 		lsSet(K_VOL, String(v));
 		applyGain();
-		if (v > 0) setEnabled(true);
+		if (v > 0) setEnabled(true); else stopAll();
 		return v;
 	}
 	/* 组合档（各游戏设置面板只暴露这一个）：0 = 关，30/60/100 = 低/中/高 */
@@ -226,7 +272,7 @@
 
 	function applyGain() {
 		if (!master) return;
-		try { master.gain.value = (volume() / 100) * MASTER_K; } catch (e) {}
+		try { master.gain.value = (volume() / 100) * MASTER_K; if(wet)wet.gain.value=enabled()&&volume()>0?.12:0; } catch (e) {}
 	}
 
 	/** 程序生成脉冲响应（噪声 × 指数衰减），供卷积混响使用 —— 不加载任何音频文件。
@@ -325,6 +371,7 @@
 			if (f1) o.frequency.exponentialRampToValueAtTime(Math.max(20, f1), t0 + L.dur);
 			envOf(g, t0, L.dur, peak);
 			o.connect(g); g.connect(master);
+			trackVoice(o,[o,g]);
 			o.start(t0); o.stop(t0 + L.dur + 0.02);
 			return;
 		}
@@ -340,6 +387,7 @@
 		if (L.hz1) f.frequency.exponentialRampToValueAtTime(Math.max(20, L.hz1 * mul), t0 + L.dur);
 		var g2 = c.createGain(); envOf(g2, t0, L.dur, peak);
 		s.connect(f); f.connect(g2); g2.connect(master);
+		trackVoice(s,[s,f,g2]);
 		s.start(t0); s.stop(t0 + L.dur + 0.02);
 	}
 
@@ -359,7 +407,7 @@
 	function has(name) { return !!resolveName(name, null) || !!ALIAS[name]; }
 	/* 总开关关闭 / 音量 0 时直接 return，不建 AudioContext（附录 C 实现约定） */
 	function play(name, opt) {
-		if (!enabled()) return false;
+		if (!enabled() || (root.document && root.document.hidden)) return false;
 		if (volume() === 0) return false;
 		var key = resolveName(name, opt);
 		if (!key) { lastError = "unknown:" + name; return false; }
@@ -369,9 +417,14 @@
 		if (!c) return false;
 		if (c.state === "suspended") { try { c.resume(); } catch (e) {} }
 		if (c.state !== "running") return false;   // 未解锁先静默，不做伪播放
+    var gap = key==='ui.tap'? .035 : key==='win'||key==='lose'? .30 : key.indexOf('card.')===0||key==='chip.bet'? .025 : .015;
+    if(recent[key]!=null && c.currentTime-recent[key]<gap)return false;
+    recent[key]=c.currentTime;
+    applyGain();
 		var o = opt || {};
 		var vol = o.vol == null ? 1 : Math.max(0, Math.min(2, Number(o.vol) || 0));
-		var t0 = c.currentTime + (o.delay || 0) + 0.002;
+		var delay = Math.max(0, Math.min(2, Number(o.delay) || 0));
+		var t0 = c.currentTime + delay + 0.002;
 		var n = Math.max(0, Math.floor(Number(o.n) || 0));
 		var cnt = Math.min(layers.length, MAX_LAYERS);
 		for (var i = 0; i < cnt; i++) {
@@ -395,6 +448,8 @@
 			return { game: cfg.game, key: swKey() };
 		},
 		play: play,
+    stop: stopAll,
+    activeVoices: function(){return voices.length;},
 		unlock: unlock,
 		enabled: enabled,
 		setEnabled: setEnabled,
@@ -426,6 +481,8 @@
 		var o = {
 			init: function () { return { game: "", key: "" }; },
 			play: function () { return false; },
+      stop: function () {},
+      activeVoices: function () { return 0; },
 			unlock: function () { return false; },
 			enabled: function () { return false; },
 			setEnabled: function () { return false; },
@@ -449,6 +506,8 @@
 		return o;
 	}
 
+  if(root.addEventListener)root.addEventListener('pagehide',stopAll);
+  if(root.document&&root.document.addEventListener)root.document.addEventListener('visibilitychange',function(){if(root.document.hidden)stopAll();});
 	root.CSH_SFX = bus;
 	root.CSH_SFX_SANDBOX = function () { return root.CSH_SFX || noop(); };
 	root.CSH_SFX_LEVELS = LEVELS.slice();

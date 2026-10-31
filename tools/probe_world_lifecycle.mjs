@@ -22,7 +22,7 @@ function harness(key='uno'){
   const noop=()=>{},shellWallet={flushSave:noop,saveEpoch:()=>0};
   Object.assign(ctx,{ackToGame:(name,ok,d)=>acks.push({name,ok,data:d}),logError:(m,e)=>errors.push(m+(e?' '+e.message:'')),logInfo:noop,paintTop:noop,paintPc:noop,cshTableAward:noop,selfCloseAfterSettle:noop,
     cancelSelfClose:noop,removeLeave:noop,ensureStyle:noop,bindMessage:noop,bindEsc:noop,bindVisibility:noop,setTitle:noop,checkOrientation:noop,urlOf:k=>k+'.html',docHost:()=>doc.documentElement,
-    ensureChrome(){const fr={src:'',contentWindow:{}};const ov={parentNode:{removeChild(){nodes.clear();}}};nodes.set('csh-shell-frame',fr);nodes.set('csh-shell-overlay',ov);return ov;},
+    ensureChrome(){const fr={src:'',contentWindow:{}};const attrs=new Map();const ov={setAttribute(k,v){attrs.set(k,String(v));},getAttribute:k=>attrs.get(k)??null,parentNode:{removeChild(){nodes.clear();}}};nodes.set('csh-shell-frame',fr);nodes.set('csh-shell-overlay',ov);return ov;},
     wallet:()=>shellWallet,emit:noop,
     settle(k,d){ctx.cashCalls++;const profit=d.chips-d.buyIn;return {profit,credited:profit>=0?d.buyIn+Math.floor(profit*.9):d.chips,rate:.9,...ctx.cashOverride};}});
   vm.runInContext(`var current=null,currentBuyIn=0,paused=false,pausedAuto=false,enteredAt=0,tickTimer=0,pausedAt=0,totalPaused=0,CUR_REQ=null;
@@ -91,8 +91,8 @@ function unoHarness(h,deferred=false){
     }
   });
   const pending=[],calls=[];
-  const T={active:true,onCloseSelf(){},settle(){},isSettled:()=>false,call(cmd,d,cb){calls.push({cmd,d});const ack=h.send(cmd,d);if(cb){if(deferred)pending.push(()=>cb(ack.ok,ack.data));else cb(ack.ok,ack.data);}}};
-  const ctx=vm.createContext({CSHPage:{transport:()=>T},COLORS:['red','yellow','green','blue'],Math,Bridge:null,sfx:{deal(){}},view:null,botSeats:[],alive:true,room:null,myHand:[],youIdx:-1,botCount:2,
+  const T={active:true,onCloseSelf(){},settle(cmd,data,cb){calls.push({cmd,d:data});if(cb)cb(true,{ok:true});},isSettled:()=>false,call(cmd,d,cb){calls.push({cmd,d});const ack=h.send(cmd,d);if(cb){if(deferred)pending.push(()=>cb(ack.ok,ack.data));else cb(ack.ok,ack.data);}}};
+  const ctx=vm.createContext({CSHPage:{transport:()=>T},COLORS:['red','yellow','green','blue'],Math,Bridge:null,sfx:{deal(){}},view:null,botSeats:[],alive:true,closePending:false,room:null,myHand:[],youIdx:-1,botCount:2,
     window:{parent:{postMessage:d=>h.send(d.__csh,d)}},LocalNet:{},lsSet(){return true;},$:()=>({value:'玩家'}),toast(){},clearAllTimers(){},quipGreet(){}});
   for(const s of snippets)vm.runInContext(s,ctx);
   Object.assign(ctx.Room.prototype,{giveCards(p,n){p.hand=Array(n).fill({color:'red',value:'1',id:1});},pushLog(){},scheduleBot(){},addPlayer(name){this.players.push({name,hand:[],id:'local-me'});return {};},addBot(s){this.players.push({name:s.name,hand:[],id:s.id});},destroy(){},broadcastState(){},canPlay(){return true;}});

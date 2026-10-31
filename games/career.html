@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-csh-palette="chrome">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
@@ -8,6 +8,7 @@
      data-csh-selftest="auto" 表示「本页是独立文档，DOM 就绪后自动扫 document.body」。 -->
 <script src="../core/csh_selftest.js" data-csh-selftest="auto"></script>
 <script src="../core/csh_page.js"></script>
+<script src="../core/csh_goals.js"></script>
 <script src="../core/csh_achv.js"></script>
 <style>
 /* 生涯大厅（§4.1.6 / §G.7 / §J.5）：零外部资源 / 不用 vw·vh */
@@ -514,8 +515,57 @@ button:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid
 @media(max-height:440px) and (min-width:481px){#app{flex-direction:row}#tabs{display:flex;flex-direction:column;flex-basis:120px;padding:8px 0;overflow-y:auto}.tab{min-height:46px;padding:8px 12px}#body{padding-top:48px}.world-tools{margin-bottom:8px}}
 </style>
 <link rel="stylesheet" href="../core/csh_experience.css">
+<style id="career-layout-repair">
+body{--fs-card-title:16px;--fs-control:14px;--fs-label:13px;--fs-subtitle:18px;--fs-base:13.5px;--text:#F0F1E9;--text-dim:#C0C8C2}
+#tabs{flex-basis:112px;padding:12px 0;overflow-y:auto;overscroll-behavior:contain;background:linear-gradient(150deg,var(--ink-1),var(--ink-0));border-color:var(--gold-line)}
+#tabs .tab{min-height:48px;padding:10px 12px;gap:3px;font-size:var(--fs-control);font-family:var(--ff-body);line-height:1.4;letter-spacing:0;transform:none}
+#tabs .tab .tm{font-size:var(--fs-tiny);opacity:1;color:var(--text-dim)}
+#tabs .tab.on{background:var(--gold-fill);color:var(--gold-hi)}
+#app.career-collection #body{padding:10px 16px 16px}
+#p-ach{max-width:1440px;margin-inline:auto}
+#p-ach .ach-header{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:44px;margin:0 0 8px;padding-right:var(--csh-dock-safe,68px)}
+#p-ach .ach-header>div{min-width:0;flex:1 1 auto}
+#p-ach .ach-header h3{margin:0;padding:0;border:0;font-size:var(--fs-subtitle);line-height:1.4;color:var(--text);white-space:nowrap}
+#p-ach #ach-summary{margin:8px 0 0;padding:0;border:0;background:none;font-size:var(--fs-label);line-height:1.5;color:var(--text-dim)}
+#p-ach #ach-claim-all{position:static;width:auto;max-width:210px;margin:0;min-height:44px;padding:6px 12px;font-size:var(--fs-label);line-height:1.4;flex:0 1 auto;white-space:normal}
+#p-ach .ach-controls{display:grid;grid-template-columns:minmax(120px,1fr) minmax(100px,128px) auto;align-items:center;gap:8px;margin:0 0 4px}
+#p-ach .ach-controls label{min-width:0;font-size:var(--fs-label);display:block}
+#p-ach .ach-controls input,#p-ach .ach-controls select{width:100%;min-height:44px;padding:7px 9px;font-size:var(--fs-control);color:var(--text)}
+#p-ach .ach-controls label>span{position:absolute;width:1px;height:1px;padding:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+#ach-refinements{padding:12px;margin:8px 0;background:var(--ink-1);border:1px solid var(--gold-line);border-radius:10px}
+#ach-refinements[hidden]{display:none}
+.ach-options-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.ach-options-row label{display:flex;align-items:center;gap:8px}
+.ach-options-row select{min-height:44px;background:var(--ink-1);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:7px;font:inherit}
+#p-ach .catchips{gap:6px;flex-wrap:wrap;margin:10px 0 0}#p-ach .catchips .chip{font-size:var(--fs-label);line-height:1.4;min-height:44px;padding:6px 12px}
+#p-ach #ach-results{margin:0 0 8px;padding:0;background:none;border:0;font-size:var(--fs-cap);line-height:1.4;color:var(--text-dim)}
+#p-ach .ach{padding:14px;border-radius:12px;background:linear-gradient(140deg,var(--ink-2),var(--ink-1));background-color:var(--ink-1);border:1px solid var(--line);box-shadow:inset 0 1px rgba(255,255,255,.04)}
+#p-ach .ach.on{border-color:var(--gold-line);background:linear-gradient(145deg,var(--gold-fill),var(--ink-1));background-color:var(--ink-1)}
+#p-ach .ach .adetail{display:flex;align-items:center;gap:10px;min-height:44px;text-align:left}
+#p-ach .ach .ico{display:grid;place-items:center;flex:0 0 40px;height:40px;border-radius:10px;border:1px solid var(--gold-line);background:var(--ink-0);font-size:var(--fs-icon)}
+#p-ach .ach .adetail strong{font-size:var(--fs-card-title);line-height:1.5}
+#p-ach .ach .adesc{font-size:var(--fs-control);line-height:1.6;color:var(--text-dim)}
+#p-ach .ach .alab{font-size:var(--fs-label);line-height:1.5}
+#p-ach .agrid{grid-template-columns:repeat(auto-fill,minmax(min(100%,260px),1fr));gap:12px}
+@media(max-height:500px){#tabs{flex-basis:104px;padding:8px 0}#tabs .tab{min-height:44px;padding:8px 9px}#tabs .tab::before{display:none}#app.career-collection #body{padding:8px 12px 12px}#p-ach .ach-header{margin-bottom:6px;gap:8px}#p-ach .ach-header h3{font-size:var(--fs-lead)}#p-ach .ach-controls{gap:6px}#p-ach .ach{padding:12px}#p-ach .agrid{grid-template-columns:repeat(auto-fill,minmax(min(100%,232px),1fr));gap:10px}}
+@media(max-width:600px) and (min-height:441px){#tabs{flex-basis:auto;padding:calc(52px + env(safe-area-inset-top,0px)) 6px 8px;overflow:visible}#app.career-collection #body{padding:8px 12px 12px}#p-ach .ach-header{padding-right:0}#p-ach #ach-claim-all{max-width:180px}#p-ach .ach-controls{grid-template-columns:minmax(0,1fr) auto}#p-ach .ach-search{grid-column:1/-1}}
+
+#p-ach .ach-header>div{display:flex;align-items:center;gap:8px}
+#career-nav-toggle{display:none;min-height:44px;padding:6px 10px;font:inherit;color:var(--text);background:var(--ink-1);border:1px solid var(--line);border-radius:8px;cursor:pointer;flex:none}
+#p-ach:not(.has-ach-filter) #ach-results{position:absolute;width:1px;height:1px;padding:0;margin:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+@media(max-width:1000px) and (max-height:600px),(max-width:600px){
+ #app.career-collection #career-nav-toggle{display:inline-flex;align-items:center;justify-content:center}
+ #app.career-collection #tabs{display:none;flex-direction:row}
+ #app.career-collection #body{width:100%;padding:8px 12px 12px}
+ #app.career-collection.career-nav-open #tabs{position:absolute;display:flex;flex-direction:column;left:0;top:0;bottom:0;width:180px;max-width:75%;z-index:10;padding:10px 0;overflow-y:auto;background:var(--ink-1);border-right:1px solid var(--gold-line);box-shadow:12px 0 32px #0007}
+ #app.career-collection.career-nav-open #tabs .tab{flex:none}
+}
+@media(max-width:480px){#app.career-collection .ach-header{flex-wrap:wrap;padding-right:0}#app.career-collection .ach-header>div{flex-basis:100%;min-height:44px;padding-right:56px}#app.career-collection #ach-claim-all{margin-left:auto}}
+</style>
+
+<link rel="stylesheet" href="../core/csh_journal.css">
 </head>
-<body class="csh-experience">
+<body class="csh-experience" data-csh-journal="career">
 <div id="app">
   <div id="tabs">
     <button class="tab on" data-p="overview">总览<i class="tm" id="tm-overview"></i></button>
@@ -525,6 +575,7 @@ button:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid
     <button class="tab" data-p="rank">官阶<i class="tm" id="tm-rank"></i></button>
     <button class="tab" data-p="board">世界与牌友<i class="tm" id="tm-board"></i></button>
   </div>
+  <div class="career-workspace"><header id="career-top" class="journal-header"><button id="career-nav-toggle" type="button" aria-expanded="false" aria-controls="tabs">栏目</button><h1 id="career-page-title">生涯总览</h1><h3 id="ach-title">成就墙</h3><button class="btn" id="ach-claim-all" type="button" disabled>一键领取</button></header>
   <div id="body">
     <!-- 总览（2026-10-03 · 双栏化）
          宽屏（≥900px）左右两栏，一屏看完，不再上下滑：
@@ -550,32 +601,34 @@ button:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid
                2026-10-15 二次修：**不再当账本入口**（左侧导航已有「账本」页签），
                并且把「数字 / 单位」改成上下两行 —— 原来挤在一行，长时间到七位数时
                数字会盖住「池子币 CBY · 查账 ›」那行小字（作者实机截图）。 -->
-          <div class="pc-big"><span id="ov-pc-big">—</span><small>池子币 CBY</small></div>
+
         </div>
+          <div class="pc-big"><span id="ov-pc-big">—</span><small>池子币 CBY</small></div>
       </div>
 
-      <div class="ov-col">
+      <div class="ov-col ov-status">
 
-        <div class="sect"><h3>资产</h3>
+        <div class="sect ov-assets"><h3>长期积累</h3>
           <div class="wallet">
             <div class="wl"><div class="k">连签</div><div class="v" id="ov-streak">0</div></div>
             <div class="wl"><div class="k">生涯峰值</div><div class="v" id="ov-peak">0</div></div>
           </div>
         </div>
 
-        <div class="sect"><h3>今日</h3>
+        <div class="sect ov-today"><h3>今日补给</h3>
           <div class="card">
-            <div class="diffbox" id="ov-today">状态载入中…</div>
             <div class="btnrow">
               <button class="btn" id="ov-sign">签到领补给</button>
               <button class="btn ghost" id="ov-relief">领取救济</button>
             </div>
+            <div class="diffbox" id="ov-today">状态载入中…</div><details class="journal-context"><summary>辅助对局记录</summary><div class="diffbox" id="aux-summary"></div></details>
+
           </div>
         </div>
       </div>
 
       <div class="ov-col">
-        <div class="sect"><h3>今日任务 · 五游戏共用</h3>
+        <div class="sect"><h3>今日任务 · 牌桌共用</h3>
           <div class="tasks" id="ov-tasks"></div>
           <div class="diffbox" id="ov-tasks-note">与各游戏内看到的是同一份进度。</div>
         </div>
@@ -630,16 +683,18 @@ button:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid
 
     <!-- 成就 -->
     <div class="page" id="p-ach">
-      <div class="sect"><h3 id="ach-title">成就墙</h3>
-        <button class="btn" id="ach-claim-all" type="button" disabled>一键领取</button>
-        <div class="diffbox" id="ach-summary">成就统计载入中…</div>
+      <div class="sect">
         <div class="ach-controls">
-          <label class="ach-search">查找<input id="ach-search" type="search" placeholder="名称、条件或分类" aria-label="查找成就"></label>
-          <label>状态<select id="ach-state"><option value="all">全部状态</option><option value="ready">可领取</option><option value="todo">未完成</option><option value="claimed">已领取</option></select></label>
-          <label>排序<select id="ach-sort"><option value="near">推荐目标</option><option value="catalog">图鉴顺序</option></select></label>
-          <button class="btn ghost" id="ach-reset" type="button">重置筛选</button>
+          <label class="ach-search"><span>查找成就</span><input id="ach-search" type="search" placeholder="搜索名称、条件或分类" aria-label="查找成就"></label>
+          <label><span>成就状态</span><select id="ach-state"><option value="all">全部状态</option><option value="ready">可领取</option><option value="todo">未完成</option><option value="near">近期目标</option><option value="claimed">已领取</option></select></label>
+          <button class="btn ghost" id="ach-filters-toggle" type="button" aria-expanded="false" aria-controls="ach-refinements">筛选与追踪</button>
         </div>
-        <div class="catchips" id="ach-cats"></div>
+        <div id="ach-refinements" hidden>
+          <div class="ach-options-row"><label>排序<select id="ach-sort"><option value="near">推荐目标</option><option value="catalog">图鉴顺序</option><option value="recent">最近记录</option></select></label><button class="btn ghost" id="ach-reset" type="button">重置筛选</button><button class="btn ghost" id="ach-feedback-history" type="button">成就反馈记录</button></div>
+          <div class="catchips" id="ach-cats"></div>
+          <div class="diffbox" id="ach-summary">成就统计载入中…</div>
+          <section id="career-goal-bar" aria-label="正在追踪的生涯目标"></section>
+        </div>
         <div class="diffbox" id="ach-results" role="status" aria-live="polite"></div>
         <div class="agrid" id="ach-grid"></div>
         <div class="diffbox" id="ach-empty" hidden>没有符合条件的成就，试试其他关键词或重置筛选。</div>
@@ -693,6 +748,8 @@ button:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid
 </div>
     </div>
   </div>
+</div>
+
 </div>
 
 <div id="modal" role="dialog" aria-modal="true" aria-labelledby="md-name"><div class="mbox">
@@ -829,6 +886,9 @@ function bindTabs() {
       var pages = document.querySelectorAll(".page");
       for (var k = 0; k < pages.length; k++) pages[k].className = "page";
       $("#p-" + p).className = "page on";
+      $("#app").classList.toggle("career-collection",p === "ach");
+      $("#career-page-title").textContent=({overview:"生涯总览",ledger:"收支账本",tasks:"每日任务",ach:"生涯成就",rank:"官阶图鉴",board:"世界与牌友"})[p]||"生涯";
+      $("#app").classList.remove("career-nav-open");$("#career-nav-toggle").setAttribute("aria-expanded","false");if(p==="ach"&&$("#career-nav-toggle").getClientRects().length)$("#career-nav-toggle").focus({preventScroll:true});
       $("#body").scrollTop = 0;
       for (var n = 0; n < all.length; n++) all[n].setAttribute("aria-pressed", all[n] === this ? "true" : "false");
       if (p === "board") refreshWorld();
@@ -1053,6 +1113,7 @@ function renderOverview() {
      · 「当前段「中垒」加成：…」→「加成：…」（段名已在页签数据槽与本卡段标显示）
      · 数据保留位数不变。 */
 function renderToday() {
+  var aux=document.getElementById("aux-summary"),record=State.snap&&State.snap.assisted;if(aux)aux.textContent=record?"辅助身份场 "+fmt(record.wins)+" 胜 "+fmt(record.losses)+" 负 · 独立统计，无普通奖励":"辅助战绩暂不可读取";
   var s = State.snap || {};
   var box = $("#ov-today");
   if (!box) return;
@@ -1204,7 +1265,7 @@ function loadTasks() {
 var achCat = "全部";           /* 当前筛选分类 */
 var achRows = [];              /* 最近一次 evalAll 结果 */
 var achQuery = "", achState = "all", achSort = "near", achLimit = 60, achRequest = 0;
-var achPending = Object.create(null);
+var achPending = Object.create(null), achSyncMessage = "", achRecommendationsReliable = false;
 /* 本地兜底统计（仅在快照尚未到达时使用；权威版本由宿主 shell-stats 聚合）。
    全部取自真实快照字段，不含任何占位值。 */
 function achStats() {
@@ -1232,21 +1293,22 @@ function renderAch() {
   if (!box) return;
   if (!AC) { box.innerHTML = ""; $("#ach-summary").textContent = "成就引擎未加载（core/csh_achv.js）"; return; }
   var request = ++achRequest;
-  var paint = function (rows) {
+  var paint = function (rows, reliable) {
     if (request !== achRequest) return; /* 迟到的旧快照不得覆盖新结果 */
+    achRecommendationsReliable=reliable===true;
     achRows = rows;
     var done = 0, claimedN = 0, claimable = 0;
     for (var i = 0; i < rows.length; i++) {
-      if (rows[i].done) done++;
+      if (rows[i].done || rows[i].claimed) done++;
       if (rows[i].claimed) claimedN++;
       if (rows[i].done && !rows[i].claimed) claimable++;
     }
-    $("#ach-title").textContent = "成就墙 · " + rows.length + " 枚";
+    $("#ach-title").textContent = rows.length + " 枚";
     $("#ach-summary").innerHTML = "已达成 <b>" + done + "</b> / " + rows.length +
       " · 已领取 <b>" + claimedN + "</b>" +
       (claimable ? " · <b style='color:var(--gold-hi)'>" + claimable + " 枚可领取</b>" : "");
     var total=rows.filter(function(r){return r.done&&!r.claimed;}).reduce(function(n,r){return n+r.reward;},0),allBtn=$("#ach-claim-all");
-    allBtn.disabled=!!window.__careerClaimAllBusy||!claimable;allBtn.textContent=window.__careerClaimAllBusy?"领取中…":"一键领取"+(claimable?" · "+claimable+"枚 / +"+fmt(total):"");
+    allBtn.disabled=!!window.__careerClaimAllBusy||!claimable;allBtn.textContent=window.__careerClaimAllBusy?"领取中…":"领取"+(claimable?" "+claimable+" 项 · +"+fmt(total):"全部");
     var tmA = document.querySelector("#tm-ach"); if (tmA) tmA.textContent = done + "/" + rows.length;
     /* 分类条 */
     var cats = { "全部": 1 };
@@ -1277,30 +1339,58 @@ function renderAch() {
     paint(AC.evalAll(achStats()));
     return;
   }
-  Bridge.call("shell-stats", null, function (ok3, st3) {
-    paint(AC.evalAll(ok3 && st3 ? st3 : achStats()));
+  Bridge.call("shell-career-sync", null, function (ok3, result) {
+    function status(reason) {
+      if(request!==achRequest)return;
+      var note=$("#ach-note");
+      if(reason){achSyncMessage=reason;note.textContent=reason;}
+      else {if(note.textContent===achSyncMessage)note.textContent="";achSyncMessage="";}
+    }
+    if(request!==achRequest)return;
+    if(result&&result.stats){paint(AC.evalAll(result.stats),result.stats.careerStatsReliable===true);status(ok3?"":result.reason||"生涯达成记录暂未更新");return;}
+    /* A refused write must not replace confirmed history with incomplete local stats. */
+    Bridge.call("shell-stats", null, function (readOK, stats) {
+      if(request!==achRequest)return;
+      if(readOK&&stats)paint(AC.evalAll(stats),stats.careerStatsReliable===true);
+      else {achRows=[];box.textContent="未能读取生涯达成记录，请刷新后重试。";$("#ach-claim-all").disabled=true;}
+      status(result&&result.reason||"生涯达成记录暂未更新，请刷新后重试");
+    });
   });
 }
 /* 筛选和展开仅消费最近快照，不因输入关键词重拉宿主或改成就定义。 */
 function paintAchGrid() {
+  var filterToggle=document.getElementById("ach-filters-toggle");if(filterToggle)filterToggle.textContent="筛选与追踪"+(window.CSHGoals&&CSHGoals.list("career").length?" · "+CSHGoals.list("career").length:"");
+  if(window.CSHGoals){var targetBox=document.getElementById("career-goal-bar");if(!targetBox){targetBox=document.createElement("section");targetBox.id="career-goal-bar";targetBox.setAttribute("aria-label","正在追踪的生涯目标");var filters=document.querySelector("#p-ach .ach-controls");filters.parentNode.insertBefore(targetBox,filters);}CSHGoals.paint(targetBox,"career",achRows.map(function(r){return {id:r.key,label:r.label,description:r.desc,current:r.done?r.goal:r.cur,target:r.goal,done:r.done,claimed:r.claimed};}),paintAchGrid);}
+
   var query = achQuery.trim().toLocaleLowerCase();
   var rows = achRows.filter(function (r) {
     return (achCat === "全部" || r.cat === achCat) &&
       (!query || (r.label + " " + r.desc + " " + r.cat).toLocaleLowerCase().indexOf(query) >= 0) &&
       (achState === "all" || (achState === "ready" && r.done && !r.claimed) ||
-        (achState === "todo" && !r.done && !r.claimed) || (achState === "claimed" && r.claimed));
+        ((achState === "todo" || achState === "near") && !r.done && !r.claimed) || (achState === "claimed" && r.claimed));
   });
+  var pins=window.CSHGoals?CSHGoals.list("career"):[],recommended=window.CSHGoals&&CSHGoals.recommend?CSHGoals.recommend(rows,pins,achRecommendationsReliable):[];
+  var nextRank=Object.create(null);recommended.forEach(function(r,index){nextRank[r.key]=index;});
+  if(achState==="near")rows=recommended.slice();
+  var catalogOrder=Object.create(null);achRows.forEach(function(row,index){catalogOrder[row.key]=index;});
   if (achSort === "near") {
     rows.sort(function (a, b) {
       var group = function (r) { return r.claimed ? 2 : r.done ? 0 : 1; };
-      return group(a) - group(b) ||
+      var rank=function(r){return Object.prototype.hasOwnProperty.call(nextRank,r.key)?nextRank[r.key]:3;};
+      return group(a) - group(b) || rank(a)-rank(b) ||
         ((a.done || a.claimed) ? 0 : (b.cur / b.goal - a.cur / a.goal)) ||
-        achRows.indexOf(a) - achRows.indexOf(b);
+        catalogOrder[a.key] - catalogOrder[b.key];
     });
   }
+  if (achSort === "recent") {
+    var recordGroup=function(r){return r.recorded&&r.observedAt>0?0:r.recorded||r.claimed?1:2;};
+    rows.sort(function(a,b){return recordGroup(a)-recordGroup(b)||(recordGroup(a)===0?b.observedAt-a.observedAt:0)||catalogOrder[a.key]-catalogOrder[b.key];});
+  }
+  $("#p-ach").classList.toggle("has-ach-filter",achCat!=="全部"||!!String(achQuery).trim()||achState!=="all");
   var box = $("#ach-grid"), count = Math.min(rows.length, achLimit);
   box.innerHTML = "";
-  $("#ach-results").textContent = "匹配 " + rows.length + " 枚 · 已显示 " + count + " 枚 / 全部 " + achRows.length + " 枚";
+  $("#ach-empty").textContent=achState==="near"?(achRecommendationsReliable?"暂无符合筛选的进行中目标；可追踪感兴趣的成就，或游玩后刷新。":"生涯统计尚未完整读取，暂不推荐目标。请刷新后重试。") : "没有符合条件的成就，试试其他关键词或重置筛选。";
+  $("#ach-results").textContent = (achState==="near"?"近期目标 · ":"")+"匹配 " + rows.length + " 枚 · 已显示 " + count + " 枚 / 全部 " + achRows.length + " 枚";
   $("#ach-empty").hidden = rows.length > 0;
   var more = $("#ach-more"); more.hidden = count >= rows.length;
   more.textContent = "继续查看 · 还有 " + (rows.length - count) + " 枚";
@@ -1313,10 +1403,18 @@ function paintAchGrid() {
       detail.appendChild(el("strong", "", r.label)); c.appendChild(detail);
       c.appendChild(el("div", "adesc", r.desc));
       var bar = el("div", "abar"), fill = el("i");
-      fill.style.width = Math.max(0, Math.min(100, Math.round((r.cur / r.goal) * 100))) + "%";
+      fill.style.width = (r.done ? 100 : Math.max(0, Math.min(100, Math.round((r.cur / r.goal) * 100)))) + "%";
       bar.setAttribute("aria-hidden", "true"); bar.appendChild(fill); c.appendChild(bar);
-      c.appendChild(el("div", "alab", (r.claimed ? "已领取" : r.done ? "可领取" : achProgress(r.cur) + " / " + achProgress(r.goal)) +
+      c.appendChild(el("div", "alab", (r.claimed ? "已领取" : r.done ? "可领取" : achProgress(r.cur,r.goal) + " / " + achProgress(r.goal)) +
         " · +" + fmt(r.reward) + " CBY" + (r.retired ? " · 绝版" : "")));
+      if((achSort==="near"||achState==="near")&&Object.prototype.hasOwnProperty.call(nextRank,r.key)){
+        var reason=pins.indexOf(r.key)>=0?"正在追踪":r.cat+"进展";
+        c.appendChild(el("div","alab ach-recommendation",reason+" · 还差 "+achRemaining(r.cur,r.goal)) );
+      }
+      if (achSort === "recent" && (r.recorded || r.claimed)) {
+        var recordTime=r.recorded&&r.observedAt>0?new Date(r.observedAt):null;
+        c.appendChild(el("div", "alab ach-record-time", recordTime?"首次记录 "+recordTime.toLocaleDateString()+" "+recordTime.toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}):"历史达成 · 时间未记录"));
+      }
       if (r.done || r.claimed) {
         var btn = el("button", "aclaim" + (r.claimed ? " got" : ""), r.claimed ? "已领取" : achPending[r.key] ? "领取中…" : "领取 +" + fmt(r.reward));
         btn.type = "button"; btn.disabled = r.claimed || !!achPending[r.key];
@@ -1337,14 +1435,23 @@ function paintAchGrid() {
       }
       detail.addEventListener("click", function () {
         $("#ach-note").textContent = r.label + "（" + r.cat + "）：" + r.desc + " · 奖励 +" + fmt(r.reward) +
-          " CBY · " + (r.claimed ? "已领取" : r.done ? "可领取" : "进度 " + achProgress(r.cur) + " / " + achProgress(r.goal));
+          " CBY · " + (r.claimed ? "已领取" : r.done ? "可领取" : "进度 " + achProgress(r.cur,r.goal) + " / " + achProgress(r.goal)) +
+          (r.recorded ? (r.observedAt === 0 ? " · 历史达成，时间未记录" : " · 首次记录于 " + new Date(r.observedAt).toLocaleString()) : "") +
+          (r.recorded && !r.conditionMet ? " · 达成资格已保留，当前数值 " + achProgress(r.cur,r.goal) + " / " + achProgress(r.goal) : "");
       }, false);
+      if(window.CSHGoals)c.appendChild(CSHGoals.button("career",r.key,r.label,paintAchGrid,toast));
       box.appendChild(c);
     })(rows[i]);
   }
 }
-function achProgress(value) {
-  return value === Math.floor(value) ? fmt(value) : String(Number(value.toFixed(2)));
+function achRemaining(current,goal) {
+  var gap=Math.max(0,goal-current);
+  return gap>0&&gap<0.01?"不足0.01":achProgress(Number(gap.toFixed(8)));
+}
+function achProgress(value,target) {
+  var rounded=Number(value.toFixed(2));
+  if(Number.isFinite(target)&&value<target&&rounded>=target){var precise=Number(value.toPrecision(8));return precise<target?String(precise):"不足"+achProgress(target);}
+  return value === Math.floor(value) ? fmt(value) : String(rounded);
 }
 function bindAchFilters() {
   $("#ach-claim-all").addEventListener("click",function(){if(window.__careerClaimAllBusy)return;window.__careerClaimAllBusy=true;this.disabled=true;this.textContent="领取中…";
@@ -1816,10 +1923,21 @@ function closeDetail() {
   $("#modal").className = "";
   if (modalFocusBack && modalFocusBack.isConnected) modalFocusBack.focus({ preventScroll: true });
 }
+var navToggle=$("#career-nav-toggle");
+function foldCareerNav(focus){$("#app").classList.remove("career-nav-open");navToggle.setAttribute("aria-expanded","false");if(focus&&navToggle.getClientRects().length)navToggle.focus({preventScroll:true});}
+navToggle.addEventListener("click",function(){var open=!$("#app").classList.contains("career-nav-open");$("#app").classList.toggle("career-nav-open",open);this.setAttribute("aria-expanded",String(open));if(open){var selected=$("#tabs .tab.on");if(selected)selected.focus({preventScroll:true});}});
+$("#body").addEventListener("click",function(e){if(!navToggle.contains(e.target))foldCareerNav(false);});
+window.addEventListener("resize",function(){if(!navToggle.getClientRects().length)foldCareerNav(false);});
+$("#ach-feedback-history").addEventListener("click",function(){try{if(parent.lib&&parent.lib.cshUI&&parent.lib.cshUI.achievementHistory())return;}catch(e){}toast("请从扩展设置查看成就反馈记录");});
+var refineToggle=$("#ach-filters-toggle"),refinePanel=$("#ach-refinements");
+function foldAchRefinements(){refinePanel.hidden=true;refineToggle.setAttribute("aria-expanded","false");refineToggle.focus({preventScroll:true});}
+refineToggle.addEventListener("click",function(){var open=refinePanel.hidden;refinePanel.hidden=!open;this.setAttribute("aria-expanded",String(open));});
 $("#md-close").addEventListener("click", closeDetail, false);
 $("#modal").addEventListener("click", function (e) { if (e.target === this) closeDetail(); });
 document.addEventListener("keydown", function (e) {
   if (!$("#modal").classList.contains("on")) {
+    if(e.key === "Escape" && $("#app").classList.contains("career-nav-open")){e.preventDefault();e.stopImmediatePropagation();foldCareerNav(true);return;}
+    if(e.key === "Escape" && !refinePanel.hidden && $("#p-ach").classList.contains("on")){e.preventDefault();e.stopImmediatePropagation();foldAchRefinements();return;}
     if (e.key === "Escape" && Bridge.active && typeof Bridge.close === "function") { e.preventDefault(); e.stopImmediatePropagation(); Bridge.close(); }
     return;
   }

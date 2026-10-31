@@ -137,7 +137,7 @@
 
 	function settle(hand) {
 		hand = hand || {};
-		var players = Array.isArray(hand.players) ? hand.players.map(function(p){ var c=p.contrib==null?0:Number(p.contrib); if(!Number.isSafeInteger(c)||c<0||c>100000000000)throw Error("德州投入无效"); return Object.assign({},p,{contrib:c,_committed:c}); }) : [];
+		var players = Array.isArray(hand.players) ? hand.players.map(function(p){ var c=p.contrib==null?0:Number(p.contrib); if(!Number.isSafeInteger(c)||c<0||c>100000000000)throw Error("德州投入无效"); var ante=p.antePaid==null?0:Number(p.antePaid); if(!Number.isSafeInteger(ante)||ante<0||ante>c)throw Error("德州前注无效"); return Object.assign({},p,{contrib:c,_committed:c,antePaid:ante}); }) : [];
 		var community = hand.community || [];
 		var stacks = hand.stacks || {};
 		var dealerId = hand.dealerId;
@@ -285,7 +285,7 @@
 			ledger.push({
 				id: p.id, name: p.name, isHuman: !!p.isHuman,
 				startStack: st, committed: committed, won: won, net: net, endStack: end,
-				payout: gross, uncalledRefund: refund, rakePaid: fee, tableFee: 0,
+				payout: gross, uncalledRefund: refund, rakePaid: fee, tableFee: 0, antePaid: p.antePaid || 0,
 				folded: !!p.folded, out: !!p.out,
 			});
 		}

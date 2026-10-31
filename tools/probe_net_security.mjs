@@ -7,7 +7,7 @@ function client(mode='ok'){
   calls++;url=u;options=o;if(mode==='error')throw Error('injected');
   return {ok:mode!=='httpfail',headers:{get:()=>null},body:{getReader(){let sent=false;return {async read(){if(sent)return {done:true};sent=true;return {done:false,value:new TextEncoder().encode(body)};},async cancel(){aborted=true;}};}}};
  }};
- const ctx=vm.createContext({window,URL,TextEncoder,TextDecoder,Uint8Array,AbortController,setTimeout,clearTimeout,Number,console});vm.runInContext(code,ctx);return {N:window.CSHNet,calls:()=>calls,opts:()=>options,url:()=>url,aborted:()=>aborted};
+ const ctx=vm.createContext({window,URL,TextEncoder,TextDecoder,Uint8Array,AbortController,setTimeout,clearTimeout,Number,console});const memory=new Map();window.localStorage={getItem:k=>memory.get(k)??null,setItem:(k,v)=>memory.set(k,String(v))};vm.runInContext(fs.readFileSync(root+'/core/csh_online.js','utf8'),ctx);window.CSHOnline.setEnabled(true);vm.runInContext(code,ctx);return {N:window.CSHNet,calls:()=>calls,opts:()=>options,url:()=>url,aborted:()=>aborted};
 }
 const req=(c,path='/board',method='GET',body=null)=>new Promise(resolve=>{let n=0;c.N.request(path,method,body,(ok,data)=>{n++;resolve({ok,data,count:()=>n});});});
 for(const bad of ['http://evil.test/board','//evil.test/girls','/admin','/girls/../admin','/board?x='+'x'.repeat(2050)]){const c=client(),r=await req(c,bad);check('reject invalid target '+bad.slice(0,25),!r.ok&&c.calls()===0);}

@@ -15,7 +15,7 @@ const id=Object.keys(MINIONS).find(i=>FAV[i]&&affOf(i));if(!id)throw Error('No r
 function fixture(state='open',max=false){
   const data=new Map(),writes=[],coins=[];let pending=false,busy=false,fault=false;
   const store={getItem(k){if(fault&&k==='csh_migrate_recovery')throw Error('read failed');return data.get(k)??null;},setItem(k,v){writes.push(k);data.set(k,String(v));},removeItem(k){writes.push(k);data.delete(k);}};
-  const lib={config:{},translate:{},cshMigrate:{recoveryState:()=>({pending,busy})},cshBossRecord:{summary:()=>({minions:{[id]:{n:1}}})},cshWallet:{wallet:{spend(n){coins.push(-n);return true;},add(n){coins.push(n);return n;}}}};
+  const lib={config:{},translate:{},cshMigrate:{recoveryState:()=>({pending,busy})},cshBossRecord:{summary:()=>({minions:{[id]:{n:1}}})},cshWallet:{saveEpoch:()=>0,const:{PC_CAP:100000000000},wallet:{pc(){return 10000000+coins.reduce((n,v)=>n+v,0);},spend(n){coins.push(-n);return true;},add(n){coins.push(n);return n;},commitAffection(state,cost){store.setItem("csh_affection",JSON.stringify(state));if(cost)coins.push(-cost);return {ok:true};}}}};
   const context=vm.createContext({lib,game:{log(){}},localStorage:store,MINIONS,affLinesOf:affOf,AFF_SHAPE,FAV,OATH_LINES,window:{CSH:{}},console});
   lib.cshWallet.saveGuard={blocked:vm.runInContext('('+guard+')',context)};
   vm.runInContext(fs.readFileSync(path.join(root,'core/csh_bond.js'),'utf8'),context);
@@ -47,7 +47,7 @@ for(const state of ['persisted','broken','busy','pending','read-fault','startup'
 check('recovery completion permits the same pending interaction once',()=>{const h=fixture('persisted'),before=h.raw();if(h.A.interact(id,'talk').ok||h.raw()!==before)return false;h.unlock();const first=h.A.interact(id,'talk'),second=h.A.interact(id,'talk');return first.ok&&first.gain>0&&!second.ok&&second.reason==='daily';});
 check('normal gift pays once and increases affection',()=>{const h=fixture(),r=h.A.gift(id,'wine');return r.ok&&r.gain>0&&h.coins.length===1&&h.coins[0]===-r.cost&&h.A.get(id).v===r.value;});
 check('normal notes and table games retain progression',()=>{const h=fixture();return [h.A.noteHunt(id),h.A.noteHold(id),h.A.noteTalk(id),h.A.notePlay(id)].every(r=>r?.gain>0)&&h.A.get(id).v>5000;});
-check('normal oath retains two payment entries and oath receipt',()=>{const h=fixture('open',true),r=h.A.oath(id);return r.ok&&h.coins.length===2&&-h.coins.reduce((a,b)=>a+b,0)===r.cost&&h.A.get(id).oath>0;});
+check('normal oath retains exact joint payment and oath receipt',()=>{const h=fixture('open',true),r=h.A.oath(id);return r.ok&&h.coins.length===1&&-h.coins.reduce((a,b)=>a+b,0)===r.cost&&h.A.get(id).oath>0;});
 check('normal line collection and reset remain available',()=>{const h=fixture();h.A.line(id,'talk');if(h.A.heardOf(id).got!==1)return false;return h.A.reset(id)===true&&h.A.get(id).v===0;});
 check('wallet-free normal startup remains usable',()=>{const h=fixture();delete h.lib.cshWallet;return h.A.notePlay(id)?.gain>0;});
 const failures=rows.filter(r=>!r.passed);console.log(JSON.stringify({scope:'actual affection public APIs and wallet saveBlocked, isolated stores; no live saves',passed:rows.length-failures.length,failed:failures.length,failures},null,2));process.exitCode=failures.length?1:0;

@@ -131,6 +131,9 @@
 				(doc.head || doc.documentElement).appendChild(el);
 			}
 			el.textContent = css;
+			// The shared script loads before page CSS; apply last at ready and each skin change.
+			(doc.head || doc.documentElement).appendChild(el);
+			doc.documentElement.setAttribute("data-csh-skin", pt.currentSkin());
 		} catch (e) {}
 	}
 
@@ -152,7 +155,7 @@
 		   带入已扣、钱永不回账。现在失败只回 idle，允许安全重试 ——
 		   壳侧对同一会话的重复结算请求是幂等的（csh_shell 的 GUARD 会回放上次结果），
 		   所以重试不会造成重复入账。 */
-		var settled = false, inFlight = false;
+		var settled = false, inFlight = false, settlementCallbacks=[], settlementData=null;
 		var closeSelfHook = null;      /* 壳委托关窗时要跑的本页收尾流程（见下） */
 
 		root.addEventListener("message", function (ev) {
@@ -187,9 +190,9 @@
 		function writesSave(name, payload) {
 			if (name === "shell-open" && payload && payload.key === "save") return false;
 			return ["shell-settle", "shell-settle-session", "shell-task-add", "shell-merit",
-				"shell-sign", "shell-relief", "shell-ach-claim", "shell-ach-claim-all", "shell-pool-ach-claim", "shell-trade",
+				"shell-sign", "shell-relief", "shell-career-sync", "shell-ach-claim", "shell-ach-claim-all", "shell-pool-ach-claim", "shell-trade",
 				"shell-goldfish", "shell-market-new", "shell-aff-do", "shell-cheer", "shell-bounty",
-				"shell-seat", "shell-world-round", "shell-world-result", "shell-open"].indexOf(name) >= 0;
+				"shell-seat", "shell-world-round", "shell-world-result", "shell-open", "shell-results-retry", "shell-pool-ach-claim-all", "shell-cheer-ack", "shell-cheer-import"].indexOf(name) >= 0;
 		}
 		function call(name, payload, cb, timeoutMs) {
 			if (!hasParent) { if (cb) cb(false, null); return; }
@@ -235,14 +238,11 @@
 		}
 		function confirmClaim() { inFlight = false; settled = true; }
 		function releaseClaim() { inFlight = false; }
-		function settleOnce(name, payload, cb, timeoutMs) {
-			if (!hasParent || !claim()) { if (cb) cb(false, null); return false; }
-			call(name, payload, function (ok, data) {
-				if (ok) confirmClaim(); else releaseClaim();
-				if (cb) cb(ok, data);
-			}, timeoutMs);
-			return true;
-		}
+		function settleOnce(name,payload,cb,timeoutMs){
+            if(!hasParent){if(cb)cb(false,null);return false;}if(settled){if(cb)cb(true,settlementData);return false;}
+            if(cb)settlementCallbacks.push(cb);if(inFlight)return true;inFlight=true;
+            call(name,payload,function(ok,data){if(data&&data.ok===false)ok=false;if(ok){settlementData=data;confirmClaim();}else releaseClaim();var list=settlementCallbacks.splice(0);list.forEach(function(done){try{done(ok,data);}catch(e){}});},timeoutMs);return true;
+        }
 
 		return {
 			active: hasParent,
@@ -262,6 +262,7 @@
 	}
 
 	try { applyGameSkin(); } catch (e) {}
+	try { if (root.document && root.document.readyState === "loading") root.document.addEventListener("DOMContentLoaded", applyGameSkin, { once: true }); } catch (eReady) {}
 
 	/* ============================================================
 	   牌桌拟人：状态口吻 + 说话气泡（2026-10-03 新增）

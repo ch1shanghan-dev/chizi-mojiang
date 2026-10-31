@@ -67,9 +67,11 @@
 			var value = rates(run.mode)[result ? "win" : "lose"];
 			if (!value) return;
 			var item = {id:run.id,mode:run.mode,win:result,amount:value,busy:false,generation:generation};
-			pending.push(item); void pay(item);
+			var Q=lib.cshWallet&&lib.cshWallet.pending;
+            if(Q){var r=Q.put("match",item.id,{mode:item.mode,win:item.win,amount:item.amount});if(r.ok&&!r.already)toast(label(item.mode)+(item.win?"胜利":"落败")+"，获得 "+r.gained+" CBY");else if(!r.ok)toast(r.durable?"对局奖励已保留，存储恢复后自动补记；行囊可查看":"对局结果暂未写入本机，请保持页面打开并恢复存储");}
+            else {pending.push(item);void pay(item);}
 		}
-		async function retryPending() { var list = pending.slice(); for (var i=0;i<list.length;i++) await pay(list[i]); return {pending:pending.length}; }
+		async function retryPending() { if(lib.cshWallet&&lib.cshWallet.pending)return {pending:lib.cshWallet.pending.retry().count};var list = pending.slice(); for (var i=0;i<list.length;i++) await pay(list[i]); return {pending:pending.length}; }
 		function closePanel() { if (panel) panel.close(); }
 		function openPanel(){toast("对局奖励由扩展统一设定；正常终局自动到账");return false;}
 		lib.skill.csh_match_reward_tap = {trigger:{global:["gameStart","phaseBefore","useCardAfter","respondAfter","damageEnd"]},forced:true,silent:true,popup:false,forceDie:true,priority:-101,filter:function(ev,p){if(!allowed())return false;return p===game.me;},async content(event,trigger){tap(event.triggername,trigger);}};

@@ -1,11 +1,44 @@
-// Generate 99-character progress rows; semantic decisions are maintained manually.
+// Historical audit index. AI optimizations were withdrawn at the author request on 2026-10-27.
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {parse,skillsOf,property,keyOf,walk} from './lib/skill_audit.mjs';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const inventory = JSON.parse(fs.readFileSync(path.join(root, 'docs/audit/inventory.json'), 'utf8'));
+if(inventory.characters.length!==100)throw Error('Current audit roster must contain 100 heroes');
+// Verify current references; adding a role never marks its AI reviewed automatically.
+const skillPack=skillsOf(parse(fs.readFileSync(path.join(root,'skills/index.js'),'utf8'))),currentSkills=new Map();
+function indexSkills(pack,prefix=''){for(const p of pack.properties||[]){const id=prefix+keyOf(p);currentSkills.set(id,p.value);const subs=property(p.value,'subSkill');if(subs)indexSkills(subs,id+'_');}}
+indexSkills(skillPack);
+for(const skill of inventory.skills){if(skill.file==='skills/index.js'&&currentSkills.has(skill.id))skill.line=currentSkills.get(skill.id).loc.start.line;}
+let characterPack;walk(parse(fs.readFileSync(path.join(root,'character/index.js'),'utf8')),n=>{if(n.type==='ExportDefaultDeclaration')characterPack=property(n.declaration,'character');});
+for(const c of inventory.characters){const n=property(characterPack,c.id),refs=property(n,'skills');if(!refs||JSON.stringify(refs.elements.map(e=>e.value))!==JSON.stringify(c.skills))throw Error('Roster drift requires review: '+c.id);}
+const currentRosterCount=characterPack.properties.length;
+if(currentRosterCount!==100||characterPack.properties.some(p=>!inventory.characters.some(c=>c.id===keyOf(p))))throw Error("Current role inventory requires refresh");
 // Add a decision only after recording its evidence in AI审查记录.md.
-const decisions = {
+const historicalDecisions = {
+  csh_longhun:'移除按花色虚构全用牌收益；实际次数/距离/目标与成本转化、响应素材和声明已审',
+  csh_yajiao:'只为实际非回合内使用自己的素材计来源摸牌偏好；展示后给牌/异类弃牌和收尾链已审',
+
+  csh_juwei:'安全重复限已核对的无中/桃，修复铁索重复反转；选择/追加效果/直击/失效链已审',
+  csh_chonglei:'实际变化体力才加甲；致命不预支护甲，保留原基础AI与强制机制',
+  csh_qianju:'强制按已损体力减距离，实际mod与无额外决策入口已核对',
+  csh_kuanggu:'根据真实可选控件、有效回复、低血量/溢出选摸或回；距1快照及多点选择链已审',
+  csh_langxi1x:'概率期望与五伤尾部风险分开，拒赌低血队友；实际选择与元数据共用本技能评分',
+  csh_xiongluan:'移除暗闪查询，先回血代价/合法两牌/强制友方备选/真实奖励选项已审',
+  csh_junchi:'本技能ai2计用牌前失体力、摸牌/甲与低血风险；不把护甲当失体力保护',
+  csh_zhansong:'不预支限技收益鼓励吃伤，保留有效自救；弃装备后距离/成本与三刺杀链已审',
+
+  csh_liegong:'释放移除暗闪查询，核对当前伤害属性/免伤与护甲；蓄弦/50与100解锁/全档释放已审',
+  csh_wanshi:'双虚拟装备的继承与空栏/移除已审；免疫保留来源收益，火伤AI补无视防具守卫',
+  csh_lieqiong:'不再固定封红桃，按合法部位/公开手牌/已知花色/当前负面状态择优；五部位与清理链已审',
+
+  csh_wuzhen:'全体目标效用方向修正；起点与逼杀/失体力/火杀选择链已审，保留公开人数启发式',
+  csh_qiai:'仅为合法有效自救牌优先交付；依次交牌与引擎轮次冷却已审',
+  csh_sbweimu:'阴阳取消目标的AI保留来源独立收益；转换触发链已审',
+  csh_pojun12:'暗牌按钮隔离、公开基础价值、响应标签与分区/实体材料增伤估值已修',
+  csh_yingzipojun:'额外摸牌与击杀摸三链已审，无需重写免费收益选择',
+
   csh_jsrgpingtao: '目标收益方向已修', csh_jsrgpingtao_2: '目标收益方向已修',
   csh_qiege: '三花色目标收益已修', csh_gyweiyang: '回复目标收益已修',
   csh_spweiwu: '顺手收益方向已修', csh_duwu: '弃牌伤害评分已修',
@@ -56,9 +89,16 @@ const decisions = {
   csh_kurou: '失体力不借护甲抵消，计真实诈降和未消耗/可回复的自救资源',
   csh_zhaxiang: '损失体力补偿方向/致命不预支/恢复成本守卫已修，recover链已审',
 };
-const sourceReviewed = new Set(['csh_dz','csh_wn','csh_sunshangxiang','csh_huangyueying','csh_huaman','csh_xingganning','csh_yuangubafei','csh_liximing','csh_mingrixiang','csh_jzh']);
+const historicalReviewed = new Set(['csh_dz','csh_wn','csh_sunshangxiang','csh_huangyueying','csh_huaman','csh_xingganning','csh_yuangubafei','csh_liximing','csh_mingrixiang','csh_jzh','csh_qw','csh_jjxs','csh_mmhz','csh_haozhao','csh_wlk','csh_sx','csh_gdsn']);
 // Evidence-based closures for reviewed roles; computed/dynamic grants still require tracing.
 const extraChains = {
+  csh_gdsn:[],
+  csh_haozhao:[],
+  csh_wlk:['csh_kuanggu_check'],
+  csh_sx:['csh_xiongluan_direct','csh_xiongluan_draw','csh_zhansong_unlimited'],
+  csh_mmhz:['csh_liegong_gain','csh_liegong_xian','csh_liegong_extrashot','csh_liegong_fengyin','csh_wanshi','csh_wanshi_qilin','csh_wanshi_tengjia1','csh_wanshi_tengjia2','csh_wanshi_tengjia3','csh_lieqiong','csh_lieqiong_abdomen','qilin_skill','tengjia1','tengjia2','tengjia3','baiban'],
+  csh_qw:['csh_qiai_roundcount'],
+  csh_jjxs:['csh_repojun2','csh_repojun3','csh_yingzipojun_dabaoliewei'],
   csh_dz:['chengxiang'],
   csh_wn:['csh_ranshang_start','csh_ranshang_zhuanhp','csh_ranshang_zhuanjia','csh_ranshang_jiesuan','csh_ranshang_jianran'],
   csh_sunshangxiang:['csh_ssx_xiaoji2','csh_ssx_saran','csh_ssx_saran_reset'],
@@ -82,22 +122,17 @@ const link = id => {
 let touched = 0;
 const rows = inventory.characters.map((character, index) => {
   const extra = extraChains[character.id] || [];
-  const reviewed = skills.filter(s => decisions[s.id] && (s.characters.includes(character.id) || extra.includes(s.id)));
+  const reviewed = skills.filter(s => historicalDecisions[s.id] && (s.characters.includes(character.id) || extra.includes(s.id)));
   if (reviewed.length) touched++;
-  return `| ${index + 1} | ${esc(character.name)} (${character.id}) | ${character.skills.map(link).join('、')} | ${extra.length ? extra.map(link).join('、') : '仍需追踪'} | `
-    + (reviewed.length ? reviewed.map(s => `${link(s.id)}：${decisions[s.id]}`).join('<br>') : '尚未形成语义结论')
-    + (sourceReviewed.has(character.id) ? ' | 本机源码选择链已审；实战待验 |' : ' | 完整技能链待审 |');
+  return `| ${index + 1} | ${esc(character.name)} (${character.id}) | ${character.skills.map(link).join('、')} | ${extra.length ? extra.map(link).join('、') : historicalReviewed.has(character.id) ? '无额外授予/继承技能；对象内辅助链已核对' : '仍需追踪'} | `
+    + (reviewed.length ? reviewed.map(s => `${link(s.id)}：${historicalDecisions[s.id]}`).join('<br>') : '尚未形成语义结论')
+    + (historicalReviewed.has(character.id) ? ' | 历史已审；补丁已撤回，暂停 |' : ' | 暂停；未继续审查 |');
 });
-const text = '# 99 武将技能 AI 审查进度\n\n'
-  + '作者明确以普通名册 99 人为主线；妖灵与派生魔王不计入覆盖进度。由 `node tools/audit_roster_ai.mjs` 生成，'
-  + '只合并真实名册、结构关联与已记证据的手工结论，不根据有没有 ai 字段推断通过。\n\n'
-  + `当前 ${inventory.characters.length} 位武将、${inventory.characters.reduce((n,c) => n+c.skills.length,0)} 条直接技能引用；`
-  + `${touched} 位存在语义结论或已定位问题，其中${sourceReviewed.size}位本机源码选择链已审；全部仍未做游戏实战验证。\n\n`
-  + '每名武将还需追踪实际获得/替换/派生技能、group/subSkill/继承、check 与选择回调、响应以及失去技能后的状态。'
-  + '表中直接关联不覆盖全部动态授予路径，例如卡尔动态技能池不能仅由初始技能数组判为已审。'
-  + '具体改前/改后与限制见 [AI 审查记录](AI审查记录.md)。\n\n'
-  + '| # | 普通武将 | 初始技能引用 | 已核对的继承/获得/子技能链 | 已有结论/问题 | 整体状态 |\n'
+const text = "# 100 武将技能 AI 审查进度（历史索引，已暂停）\n\n> **2026-10-27：按作者最新指令，Codex 的武将 AI 优化已回退，停止继续审查。** 下表仅保留既往审查证据和当前源码定位，所有“已修”描述属于已撤回补丁，不能当作当前实现承诺。详见 [回退与 UI 修复](UI_RECOVERY_20261027.md)。\n\n由 `node tools/audit_roster_ai.mjs` 生成；当前保留100名普通武将（含郝昭）。不因保留角色而保留本轮AI优化。\n\n"
+  + `历史记录涉及 ${touched} 位，其中 ${historicalReviewed.size} 位曾记录源码选择链审查，均未完成逐武将完整实战验证。当前优化任务已暂停，不记为有效完成进度。\n\n`
+  + "表中动态技能链与结论供溯源；规则、立绘和存档沿用当前有效实现。\n\n"
+  + '| # | 普通武将 | 初始技能引用 | 已核对的继承/获得/子技能链 | 历史结论/问题（补丁已撤回） | 当前状态 |\n'
   + '| --- | --- | --- | --- | --- | --- |\n' + rows.join('\n') + '\n';
-const target = path.join(root, 'docs/audit/99武将AI审查进度.md');
+const target = path.join(root, 'docs/audit/100武将AI审查进度.md');
 fs.writeFileSync(target, text);
 console.log(JSON.stringify({characters: inventory.characters.length, partialOrLocated: touched, output: path.relative(root,target)}));

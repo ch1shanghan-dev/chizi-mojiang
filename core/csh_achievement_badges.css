@@ -1,0 +1,32 @@
+/* Decorative only: all selectors are owned by the badge; no text or target sizing. */
+.csh-achv-badge {
+    display: inline-block;
+    flex: 0 0 auto;
+    width: 32px;
+    height: 36px;
+    vertical-align: middle;
+    color: var(--muted, var(--csh-gray, #bbc2bb));
+    pointer-events: none;
+    user-select: none;
+    shape-rendering: geometricPrecision;
+}
+.csh-achv-badge .csh-achv-badge__plate {
+    fill: var(--panel, var(--csh-paper2, transparent));
+    stroke-opacity: .72;
+}
+.csh-achv-badge .csh-achv-badge__rim { stroke-opacity: .28; }
+.csh-achv-badge .csh-achv-badge__symbol { stroke-opacity: .96; }
+.csh-achv-badge--rare-2 { color: var(--accent, var(--csh-accent, #ddc88e)); }
+.csh-achv-badge--rare-2 .csh-achv-badge__plate { stroke-opacity: .9; }
+.csh-achv-badge--rare-2 .csh-achv-badge__rim { stroke-opacity: .42; }
+.csh-achv-badge--rare-3 { color: var(--accent, var(--csh-accent, #ddc88e)); }
+.csh-achv-badge--rare-3 .csh-achv-badge__plate { stroke-width: 1.9; stroke-opacity: 1; }
+.csh-achv-badge--rare-3 .csh-achv-badge__rim { stroke-opacity: .65; }
+.csh-achv-badge .csh-achv-badge__grade { stroke-opacity: .95; }
+@media (orientation: landscape) and (max-height: 430px) {
+    .csh-achv-badge { width: 28px; height: 32px; }
+}
+@media (forced-colors: active) {
+    .csh-achv-badge { color: CanvasText; }
+    .csh-achv-badge .csh-achv-badge__plate { fill: Canvas; stroke-opacity: 1; }
+}

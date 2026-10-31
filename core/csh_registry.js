@@ -56,7 +56,7 @@
 		texas: {
 			key: "texas", title: "德州扑克", dir: "texas", file: "texas.html",
 			tag: "牌桌", desc: "真实 AI 同桌 · 带入制",
-			landscape: false, settle: "chips", needBuyIn: true, ticket: 0, decay: 1,
+			landscape: true, settle: "chips", needBuyIn: true, ticket: 0, decay: 1,
 		},
 		doudizhu: {
 			key: "doudizhu", title: "斗地主", dir: "doudizhu", file: "doudizhu.html",
@@ -65,27 +65,27 @@
 			   门票在结算时被返还（带入 + 净赢×90%），所以它**本来就是带入**，
 			   却挂着"门票"的名字，导致收费屏"还可玩 N 局"的说法不成立。
 			   现与德州 / 廿一点统一为带入制（免门票 + 必选带入）。 */
-			landscape: false, settle: "chips", needBuyIn: true, ticket: 0, decay: 0.90,
+			landscape: true, settle: "chips", needBuyIn: true, ticket: 0, decay: 0.90,
 		},
 		blackjack: {
 			key: "blackjack", title: "廿一点", dir: "blackjack", file: "blackjack.html",
 			tag: "牌桌", desc: "真庄家 · 台面零和",
 			/* 2026-09-29：免门票 + 必选带入。回收率 95% 本身就是台费，
 			   再叠一张门票等于双重抽水；且门票与最低带入叠加会高于本金。 */
-			landscape: false, settle: "chips", needBuyIn: true, ticket: 0, decay: 0.95,
+			landscape: true, settle: "chips", needBuyIn: true, ticket: 0, decay: 0.95,
 		},
 		uno: {
 			key: "uno", title: "UNO", dir: "uno", file: "uno.html",
 			tag: "纸牌", desc: "你 vs 1~3 个人机",
 			/* 名次类：门票不返还。奖励 = 门票 × 0.6 × 击败对手数。
 			   4 人局 → 270 / 180 / 90 / 0，期望 135 < 门票 150（负期望）。 */
-			landscape: false, settle: "rank", needBuyIn: false, ticket: 150, decay: 0,
+			landscape: true, settle: "rank", needBuyIn: false, ticket: 150, decay: 0,
 		},
 		career: {
 			key: "career", title: "生涯大厅", dir: "", file: "career.html",
 			tag: "", desc: "战绩 / 官阶 / 成就 / AI 世界",
 			lobby: true,
-			landscape: false, settle: "none", needBuyIn: false, ticket: 0, decay: 0,
+			landscape: true, settle: "none", needBuyIn: false, ticket: 0, decay: 0,
 		},
 		/* 讨伐录（2026-10-13 · 批次 4a）：BOSS 模式击破手记——与生涯大厅平级的
 		   非游戏页（lobby:true 免收费屏直开）。不进 ORDER（keys() 保持纯游戏卡，
@@ -94,14 +94,14 @@
 			key: "bossbook", title: "讨伐录", dir: "", file: "bossbook.html",
 			tag: "手记", desc: "魔王的击破实录",
 			lobby: true,
-			landscape: false, settle: "none", needBuyIn: false, ticket: 0, decay: 0,
+			landscape: true, settle: "none", needBuyIn: false, ticket: 0, decay: 0,
 		},
 		/* 金鳞市（2026-10-14 批次 B）：股市小游戏——五十位妖灵挂牌，持仓吃分红。
 		   settle "none"：经济自管（买卖走 csh_wallet 单一账本），不走牌桌结算链。 */
 		goldfish: {
 			key: "goldfish", title: "金鳞市", dir: "", file: "goldfish.html",
 			tag: "市集", desc: "五十位妖灵挂牌 · 持仓吃分红",
-			landscape: false, settle: "none", needBuyIn: false, ticket: 0, decay: 0,
+			landscape: true, settle: "none", needBuyIn: false, ticket: 0, decay: 0,
 		},
 		/* 妖灵图鉴（2026-10-14 批次 C）：讨伐录平级的档案页——五十位妖灵的大图档案
 		   （主立绘 + 人设简介 + 台词全集 + 讨伐次数/金鳞市热度）。纯展示、无写操作，
@@ -114,7 +114,7 @@
 			key: "rank", title: "天下榜", dir: "", file: "rank.html",
 			tag: "联机", desc: "天下英雄的池子币与功勋",
 			lobby: true,
-			landscape: false, settle: "none", needBuyIn: false, ticket: 0, decay: 0,
+			landscape: true, settle: "none", needBuyIn: false, ticket: 0, decay: 0,
 		},
 		/* 池子成就（2026-10-20）：操作型成就墙——与生涯大厅/讨伐录/天下榜同级的非游戏页
 		   （lobby:true 免收费屏直开）。数据读 core/csh_pool_achv.js 的 RULES 与 localStorage，
@@ -123,12 +123,12 @@
 			key: "achv", title: "池子成就", dir: "", file: "achv.html",
 			tag: "成就", desc: "你在对局里打出过的操作",
 			lobby: true,
-			landscape: false, settle: "none", needBuyIn: false, ticket: 0, decay: 0,
+			landscape: true, settle: "none", needBuyIn: false, ticket: 0, decay: 0,
 		},
 		codex: {
 			key: "codex", title: "妖灵图鉴", dir: "", file: "codex.html",
 			tag: "档案", desc: "五十位妖灵的大图档案",
-			landscape: false, settle: "none", needBuyIn: false, ticket: 0, decay: 0,
+			landscape: true, settle: "none", needBuyIn: false, ticket: 0, decay: 0,
 		},
 		/* 行囊（v6.10 · 2026-10-15）：存档总口 —— 与生涯大厅 / 讨伐录 / 天下榜同级
 		   （lobby:true 免收费屏直开）。为什么单开一页：导入导出原先塞在生涯大厅右栏，
@@ -140,7 +140,7 @@
 			key: "save", title: "行囊", dir: "", file: "save.html",
 			tag: "存档", desc: "一身家当，随身可带",
 			lobby: true,
-			landscape: false, settle: "none", needBuyIn: false, ticket: 0, decay: 0,
+			landscape: true, settle: "none", needBuyIn: false, ticket: 0, decay: 0,
 		},
 	};
 
@@ -204,6 +204,7 @@
 			if (!g) { errs.push("目录缺失: " + k); return; }
 			if (g.key !== k) errs.push("key 不一致: " + k + " vs " + g.key);
 			if (!g.title) errs.push(k + " 缺标题");
+			if (g.landscape !== true) errs.push(k + " 必须使用横屏");
 			if (!g.file) errs.push(k + " 缺 file");
 			/* dir 为空 = 文件直接放 games/ 下（bossbook / goldfish / codex 先例，urlOf 已兼容
 			   空 dir）；此时 file 必须是纯文件名（含路径分隔就会拼错 URL）。
@@ -240,9 +241,14 @@
 
 	function texasRake(value) {
 		var rate = Number(value);
-		if ([0,50,100,200].indexOf(rate) < 0 || value == null) rate = 100;
-		return { rateBps: rate, cap: null, noFlopNoDrop: true };
+		if ([0,50,100,200].indexOf(rate) < 0 || value == null) rate = 50;
+		return { modelVersion: 2, anteBbBps: 1000, rateBps: rate, cap: null, noFlopNoDrop: true };
 	}
+	function texasAnte(fees, bb) {
+    if (!fees || fees.modelVersion !== 2 || !Number.isSafeInteger(fees.anteBbBps) || fees.anteBbBps <= 0) return 0;
+    if (!Number.isSafeInteger(bb) || bb <= 0 || bb > 100000000000) throw Error('德州盲注无效');
+    return Math.max(1, Math.floor(bb * Math.min(5000, fees.anteBbBps) / 10000));
+  }
 	function matchRewards(mode) { var values={identity:{win:300,lose:100},versus:{win:250,lose:80},doudizhu:{win:300,lose:100},guozhan:{win:400,lose:120},boss:{win:150,lose:50}}; return mode?Object.assign({},values[mode]||{win:250,lose:80}):JSON.parse(JSON.stringify(values)); }
 	var API = {
 		version: "1.0.0",
@@ -254,7 +260,7 @@
 		isLobby: isLobby, settleOf: settleOf, needBuyIn: needBuyIn, isLandscape: isLandscape,
 		titleOf: titleOf, dirOf: dirOf,
 		tickets: tickets, decays: decays, minTicket: minTicket, settlePlan: settlePlan,
-		matchRewards:matchRewards, selfTest: selfTest, texasRake: texasRake,
+		matchRewards:matchRewards, selfTest: selfTest, texasRake: texasRake, texasAnte: texasAnte,
 	};
 	root.CSH.registry = API;
 	/* 兼容：非 ESM 环境（noname 本体把 lib 挂在全局） */

@@ -1469,7 +1469,12 @@ async function runBossChecks() {
 			if (!/cmd === "shell-pc"/.test(sh24b)) e24.push("缺 shell-pc（回礼后刷新余额胶囊）");
 			const wt24 = fs.readFileSync(path.join(ROOT, "core", "csh_wallet.js"), "utf8");
 			if (!/她的回礼/.test(wt24)) e24.push("账本缺「她的回礼」分类");
-			if (!/W\.spend\(g\.cost/.test(af)) e24.push("送礼未走钱包扣款（顺序应「先扣款后加好感」）");
+			/* NC-01: debit and entitlement must survive together; a spend() regex enforces the old unsafe split. */
+            try {
+                const result = JSON.parse(execFileSync(process.execPath, [path.join(ROOT, "tools/probe_affection_transactions.mjs"), "--gate"],
+                    { encoding: "utf8", timeout: 20000, windowsHide: true }));
+                if (result.passed < 33 || result.failed !== 0) e24.push("送礼/结契共同事务故障回归未通过");
+            } catch (error) { e24.push("送礼/结契共同事务故障回归失败：" + error.message.slice(0, 160)); }
 			if (!/export function installAffection/.test(af)) e24.push("缺 installAffection");
 		}
 		const ct24 = fs.readFileSync(path.join(ROOT, "main", "content.js"), "utf8");
@@ -1941,7 +1946,7 @@ async function runBossChecks() {
 		if (!fs.existsSync(rp32)) e32.push("缺 games/rank.html");
 		else {
 			const t32 = fs.readFileSync(rp32, "utf8");
-			if (!/var NET_BASE = "/.test(t32)) e32.push("rank.html 缺 NET_BASE 常量");
+			if (!t32.includes("csh_online.js") || !/function netService/.test(t32)) e32.push("rank.html 未接单一可信联网策略");
 			if (/id="net-url"|placeholder="https?:/.test(t32)) e32.push("rank.html 把服务器地址做成了输入框（玩家不该看到）");
 			if (!/CSHNet\.request/.test(t32) || !t32.includes("csh_net.js")) e32.push("rank.html 未接共享 HTTPS 双通道");
 			if (t32.indexOf('NET_BASE.indexOf("https://") !== 0') >= 0)
@@ -1969,24 +1974,19 @@ async function runBossChecks() {
 		else ok("执行级 E32：天下榜（独立页 · 与生涯大厅同级 · 玩家只见昵称不见地址 · Node http 通道）");
 	}
 
-	/* E33（v2 · 2026-10-15 新增 · 留名机制契约）：
-	   作者实机发现同一台机器能占两个位置（清一次浏览器数据 ⇒ 新 uid ⇒ 新一行）。
-	   v2 把"身份"的判定权交回服务端（机器指纹 / 出口网络），客户端必须把这些**送上去**，
-	   并且把服务端"认领了哪一行"的结果**接住**——否则"留完只能改名"在页面上根本不成立。
-	   同时补齐体验缺口：不在前 N 名也要看得见自己排第几。 */
+	/* E33: Offline-first identity contract. Public UID/IP does not prove ownership. */
 	{
 		const e33 = [];
 		const t33 = fs.readFileSync(path.join(ROOT, "games", "rank.html"), "utf8");
 		if (/networkInterfaces|os\.hostname|os\.cpus|os\.totalmem/.test(t33) || !/function machineFp\(\) \{ return ""; \}/.test(t33))
 			e33.push("客户端必须停止收集硬件指纹，旧字段仅留空兼容");
-		if (!/fp: NET\.fp/.test(t33)) e33.push("submit 未保留空 fp 兼容字段");
+		if (!/fp:\s*(?:NET\.fp|['"]['"])/.test(t33)) e33.push("submit 未保留空 fp 兼容字段");
 		if (!/seg: NET\.seg/.test(t33)) e33.push("submit 未带 seg（官阶，真源是钱包 RANKS，页面不许另抄一份表）");
 		if (!/uid=/.test(t33) || !/NET\.me/.test(t33))
 			e33.push("拉榜未带 uid / 未接 me（不在前 N 名就看不到自己排第几）");
 		if (!/renderMeBar/.test(t33)) e33.push("缺「我的名次」常驻条");
-		if (!/r\.adopted/.test(t33)) e33.push("未处理服务端的认领结果（adopted = same/fp/ip/new）");
-		if (!/NET\.uid = r\.uid/.test(t33))
-			e33.push("认领后未回存 uid（之后「我的那条」高亮会错位）");
+        if (/NET\.uid\s*=\s*r\.uid/.test(t33) || !/r\.uid !== context\.uid/.test(t33)) e33.push("未经验证的服务归属不能自动替换本机身份");
+        if(!/netCanPublish/.test(t33))e33.push("公开读取与发布权限未隔离");
 		if (!/name-taken/.test(t33)) e33.push("未处理名字已被占用的情况");
 		if (!/r\.ignored/.test(t33)) e33.push("未处理服务端静默忽略（会让玩家以为点了个死按钮）");
 		/* v2.1（打榜 + 签名）：扣费必须在宿主单一账本（shell-cheer），服务端只做聚合 */
@@ -2000,7 +2000,7 @@ async function runBossChecks() {
 		if (/作弊|违规|非法|封禁|黑名单|数值异常/.test(t33))
 			e33.push("页面出现指责性或内部术语字样（玩家不该看见）");
 		if (e33.length) fail("执行级 E33：天下榜留名契约（" + e33.slice(0, 4).join("；") + "）");
-		else ok("执行级 E33：天下榜留名契约（机器指纹 + 认领回存 + 我的名次 + 重复名中性提示 · 拦截静默）");
+		else ok("执行级 E33：天下榜契约（无硬件指纹 · 公开读取与发布分离 · 旧UID不自动认领 · 已付记录保留）");
 	}
 
 	/* E34（2026-10-15 新增 · 魔王可见性 fail-loud）：
@@ -2211,8 +2211,9 @@ async function runBossChecks() {
 			}
 		};
 		if (fs.existsSync(gdir)) walk38(gdir);
-		const transport38 = fs.readFileSync(path.join(ROOT,"core","csh_net.js"),"utf8");
-		if(!transport38.includes("req('https')") || !transport38.includes("root.fetch(") || !transport38.includes("credentials:'omit'") || !transport38.includes("redirect:'error'") || !transport38.includes("size>MAX")) e38.push("共享传输缺HTTPS双通道、凭据隔离或响应尺寸上限");
+        const transport38=fs.readFileSync(path.join(ROOT,"core/csh_net.js"),"utf8");
+        if(!transport38.includes("req('https')")||!transport38.includes("root.fetch(")||!/credentials:\s*'omit'/.test(transport38)||!/redirect:\s*'error'/.test(transport38)||!/size\s*>\s*MAX/.test(transport38))e38.push("共享传输缺HTTPS双通道、凭据隔离或响应尺寸上限");
+        try{const result=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,"tools/probe_online_offline.mjs")],{encoding:"utf8",timeout:20000,windowsHide:true}));if(result.failed!==0||result.passed<76)e38.push("联网开关、取消、缓存/竞态与补送故障回归未通过");}catch(error){e38.push("联网离线故障回归失败："+error.message.slice(0,150));}
 		if (e38.length) fail("执行级 E38：云功能基址与双通道（" + e38.slice(0, 3).join("；") + "）");
 		else ok("执行级 E38：云功能基址全 https + Node/fetch 双通道齐全（手机端混合内容拦截不再复发）");
 	}
@@ -2521,14 +2522,10 @@ async function runBossChecks() {
 		else if (!/CSH_UPDATE_SRC\s*=\s*"https:\/\/raw\.githubusercontent\.com\/ch1shanghan-dev\/chizi-mojiang\/main\/"/.test(db46))
 			e46.push("更新源未硬编码为仓库 raw 根（自动化要求不依赖引擎「获取扩展地址」设置项）");
 		else if (/lib\.config\.extension_sources?\[/.test(db46)) e46.push("更新逻辑读了 lib.config.extension_sources（应由内置源接管）");
-		else if (!/game\.checkFileList/.test(db46))
-			e46.push("更新未复用引擎 game.checkFileList（素材补缺）");
-		else if (!/function fetchBin\s*\(/.test(db46) || !/game\.download\s*\(/.test(db46))
-			e46.push("更新下载未走自建逐文件器（PC = fetch+fs 校验落盘 / 手机 = game.download 双通道）");
-		else if (!/"extension\/"\s*\+\s*EXT_DIR_NAME\s*\+\s*"\/"\s*\+\s*rel/.test(db46))
-			e46.push("手机端 更新 URL→本地路径 映射缺失或写法不符（文件会落错位置）");
-		else if (!/p\.join\(extRoot,\s*rel\)/.test(db46))
-			e46.push("PC 端落盘未按扩展根拼接（文件会落错位置）");
+		else if (!/updateTx\.apply/.test(db46) || !/updateTx\.recover/.test(db46) || !/engine\.digest/.test(db46))
+            e46.push("更新缺暂存、摘要核验或恢复接线");
+        else if (!fs.existsSync(path.join(ROOT, "core/csh_update.js")))
+            e46.push("缺分阶段更新事务模块");
 		else if (!/csh_check_update/.test(cf46) || !/lib\.cshDebug\.checkUpdate/.test(cf46))
 			e46.push("扩展设置缺「检查更新」按钮接线（config.js → lib.cshDebug.checkUpdate）");
 		/* ② 框体分层 */
@@ -2558,7 +2555,7 @@ async function runBossChecks() {
 			if (cost46 == null || cost46 < 12.5) e46.push(f46 + " 礼物价格 .cost 字号过小（现 " + (cost46 == null ? "无法解析" : cost46 + "px") + "，应 ≥12.5px）");
 		}
 		if (e46.length) fail("执行级 E46：在线更新自动化 + 框体分层 + 价格字号（" + e46.slice(0, 4).join("；") + "）");
-		else ok("执行级 E46：更新已自动化（内置源 · 检查→确认→逐文件下载→重启）＋ 框体分层在位（牌桌四款统一 gb-table · 金鳞市/妖灵图鉴各具特色）＋ 礼物价格字号达标");
+		else ok("执行级 E46：更新已自动化（内置源 · 文件核对→暂存校验→备份→提交或恢复→成功重启）＋ 框体分层在位（牌桌四款统一 gb-table · 金鳞市/妖灵图鉴各具特色）＋ 礼物价格字号达标");
 	}
 
 	/* E47（2026-10-17 · 指定讨伐令 A 方案：1000 CBY 指定一只未讨伐妖灵出战）：
@@ -2658,7 +2655,7 @@ async function runBossChecks() {
 		/* 逐文件回退：必须有 updateBases（多源）与逐文件尝试，而不是整批塞给引擎 */
 		else if (!/function updateBases\s*\(/.test(db48)) e48.push("更新下载未做逐文件多源回退（单源挂 = 整批挂）");
 		else if (/game\.multiDownload/.test(db48)) e48.push("仍在用 game.multiDownload（onfinish 无条件触发 → 失败也会重启）");
-		else if (!/failed\.push/.test(db48) || !/finishAll/.test(db48)) e48.push("更新缺失败清单（失败必须列出并不重启）");
+		else if (!/catch\(e\)\{status\.textContent/.test(db48) || !/updateTx\.apply/.test(db48)) e48.push("更新失败缺可见反馈或绕过事务");
 		/* 2026-10-19 三个回归点（都是玩家端真实踩到的）：
 		   ① 源必须「并列摆出来」而不是串行试探（作者：所有可选源都列出来）；
 		   ② 本机版本必须以包内/info.json 为准 —— `extension_<名>_version` 只在「从网址安装」时写一次，
@@ -2666,12 +2663,17 @@ async function runBossChecks() {
 		   ③ 更新成功后必须把版本号写回，否则下一次检查又报「有新版本」。 */
 		else if (!/CSH_UPDATE_SOURCES/.test(db48) || !/function cshProbeAll\s*\(/.test(db48) || !/function renderSources\s*\(/.test(db48)) e48.push("更新源未并列展示（并发探测 + 可点选）");
 		else if (!/var diskVer\s*=/.test(db48) || !/localVer = diskVer \|\|/.test(db48)) e48.push("本机版本仍以 lib.config 记录为准（已手动更新的机器会永远显示旧版本）");
-		else if (!/_version", remoteVer\)|_version", remoteVer/.test(db48)) e48.push("更新成功后未写回版本号（下次检查仍报有新版本）");
+		else if (!/game\.saveConfig\(['"]extension_池子魔将_version['"],\s*remoteVer\)/.test(db48)) e48.push("更新成功后未写回版本号（下次检查仍报有新版本）");
 		else if (/"https:\/\/raw\.gitmirror\.com/.test(db48)) e48.push("更新源仍含已停止解析的 raw.gitmirror.com");
+        /* Execute faults against the actual staged engine; old failed.push/finishAll regexes required an unsafe updater. */
+        try {
+            const result = JSON.parse(execFileSync(process.execPath,[path.join(ROOT,"tools/probe_update_transaction.mjs")],{encoding:"utf8",timeout:20000,windowsHide:true}));
+            if(result.passed<18||result.failed!==0)e48.push("更新暂存/取消/失败文件清单/回滚故障回归未通过");
+        } catch(error){e48.push("更新事务故障回归失败："+error.message.slice(0,160));}
 		const rk48 = fs.readFileSync(path.join(ROOT, "games", "rank.html"), "utf8");
 		if (!/RANK_CACHE_KEY\s*=\s*"csh_rank_cache_v1"/.test(rk48)) e48.push("天下榜缺榜单缓存键");
-		else if (!/function cacheWrite\s*\(/.test(rk48) || !/cacheWrite\(\)/.test(rk48)) e48.push("天下榜未写缓存");
-		else if (!/CSHNet\.request\(path,method,body,cb,4500\)/.test(rk48)) e48.push("天下榜未向共享传输传入4.5s超时");
+		else if (!/function cacheWrite\s*\(/.test(rk48) || !/cacheWrite\(context\.kind/.test(rk48)) e48.push("天下榜未写缓存");
+		else if (!/CSHNet\.request\(path,\s*method,\s*body,\s*cb,\s*4500[,)]/.test(rk48)) e48.push("天下榜未向共享传输传入4.5s超时");
 		/* 上报口径（2026-10-18）：服务端取 max，客户端必须上报「历史最高」而不是当前余额，
 		   否则「打出新高 → 断网 → 花掉一部分 → 再传」会把那一笔永久抹掉。 */
 		else if (!/rankHighMerge\s*\(/.test(rk48) || !/cby:\s*upCby/.test(rk48)) e48.push("天下榜上报未取历史最高（花掉池子币会带走已打出的成绩）");
@@ -2913,13 +2915,20 @@ async function runBossChecks() {
 		if (!fs.existsSync(paPath)) e52.push("缺 core/csh_pool_achv.js");
 		else {
 			const pa52 = fs.readFileSync(paPath, "utf8");
-			ids52 = Array.from(pa52.matchAll(/\{\s*id:\s*"([a-z0-9_]+)"/g)).map((m) => m[1]);
-			if (ids52.length < 80) e52.push("规则不足 80 条（当前 " + ids52.length + "）");
+			try {
+                const vm52=await import('node:vm'),box52=vm52.createContext({window:{}});vm52.runInContext(pa52,box52,{timeout:2000});
+                const api52=box52.window.CSH_POOL_ACHV;ids52=api52.RULES.map(r=>r.id);
+                const heroes52=api52.PROFILES||[],roster52=fs.readFileSync(path.join(ROOT,'character/index.js'),'utf8');
+                if(heroes52.length!==100||new Set(heroes52.map(p=>p.id)).size!==100||heroes52.some(p=>!roster52.includes('"'+p.id+'"')))e52.push('100人专属名册覆盖不完整');
+                if(api52.RULES.filter(r=>!r.hero&&!r.collection).length!==80||heroes52.some(p=>api52.RULES.filter(r=>r.hero===p.id).length<10))e52.push('旧80项或每人至少10项专属内容丢失');
+                if(!api52.selfTest().ok)e52.push('成就运行时自检失败');
+            }catch(error52){e52.push('规则表执行失败：'+error52.message);}
+			if (ids52.length < 1080) e52.push("规则不足 1080 条（当前 " + ids52.length + "）");
 			const dup52 = ids52.filter((x, i) => ids52.indexOf(x) !== i);
 			if (dup52.length) e52.push("规则 id 重复：" + Array.from(new Set(dup52)).join("、"));
 			const ev52 = pa52.match(/var _EVENTS = \{([^}]*)\}/);
 			if (!ev52) e52.push("找不到事件白名单 _EVENTS");
-			else if ((ev52[1].match(/([a-zA-Z]+)\s*:/g) || []).length !== 8) e52.push("事件白名单不是 8 个（改了要同步本断言与设计文档）");
+			else if ((ev52[1].match(/([a-zA-Z]+)\s*:/g) || []).length !== 9) e52.push("事件白名单不是 9 个（改了要同步本断言与设计文档）");
 			if (!/connectMode/.test(pa52)) e52.push("缺联机守卫（联机会把成就刷爆）");
 			if (!/silent:\s*true/.test(pa52)) e52.push("全局技未设 silent（会打断牌局）");
 			if (!/addGlobalSkill/.test(pa52)) e52.push("未走 addGlobalSkill 注册");
@@ -2933,7 +2942,7 @@ async function runBossChecks() {
 			const ah52 = fs.existsSync(path.join(ROOT, "games", "achv.html")) ? fs.readFileSync(path.join(ROOT, "games", "achv.html"), "utf8") : "";
 			/* 奖励只在宿主复核并提交；页面只发规则 ID，不再自行写钱包。 */
 			const sh52 = fs.readFileSync(path.join(ROOT, "core", "csh_shell.js"), "utf8");
-			const claim52 = sh52.match(/if \(cmd === "shell-pool-ach-claim"\) \{([\s\S]*?)ackToGame\("shell-pool-ach-claim",[^;]+; return;\s*\}/)?.[1] || "";
+			const claim52 = sh52.match(/if \(cmd === "shell-pool-ach-claim"\) \{([\s\S]*?)ackToGame\("shell-pool-ach-claim",[^;]+;[\s\S]*?return;\s*\}/)?.[1] || "";
 			if (!/PA\.load\(\)\.got\[def\.id\]/.test(claim52) || !/PA\.RULES\.find/.test(claim52)) e52.push("宿主未复核真实规则与解锁记录");
 			if (!/PA\.isPaid/.test(claim52) || !/PA\.recordPaid/.test(claim52) || !/PA\.reward\(def\)/.test(claim52) || !/wallet\.claimPool\(def\.id,rw\.pc,rw\.merit,def\.name\)/.test(claim52)) e52.push("宿主领奖缺去重/规则奖励/持久提交/对账");
 			const wa52 = fs.readFileSync(path.join(ROOT, "core", "csh_wallet.js"), "utf8");
@@ -2942,6 +2951,12 @@ async function runBossChecks() {
 			if (ah52 && /(?:wallet|CSH\.wallet)\.(?:add|claimPool)\(/.test(ah52)) e52.push("成就页不应自行提交经济奖励");
 			if (!fs.existsSync(path.join(ROOT, "tools", "probe_pool_achv.mjs"))) e52.push("缺 tools/probe_pool_achv.mjs（判定层没有探针就等于没有验证）");
 			for (const probe52 of ["probe_pool_achv_rebuild.mjs", "probe_pool_achv_browser.mjs"]) if (!fs.existsSync(path.join(ROOT, "tools", probe52))) e52.push("缺 tools/" + probe52);
+            // Post-ACK presentation is allowed; all original rule/receipt assertions remain above.
+            for(const [probe,minimum] of [["probe_pool_achv_rebuild.mjs",57],["probe_achievement_feedback.mjs",35]]){
+                try{const r=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,"tools",probe)],{encoding:"utf8",timeout:20000,windowsHide:true}));if(r.failed!==0||r.passed<minimum)e52.push(probe+" 实际持久化/反馈契约未通过");}
+                catch(error){e52.push(probe+" 执行失败："+error.message.slice(0,120));}
+            }
+
 			const dbgA = fs.readFileSync(path.join(ROOT, "core", "csh_debug.js"), "utf8");
 			/* 2026-10-20 真实事故：成就卡建好了却忘了 appendChild ⇒ 池子世界里那张卡直接不存在，
 			   而 E32（registry/CARDS）和 E52 全都绿 —— 因为没人检查"卡有没有挂上去"。
@@ -2960,7 +2975,7 @@ async function runBossChecks() {
 			}
 		}
 		if (e52.length) fail("执行级 E52：池子成就（" + e52.slice(0, 4).join("；") + "）");
-		else ok("执行级 E52：池子成就引擎（" + ids52.length + " 条规则 · id 唯一 · 事件白名单 8 个 · 联机守卫 · 存档已登记 · 探针在位）");
+		else ok("执行级 E52：池子成就引擎（" + ids52.length + " 条规则 · 100武将每人至少10项专属 · id 唯一 · 事件白名单 9 个 · 联机守卫 · 存档已登记 · 探针在位）");
 
 		/* ------------------------------------------------------------------ *
 		 * E53（2026-10-20 · 发版命脉：catalog.js ↔ package.js ↔ 磁盘 三方对账）
@@ -3133,6 +3148,46 @@ async function runBossChecks() {
 		if (e56.length) fail("执行级 E56：演出素材注册表（" + e56.slice(0, 4).join("；") + "）");
 		else ok("执行级 E56：演出素材注册表（" + Object.keys(entries56).length + " 条 · 字段齐 · 与 effect/ 双向对账 · play 查表 · durOf 入口 · 技能侧零直读）");
 	}
+  // E57: Execute actual hint/policy boundaries; syntax and autoplay alone missed a free-variable regression.
+  if (spawnOk && execFileSync) {
+    let tmp57;
+    try {
+      tmp57 = fs.mkdtempSync(path.join(os.tmpdir(), 'csh-planning-'));
+      const target57 = path.join(tmp57, 'result.json');
+      const result57 = JSON.parse(execFileSync(process.execPath, [path.join(ROOT, 'tools/probe_minigame_planning.mjs'), '--out', target57], {encoding:'utf8', timeout:20000, windowsHide:true}));
+      if (result57.failed !== 0 || result57.passed < 42) fail('执行级 E57：小游戏提示/残局规划/公开记忆边界未通过');
+      else ok('执行级 E57：实际提示/残局规划/公开记忆/托管销毁边界（'+result57.passed+'/0）');
+      const bj57=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_blackjack_hint.mjs'),'--out',path.join(tmp57,'blackjack.json')],{encoding:'utf8',timeout:20000,windowsHide:true}));
+      if(bj57.failed!==0||bj57.passed<14)fail('执行级 E57B：廿一点4对NDAS提示未通过');else ok('执行级 E57B：廿一点4对NDAS提示（14/0）');
+      const rules57=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_blackjack_rules_hint.mjs'),'--out',path.join(tmp57,'blackjack-rules.json')],{encoding:'utf8',timeout:20000,windowsHide:true}));
+      if(rules57.failed!==0||rules57.passed<1653)fail('执行级 E57C：廿一点NDAS提示与合法动作未通过');else ok('执行级 E57C：廿一点NDAS与合法按钮（'+rules57.passed+'/0）');
+      const uno59=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_uno_round_boundaries.mjs'),'--out',path.join(tmp57,'uno-rounds.json')],{encoding:'utf8',timeout:20000,windowsHide:true}));
+      if(uno59.failed!==0||uno59.passed<27)fail('执行级 E59：UNO轮次/关闭回调边界未通过');else ok('执行级 E59：UNO轮次/关闭与迟到ACK（'+uno59.passed+'/0）');
+      const matrix60=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_blackjack_strategy_matrix.mjs'),'--out',path.join(tmp57,'blackjack-matrix.json')],{encoding:'utf8',timeout:20000,windowsHide:true}));
+      if(matrix60.failed!==0||matrix60.passed<24365)fail('执行级 E60：廿一点实际桌规策略矩阵未通过');else ok('执行级 E60：廿一点S17/H17与NDAS策略矩阵（'+matrix60.passed+'/0）');
+      const ddz61=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_doudizhu_round_boundaries.mjs'),'--out',path.join(tmp57,'ddz-rounds.json')],{encoding:'utf8',timeout:20000,windowsHide:true}));
+      if(ddz61.failed!==0||ddz61.passed<31)fail('执行级 E61：斗地主关窗/再来互斥未通过');else ok('执行级 E61：斗地主关窗/收工/重开与迟到ACK（'+ddz61.passed+'/0）');
+      const gifts62=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_gift_quantity.mjs'),'--out',tmp57],{encoding:'utf8',timeout:20000,windowsHide:true}));
+      if(gifts62.failed!==0||gifts62.passed<41)fail('执行级 E62：批量赠礼事务与幂等凭据未通过');else ok('执行级 E62：批量赠礼/幂等/封顶/故障/迁移（'+gifts62.passed+'/0）');
+      const goals63=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_goal_recommendations.mjs'),'--out',path.join(tmp57,'goals.json')],{encoding:'utf8',timeout:20000,windowsHide:true}));
+      if(goals63.failed!==0||goals63.passed<35)fail('执行级 E63：近期目标纯策略未通过');else ok('执行级 E63：近期目标/阶梯去重/真实进度/可靠性（'+goals63.passed+'/0）');
+      const blackjack64=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_blackjack_exit_boundaries.mjs'),'--out',path.join(tmp57,'bj-exit.json')],{encoding:'utf8',timeout:20000,windowsHide:true}));
+      if(blackjack64.failed!==0||blackjack64.passed<36)fail('执行级 E64：廿一点退出/失败续局未通过');else ok('执行级 E64：廿一点退出互斥/失败续步/迟到ACK（'+blackjack64.passed+'/0）');
+      const spirit65=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_spirit_owner_boundaries.mjs'),'--out',tmp57],{encoding:'utf8',timeout:20000,windowsHide:true}));
+      if(spirit65.failed!==0||spirit65.passed<31)fail('执行级 E65：妖灵主人与执行期支援边界未通过');else ok('执行级 E65：妖灵主人/配额/暂停/迟到支援（'+spirit65.passed+'/0）');
+      const feedback66=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_feedback_lifecycle.mjs'),'--out',tmp57],{encoding:'utf8',timeout:20000,windowsHide:true}));
+      if(feedback66.failed!==0||feedback66.passed<43)fail('执行级 E66：成就反馈恢复/暂停/重入生命周期未通过');else ok('执行级 E66：成就反馈恢复/前后台/暂停重入（'+feedback66.passed+'/0）');
+      const tactics67=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_tactical_achievements.mjs')],{encoding:'utf8',timeout:20000,windowsHide:true}));
+      if(tactics67.failed!==0||tactics67.passed<180)fail('执行级 E67：同局组合成就边界未通过');else ok('执行级 E67：28条同局挑战/事件/身份/模式/重载/领奖（'+tactics67.passed+'/0）');
+      const badges68=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_achievement_badges.mjs')],{encoding:'utf8',timeout:20000,windowsHide:true}));
+      if(badges68.failed!==0||badges68.passed<41)fail('执行级 E68：语义徽章隔离边界未通过');else ok('执行级 E68：十类徽章/稀有度/纯DOM/只读（'+badges68.passed+'/0）');
+      const facts69=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_achievement_event_facts.mjs')],{encoding:'utf8',timeout:20000,windowsHide:true}));
+      if(facts69.failed!==0||facts69.passed<35)fail('执行级 E69：成就事件事实边界未通过');else ok('执行级 E69：装备前后事实/有效判定/去重/保存隔离（'+facts69.passed+'/0）');
+      const career58=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_career_unlocks.mjs'),'--out',path.join(tmp57,'career.json')],{encoding:'utf8',timeout:20000,windowsHide:true}));
+      if(career58.failed!==0||career58.passed<40)fail('执行级 E58：生涯首次达成与永久资格未通过');else ok('执行级 E58：生涯首次达成/旧档/失败/迁移/资格（'+career58.passed+'/0）');
+    } catch(error) { fail('执行级 E57—E69：小游戏/生涯/赠礼执行回归失败（'+String(error.message).slice(0,160)+'）'); }
+    finally { if(tmp57){for(const file of ['blackjack-matrix.json','ddz-rounds.json','gift-quantity.json','goals.json','bj-exit.json','spirit-owner-boundaries.json','feedback-lifecycle.json']){try{fs.unlinkSync(path.join(tmp57,file));}catch{}}try{fs.unlinkSync(path.join(tmp57,'uno-rounds.json'));}catch{}try{fs.unlinkSync(path.join(tmp57,'blackjack-rules.json'));}catch{}try{fs.unlinkSync(path.join(tmp57,'career.json'));}catch{}try{fs.unlinkSync(path.join(tmp57,'blackjack.json'));}catch{}try{fs.unlinkSync(path.join(tmp57,'result.json'));}catch{}try{fs.rmdirSync(tmp57);}catch{}} }
+  } else warn('执行级 E57—E69：当前环境不能启动Node，小游戏/生涯/赠礼执行回归待运行');
 	log("");
 }
 

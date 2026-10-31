@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-csh-palette="chrome">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -401,7 +401,7 @@
   @media (orientation: landscape) and (max-height: 430px) {
     :root {
       --card-w: clamp(44px, 13.4vh, 66px);  /* 手牌宽：矮屏反而要更大 —— 屏幕小，牌得自己抢眼 */
-      --fs-xs: 10px; --fs-sm: 11px; --fs-md: 12.5px; --fs-lg: 15px;
+      --fs-xs: 10px; --fs-sm: 12px; --fs-md: 12.5px; --fs-lg: 15px;
     }
     #view-game .csh-board { gap: 3px; }
     #view-game .opp { padding: 2px 7px; border-radius: 8px; }
@@ -435,8 +435,15 @@
   }
 </style>
 <link rel="stylesheet" href="../../core/csh_experience.css">
+<style id="readable-ui-410">
+:root{--ui-readable:12px}
+.start-card>.subtitle,.field .lab,.start-card label,.start-card .hint{font-size:var(--ui-readable)!important;line-height:1.4}
+@media(max-height:430px){:root{--fs-xs:12px;--fs-sm:12px}}
+</style>
+<link rel="stylesheet" href="../../core/csh_tables.css">
+<link rel="stylesheet" href="../../core/csh_trick_tables.css">
 </head>
-<body class="csh-experience">
+<body class="csh-experience" data-csh-table="uno">
 
 <!-- ★ 2026-09-29：移除页面自带浮动「关闭」—— 壳顶带已有关闭，双按钮冗余（同德州轮修复） -->
 
@@ -457,12 +464,12 @@
         <button class="seg-btn active" type="button" data-n="3">3 个</button>
       </div>
     </div>
-    <button class="btn" id="btn-start-game" type="button">开始游戏</button>
+    <div class="trick-start-actions"><button class="btn" id="btn-start-game" type="button">开始游戏</button><details class="trick-reference"><summary>操作说明</summary><div class="tip">点可出的牌打出；无牌可出时摸牌。方向和当前颜色始终在台面显示，剩一张前按「UNO!」。</div></details></div>
     <div class="tip" id="econ-tip" style="display:none"></div>
     <!-- 【2026-10-03 精简】原第二行「手里剩 1 张前记得喊 UNO，否则罚摸 2 张」——
          局内在剩 1 张时本来就会弹「喊 UNO」按钮，规则写在按钮旁边才有用；
          开局页只留一行操作方式。 -->
-    <div class="tip">点可出的牌打出 · 没牌可出就摸牌</div>
+
   </div>
 </div>
 
@@ -516,7 +523,7 @@
   <div class="csh-dock">
     <button class="btn hidden" id="btn-draw" type="button">摸牌</button>
     <button class="btn-uno hidden" id="btn-uno" type="button">UNO!</button>
-    <button class="btn-uno ghost hidden" id="btn-auto" type="button" title="托管：自动帮你出牌">托管</button>
+    <button class="btn-uno ghost hidden" id="btn-auto" type="button" title="托管：自动出牌；Esc 可立即接管">托管</button>
   </div>
 </div>
 
@@ -803,6 +810,8 @@ function Room(id, net) {
   this.botTimer = null;
   this.autoPlay = false;    /* 托管：本机真人回合也交给同一套人机 AI */
   this.log = [];
+  this.publicHistory = [];
+  this.publicSerial = 0;
 }
 
 Room.prototype.alivePlayers = function () {
@@ -927,6 +936,25 @@ Room.prototype.refillDeck = function () {
   this.discard = [top];
 };
 
+/* Public observations are weak tendencies, never proof of a missing color. */
+Room.prototype.rememberAction = function (pi, kind, color) {
+  var p=this.players[pi]; if(!p)return;
+  if(!this.publicHistory)this.publicHistory=[];
+  this.publicSerial=(this.publicSerial||0)+1;
+  this.publicHistory.push({pid:p.id,kind:kind,color:color||null,round:this.round,serial:this.publicSerial});
+  if(this.publicHistory.length>32)this.publicHistory.shift();
+};
+Room.prototype.observedDrawColor = function (p, color) {
+  var history=this.publicHistory||[];
+  for(var i=history.length-1;i>=0;i--){var e=history[i];
+    if(e.round!==this.round||(this.publicSerial||0)-e.serial>8)break;
+    if(e.pid!==p.id)continue;
+    if(e.kind==='gain')return false; /* New penalty cards invalidate a color tendency. */
+    if(e.kind==='play'&&e.color===color)return false;
+    if(e.kind==='draw'&&e.color===color)return true;
+  }
+  return false;
+};
 Room.prototype.canPlay = function (card) {
   if (!this.topCard) return true;
   if (card.color === 'black') return true;
@@ -952,10 +980,13 @@ Room.prototype.giveCards = function (player, n) {
   var cards = this.drawFromDeck(n);
   for (var i = 0; i < cards.length; i++) player.hand.push(cards[i]);
   player.uno = false;
+  if(cards.length)this.rememberAction(this.players.indexOf(player),'gain',null);
   return cards;
 };
 
 Room.prototype.start = function () {
+  if (typeof closePending !== 'undefined' && closePending) return { err: '正在确认结算，请稍候再开局' };
+  if(this.destroyed)return {err:'牌桌已关闭，请重新入场'};
   if (this.state === 'playing') return { err: '游戏进行中' };
   if (this.players.length < 2) return { err: '至少需要 2 名玩家' };
   for (var i = 0; i < this.players.length; i++) {
@@ -982,6 +1013,7 @@ Room.prototype.start = function () {
   this.activeColor = first.color;
   this.state = 'playing';
   this.round += 1;
+  this.publicHistory = []; this.publicSerial = 0;
   if (Bridge.active) Bridge.round(this.round);
   sfx.deal();
   this.pushLog('游戏开始！');
@@ -1047,10 +1079,12 @@ Room.prototype.play = function (pi, cardId, chosenColor) {
   this.discard.push(card);
   this.topCard = card;
   this.activeColor = card.color === 'black' ? chosenColor : card.color;
+  this.rememberAction(pi,'play',this.activeColor);
   var cardDesc = this.cardText(card, card.color === 'black' ? chosenColor : card.color);
   this.pushLog(p.name + ' 打出了 ' + cardDesc);
-  if (card.value === 'draw2' || card.value === 'wild4') sfx.penal();
-  else if (card.value === 'skip' || card.value === 'reverse') sfx.skip();
+  if (card.value === 'draw2' || card.value === 'wild4') sfxPlay('uno.draw');
+  else if (card.value === 'reverse') sfxPlay('uno.reverse');
+  else if (card.value === 'skip') sfxPlay('uno.skip');
   else sfx.play();
 
   /* UNO 判定：出牌后剩 1 张且事前未声明 → 罚摸 2 张 */
@@ -1094,6 +1128,7 @@ Room.prototype.draw = function (pi) {
   p.hand.push(card);
   p.uno = false;
   this.turnHasDrawn = true;
+  this.rememberAction(pi,'draw',this.activeColor);
   sfx.draw();
   this.pushLog(p.name + ' 摸了 1 张牌');
   if (this.canPlay(card)) {
@@ -1142,10 +1177,12 @@ Room.prototype.scheduleBot = function () {
     this.botTimer = null;
   }
   var p = this.players[this.current];
-  if (!alive || this.state !== 'playing' || !p) return;
+  if (!alive || this.destroyed || this.state !== 'playing' || !p) return;
   if (!this.isAuto(p)) return; /* 真人回合：等玩家操作，不排程 */
-  var self = this;
+  var self = this, round = this.round, player = p, current = this.current;
+  var ticket = this.botTicket = (this.botTicket || 0) + 1;
   this.botTimer = later(function () {
+    if (!alive || self.destroyed || self.botTicket !== ticket || self.round !== round || self.current !== current || self.players[current] !== player || !self.isAuto(player)) return;
     self.botTimer = null;
     self.botAct();
   }, botDelay());
@@ -1160,26 +1197,45 @@ Room.prototype.botPlay = function (pi, card) {
 };
 
 Room.prototype.botChooseCard = function (p, playable) {
-  var next = this.players[this.peekNext(1)];
-  var threat = !!next && next !== p && next.hand.length <= 2;
-  var attackRank = { wild4: 0, draw2: 1, skip: 2, reverse: 3 };
-  var score = function (c) {
-    if (c.color === 'black') return c.value === 'wild4' ? 90 : 80;
-    if (attackRank[c.value] !== undefined) {
-      return threat ? attackRank[c.value] : 40 + attackRank[c.value];
-    }
-    return 20 - Number(c.value); /* 数字牌优先出大点数 */
-  };
-  var best = playable[0];
-  var bestScore = Infinity;
-  for (var i = 0; i < playable.length; i++) {
-    var s = score(playable[i]);
-    if (s < bestScore) {
-      bestScore = s;
-      best = playable[i];
-    }
+  if (!playable.length) return null;
+  if (p.hand.length === 1) return playable[0];
+  var colors = {red:0,yellow:0,green:0,blue:0}, self = this;
+  var profile = p.seat || {}, focus = Math.max(.4,Math.min(1,(Number(profile.effSkill || profile.skill)||.8)-(Number(profile.fatigue)||0)*.08));
+  p.hand.forEach(function (c) { if (c.color !== 'black') colors[c.color]++; });
+  function target(card) {
+    if (card.value !== 'reverse' || self.alivePlayers().length <= 2) return self.players[self.peekNext(1)];
+    for (var step=1;step<=self.players.length;step++) { var i=(self.current-self.direction*step+self.players.length*2)%self.players.length; if(!self.players[i].out)return self.players[i]; }
+    return null;
   }
-  return best;
+  function chosenColor(c) { return c.color==='black'?self.botPickColor(p):c.color; }
+  function ownChain(rest, value, color, depth, budget) {
+    if(!depth||!rest.length||budget.left--<=0)return 0;
+    var best=0;
+    for(var i=0;i<rest.length;i++) { var c=rest[i]; if(c.color!=='black'&&c.color!==color&&c.value!==value)continue;
+      var remaining=rest.slice();remaining.splice(i,1);
+      if(c.color==='black')COLORS.forEach(function(ch){best=Math.max(best,1+ownChain(remaining,c.value,ch,depth-1,budget));});
+      else best=Math.max(best,1+ownChain(remaining,c.value,c.color,depth-1,budget));
+      if(best>=Math.min(depth,rest.length))break;
+    }
+    return best;
+  }
+  function score(c) {
+    var t=target(c), threat=t&&t!==p&&t.hand.length<=2;
+    var attack=c.value==='wild4'||c.value==='draw2'||c.value==='skip'||c.value==='reverse';
+    var s=c.color==='black'?50:(20-Number(c.value||0)-(colors[c.color]||0)*(3+3*focus));
+    if(attack)s=threat?-30:(c.color==='black'?55:24-(colors[c.color]||0)*3);
+    if(attack&&!threat&&(profile.persona==='aggro'||profile.persona==='wild'))s-=3;
+    if(c.value==='wild4'&&!threat)s+=12;
+    if(p.hand.length<=3&&c.color==='black')s-=18;
+    var rest=p.hand.filter(function(x){return x.id!==c.id;}), color=chosenColor(c);
+    var compatible=function(x){return x.color==='black'||x.color===color||x.value===c.value;};
+    var extraTurn=(c.value==='skip'||c.value==='draw2'||c.value==='wild4'||c.value==='reverse')&&self.alivePlayers().length===2;
+    if(extraTurn&&rest.length===1&&compatible(rest[0]))s-=100; /* Guaranteed next action can finish; no hidden-card assumptions. */
+    else if(p.hand.length<=7)s-=ownChain(rest,c.value,color,3,{left:64})*2*focus;
+    if(t&&self.observedDrawColor(t,color))s-=.6; /* Soft evidence only, subordinate to own hand and urgent blocking. */
+    return s;
+  }
+  return playable.map(function(c){return {card:c,score:score(c)};}).sort(function(a,b){return a.score-b.score||String(a.card.id).localeCompare(String(b.card.id));})[0].card;
 };
 
 Room.prototype.botPickColor = function (p) {
@@ -1187,25 +1243,23 @@ Room.prototype.botPickColor = function (p) {
   for (var i = 0; i < p.hand.length; i++) {
     if (p.hand[i].color !== 'black') count[p.hand[i].color]++;
   }
-  var best = COLORS[0];
-  var n = -1;
-  for (var k = 0; k < COLORS.length; k++) {
-    if (count[COLORS[k]] > n) {
-      n = count[COLORS[k]];
-      best = COLORS[k];
-    }
+  var best=this.activeColor||COLORS[0], bestScore=-Infinity, target=this.players[this.peekNext(1)];
+  for(var k=0;k<COLORS.length;k++){
+    var color=COLORS[k], weak=target&&this.observedDrawColor(target,color)?.35:0;
+    var score=count[color]*4+weak+(color===this.activeColor?.1:0);
+    if(score>bestScore){bestScore=score;best=color;}
   }
   return best;
 };
 
 Room.prototype.botAct = function () {
-  if (!alive || this.state !== 'playing') return;
+  if (!alive || this.destroyed || this.state !== 'playing') return;
   var p = this.players[this.current];
   if (!p || !this.isAuto(p)) return;
   var pi = this.current;
   var self = this;
   var stillMe = function () {
-    return self.state === 'playing' && self.players[self.current] === p && !p.out;
+    return alive && self.state === 'playing' && self.players[self.current] === p && !p.out && self.isAuto(p);
   };
 
   /* 出牌后剩 1 张前先声明 UNO，避免罚牌（摸牌会重置 uno，出牌前都要补声明） */
@@ -1307,6 +1361,8 @@ Room.prototype.broadcastState = function () {
 };
 
 Room.prototype.destroy = function () {
+  this.destroyed=true; this.botTicket=(this.botTicket||0)+1; this.state='destroyed';
+  this.publicHistory=[];
   if (this.botTimer) {
     clearTimeout(this.botTimer);
     this.botTimer = null;
@@ -1464,6 +1520,8 @@ function renderGame() {
       (p.isTurn ? ' turn' : '') +
       (p.isBot ? ' bot' : '') +
       (p.online || p.isBot ? '' : ' offline');
+    el.title=String(p.name||'牌友');
+    el.setAttribute('aria-label',String(p.name||'牌友')+' · '+p.count+' 张'+(p.isTurn?' · 当前出牌':'')+(p.uno?' · UNO':'' )+(p.out?' · 已出局':''));
     var html = '';
     if (p.isHost) html += '<span class="crown">👑</span>';
     if (p.out) html += '<span class="out">出局</span>';
@@ -1547,6 +1605,7 @@ function renderGame() {
   btnAuto.classList.toggle('hidden', view.state !== 'playing');
   btnAuto.classList.toggle('on', autoOn);
   btnAuto.textContent = autoOn ? '托管中' : '托管';
+  btnAuto.setAttribute('aria-pressed',autoOn?'true':'false');
 
   /* 回合横幅 */
   var tb = $('#turn-banner');
@@ -1696,7 +1755,7 @@ function syncModals() {
         /* ★ 2026-09-29 R3-2：结算回调此前完全不看 ok ⇒ 桥超时/失败时玩家毫无感知
            （门票已扣，收益没入账）。失败即如实提示，不谎报成功。 */
         try { Bridge.settle(rk.place, rk.players, function (ok) {
-          if (ok === false) { try { toast('结算未成功，本局未入账（可退出后重查余额）'); } catch (eT) {} }
+          if (ok === false) { try { toast('结算未成功，本局未入账（页面保留后可安全重试）'); } catch (eT) {} }
         }); } catch (eS) {}
         /* 【2026-10-03】同桌拟人 + 战果回报：让对手说一句，并把这一局的胜负记进世界
            （只记胜负、不动钱：UNO 是门票制，世界资金的零和记账不参与本游戏）。 */
@@ -1720,9 +1779,10 @@ function syncModals() {
 function setAuto(on) {
   if (!room) return;
   room.autoPlay = !!on;
+  sfxPlay(room.autoPlay ? 'assist.on' : 'assist.off');
   toast(room.autoPlay ? '已开启托管 · 自动出牌' : '已关闭托管');
   /* 当前若正好是我的回合，立刻补排一次，否则要等到下一轮才生效 */
-  if (room.autoPlay && view && view.state === 'playing') room.scheduleBot();
+  if (view && view.state === 'playing') room.scheduleBot();
   room.broadcastState();
 }
 
@@ -1758,19 +1818,10 @@ function quipEnd(iWin) {
     CSHPage.sayThrottled(CSHPage.seatAnchor(s.name), s, iWin ? 'lose' : 'win');
   } catch (eQ2) {}
 }
-function reportBots(myLeft) {
-  try {
-    for (var i = 0; i < botSeats.length; i++) {
-      var s = botSeats[i];
-      if (!s || !s.id) continue;
-      var left = leftOf(s.name);
-      if (left == null) continue;
-      Bridge.result(s.id, left < myLeft, view.round); /* 与 rankOf 一致：真人固定先手，同牌数时排在后座之前 */
-    }
-  } catch (eR) {}
-}
+function reportBots(myLeft,callback){var jobs=[];for(var i=0;i<botSeats.length;i++){var seat=botSeats[i],left=seat&&leftOf(seat.name);if(seat&&seat.id&&left!=null)jobs.push({id:seat.id,won:left<myLeft});}if(!jobs.length){if(callback)callback(true);return;}var pending=jobs.length,success=true;jobs.forEach(function(job){Bridge.result(job.id,job.won,view.round,function(ok){success=success&&ok!==false;if(--pending===0&&callback)callback(success);});});}
 
 function startGame() {
+  if (closePending || !alive) { toast('正在确认结算，请稍候再开局'); return; }
   var name = ($('#inp-name').value || '').trim().slice(0, 12) || '池子';
   if (!lsSet('csh_uno_name', name)) return;
 
@@ -1799,6 +1850,7 @@ function startGame() {
 }
 
 function showStart() {
+  if (closePending || !alive) { toast('正在确认结算，请稍候返回'); return; }
   if (room) { room.destroy(); room = null; }
   clearAllTimers();
   view = null;
@@ -1811,24 +1863,11 @@ function showStart() {
   switchView('view-start');
 }
 
-function closePage() {
-  alive = false;              /* 先掐断机器人定时器递归 */
-  clearAllTimers();
-  if (room) { try { room.destroy(); } catch (e) {} room = null; }
-  /* 战果与金额分别确认；重复回报由宿主按桌/轮/对手回放，补结束时失败的回报。 */
-  if (Bridge.active && view && view.state === 'ended') {
-    var finalLeft = (view.players[youIdx] || {}).count;
-    reportBots(finalLeft == null ? myHand.length : (Number(finalLeft) || 0));
-  }
-  /* 兜底：若对局已结束但尚未结算（如直接关窗），按当前结果补一次（幂等） */
-  if (Bridge.active && !Bridge.isSettled() && view && view.state === 'ended') {
-    var myName2 = (view.players[youIdx] || {}).name;
-    var rk2 = rankOf(view, myName2);
-    try { Bridge.settle(rk2.place, rk2.players, function (ok2) {
-      if (ok2 === false) { try { toast('结算未成功，本局未入账（可退出后重查余额）'); } catch (eT2) {} }
-    }); } catch (eS2) {}
-  }
-  try { window.parent.postMessage({ __csh: "uno-close" }, "*"); } catch (e) {}
+var closePending=false;
+function closePage(){if(!alive||closePending)return;closePending=true;var finished=false;
+ function finish(ok){if(finished||!alive)return;finished=true;closePending=false;if(ok===false){toast('结算或战果尚未确认，页面已保留。可再次关闭以安全重试。');try{window.parent.postMessage({__csh:'shell-close-cancelled'},'*');}catch(e){}return;}alive=false;clearAllTimers();if(room){try{room.destroy();}catch(e){}room=null;}try{window.parent.postMessage({__csh:'uno-close'},'*');}catch(e){}}
+ function settle(){if(finished||!alive)return;if(Bridge.active&&!Bridge.isSettled()&&view&&view.state==='ended'){var rank=rankOf(view,(view.players[youIdx]||{}).name);Bridge.settle(rank.place,rank.players,finish);}else finish(true);}
+ try{if(Bridge.active&&view&&view.state==='ended'){var left=(view.players[youIdx]||{}).count;reportBots(left==null?myHand.length:Number(left)||0,function(ok){if(ok)settle();else finish(false);});}else settle();}catch(e){finish(false);}
 }
 
 /* ============================================================
@@ -1888,6 +1927,7 @@ $('#btn-cancel-color').addEventListener('click', function () {
 /* Esc：先关模态，否则关页面（§17.2：有模态打开时 Esc 不得关整局） */
 document.addEventListener('keydown', function (e) {
   if (e.key !== 'Escape') return;
+  if(e.repeat){e.preventDefault();return;}
   if (!$('#modal-color').classList.contains('hidden')) {
     pendingColorCard = null;
     $('#modal-color').classList.add('hidden');
@@ -1896,6 +1936,7 @@ document.addEventListener('keydown', function (e) {
   /* 摸牌决策 / 结算弹窗打开时 Esc 不动作：决策要靠按钮完成，结算横幅不许被误触关掉 */
   if (!$('#modal-drawn').classList.contains('hidden')) return;
   if (!$('#modal-end').classList.contains('hidden')) return;
+  if(room&&room.autoPlay){e.preventDefault();e.stopPropagation();setAuto(false);return;}
   closePage();
 });
 

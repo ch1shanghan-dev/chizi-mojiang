@@ -51,8 +51,8 @@ function run(mode, opt) {
 console.log("== 1. 规则表自检 ==");
 const st = PA.selfTest();
 ok("selfTest 通过", st.ok, st.errors.join("; "));
-ok("规则 80 条", st.total === 80, "实际 " + st.total);
-ok("事件白名单 8 个", Object.keys(PA.EVENTS).length === 8);
+ok("保留通用80条，100位武将专属均在", PA.RULES.filter(r=>!r.hero&&!r.collection).length === 80 && PA.PROFILES.length===100 && st.total>=1080, "实际 " + st.total);
+ok("事件白名单 9 个（含公开结果采集）", Object.keys(PA.EVENTS).length === 9);
 
 console.log("\n== 2. 单条判定（正例 / 反例） ==");
 {
@@ -191,7 +191,7 @@ console.log("\n== 9. 存档 ==");
 	PA.unlock("op_one_slash", "identity");
 	ok("再次达成累加次数", PA.load().got["op_one_slash"].n === 2);
 	const cs = PA.claimState();
-	ok("claimState 计数", cs.got === 1 && cs.total === 80, JSON.stringify(cs));
+	ok("claimState 计数", cs.got === 1 && cs.total === PA.RULES.length, JSON.stringify(cs));
 	ok("未读计数", cs.unread === 1);
 }
 

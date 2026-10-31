@@ -18,10 +18,10 @@
 
      文案纪律（与天下榜同款）：页面上一切对外可见的字，都只从脚本顶部的文案表 T 取。
      ============================================================ -->
-<html lang="zh-CN">
+<html lang="zh-CN" data-csh-palette="portrait">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>行囊</title>
 <script src="../core/csh_selftest.js" data-csh-selftest="auto"></script>
 <script src="../core/csh_page.js"></script>
@@ -41,8 +41,8 @@
 
   /* 字号收编档（2026-10-20）：同值 token 替换裸字号，渲染不变；同档多值待实机测量后并档 */
   --pfs-micro: 10.5px;
-  --pfs-cap: 11px;
-  --pfs-cap2: 11.5px;
+  --pfs-cap: 12px;
+  --pfs-cap2: 12px;
   --pfs-sm: 12.5px;
   --pfs-md: 13px;
   --pfs-lg: 14px;
@@ -149,6 +149,9 @@ textarea{min-height:110px;max-height:220px}
 .result .msg.warn{color:var(--warn)}
 .recovery{border:1px solid var(--warn);margin-bottom:10px;padding:10px 12px;border-radius:9px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 .recovery[hidden]{display:none}
+#pending-details{flex-basis:100%;min-width:0}
+#pending-details summary{min-height:44px;display:flex;align-items:center;cursor:pointer}
+#pending-error{margin:0;white-space:pre-wrap;overflow-wrap:anywhere}
 .recovery span{flex:1;font-size:var(--pfs-sm);line-height:1.6;min-width:200px}
 details.card{margin-top:10px}
 details.card>summary{cursor:pointer;color:var(--gold);min-height:44px;display:list-item;padding:11px 0;line-height:22px}
@@ -185,10 +188,33 @@ details.card[open]>summary{margin-bottom:8px;border-bottom:1px solid var(--line-
   .diffrow{padding:4px 9px;font-size:var(--pfs-cap2)} .diffrow .dk{flex-basis:80px}
   .foot{margin-top:4px;font-size:var(--pfs-cap)}
 }
+.inv-extra{margin-top:10px;border-top:1px solid var(--line)}.inv-extra summary{cursor:pointer;min-height:44px;padding:10px 0;color:var(--ink-dim);line-height:1.6}.iv[data-has="0"]{opacity:.72}.scope{margin-bottom:8px}.scope small{line-height:1.5}
+/* 一次只突出可执行的任务：完整范围留在标题旁，文件入口前置，生成码后再展示带走操作。 */
+.work-heading{display:flex;align-items:baseline;justify-content:space-between;gap:6px 12px;flex-wrap:wrap;margin-bottom:8px;min-width:0}
+.work-heading h3{margin:0}
+.card>summary>span{margin-left:8px;font-family:var(--ff-body);font-size:var(--pfs-cap2);font-weight:400;color:var(--ink-dim);letter-spacing:.02em}
+.work-heading h3 span:empty{display:none}
+.work-heading .scope{padding:0;margin:0;border:0;line-height:1.6;font-size:var(--pfs-sm);font-weight:400;min-width:0;overflow-wrap:anywhere}
+.work-heading .scope small:empty{display:none}
+.work-actions .result{padding:7px 0;margin:0 0 7px}
+.work-actions .rowbtn{margin-top:8px}
+.work-actions .code-label{margin-top:8px}
+.rowbtn[hidden]{display:none}
+.inv{display:block}
+.inv-core{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:0 14px}
+.inv-extra{grid-column:1/-1}
+.workspace>.card{min-width:0}
+.scope,.note,.diffrow .dv,.bkrow .bv{overflow-wrap:anywhere;min-width:0}
+@media(max-width:760px){.work-heading{align-items:flex-start}.work-heading .scope{flex-basis:auto}}
 </style>
 <link rel="stylesheet" href="../core/csh_experience.css">
+<style id="readable-ui-410">
+:root{--pfs-micro:12px;--pfs-cap:12px;--pfs-cap2:12px}
+.brand small{line-height:1.5}
+</style>
+<link rel="stylesheet" href="../core/csh_journal.css">
 </head>
-<body class="csh-experience">
+<body class="csh-experience" data-csh-journal="save">
 <div id="app">
   <div class="topbar">
     <div class="brand" id="brand">行囊<small id="brandsub"></small></div>
@@ -197,42 +223,25 @@ details.card[open]>summary{margin-bottom:8px;border-bottom:1px solid var(--line-
 
   <div id="board">
     <div class="recovery" id="recovery" hidden><span id="recovery-note"></span><button class="btn" id="b-recover" type="button"></button></div>
+    <section class="recovery" id="pending-results" hidden><span id="pending-note" role="status"></span><button class="btn" id="pending-retry" type="button">重试保存</button><details id="pending-details" hidden><summary>查看保存提示</summary><p id="pending-error"></p></details></section>
     <div class="workspace">
     <!-- ① 家当清点 -->
-    <div class="card work-data">
-      <h3 id="h-inv"></h3>
-      <div class="selection" id="selection"></div>
-      <div class="inv" id="inv"></div>
-      <div class="note" id="invnote"></div>
-    </div>
-
-    <!-- ② 一份家当（导出 / 导入共用一格码） -->
-    <div class="card work-actions">
-      <h3 id="h-code"></h3>
-      <div class="scope" id="scope"></div>
+    <div class="journal-actions-column"><div class="card work-actions">
+      <div class="work-heading"><h3 id="h-code"></h3><div class="scope" id="scope"></div></div>
+      <div class="rowbtn"><button class="btn primary" id="b-pack" type="button"></button></div>
+      <div class="rowbtn" id="output-actions" hidden><button class="btn ghost" id="b-copy" type="button"></button><button class="btn ghost" id="b-download" type="button"></button></div>
       <div class="result"><div class="msg" id="msg" role="status" aria-live="polite"></div></div>
-      <div class="rowbtn">
-        <button class="btn primary" id="b-pack" type="button"></button>
-        <button class="btn ghost" id="b-copy" type="button"></button>
-        <button class="btn ghost" id="b-download" type="button"></button>
-      </div>
-      <label class="code-label" id="code-label" for="code"></label>
-      <textarea id="code" spellcheck="false" autocomplete="off" aria-describedby="msg"></textarea>
-      <div class="rowbtn">
-        <button class="btn ghost" id="b-check" type="button"></button>
-        <button class="btn" id="b-unpack" type="button"></button>
-      </div>
-      <div class="diff" id="diff"></div>
-    </div>
-    </div>
-
+      <details id="journal-import"><summary>存档码与恢复</summary>
+       <div class="restore-heading"><label class="code-label" id="code-label" for="code"></label><button class="btn ghost" id="b-file" type="button">选择存档文件</button><input id="save-file" type="file" accept=".txt,.json,.csh" hidden></div>
+       <textarea id="code" spellcheck="false" autocomplete="off" aria-describedby="msg"></textarea>
+       <div class="rowbtn"><button class="btn ghost" id="b-check" type="button"></button><button class="btn" id="b-unpack" type="button"></button></div><div class="diff" id="diff"></div>
+      </details>
+    </div><div class="journal-storage-tools">
     <!-- ③ 备份与回滚 -->
     <details class="card">
       <summary id="h-bk"></summary>
       <div id="bklist"></div>
-      <div class="rowbtn">
-        <button class="btn ghost" id="b-bk" type="button"></button>
-      </div>
+
       <div class="note" id="bknote"></div>
     </details>
 
@@ -251,6 +260,18 @@ details.card[open]>summary{margin-bottom:8px;border-bottom:1px solid var(--line-
       <div class="excl" id="edge"></div>
     <div class="foot" id="foot"></div>
     </details>
+    </div></div>
+<div class="card work-data">
+      <div class="work-heading"><h3 id="h-inv"></h3><button class="btn ghost" id="b-bk" type="button"></button></div>
+      <div class="selection" id="selection"></div>
+      <div class="inv" id="inv"></div>
+      <div class="note" id="invnote"></div>
+    </div>
+
+
+
+    </div>
+
   </div>
 </div>
 
@@ -268,11 +289,11 @@ var T = {
   /* 资产条单位 */
   uPc: "池子币", uMerit: "功勋",
   /* 家当清点 */
-  hInv: "随行内容", hInvSub: "以本机清点结果为准",
-  invNote: "✓ 表示已有数据；灰色表示尚未使用，导出时会略过空项。整份打包，无需逐项选择。",
-  scope: "当前范围：全部玩家数据",
-  scopeNote: "钱包、进度、战绩、世界与个人偏好统一打包；不支持拆分选择。",
-  selection: "共 {n} 类 · 已有数据 {has} 类 · 全部随行",
+  hInv: "重要进度", hInvSub: "",
+  invNote: "✓ 表示已有进度。导出仍包含全部玩家数据，无需逐项选择。",
+  scope: "包含全部玩家数据",
+  scopeNote: "",
+  selection: "已有进度均随完整存档带走",
   selectionLoading: "正在清点本机数据…",
   selectionFailed: "本机清点暂不可用，请重新读取后再打包。",
   capacity: "不设整包数量或容量限额；各项按存档规则校验。",
@@ -300,24 +321,24 @@ var T = {
   fmtSum: "合计 {v}", fmtFull: "满档 {v}", fmtCost: "成本 {v}",
   fmtGained: "累计 {v}",
   /* 码区 */
-  hCode: "打包与导入", hCodeSub: "打包 → 复制或保存文件",
+  hCode: "带走存档", hCodeSub: "",
   phCode: "一键打包后这里会出现存档码；也可粘贴已有存档码，先校验预览再导入。",
-  codeLabel: "存档码 / 粘贴待导入的存档码",
+  codeLabel: "粘贴存档码，或选择存档文件",
   bPack: "一键打包", bCopy: "复制存档码", bDownload: "保存文件", bCheck: "只校验", bUnpack: "导入存档", bConfirmImport: "确认导入",
-  msgIdle: "清点后，点「一键打包」生成完整存档。",
+  msgIdle: "一键打包后，可保存文件或复制存档码。",
   msgWorking: "正在处理，请稍候…",
-  msgPacked: "打包完成 · {n} 字 / {bytes} · 格式 v{v}。可复制存档码或保存文件；本机存档保留。",
+  msgPacked: "打包完成 · 可保存文件或复制存档码，本机进度保留。",
   msgDownloaded: "已生成存档文件并交给浏览器保存。",
   msgDownloadFail: "文件未能生成，请复制存档码带走。",
   msgCodeChanged: "存档码已修改，请重新校验预览。",
   msgHostBusy: "宿主仍在处理存档，完成后自动重新清点。",
   msgReconciled: "宿主操作已结束，已重新清点。请核对当前数值与备份。",
-  msgReadFail: "读取未完成，保留上次显示；可在「备份与回滚」中点击「重新读取」。",
+  msgReadFail: "读取未完成，保留上次显示；点击「重新读取」重试。",
   msgCopied: "已复制到剪贴板。",
   msgCopyFail: "复制没成功，框里已全选，手动复制一次即可。",
-  msgCheckOk: "这份家当是好的 · 来自 {build} · 生成于 {time}",
+  msgCheckOk: "文件可读取 · 来自 {build} · 生成于 {time}",
   msgCheckAgain: "校验通过。请检查下方差异，再点「确认导入」。导入前会自动备份本机。",
-  msgUnpacked: "已倒进来 · 备份戳 {stamp}。若数值没变，退出游戏重进一次即刷新。",
+  msgUnpacked: "导入完成。已保留导入前的本机备份，可在下方查看。",
   msgEmpty: "框里是空的。",
   msgPackFail: "没收成：{err}",
   msgCheckFail: "这份家当读不出来：{err}",
@@ -328,7 +349,7 @@ var T = {
   dkPc: "池子币", dkRank: "官阶序号", dkMerit: "功勋", dkMatch: "战绩场次",
   dkKill: "已击破魔王", dkGirls: "羁绊人数",
   /* 备份 */
-  hBk: "备份与回滚", hBkSub: "每次倒入前都会自动留一份",
+  hBk: "本机备份", hBkSub: "每次倒入前都会自动留一份",
   bBk: "重新读取", bBkRoll: "回滚", bRecover: "恢复未完成操作",
   bkNone: "这台机器上还没有备份（倒过一次家当之后就有了）。",
   bkNote: "本机自动备份只留最近三份，更早的会被挤掉；另存的文件由你保管。",
@@ -341,7 +362,7 @@ var T = {
   msgRecoveryFirst: "请先恢复原存档，恢复后再继续使用其他功能。",
   msgPending: "暂未收到完成结果，请稍后点击“恢复未完成操作”确认，恢复后再继续使用其他功能。",
   /* 重置 */
-  hReset: "推倒重来", hResetSub: "不可撤销",
+  hReset: "重置进度", hResetSub: "不可撤销",
   resetNote: "清空全部家当，回到刚装好扩展的样子（2000 池子币 / 平民）。请先「一键打包」并另存一份，再动手。",
   bReset: "重置这一身",
   resetConfirm1: "确定要清空这一身家当吗？\n\n清完就回到出厂初始态：\n· 池子币回到 2000，官阶回到「平民」\n· 战绩 / 讨伐录 / 羁绊 / 金鳞市持仓 / 成就 / 每日任务\n· 兑换码记录（已兑换的码会失效）\n\n建议先「一键打包」并另存一份。",
@@ -349,7 +370,7 @@ var T = {
   msgReset: "已清空，正在刷新…",
   msgResetFail: "重置没成功：{err}",
   /* 边界 */
-  hEdge: "不随行囊走的那些", hEdgeSub: "换台机器就该换的东西",
+  hEdge: "存档范围", hEdgeSub: "换台机器就该换的东西",
   edgeLead: "下面这些是「这台机器」的标识，跟你的人身家当无关，所以不带：",
   edgeTail: "另外，游戏设置里那些开关（音效播报、平行时空、面板样式之类）属于无名杀自己的设置，跟着本机走 —— 换机器时在设置界面里按自己习惯再调一次就行。",
   /* 页脚 */
@@ -374,12 +395,12 @@ function big(n) {
   if (n >= 10000) return (n / 10000).toFixed(2) + " 万";
   return fmt(n);
 }
-var STATE = { inv: [], excluded: [], version: 0, pending: null, backups: [], ready: false,
+var STATE = { exportCode: null, inv: [], excluded: [], version: 0, pending: null, backups: [], ready: false,
   busy: false, recovery: false, hostBusy: false, disposed: false, loadSeq: 0, poll: null };
 function currentCode() { var ta = el("code"); return ta ? String(ta.value || "").trim() : ""; }
 function syncControls() {
   var lock = STATE.busy || STATE.hostBusy || STATE.recovery;
-  var ids = ["b-pack", "b-check", "b-unpack", "b-reset", "b-bk", "b-recover", "b-copy", "b-download"];
+  var ids = ["b-file", "save-file", "pending-retry", "b-pack", "b-check", "b-unpack", "b-reset", "b-bk", "b-recover", "b-copy", "b-download"];
   for (var i = 0; i < ids.length; i++) {
     var b = el(ids[i]); if (!b) continue;
     b.disabled = ids[i] === "b-recover" ? STATE.busy || STATE.hostBusy :
@@ -389,6 +410,7 @@ function syncControls() {
   }
   var un = el("b-unpack"); if (un) un.textContent = STATE.pending === currentCode() && STATE.pending ? T.bConfirmImport : T.bUnpack;
   var ta = el("code"); if (ta) ta.readOnly = !!STATE.busy;
+  var output = el("output-actions"); if (output) output.hidden = !currentCode() || currentCode() !== STATE.exportCode;
   var rc = el("recovery"); if (rc) rc.hidden = !(STATE.recovery || STATE.hostBusy);
   var rn = el("recovery-note"); if (rn) rn.textContent = STATE.hostBusy ? T.msgHostBusy : T.msgRecoveryNeeded;
   var list = el("bklist");
@@ -460,7 +482,7 @@ function applyStaticCopy() {
   for (var j = 0; j < btns.length; j++) { var bb = el(btns[j][0]); if (bb) bb.textContent = T[btns[j][1]]; }
   var nn = el("invnote"); if (nn) nn.textContent = T.invNote;
   var sl = el("selection"); if (sl) sl.textContent = T.selectionLoading;
-  var sc = el("scope"); if (sc) sc.innerHTML = esc(T.scope) + "<small>" + esc(T.scopeNote) + "</small><small>" + esc(T.capacity) + "</small>";
+  var sc = el("scope"); if (sc) sc.innerHTML = esc(T.scope) + "<small>" + esc(T.scopeNote) + "</small>";
   var cl = el("code-label"); if (cl) cl.textContent = T.codeLabel;
   var bn = el("bknote"); if (bn) bn.textContent = T.bkNote;
   var rn = el("resetnote"); if (rn) rn.textContent = T.resetNote;
@@ -502,17 +524,11 @@ function renderInv() {
   var box = el("inv");
   if (!box) return;
   if (!STATE.inv.length) { box.innerHTML = '<div class="iv"><span class="iv-k">' + esc(T.wordNone) + '</span></div>'; return; }
-  var h = "";
-  for (var i = 0; i < STATE.inv.length; i++) {
-    var it = STATE.inv[i];
-    var lab = (T.d && T.d[it.key]) ? T.d[it.key] : it.key;
-    var got = valueOf(it);
-    h += '<div class="iv" data-has="' + (it.has ? "1" : "0") + '">'
-      + '<span class="iv-k">' + esc(lab) + '</span>'
-      + '<span class="iv-v">' + (it.has ? esc(got.v) : T.wordNone) + '</span>'
-      + '<span class="iv-x">' + (it.has ? esc(got.d || "") : "") + '</span></div>';
-  }
-  box.innerHTML = h;
+  var primary={winrate:1,bossKill:1,bossAsBoss:1,affection:1,goldfish:1,world:1,poolAchv:1,achv:1},core=[],extra=[];
+  function row(it){var lab=(T.d&&T.d[it.key])?T.d[it.key]:it.key,got=valueOf(it);return '<div class="iv" data-domain="'+esc(it.key)+'" data-has="'+(it.has?'1':'0')+'"><span class="iv-k">'+esc(lab)+'</span><span class="iv-v">'+(it.has?esc(got.v):T.wordNone)+'</span><span class="iv-x">'+(it.has?esc(got.d||''):'')+'</span></div>';}
+  STATE.inv.forEach(function(it){(primary[it.key]?core:extra).push(row(it));});
+  box.innerHTML='<div class="inv-core">'+core.join('')+'</div><details class="inv-extra"><summary>设置与历史明细 · '+extra.length+' 类（导出均包含）</summary>'+extra.join('')+'</details>';
+
   var sl = el("selection"); if (sl) sl.textContent = tt("selection", {n: STATE.inv.length, has: STATE.inv.filter(function (x) { return x.has; }).length});
 }
 function renderAssets(s) {
@@ -538,22 +554,9 @@ function renderEdge() {
 }
 
 /* ---------- 差异渲染（只画"变了的"行；没变的不出现） ---------- */
-function renderDiff(d) {
-  var box = el("diff");
-  if (!box) return;
-  var map = [["pc", "dkPc"], ["rank", "dkRank"], ["merit", "dkMerit"],
-    ["matches", "dkMatch"], ["kills", "dkKill"], ["girls", "dkGirls"]];
-  var rows = "";
-  for (var i = 0; i < map.length; i++) {
-    var v = d && d[map[i][0]];
-    if (!v) continue;
-    rows += '<div class="diffrow"><span class="dk">' + esc(T[map[i][1]]) + '</span>'
-      + '<span class="dv"><span class="from">' + esc(big(v.from)) + '</span>'
-      + '<span class="arw">→</span><span class="to">' + esc(big(v.to)) + '</span></span></div>';
-  }
-  if (!rows) { box.className = "diff on"; box.innerHTML = '<div class="diffrow"><span class="dk">' + esc(T.diffTitle) + '</span><span class="dv">' + esc(T.diffSame) + '</span></div>'; return; }
-  box.className = "diff on";
-  box.innerHTML = rows;
+function renderDiff(d){var box=el('diff');if(!box)return;var rows='',map=[['pc','dkPc'],['rank','dkRank'],['merit','dkMerit'],['matches','dkMatch'],['kills','dkKill'],['girls','dkGirls']];map.forEach(function(pair){var v=d&&d[pair[0]];if(!v||v.from===v.to)return;rows+='<div class="diffrow"><span class="dk">'+esc(T[pair[1]])+'</span><span class="dv">'+esc(big(v.from))+' → '+esc(big(v.to))+'</span></div>';});
+ var domains=d&&d.domains||[],changed=domains.filter(function(x){return x.changed;}),kept=domains.filter(function(x){return x.action==='keep';});changed.forEach(function(x){var label=T.d[x.key]||x.key;rows+='<div class="diffrow"><span class="dk">'+esc(label)+'</span><span class="dv">'+(x.mayDecrease?'含回退或移除，请核对 · ':'')+(x.action==='merge'?'合并记录':'覆盖内容（数量相同也可能不同）')+'</span></div>';});
+ if(kept.length)rows+='<details><summary>保留本机 · '+kept.length+' 类未包含数据</summary><p>'+kept.map(function(x){return esc(T.d[x.key]||x.key);}).join('、')+'</p></details>';box.className='diff on';box.innerHTML=rows||'<div class="note">所列数据未发现变化，仍请核对文件日期和来源。</div>';
 }
 function hideDiff() { var b = el("diff"); if (b) { b.className = "diff"; b.innerHTML = ""; } }
 
@@ -603,7 +606,7 @@ function doPack() {
   actionCall("shell-mig-export", null, false, function (ok, d) {
     if (!ok || !d || !d.code) { setMsg(tt("msgPackFail", { err: (d && d.err) || T.msgPending }), "bad"); return; }
     var ta = el("code");
-    if (ta) { ta.value = d.code; try { ta.select(); } catch (e) {} }
+    if (ta) { ta.value = d.code; STATE.exportCode=d.code; }
     STATE.pending = null;
     hideDiff();
     /* 版本号从最近一次清点里取（拿不到就不写死一个假版本） */
@@ -629,7 +632,7 @@ function doCopy() {
   if (!ta || !ta.value) { setMsg(T.msgEmpty, "warn"); return; }
   var txt = ta.value;
   var done = function () { if (!STATE.disposed && currentCode() === txt.trim() && !STATE.busy) setMsg(T.msgCopied, "ok"); };
-  var fail = function () { if (!STATE.disposed && currentCode() === txt.trim() && !STATE.busy) { ta.focus(); ta.select(); setMsg(T.msgCopyFail, "warn"); } };
+  var fail = function () { if (!STATE.disposed && currentCode() === txt.trim() && !STATE.busy) { var restore=el("journal-import");if(restore)restore.open=true;ta.focus(); ta.select(); setMsg(T.msgCopyFail, "warn"); } };
   try {
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(txt).then(done, function () { legacyCopy(txt, done, fail); });
@@ -740,7 +743,7 @@ function loadAll() {
   call("shell-mig-inventory", null, function (ok, d) {
     if (seq !== STATE.loadSeq) return;
     if (ok && d) {
-      STATE.inv = d.list || [];
+      STATE.inv = d.list || [];var result=d.results,box=el('pending-results');if(box){box.hidden=!(result&&(result.count||result.error));var note=result?(result.error?'待保存结果处理遇到问题，请检查存储后重试。':'有 '+result.count+' 项结果待保存，存储恢复后会自动补记。'):'';if(result&&result.volatile)note+=' 部分结果尚未写入本机，请保持页面打开，恢复存储后重试。';el('pending-note').textContent=note;var diagnostic=el('pending-details');diagnostic.hidden=!(result&&result.error);if(diagnostic.hidden)diagnostic.open=false;el('pending-error').textContent=result&&result.error?String(result.error):'';}
       STATE.excluded = d.excluded || [];
       STATE.version = d.version || 0;
       STATE.ready = true;
@@ -785,10 +788,12 @@ function loadAll() {
       n.addEventListener("click", function () { fn(); }, false);
     })(bind[i][1]);
   }
-  /* 手动改框内内容 → 之前的"验过"作废（防止"看着是新的、装的是旧的"） */
+  var file=el('save-file'),open=el('b-file'),fileGeneration=0;if(open&&file){open.addEventListener('click',function(){if(!STATE.busy&&!STATE.recovery&&!STATE.hostBusy)file.click();});file.addEventListener('change',async function(){var chosen=file.files&&file.files[0],generation=++fileGeneration;file.value='';if(!chosen)return;if(chosen.size>5*1024*1024){setMsg('存档文件超过5MB，请确认选择正确。','warn');return;}try{var text=await chosen.text();if(generation!==fileGeneration||STATE.disposed||STATE.busy||STATE.recovery||STATE.hostBusy)return;el('code').value=text.trim();STATE.pending=null;hideDiff();syncControls();doCheck();}catch(e){setMsg('文件未能读取，请重新选择。','warn');}});}
+ var retry=el('pending-retry');if(retry)retry.addEventListener('click',function(){call('shell-results-retry',null,function(){loadAll();});});
+ /* 手动改框内内容 → 之前的"验过"作废（防止"看着是新的、装的是旧的"） */
   var ta = el("code");
   if (ta) ta.addEventListener("input", function () {
-    STATE.pending = null;
+    fileGeneration++;STATE.pending = null;
     hideDiff();
     syncControls();
   }, false);

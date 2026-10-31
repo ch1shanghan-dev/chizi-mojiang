@@ -19,6 +19,7 @@
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
+import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -72,7 +73,10 @@ for (const f of files) total += fs.statSync(path.join(root, f)).size;
 const size = (total / 1024 / 1024).toFixed(1) + "MB";
 
 /* ---------- catalog.js ---------- */
+const hashes=Object.fromEntries(files.map(f=>[f,crypto.createHash('sha256').update(fs.readFileSync(path.join(root,f))).digest('hex')]));
+const build=crypto.createHash('sha256').update(files.map(f=>f+':'+hashes[f]).join('\n')).digest('hex');
 const catalog = {
+    build, hashes,
 	name: "池子魔将",
 	author: info.author || "池上寒",
 	intro: info.intro,

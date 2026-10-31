@@ -10,7 +10,7 @@ const option=(n,f)=>{const i=process.argv.indexOf(n);return i<0?f:process.argv[i
 const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'csh-career-audit-'));
 const out=option('--out',path.join(root,'docs/audit/ui/career-achievements'));fs.mkdirSync(out,{recursive:true});
 let source=fs.readFileSync(option('--source',path.join(root,'games/career.html')),'utf8');
-source=source.replace(/src="\.\.\/([^"]+)"/g,(_,f)=>'src="'+pathToFileURL(path.join(root,f)).href+'"');
+source=source.replace(/(src|href)="\.\.\/([^"]+)"/g,(_,attr,f)=>attr+'="'+pathToFileURL(path.join(root,f)).href+'"');
 const mock=`<script>
 window.auditHost={stats:{rank:2,merit:20,interactTotal:7,worldSkillTop:0.75},calls:[],queue:[],claims:[],hold:false};
 CSH_ACHV.markClaimed('rank_1');
@@ -18,7 +18,7 @@ CSHPage.transport=function(){return {active:true,call(cmd,data,cb){
   const h=auditHost;h.calls.push({cmd,data});
   if(cmd==='shell-wallet')cb(true,{pc:500,pcPeak:500,rank:{rank:2,merit:20},world:{}});
   else if(cmd==='shell-world')cb(true,{ai:[],story:{},stats:{playerOpponents:3,playerHands:10,playerRevenge:1},news:[]});
-  else if(cmd==='shell-stats'){if(h.hold)h.queue.push(cb);else cb(true,h.stats);}
+  else if(cmd==='shell-stats'||cmd==='shell-career-sync'){const reply=(ok,stats)=>cb(ok,cmd==='shell-career-sync'?{ok,stats}:stats);if(h.hold)h.queue.push(reply);else reply(true,h.stats);}
   else if(cmd==='shell-ach-claim')h.claims.push({data,cb});
   else cb(false,null);
 }};};
@@ -60,10 +60,10 @@ for(const [name,width,height,scale] of cases){
         let guard=0;while($('#ach-more')&&!$('#ach-more').hidden&&guard++<10)$('#ach-more').click();
         check('every definition remains reachable through batches',keys().length===493&&new Set(keys()).size===493);
         check('show more hidden when exhausted',$('#ach-more')?.hidden&&getComputedStyle($('#ach-more')).display==='none');
-        reset();const requests=auditHost.calls.filter(c=>c.cmd==='shell-stats').length;
+        reset();const requests=auditHost.calls.filter(c=>['shell-stats','shell-career-sync'].includes(c.cmd)).length;
         set('ach-search','向 AI 扔出道具','input');
         check('search matches real conditions across 20 tiers',keys().length===20&&keys().every(k=>k.startsWith('interact_')));
-        check('filtering does not request new host statistics',auditHost.calls.filter(c=>c.cmd==='shell-stats').length===requests);
+        check('filtering does not request new host statistics',auditHost.calls.filter(c=>['shell-stats','shell-career-sync'].includes(c.cmd)).length===requests);
         set('ach-state','ready');check('combined state and keyword excludes incomplete tiers',keys().length>0&&keys().every(k=>auditCareer.rows().find(r=>r.key===k).done));
         reset();set('ach-state','claimed');check('claimed state includes historical claim',keys().length===1&&keys()[0]==='rank_1');
         check('claimed button disabled',$('#ach-grid .aclaim')?.disabled);
@@ -95,7 +95,11 @@ for(const [name,width,height,scale] of cases){
         auditHost.hold=false;
         reset();set('ach-search','向 AI 扔出道具','input');
         const controls=[...document.querySelectorAll('.ach-controls input,.ach-controls select,.ach-controls button')];
-        check('controls remain within viewport',controls.length===4&&controls.every(n=>{const r=n.getBoundingClientRect();return r.left>=-1&&r.right<=innerWidth+1;}),controls.map(n=>n.getBoundingClientRect().toJSON()));
+        check('controls remain within viewport',controls.length===3&&controls.every(n=>{const r=n.getBoundingClientRect();return r.left>=-1&&r.right<=innerWidth+1;}),controls.map(n=>n.getBoundingClientRect().toJSON()));
+        $('#ach-filters-toggle').click();
+        const optional=[...document.querySelectorAll('#ach-refinements select,#ach-refinements button')];
+        check('expanded filter controls remain reachable and within viewport',!$('#ach-refinements').hidden&&optional.length>2&&optional.every(n=>{const r=n.getBoundingClientRect();return r.width>0&&r.left>=-1&&r.right<=innerWidth+1;}));
+        $('#ach-filters-toggle').click();
         check('no horizontal page overflow',document.documentElement.scrollWidth<=innerWidth+1);
         if(innerWidth<=600)check('portrait navigation preserves content width',$('#body').getBoundingClientRect().width>=innerWidth-2&&getComputedStyle($('#tabs')).flexDirection==='row');
         check('current cards contain complete readable conditions',[...document.querySelectorAll('#ach-grid .ach')].every(n=>n.querySelector('.adesc')?.textContent===CSH_ACHV.byKey(n.dataset.key)?.desc));

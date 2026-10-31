@@ -4,6 +4,8 @@
    【2026-10-16 深夜八】游戏类补 game（滚动条开关 onclick 落盘用 game.saveExtensionConfig）——
    同一条红线：本文件用到的 noname 绑定必须在本文件 import。 */
 import { lib, game } from "../../../noname.js";
+import "../core/csh_online.js";
+import { installUIKit } from "../core/csh_uikit.js";
 
 
 /* 【2026-10-20】玩家可见提示统一走自绘 toast（E48 禁原生弹窗）。
@@ -22,6 +24,11 @@ function artConfigLabel(label, icon, action) {
 }
 
 export const cshConfig = {
+            "csh_achievement_feedback":{"name":"成就反馈","intro":"查看本次运行的成就反馈与领奖清单，设置动效和声音。永久进度仍在原成就页。","clear":true,"onclick":function(){var u=installUIKit();if(!u.achievementHistory())notice("请先完成存档恢复，再查看成就反馈");return false;}},
+            "csh_online_settings":{"name":"联网设置","intro":"默认离线。可选读取公开榜；本地玩法与存档不依赖网络。","clear":true,"onclick":function(){
+                var p=window.CSHOnline,ui=installUIKit();if(!p||!ui){notice("联网设置尚未就绪，请重试");return false;}
+                var was=p.enabled();ui.confirm({title:was?"切为离线":"开启公开榜",message:was?"停止本扩展的远端请求，保留本地进度、缓存和已付待报。":"仅获取旧服务公开社区榜，服务器可见连接IP。不会上传昵称、题壁或成绩；线上发布与全球应援写入待接入。",ok:was?"切为离线":"开启读取",cancel:"返回"},function(ok){if(ok){var result=p.setEnabled(!was);notice(result.ok?(was?"已切为离线，本地玩法照常":"已开启公开信息读取"):result.reason);}});return false;
+            }},
             /* ===== 顶部：仅次于版本号的两个面板入口 ===== 
              * 顺序即渲染顺序。两项都是 clear:true 的纯按钮，不占配置值。
              * AI 互动的三个开关（总开关 / 频率 / 台词）已收进卡片面板，
@@ -52,9 +59,10 @@ export const cshConfig = {
                 notice("池子世界没能打开，请重启游戏后再试"); return false;
             }},
             "csh_interact_panel":{"name":artConfigLabel("局内互动","interaction-strategy.png"),"intro":"设置局内互动：总开关、互动频率、附带台词。联机不可用。","clear":true,"onclick":function(){ if(!lib.cshInteract||typeof lib.cshInteract.openPanel!=="function"){ notice("局内互动没能打开，请重启游戏后再试"); return false; } lib.cshInteract.openPanel(); return false; }},
-            "csh_texas_rake":{"name":"德州场供","intro":"只从已见翻牌、实际争夺的底池收取；不设金额上限。未跟注返还不收费，整场收工不再另扣净赢回收差额。","init":"100","item":{"0":"关闭","50":"0.5% · 无上限","100":"1% · 无上限","200":"2% · 无上限"}},
+            "csh_texas_rake":{"name":"德州场供","intro":"每手每人先交大盲10%作前注入池，不另扣钱包。此项只调翻牌后场供，默认0.5%、无上限；返还免收，收工不再扣费。","init":"50","item":{"0":"关闭","50":"0.5% · 无上限","100":"1% · 无上限","200":"2% · 无上限"}},
             "csh_challenge_profile":{"name":"池子挑战难度","intro":"仅池子魔王。爽快档减血减压，挑战者起手6张与1护甲；困难档保留原参数。下局生效，奖励不加倍。","init":"normal","item":{"normal":"爽快 · 推荐","hard":"原味困难"}},
-            "csh_aux_spirit":{"name":"妖灵乱入（实验）","intro":"下局生效。仅单机标准身份场2–8人，内奸不召唤。自己准备阶段召唤下家独立AI友军，辅助有限；战绩独立，无普通奖励。","init":false},
+            "csh_aux_spirit":{"name":"妖灵乱入（实验）","intro":"下局生效。单机标准身份2–8人，内奸不召唤。准备阶段加入守护友军；阵亡不补召，战绩独立，无普通奖励。","init":false},
+            "csh_aux_state":{"name":"本局妖灵状态","clear":true,"onclick":function(){notice(lib.cshAuxSpirit?lib.cshAuxSpirit.describe():"妖灵状态未就绪");return false;}},
             "csh_aux_stats":{"name":"妖灵辅助战绩","clear":true,"onclick":function(){try{const s=lib.cshWallet.wallet.assistedStats();notice("辅助身份场："+s.wins+"胜 "+s.losses+"负；不计普通身份战绩，无常规奖励");}catch(e){notice("辅助战绩不可读取，请先备份并恢复存档");}return false;}},
             /* ===== 功能开关 ===== */
             "csh_effect_announce":{"name":"伤害/击杀/回复播报","intro":"开启后播放伤害、连杀、回复的播报与音效。与其他特效扩展冲突时关掉。","init":false},

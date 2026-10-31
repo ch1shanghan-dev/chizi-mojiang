@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-csh-palette="chrome">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -55,7 +55,7 @@
   /* 字号收编档（2026-10-20）：同值 token 替换裸字号，渲染不变；同档多值待实机测量后并档 */
   --pfs-micro: 10px;
   --pfs-micro2: 10.5px;
-  --pfs-cap: 11.5px;
+  --pfs-cap: 12px;
 }
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
   html, body { height: 100%; }
@@ -436,8 +436,14 @@
   }
 </style>
 <link rel="stylesheet" href="../../core/csh_experience.css">
+<style id="readable-ui-410">
+:root{--ui-readable:12px;--fs-xs:clamp(12px,1.3vh,15px)}
+.start-card>.subtitle,.field .lab,.start-card .hint,.start-card label,.start-card .tip{font-size:var(--ui-readable)!important;line-height:1.4}
+</style>
+<link rel="stylesheet" href="../../core/csh_tables.css">
+<link rel="stylesheet" href="../../core/csh_trick_tables.css">
 </head>
-<body class="csh-experience">
+<body class="csh-experience" data-csh-table="doudizhu">
 
 <!-- ★ 2026-09-29：移除页面自带浮动「关闭」—— 壳顶带已有关闭，双按钮冗余（同德州轮修复） -->
 
@@ -460,12 +466,12 @@
       </span>
     </label>
 
-    <button class="btn" id="btn-start-game" type="button">开始游戏</button>
+    <div class="trick-start-actions"><button class="btn" id="btn-start-game" type="button">开始游戏</button><details class="trick-reference"><summary>操作说明</summary><div class="tip">点牌选中 · 再点取消；「提示」循环给出建议。当前身份、倍数和剩余张数会在牌桌上显示。</div></details></div>
     <div class="tip" id="econ-tip" style="display:none"></div>
     <!-- 【2026-10-03 精简】原为三行规则（牌数 / 叫分 / 选牌方式）。牌数属于背景资料，
          叫分与选牌在局内都有明确提示（选中的牌会浮起、按钮上写着"叫 3 分"），
          开局页只留一行"点牌选中 / 再点取消"这个真正需要先知道的手势。 -->
-    <div class="tip">点牌选中 · 再点取消　|　「提示」循环给建议</div>
+
   </div>
 </div>
 
@@ -541,7 +547,7 @@
       <button class="btn" id="btn-again-bar" type="button">再来一局</button>
     </div>
     <div class="act-group" id="auto-group">
-      <button class="btn ghost" id="btn-auto" type="button" title="托管：自动帮你叫分与出牌">托管</button>
+      <button class="btn ghost" id="btn-auto" type="button" title="托管：自动叫分与出牌；Esc 可立即接管">托管</button>
     </div>
   </div>
 </div>
@@ -643,6 +649,7 @@ var $$ = function (s) { return document.querySelectorAll(s); };
 
 /* 页面存活标志：销毁后不再排任何定时器（人机回合是 later 递归） */
 var alive = true;
+var tornDown = false;
 var timers = [];
 
 function later(fn, ms) {
@@ -1084,16 +1091,21 @@ function botBidValue(hand) {
   }
   return score;
 }
-function botBid(hand, highest) {
+function botBid(hand, highest, profile) {
   var v = botBidValue(hand);
-  if (Math.random() < 0.22) v += 1;                    /* 一点随机，别每次都一样 */
+  profile = profile || {};
+  var focus = Math.max(.35, Math.min(1, Number(profile.effSkill || profile.skill) || .8));
+  v += (Math.random() * 2 - 1) * (1 - focus) * 1.5;
+  if (profile.persona === 'aggro' || profile.persona === 'wild') v += .35;
+  else if (profile.persona === 'tight') v -= .25;                    /* 一点随机，别每次都一样 */
   var want = v >= 7.5 ? 3 : (v >= 5 ? 2 : (v >= 2.6 ? 1 : 0));
   if (want <= highest) return 0;
   return Math.min(3, want);
 }
 
 /* ---------- 人机：自由出牌的偏好打分（越小越先出） ---------- */
-function leadScore(m) {
+function leadScore(m, hand, profile) {
+  var planning = Math.max(.5, Math.min(1, Number(profile && (profile.effSkill || profile.skill)) || .8));
   var s = m.cls.main;
   if (m.cls.main >= JOKER_S) s += 80;
   else if (m.cls.main === 15) s += 26;
@@ -1102,6 +1114,13 @@ function leadScore(m) {
   if (m.cls.type === 'trio1' || m.cls.type === 'trio2') s += 2.5;
   if (m.cls.type === 'plane1' || m.cls.type === 'plane2') s += 2;
   s -= m.cards.length * 0.45;
+  if (hand) {
+    var original = groupHand(hand), used = groupHand(m.cards), k;
+    for (k in used) if (Object.prototype.hasOwnProperty.call(used,k) && original[k].length > used[k].length) {
+      if (original[k].length >= 3) s += 5 * planning;
+      else if (original[k].length === 2) s += 2.5 * planning;
+    }
+  }
   return s;
 }
 
@@ -1130,9 +1149,56 @@ function handWithout(hand, cards) {
   for (i = 0; i < hand.length; i++) if (!ids[hand[i].id]) out.push(hand[i]);
   return out;
 }
+/* Own-hand partitioning only. Fixed state budget keeps the UI bounded and replay deterministic. */
+function handPartitionPlanner(budget) {
+  var memo = Object.create(null), expanded = 0, limit = Math.max(8, Math.min(256, Math.floor(budget || 96)));
+  function turns(hand) {
+    if (!hand.length) return 0;
+    var groups = groupHand(hand), ranks = Object.keys(groups).sort(function(a,b){return Number(a)-Number(b);});
+    var key = ranks.map(function(r){return r+':'+groups[r].length;}).join(',');
+    if (memo[key] != null) return memo[key];
+    if (classify(hand)) return memo[key] = 1;
+    var best = ranks.length - (groups[JOKER_S] && groups[JOKER_B] ? 1 : 0);
+    if (expanded >= limit) return best; /* Existing equal-rank groups are a legal upper bound. */
+    expanded++;
+    var anchor = hand[0].id;
+    var moves = genAll(hand).filter(function(m){return m.cards.some(function(c){return c.id===anchor;});});
+    moves.sort(function(a,b){return b.cards.length-a.cards.length||a.cls.main-b.cls.main;});
+    for (var i=0;i<moves.length;i++) {
+      var n = 1 + turns(handWithout(hand,moves[i].cards));
+      if(n<best)best=n;
+      if(best===2)break; /* The whole hand was not legal; two is now optimal. */
+    }
+    memo[key] = best;
+    return best;
+  }
+  return { turns:turns, stats:function(){return {expanded:expanded,limit:limit};} };
+}
+function choosePlannedMove(moves, hand, profile, following) {
+  if (!moves.length) return null;
+  var ordered = moves.slice().sort(function(a,b){
+    return following ? a.cls.main-b.cls.main||a.cards.length-b.cards.length
+      : leadScore(a,hand,profile)-leadScore(b,hand,profile);
+  });
+  if(hand.length>12||ordered.length===1)return ordered[0];
+  var skill = Math.max(.4,Math.min(1,Number(profile&&(profile.effSkill||profile.skill))||.8));
+  var planner = handPartitionPlanner(Math.round(48+112*skill)), candidates=ordered.slice(0,12);
+  var best=candidates[0], bestTurns=Infinity;
+  for(var i=0;i<candidates.length;i++){
+    var count=planner.turns(handWithout(hand,candidates[i].cards));
+    if(count<bestTurns){bestTurns=count;best=candidates[i];}
+  }
+  return best;
+}
+function publicTeamContext(p) {
+  var mateLeft=99, farmer=!isLandlord(p);
+  if(farmer)for(var i=0;i<3;i++)if(i!==p&&!isLandlord(i))mateLeft=game.hands[i].length;
+  return {mateLeft:mateLeft,nextIsMate:farmer&&!isLandlord(nextIdx(p))};
+}
+
 function botChoose(hand, lead, opt) {
   opt = opt || {};
-  var moves = genAll(hand);
+  var moves = opt.moves || genAll(hand);
   var i, pool, follow, plain;
   if (!moves.length) return null;
   var oppMin = (opt.oppMin != null) ? opt.oppMin : 99;
@@ -1146,6 +1212,12 @@ function botChoose(hand, lead, opt) {
     }
     if (!pool.length) pool = moves;                     /* 只剩炸弹/王炸时才动它们 */
 
+    /* When the next farmer has one card, offer a low single using public counts only. */
+    if(opt.nextIsMate && opt.mateLeft===1 && oppMin>2){
+      var grouped=groupHand(hand), feeds=pool.filter(function(m){return m.cls.type==='single';});
+      feeds.sort(function(a,b){var sa=grouped[a.cls.main].length===1?0:1,sb=grouped[b.cls.main].length===1?0:1;return sa-sb||a.cls.main-b.cls.main;});
+      if(feeds.length)return feeds[0].cards;
+    }
     /* ① 对手报单：避免送小单张 */
     if (oppMin === 1) {
       var nonSingle = [], singles = [];
@@ -1156,8 +1228,7 @@ function botChoose(hand, lead, opt) {
       if (singles.length) {
         singles.sort(function (a, b) { return b.cls.main - a.cls.main; });
         if (nonSingle.length) {
-          nonSingle.sort(function (a, b) { return leadScore(a) - leadScore(b); });
-          return nonSingle[0].cards;
+          return choosePlannedMove(nonSingle,hand,opt.profile,false).cards;
         }
         return singles[0].cards;                        /* 只能出单：出最大的顶住 */
       }
@@ -1171,8 +1242,7 @@ function botChoose(hand, lead, opt) {
       }
     }
 
-    pool.sort(function (a, b) { return leadScore(a) - leadScore(b); });
-    return pool[0].cards;
+    return choosePlannedMove(pool,hand,opt.profile,false).cards;
   }
 
   follow = [];
@@ -1183,6 +1253,7 @@ function botChoose(hand, lead, opt) {
 
   /* 队友（另一个农民）刚出的牌 */
   if (opt.mate) {
+    if (opt.leadLeft <= 2) return null; /* 保留快走完的队友控制权。 */
     if (oppMin <= 2) {
       /* ② 地主快走完：用不打断队友节奏的大单/大对顶牌抢控制 */
       var top = null;
@@ -1201,15 +1272,11 @@ function botChoose(hand, lead, opt) {
   for (i = 0; i < follow.length; i++) if (!isBombType(follow[i].cls.type)) plain.push(follow[i]);
   if (!plain.length) {
     /* ③ 只能靠炸弹压：对手快走完、或炸完自己 ≤2 张可接管，才炸 */
-    var myAfter = hand.length - lead.cards.length;
-    if (opt.leadLeft !== undefined && opt.leadLeft > 2 && myAfter > 2) return null;
+    var canTakeOver = follow.some(function (m) { return hand.length - m.cards.length <= 2; });
+    if (opt.leadLeft !== undefined && opt.leadLeft > 2 && !canTakeOver) return null;
     plain = follow;
   }
-  plain.sort(function (a, b) {
-    if (a.cls.main !== b.cls.main) return a.cls.main - b.cls.main;
-    return a.cards.length - b.cards.length;
-  });
-  return plain[0].cards;
+  return choosePlannedMove(plain,hand,opt.profile,true).cards;
 }
 /* ==DDZ-ENGINE-END== */
 
@@ -1311,6 +1378,8 @@ function arrangeGoodDeck(deck) {
 }
 
 function newGame() {
+  if (!alive || (typeof closePending !== 'undefined' && closePending)) return;
+  game.actionEpoch = (game.actionEpoch || 0) + 1;
   var deck = shuffle(buildDeck());
   /* 【2026-09-30 经济修复】好牌模式 = 练习局：标记在**开局**快照进 game 对象。
      不能在结算时读当前开关——玩家可以开着好牌打完、结算前关掉，骗过练习判定拿真钱。 */
@@ -1342,11 +1411,13 @@ function newGame() {
   game.mult = 1;
   game.multLog = [];
   game.aiStakes = [0, 0];
+  game.profiles = [{skill:.9,persona:'math'},null,null];
   game.stake = Bridge.active ? Bridge.buyIn() : 0;
   game.chips = game.stake;
   if (Bridge.active) {
     var opp = Bridge.opponents();
     if (opp && opp.length) {
+      game.profiles[1] = Object.assign({},opp[0]); game.profiles[2] = opp[1] ? Object.assign({},opp[1]) : null;
       game.names[1] = opp[0].name || game.names[1];
       game.names[2] = opp[1] ? (opp[1].name || game.names[2]) : game.names[2];
       /* §4.7.2 ⑤ 连性格一起收下：座位头像的纹样由性格决定（§I.4）
@@ -1400,23 +1471,24 @@ function bidStep() {
   if (p === 0) {
     if (game.auto) {
       logLine('托管中 · 自动叫分…');
-      later(function () { botBidAct(0); }, rndMs(360, 700));
+      queueDecision(0, 'bid', function () { botBidAct(0); }, rndMs(360, 700));
       return;
     }
     logLine('轮到你叫分（当前最高 ' + game.bid.best + ' 分）');
     return;
   }
-  later(function () { botBidAct(p); }, rndMs(620, 1140));
+  queueDecision(p, 'bid', function () { botBidAct(p); }, rndMs(620, 1140));
 }
 
 function botBidAct(p) {
+  if (p === 0 && !game.auto) return;
   if (!alive || game.phase !== 'bid') return;
   if (game.bid.idx >= 3 || game.bid.order[game.bid.idx] !== p) return;
-  applyBid(p, botBid(game.hands[p], game.bid.best));
+  applyBid(p, botBid(game.hands[p], game.bid.best, game.profiles && game.profiles[p]));
 }
 
 function applyBid(p, v) {
-  if (game.phase !== 'bid') return;
+  if (!alive || game.phase !== 'bid' || game.bid.idx >= 3 || game.bid.order[game.bid.idx] !== p || !Number.isInteger(v) || v < 0 || v > 3) return;
   var before = game.bid.best;
   var nm = game.names[p];
   if (v > 0 && v > before) {
@@ -1439,7 +1511,8 @@ function finishBid() {
     if (game.redeal <= MAX_REDEAL) {
       logLine('三家都不叫，重新发牌（第 ' + game.redeal + ' / ' + MAX_REDEAL + ' 次）');
       toast('无人叫地主，重新发牌');
-      later(newGame, 820);
+      var redealEpoch = game.actionEpoch;
+      later(function () { if (alive && game.actionEpoch === redealEpoch && game.phase === 'bid') newGame(); }, 820);
       return;
     }
     game.bid.best = 1;
@@ -1469,6 +1542,15 @@ function finishBid() {
   scheduleTurn();
 }
 
+function queueDecision(p, phase, fn, delay) {
+  var epoch = game.actionEpoch, turn = game.turn, bid = game.bid && game.bid.idx;
+  var ticket = game.decisionTicket = (game.decisionTicket || 0) + 1;
+  later(function () {
+    if (!alive || game.actionEpoch !== epoch || game.decisionTicket !== ticket || game.phase !== phase || (p === 0 && !game.auto)) return;
+    if (phase === 'play' ? game.turn !== turn : !game.bid || game.bid.idx !== bid || game.bid.order[bid] !== p) return;
+    fn();
+  }, delay);
+}
 function scheduleTurn() {
   renderAll();
   if (!alive || game.phase !== 'play' || game.over) return;
@@ -1477,7 +1559,7 @@ function scheduleTurn() {
     hintIdx = 0;
     if (game.auto) {
       logLine('托管中 · 自动出牌…');
-      later(autoPlayTurn, rndMs(420, 820));
+      queueDecision(0, 'play', autoPlayTurn, rndMs(420, 820));
       return;
     }
     logLine(game.lastPlay
@@ -1486,12 +1568,15 @@ function scheduleTurn() {
     return;
   }
   logLine('等待 ' + game.names[p] + ' 出牌…');
-  later(function () { botTurn(p); }, rndMs(560, 1180));
+  queueDecision(p, 'play', function () { botTurn(p); }, rndMs(560, 1180));
 }
 
 /* ---------- 托管：玩家 0 的回合交给同一套人机 AI 代打 ---------- */
 function setAuto(on) {
+  if (!alive || (typeof closePending !== 'undefined' && closePending)) return;
   game.auto = !!on;
+  sfxPlay(game.auto ? 'assist.on' : 'assist.off');
+  if ((game.phase === 'play' && game.turn === 0) || (game.phase === 'bid' && game.bid && game.bid.order[game.bid.idx] === 0)) game.decisionTicket = (game.decisionTicket || 0) + 1;
   renderActions();
   toast(game.auto ? '已开启托管 · 自动叫分与出牌' : '已关闭托管');
   if (game.auto) autoKick();
@@ -1500,9 +1585,9 @@ function setAuto(on) {
 function autoKick() {
   if (!alive || !game.auto) return;
   if (game.phase === 'bid' && game.bid && game.bid.idx < 3 && game.bid.order[game.bid.idx] === 0) {
-    later(function () { botBidAct(0); }, rndMs(360, 700));
+    queueDecision(0, 'bid', function () { botBidAct(0); }, rndMs(360, 700));
   } else if (game.phase === 'play' && game.turn === 0) {
-    later(autoPlayTurn, rndMs(420, 820));
+    queueDecision(0, 'play', autoPlayTurn, rndMs(420, 820));
   }
 }
 function autoPlayTurn() {
@@ -1517,7 +1602,8 @@ function autoPlayTurn() {
     mate: mate,
     leadLeft: game.lastPlay ? game.hands[game.lastPlay.player].length : 99,
     isLandlord: isLandlord(0),
-    oppMin: oppMinFor(0)
+    mateLeft: publicTeamContext(0).mateLeft, nextIsMate: publicTeamContext(0).nextIsMate,
+    oppMin: oppMinFor(0), profile: game.profiles && game.profiles[0]
   });
   if (cards && cards.length) { doPlay(0, cards, classify(cards)); return; }
   if (lead) { doPass(0); return; }
@@ -1534,7 +1620,7 @@ function botTurn(p) {
   var mate = false;
   if (lead && !isLandlord(p) && !isLandlord(game.lastPlay.player)) mate = true;
   var leadLeft = game.lastPlay ? game.hands[game.lastPlay.player].length : 99;
-  var cards = botChoose(hand, lead, { mate: mate, leadLeft: leadLeft, isLandlord: isLandlord(p), oppMin: oppMinFor(p) });
+  var cards = botChoose(hand, lead, { mate: mate, leadLeft: leadLeft, isLandlord: isLandlord(p), mateLeft: publicTeamContext(p).mateLeft, nextIsMate: publicTeamContext(p).nextIsMate, oppMin: oppMinFor(p), profile: game.profiles && game.profiles[p] });
   if (cards && cards.length) {
     doPlay(p, cards, classify(cards));
   } else if (lead) {
@@ -1547,7 +1633,13 @@ function botTurn(p) {
 }
 
 function doPlay(p, cards, cls) {
-  if (!cls || !cards || !cards.length) return;
+  if (!alive || game.phase !== 'play' || game.over || game.turn !== p || !cards || !cards.length) return false;
+  var owned = {}, unique = {};
+  game.hands[p].forEach(function (c) { owned[c.id] = c; });
+  for (var ci=0;ci<cards.length;ci++) { if (!owned[cards[ci].id] || unique[cards[ci].id]) return false; unique[cards[ci].id]=true; }
+  cards = cards.map(function(c){return owned[c.id];});
+  cls = classify(cards);
+  if (!cls || (game.lastPlay && !beats(cls, game.lastPlay.cls))) return false;
   var ids = {}, i, rest = [];
   for (i = 0; i < cards.length; i++) ids[cards[i].id] = 1;
   for (i = 0; i < game.hands[p].length; i++) {
@@ -1561,7 +1653,11 @@ function doPlay(p, cards, cls) {
   game.passCount = 0;
   game.plays[p] = (game.plays[p] || 0) + 1;
   if (p === 0) { selIds = []; hintIdx = 0; }
-  if (isBombType(cls.type)) sfx.bomb(); else sfx.play();
+  if (cls.type === 'rocket') sfxPlay('ddz.rocket');
+  else if (isBombType(cls.type)) sfx.bomb();
+  else if (cls.type.indexOf('plane') === 0) sfxPlay('ddz.plane');
+  else if (cls.type === 'straight' || cls.type === 'pairs') sfxPlay('ddz.straight');
+  else sfx.play();
   /* 倍数链（§4.4）：炸弹 / 王炸 各 ×2 */
   if (cls.type === 'bomb') bumpMult('炸弹');
   else if (cls.type === 'rocket') bumpMult('王炸');
@@ -1573,6 +1669,7 @@ function doPlay(p, cards, cls) {
 }
 
 function doPass(p) {
+  if (!alive || game.phase !== 'play' || game.over || game.turn !== p || !game.lastPlay) return false;
   game.actions[p] = { pass: true };
   game.passCount++;
   sfx.pass();
@@ -1675,7 +1772,7 @@ function endGame(winner) {
         seats: __seats
       }, function (ok) {
         /* 主结算路径失败必须可见（§审计 B-11）：其余结算入口都有失败提示，唯独这里曾静默 */
-        if (ok === false) { try { toast('结算未成功，本局未入账（请勿反复重试，退出后重查余额）'); } catch (eT3) {} }
+        if (ok === false) { try { toast('结算未成功，本局未入账（页面会保留，可再次点击结算重试）'); } catch (eT3) {} }
       });
     } catch (eSettle) {}
   }
@@ -1701,29 +1798,12 @@ function endGame(winner) {
    shell 内再额外提供「收工结算」= 交回后关闭。
    独立运行保持原行为（直接重开 / 回开局页）。 */
 function afterGameAction(kind) {
+  if (!alive || (typeof closePending !== 'undefined' && closePending)) return;
   if (kind === 'back') { showStart(); return; }
-  if (Bridge.active) {
-    /* endGame 已即时结算（settled 置位）：已结算时「再来一局」走重载拉新带入，
-       静默 return 会让按钮变成死键（§审计 A-3） */
-    if (Bridge.isSettled()) { if (kind === 'again') window.location.reload(); return; }
-    /* ★ 2026-09-29 R3-2：结算回调此前不判 ok ⇒ 桥超时/失败仍照常 reload，
-       玩家以为已入账实际没有（带入已扣）。失败即如实提示，不重载、不谎报。 */
-    Bridge.settle(game.chips, function (ok) {
-      if (ok === false) { try { toast('结算未成功，本局未入账（请勿反复重试，退出后重查余额）'); } catch (eT) {} return; }
-      window.location.reload();
-    });
-    return;
-  }
+  if (Bridge.active) { leavePage(true); return; }
   game.redeal = 0; clearAllTimers(); newGame();
 }
-function cashOutGame() {
-  if (!Bridge.active) { closePage(); return; }
-  if (Bridge.isSettled()) { closePage(); return; }
-  Bridge.settle(game.chips, function (ok) {
-    if (ok === false) { try { toast('结算未成功，本局未入账（请重试）'); } catch (eT2) {} return; }
-    closePage();
-  });
-}
+function cashOutGame() { closePage(); }
 /* 结算时同步两处按钮的文案：shell 内第二按钮是「收工结算」，否则「返回开局」 */
 function syncOverButtons() {
   var a1 = $('#btn-again'), b1 = $('#btn-back-start');
@@ -1808,6 +1888,8 @@ function renderSeat(p, el) {
   var isTurn = (game.phase === 'play' && game.turn === p);
   var isBidTurn = (game.phase === 'bid' && game.bid && game.bid.idx < 3 && game.bid.order[game.bid.idx] === p);
   var h = '';
+  el.setAttribute('aria-label',String(game.names[p]||'牌友')+' · '+(game.landlord<0?'身份待定':isL?'地主':'农民')+' · 剩 '+game.hands[p].length+' 张'+(isBidTurn?' · 正在叫分':isTurn?' · 当前出牌':''));
+  el.title=String(game.names[p]||'牌友');
   h += '<div class="seat-box">';
   /* §4.7.2 ⑤ 座位头像换成程序化 SVG（§I.4）：姓氏定色、性格定纹样，与德州/廿一点同一套生成器。 */
   h += '<div class="avatar' + (isL ? ' lord' : '') + '">';
@@ -1819,7 +1901,7 @@ function renderSeat(p, el) {
   h += '</div>';
   h += '<div class="seat-info">';
   h += '<div class="seat-line"><span class="sname">' + esc(game.names[p]) + '</span>' +
-    (isL ? '<span class="badge lord">地主</span>' : '<span class="badge">农民</span>') + '</div>';
+    (game.landlord < 0 ? '<span class="badge">待定</span>' : isL ? '<span class="badge lord">地主</span>' : '<span class="badge">农民</span>') + '</div>';
   h += '<div class="seat-line"><span class="scount">剩 <b>' + game.hands[p].length + '</b> 张</span>' +
     actHTML(game.actions[p]) + '</div>';
   h += '</div></div>';
@@ -1958,6 +2040,7 @@ function renderActions() {
   if (ab) {
     ab.classList.toggle('on', !!game.auto);
     ab.textContent = game.auto ? '托管中' : '托管';
+    ab.setAttribute('aria-pressed',game.auto?'true':'false');
   }
 }
 
@@ -2011,6 +2094,7 @@ function updateSelInfo() {
 }
 
 function currentOptions() {
+  var opt = {profile:game.profiles&&game.profiles[0]};
   var hand = game.hands[0] || [];
   var lead = game.lastPlay ? game.lastPlay.cls : null;
   var moves = genAll(hand), out = [], i;
@@ -2025,8 +2109,11 @@ function currentOptions() {
       if (a.cls.main !== b.cls.main) return a.cls.main - b.cls.main;
       return a.cards.length - b.cards.length;
     }
-    return leadScore(a) - leadScore(b);
+    return leadScore(a, hand, opt.profile) - leadScore(b, hand, opt.profile);
   });
+  var team=publicTeamContext(0), mate=!!lead&&!isLandlord(0)&&!isLandlord(game.lastPlay.player);
+  var recommended=botChoose(hand,lead,{moves:moves,profile:opt.profile,mate:mate,mateLeft:team.mateLeft,nextIsMate:team.nextIsMate,oppMin:oppMinFor(0),leadLeft:game.lastPlay?game.hands[game.lastPlay.player].length:99});
+  if(recommended){var ids={};recommended.forEach(function(c){ids[c.id]=true;});var idx=out.findIndex(function(m){return m.cards.length===recommended.length&&m.cards.every(function(c){return ids[c.id];});});if(idx>0)out.unshift(out.splice(idx,1)[0]);}
   return out;
 }
 
@@ -2132,6 +2219,7 @@ function toast(msg) {
    7. 开局 / 收尾
    ============================================================ */
 function startGame() {
+  if (!alive || (typeof closePending !== 'undefined' && closePending)) return;
   var name = ($('#inp-name').value || '').trim().slice(0, 12) || '池子';
   if (!lsSet('csh_ddz_name', name)) return;
   game.names[0] = name;
@@ -2143,6 +2231,7 @@ function startGame() {
   newGame();
 }
 function showStart() {
+  if (!alive || (typeof closePending !== 'undefined' && closePending)) return;
   clearAllTimers();
   game.phase = 'idle';
   game.over = false;
@@ -2157,32 +2246,36 @@ function showStart() {
   hideBanner();
   switchView('view-start');
 }
-function closePage() {
-  alive = false;                 /* 先掐断人机定时器递归 */
-  clearAllTimers();
-  try {
-    /* shell 内：关窗前把本局余额交回宿主结算（幂等，最多一次）。
-       ★ 2026-09-29 补齐：此前只在 phase === 'over' 时结算 ——
-       叫牌/出牌中途关窗、甚至没开局就关窗，带入都凭空蒸发。
-       现在：没开局（idle）→ 全额退回带入；中途关窗 → 按当前筹码结算。 */
-    if (Bridge.active && !Bridge.isSettled()) {
-      var dzChips = (game.phase === 'idle')
-        ? Math.max(0, Math.floor(Bridge.buyIn() || 0))
-        : Math.max(0, Math.floor(game.chips || Bridge.buyIn() || 0));
-      try { Bridge.settle(dzChips, function (ok3) {
-        if (ok3 === false) { try { toast('结算未成功，本局未入账（可稍后重查余额）'); } catch (eT3) {} }
-      }); } catch (eS) {}
+var closePending = false;
+/* 关闭、收工和再来一局共用退出锁；成功 ACK 只执行一个去向。 */
+function leavePage(reload) {
+  if (!alive || closePending || tornDown) return;
+  closePending = true; alive = false; clearAllTimers();
+  var finished = false;
+  function finish(ok) {
+    if (finished || tornDown) return;
+    finished = true; closePending = false;
+    if (ok === false) {
+      alive = true; document.body.style.display = '';
+      toast('结算尚未确认，页面已保留。可再次结算或关闭以重试，奖励不会重复发放。');
+      try { window.parent.postMessage({ __csh: 'shell-close-cancelled' }, '*'); } catch (e) {}
+      if (game.phase === 'bid') bidStep(); else if (game.phase === 'play') scheduleTurn(); else renderAll();
+      return;
     }
-    if (window.parent && window.parent !== window) {
-      window.parent.postMessage({ __csh: "doudizhu-close" }, "*");
-    } else if (typeof window.close === 'function') {
-      window.close();
-    }
+    if (reload) { window.location.reload(); return; }
+    if (window.parent && window.parent !== window) window.parent.postMessage({ __csh: 'doudizhu-close' }, '*');
+    else if (typeof window.close === 'function') window.close();
     document.body.style.display = 'none';
-  } catch (e) {
-    try { document.body.style.display = 'none'; } catch (e2) {}
   }
+  try {
+    if (Bridge.active && !Bridge.isSettled()) {
+      if (reload) { Bridge.settle(game.chips, finish); return; }
+      var seats = (Bridge.opponents() || []).map(function (p, i) { return { id: p.id, stake: (game.aiStakes && game.aiStakes[i]) || p.stake || 0 }; });
+      Bridge.settleSession({ key: 'doudizhu', buyIn: Math.max(0, Math.floor(Bridge.buyIn() || 0)), chips: game.phase === 'idle' ? Math.max(0, Math.floor(Bridge.buyIn() || 0)) : Math.max(0, Math.floor(Number(game.chips) || 0)), seats: seats }, finish);
+    } else finish(true);
+  } catch (e) { finish(false); }
 }
+function closePage() { leavePage(false); }
 
 /* ============================================================
    8. 事件绑定
@@ -2282,16 +2375,19 @@ $('#hand').addEventListener('click', function (e) {
 /* Esc：先关模态/横幅，否则关页面 */
 document.addEventListener('keydown', function (e) {
   if (e.key !== 'Escape') return;
+  if(e.repeat){e.preventDefault();return;}
   if (!$('#banner').classList.contains('hidden')) {
     hideBanner();
     renderActions();
     return;
   }
+  if(game.auto){e.preventDefault();e.stopPropagation();setAuto(false);return;}
   closePage();
 });
 
 /* 页面销毁：iframe 被导航到 about:blank / 遮罩移除时，停掉一切定时器 */
 function onTeardown() {
+  tornDown = true;
   alive = false;
   clearAllTimers();
 }

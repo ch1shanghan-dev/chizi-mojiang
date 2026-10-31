@@ -67,10 +67,10 @@ export default function(){
     },
     card: cshCard,
     skill: cshSkillPack,
-    intro: "<font color=#c9a84c>版本</font> <font color=#00FFFF>4.0.12</font>",
+    intro: "<font color=#c9a84c>版本</font> <font color=#00FFFF>4.0.13</font>",
     author: "池上寒",
     diskURL: "",
     forumURL: "",
-    version: "4.0.12"
+    version: "4.0.13"
 }}
 }
