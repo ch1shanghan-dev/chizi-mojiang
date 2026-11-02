@@ -121,10 +121,10 @@
 		})(r);
 	}
 	var segDefs = [
-		[10, "一段登顶", "官阶达到 10 阶，跻身一段「杂号」之巅"],
-		[20, "二段登顶", "官阶达到 20 阶，二段「中垒」称雄"],
-		[30, "三段登顶", "官阶达到 30 阶，三段「方镇」之才"],
-		[40, "四段登顶", "官阶达到 40 阶，四段「上公」之姿"],
+		[10, "晋入杂号", "官阶达到 10 阶，进入「杂号」段（10–19 阶）"],
+		[20, "晋入中垒", "官阶达到 20 阶，进入「中垒」段（20–29 阶）"],
+		[30, "晋入方镇", "官阶达到 30 阶，进入「方镇」段（30–39 阶）"],
+		[40, "晋入上公", "官阶达到 40 阶，进入「上公」段（40–50 阶）"],
 		[50, "五段 · 大将军", "官阶达到 50 阶，位极人臣"],
 	];
 	for (var sd = 0; sd < segDefs.length; sd++) {
@@ -225,13 +225,13 @@
 		[10000, 5000, 2000, 1000, 500, 200, 100, 10],
 		function (v) { return atMostAfter("playerFundMin", v, "playerFundWitness", 1); },
 		function (v) { return Math.max(120, Math.round(20000 / v)); });
-	/* 「打穿首富」：世界最高资金被压到某个量级以下 —— 标志着你把金字塔尖拽下来了 */
-	tier({ key: "topdown", cat: "AI世界", ico: "⛏" }, "首富缩水 · {n}", "同桌游戏后，世界最高资金已降到 {n} 以下",
+	/* 世界当前最高资金的观察线；同桌经历只作前置，不证明缩水幅度、先后或玩家归因。 */
+	tier({ key: "topdown", cat: "AI世界", ico: "⛏" }, "首富观察 · {n}", "至少完成过 1 人次 AI 同桌游戏，且当前世界最高资金不超过 {n} CBY",
 		[10000000, 5000000, 2000000, 1000000, 500000, 200000, 100000, 50000, 20000, 5000],
 		function (v) { return atMostAfter("worldTopFund", v, "worldHands", 1); },
 		function (v) { return Math.max(150, Math.round(5000000 / v)); });
-	/* 「世界首富身家」：另一个方向 —— 看着塔尖一路长高（玩家输 = 世界回血），极端且真实 */
-	tier({ key: "topfund", cat: "AI世界", ico: "🏰" }, "首富身家 · {n}", "世界首富身家达到 {n} CBY（你每一次失手，都在把他喂得更大）",
+	/* 世界当前最高资金，不将世界自行演化归因为玩家输赢。 */
+	tier({ key: "topfund", cat: "AI世界", ico: "🏰" }, "首富身家 · {n}", "当前世界最高资金达到 {n} CBY",
 		[10000000, 20000000, 35000000, 50000000, 92600000, 150000000, 300000000, 500000000],
 		function (v) { return statProg("worldFundMax", v); },
 		function (v) { return Math.max(400, Math.round(v / 50000)); });
@@ -240,7 +240,7 @@
 		[1, 2, 3, 4, 6, 8],
 		function (v) { return statProg("billionaires", v); },
 		function (v) { return 300 + v * 150; });
-	tier({ key: "broke", cat: "AI世界", ico: "🔻" }, "首富落难 · {n} 人", "有 {n} 位曾经的豪赌席 AI 被打到跌出豪赌席",
+	tier({ key: "broke", cat: "AI世界", ico: "🔻" }, "首富落难 · {n} 人", "当前至少有 {n} 位曾进入豪赌席的 AI，资金已低于豪赌席门槛",
 		/* 2026-10-01：世界扩到 97 人，可上探至 ~48（穷桌 30 + 富桌 18）。 */
 		[1, 2, 3, 5, 8, 12, 18, 25, 34, 48],
 		function (v) { return statProg("billionaireBroke", v); },
@@ -287,9 +287,15 @@
 		[1, 2, 4, 8],
 		function (v) { return statProg("grudge8", v); },
 		function (v) { return Math.round(120 + v * 150); });
-	tier({ key: "gstreak2", cat: "豪赌桌", ico: "🎲" }, "豪赌连胜 · {n} 局", "在豪赌桌连赢 {n} 局",
+	/* 旧 gstreak2 四档保留ID/奖励；区别于 gmstreak 的单一连胜纪录。
+	   只要求生涯同时具备两项事实，不从计数推断先后或毛亏损。 */
+	tier({ key: "gstreak2", cat: "豪赌桌", ico: "🎲" }, "起伏之间 · {n}", "豪赌桌净亏出战数与历史连胜纪录均达到 {n} 场",
 		[2, 3, 5, 8],
-		function (v) { return statProg("gambleBestStreak", v); },
+		function (v) { return function (s) {
+			var streak = Number(s.gambleBestStreak), losses = Number(s.gambleBust);
+			var known = Number.isSafeInteger(streak) && streak >= 0 && Number.isSafeInteger(losses) && losses >= 0;
+			return [known ? Math.min(streak, losses) : 0, v];
+		}; },
 		function (v) { return Math.round(300 + v * 400); });
 	tier({ key: "retired", cat: "AI世界", ico: "🪦" }, "退隐 · {n} 人", "当前有 {n} 名 AI 因资金耗尽而退隐",
 		/* 2026-10-01：世界扩到 97 人，退隐数顶格上探（30/36 的 83% 等比例 ≈ 80）。 */
@@ -332,13 +338,13 @@
 		[2, 3, 4, 5, 6, 8, 10, 13, 17, 22],
 		function (v) { return statProg("gambleBestStreak", v); },
 		function (v) { return 300 + v * 250; });
-	/* 豪赌失血：净额为负的方向（豪赌桌期望收益为负，这是必修的学费）—— 真实净额 <= -阈值 */
+	/* 豪赌失血读取生涯净额；包含此前盈亏抵消，不是各场毛亏损之和。 */
 	(function () {
 		var mags = [100000, 500000, 2000000, 10000000, 30000000, 80000000];
 		for (var i = 0; i < mags.length; i++) {
 			(function (m) {
 				push("gmloss_" + m, "豪赌桌", "🩸", "豪赌失血 · " + fmt(m),
-					"豪赌桌生涯净输累计达到 " + fmt(m) + " CBY（期望为负的牌局，输得起才赢得起）",
+					"豪赌桌生涯累计净收益为 −" + fmt(m) + " CBY 或更低（按全部出战盈亏抵消后计算）",
 					function (s) { var n = Number(s.gambleNet) || 0; return [n <= -m ? 1 : 0, 1]; },
 					200 + Math.round(m / 5000));
 			})(mags[i]);
@@ -348,9 +354,14 @@
 	/* ============================================================
 	   9. 每日任务（完成 12）
 	   ============================================================ */
+	/* 每日只有三项；原 task_4 以上保留旧ID与奖励，改读真实跨日累计。 */
 	tier({ key: "task", cat: "任务", ico: "📋" }, "任务 · {n} 项", "单日完成 {n} 项每日任务",
-		[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 15],
+		[1, 2, 3],
 		function (v) { return statProg("taskDone", v); },
+		function (v) { return 120 + v * 60; });
+	tier({ key: "task", cat: "任务", ico: "📋" }, "日课 · 累计 {n} 项", "跨日累计完成 {n} 项每日任务",
+		[4, 5, 6, 7, 8, 9, 10, 12, 15],
+		function (v) { return statProg("taskCompletedTotal", v); },
 		function (v) { return 120 + v * 60; });
 
 	/* ============================================================
@@ -372,7 +383,7 @@
 		function (s) { return [Number(s.segIdx) || 0, 1]; }, 150);
 	push("egg_task_full", "彩蛋", "✅", "日课圆满", "当日每日任务全部完成（完成数 ≥ 任务总数）",
 		function (s) { return [Number(s.taskDone) || 0, Math.max(1, Number(s.taskTotal) || 1)]; }, 600);
-	push("egg_gamble_first", "彩蛋", "🎲", "初入豪赌", "第一次坐进豪赌桌（带入 200,000）",
+	push("egg_gamble_first", "彩蛋", "🎲", "初入豪赌", "完成首次豪赌桌出战结算（单纯入场或未开局退款不计）",
 		function (s) { return [(Number(s.gamblePlays) || 0) >= 1 ? 1 : 0, 1]; }, 300);
 	push("egg_hungry", "彩蛋", "🥣", "一贫如洗", "先有过四位数的身家，再跌回 0（然后你还会回来的）",
 		function (s) { return [((Number(s.pcPeak) || 0) >= 1000 && (Number(s.pc) || 0) <= 0) ? 1 : 0, 1]; }, 200);
@@ -380,12 +391,12 @@
 		function (s) { return [Number(s.pcPeak) || 0, 1000000]; }, 1000);
 	push("egg_rank_master", "彩蛋", "🏅", "登峰造极", "官阶达到 50 阶（大将军）",
 		function (s) { return [Number(s.rank) || 0, 50]; }, 5000);
-	push("egg_world_tour", "彩蛋", "🗺", "巡场", "AI 世界所有角色都至少与你同桌过一次（世界手数 ≥ 角色数 × 10）",
+	push("egg_world_tour", "彩蛋", "🗺", "巡场", "与 AI 同桌累计人次达到当前世界角色数的 10 倍（至少 10 人次）",
 		function (s) {
 			var need = Math.max(1, (Number(s.worldChars) || 0)) * 10;
 			return [Number(s.worldHands) || 0, need];
 		}, 800);
-	push("egg_billion_killer", "彩蛋", "⚰", "屠龙者", "把一位豪赌席 AI 打到跌出豪赌席（世界最高资金 < 3,000 万）",
+	push("egg_billion_killer", "彩蛋", "⚰", "屠龙者", "世界中至少有 1 位曾进入豪赌席的 AI，当前资金已低于豪赌席门槛",
 		function (s) { return [(Number(s.billionaireBroke) || 0) >= 1 ? 1 : 0, 1]; }, 2000);
 	push("egg_full_house", "彩蛋", "🎯", "满堂彩", "单日把三项每日任务全部完成（任务完成数 ≥ 3）",
 		function (s) { return [Number(s.taskDone) || 0, 3]; }, 400);

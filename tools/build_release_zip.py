@@ -1,5 +1,5 @@
 from pathlib import Path
-import argparse,hashlib,json,re,tempfile,zipfile
+import argparse,hashlib,json,os,re,tempfile,zipfile
 
 parser=argparse.ArgumentParser(description='Build a verified runtime-only extension ZIP from catalog.js.')
 parser.add_argument('--out',type=Path)
@@ -16,7 +16,9 @@ if len(set(files))!=len(files): raise ValueError('duplicate catalog entries')
 for file in files:
     path=(root/file).resolve()
     if not path.is_relative_to(root) or not path.is_file(): raise ValueError('unsafe or missing catalog entry')
-archive=args.out or Path(tempfile.mkdtemp(prefix='chizi-release-'))/('chizi-mojiang_v'+info['version']+'.zip')
+release_root=Path('D:/CodexWork/chizi-mojiang/releases') if os.name=='nt' else Path(tempfile.gettempdir())/'chizi-mojiang-releases'
+release_root.mkdir(parents=True,exist_ok=True)
+archive=args.out or Path(tempfile.mkdtemp(prefix='chizi-release-',dir=release_root))/('chizi-mojiang_v'+info['version']+'.zip')
 archive.parent.mkdir(parents=True,exist_ok=True)
 manifest=[]
 with zipfile.ZipFile(archive,'w',zipfile.ZIP_DEFLATED,compresslevel=6) as z:

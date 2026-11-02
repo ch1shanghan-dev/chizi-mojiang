@@ -405,8 +405,9 @@ body.empty .foot{display:none}
  .dstage{flex:0 0 36%}
 }
 </style>
+<link rel="stylesheet" href="../core/csh_collection.css">
 </head>
-<body class="csh-experience">
+<body class="csh-experience" data-csh-collection="codex">
 <div id="app">
   <div class="topbar">
     <div class="brand">妖灵图鉴<small>池中五十 · 各具其形</small></div>
@@ -427,17 +428,21 @@ body.empty .foot{display:none}
           <div class="dname" id="dname">—</div>
           <div class="dtag" id="dtag"></div>
         </div>
+        <div class="affbox" id="affbox"></div>
+        <details class="collection-details" id="character-story"><summary>人物小传与题壁</summary>
         <!-- 花榜·魁首题壁（v2.2）：该只妖灵的魁首（累计缠头第一）留的那句话。
              样式用行内：本页 <style> 里没有稳定的插入锚点，避免为四条装饰属性去动大段 CSS。 -->
         <div id="dchief" hidden style="font-size:var(--pfs-md);color:#b08d3e;border-left:2px solid #b08d3e;padding-left:10px;margin-top:6px;line-height:1.6"></div>
         <div class="dbio" id="dbio"></div>
-        <div class="affbox" id="affbox"></div>
+        </details>
         <div class="dlines" id="dlines"></div>
+        <details class="collection-details" id="character-records"><summary>讨伐与挂牌记录</summary>
         <div class="dfacts">
           <div class="fact"><div class="k">讨伐次数</div><div class="v num" id="fN">—</div></div>
           <div class="fact"><div class="k">金鳞市热度</div><div class="v num" id="fHeat">—</div></div>
           <div class="fact"><div class="k">挂牌状态</div><div class="v" id="fList">—</div></div>
         </div>
+        </details>
       </div>
     </div>
   </div>

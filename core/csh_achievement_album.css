@@ -1,0 +1,83 @@
+/* Achievement album: a collection rail, readable entries, and optional records.
+   All values inherit the existing page/skin scales; no wallet or gameplay styles. */
+body[data-csh-journal="pool"] .album-label{margin:0 0 6px;color:var(--jp-muted);font-size:var(--jp-note-size);letter-spacing:.12em}
+body[data-csh-journal="pool"] .album-navigation{display:grid;gap:3px;margin:20px 0 12px}
+body[data-csh-journal="pool"] .album-navigation button{min-height:44px;padding:8px 12px;text-align:left;font-size:var(--jp-body-size);border:0;border-left:2px solid transparent;border-radius:0;background:transparent;color:var(--jp-muted)}
+body[data-csh-journal="pool"] .album-navigation button[aria-pressed="true"]{border-left-color:var(--jp-accent);background:var(--jp-surface);color:var(--jp-text);font-weight:600}
+body[data-csh-journal="pool"] .album-mobile-volume{display:none;min-height:44px;min-width:0;font-size:var(--jp-note-size)}
+body[data-csh-journal="pool"] #pool-options>summary{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:var(--jp-note-size);min-height:44px;padding:8px 0;list-style:none}
+body[data-csh-journal="pool"] #pool-options>summary::after,body[data-csh-journal="pool"] #album-goals>summary::after{content:"＋";color:var(--jp-muted)}
+body[data-csh-journal="pool"] #pool-options[open]>summary::after,body[data-csh-journal="pool"] #album-goals[open]>summary::after{content:"−"}
+body[data-csh-journal="pool"] #album-goals{margin-top:12px;border-top:1px solid var(--jp-line);min-width:0}
+body[data-csh-journal="pool"] #album-goals>summary{display:flex;align-items:center;gap:8px;min-height:44px;padding:8px 0;list-style:none;font-size:var(--jp-note-size)}
+body[data-csh-journal="pool"] #album-goals>summary::after{margin-left:auto}
+body[data-csh-journal="pool"] #album-goal-count{color:var(--jp-muted);font-variant-numeric:tabular-nums}
+body[data-csh-journal="pool"] #album-goals.has-goals #album-goal-count{color:var(--jp-accent)}
+body[data-csh-journal="pool"] .album-goal-empty{font-size:var(--jp-note-size);line-height:1.7;color:var(--jp-muted);margin:8px 0 0}
+body[data-csh-journal="pool"] #album-goals.has-goals .album-goal-empty{display:none}
+body[data-csh-journal="pool"] #goal-bar{margin-top:8px}
+body[data-csh-journal="pool"] .album-goals-panel .csh-goal-items{grid-template-columns:minmax(0,1fr)}
+body[data-csh-journal="pool"] .album-goals-panel .csh-goal-bar h4{display:none}
+body[data-csh-journal="pool"] .album-context{display:flex;align-items:center;gap:10px;flex:none;min-height:26px;margin:0 4px 6px 1px;color:var(--jp-muted);font-size:var(--jp-note-size)}
+body[data-csh-journal="pool"] .album-context h2{font:600 var(--jp-body-size)/1.5 var(--jp-title);color:var(--jp-text);margin:0;overflow-wrap:anywhere}
+body[data-csh-journal="pool"] #album-context-count{font-variant-numeric:tabular-nums;white-space:nowrap}
+body[data-csh-journal="pool"] #album-filter-reset{margin-left:auto;min-height:44px;padding:4px 9px;font-size:var(--jp-note-size);background:transparent}
+body[data-csh-journal="pool"] #album-filter-reset[hidden]{display:none}
+body[data-csh-journal="pool"] #list{gap:12px;align-items:start;grid-auto-rows:max-content}
+body[data-csh-journal="pool"] #list .row{position:relative;grid-template-columns:minmax(0,1fr) 116px;align-items:start;gap:10px 14px;padding:14px 14px 0;border-radius:6px;background:var(--jp-surface);overflow:hidden}
+body[data-csh-journal="pool"] #list .row[data-claimable="true"]{border-color:var(--jp-line);border-left:3px solid var(--jp-accent);padding-left:12px}
+body[data-csh-journal="pool"] #list .row .name{font:600 var(--jp-title-size)/1.5 var(--jp-title);align-items:center;gap:10px}
+body[data-csh-journal="pool"] #list .row .name .meta{font:400 var(--jp-note-size)/1.5 var(--ff-body,system-ui,sans-serif);margin-top:2px;color:var(--jp-muted)}
+body[data-csh-journal="pool"] .condition-preview{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;font-size:var(--jp-body-size);line-height:1.6;margin:8px 0 0;color:var(--jp-text);overflow-wrap:anywhere}
+body[data-csh-journal="pool"] .details-open .condition-preview{display:none}
+body[data-csh-journal="pool"] #list .progress{display:grid;grid-template-columns:60px minmax(0,1fr);gap:8px;margin-top:8px;font-size:var(--jp-note-size);line-height:1.5}
+body[data-csh-journal="pool"] #list .progress progress{width:60px;height:5px}
+body[data-csh-journal="pool"] #list .achievement-actions{gap:5px;padding-left:12px;align-content:start}
+body[data-csh-journal="pool"] #list .achievement-actions button{margin:0;min-height:44px;border-radius:4px}
+body[data-csh-journal="pool"] #list .achievement-actions .reward{line-height:1.6;font-variant-numeric:tabular-nums}
+body[data-csh-journal="pool"] .achievement-details{grid-column:1/-1;min-width:0;border-top:1px solid var(--jp-line)}
+body[data-csh-journal="pool"] .achievement-details>summary{display:flex;justify-content:space-between;align-items:center;gap:10px;min-height:44px;list-style:none;font-size:var(--jp-note-size);line-height:1.5;color:var(--jp-muted);cursor:pointer}
+body[data-csh-journal="pool"] .achievement-details>summary::after{content:"展开 ＋";white-space:nowrap;color:var(--jp-muted)}
+body[data-csh-journal="pool"] .achievement-details[open]>summary::after{content:"收起 −"}
+body[data-csh-journal="pool"] .achievement-detail-body{padding:0 0 14px}
+body[data-csh-journal="pool"] .achievement-detail-body .condition{margin:0;font-size:var(--jp-body-size);line-height:1.7}
+body[data-csh-journal="pool"] .achievement-detail-body .achievement-scope{margin:8px 0 0;font-size:var(--jp-note-size);line-height:1.6;color:var(--jp-muted)}
+body[data-csh-journal="pool"] .achievement-detail-body .hint,body[data-csh-journal="pool"] .achievement-detail-body .earned-time{display:block;font-size:var(--jp-note-size);line-height:1.6;margin-top:8px;color:var(--jp-muted)}
+body[data-csh-journal="pool"] .achievement-detail-body .feat-live{padding-left:10px;border-left:2px solid var(--jp-line);margin-top:6px}
+body[data-csh-journal="pool"] details:not([open])>.achievement-detail-body,body[data-csh-journal="pool"] #album-goals:not([open])>.album-goals-panel,body[data-csh-journal="pool"] #pool-options:not([open])>.journal-filter-content{display:none}
+@media(max-width:1199px),(max-height:599px){
+ body[data-csh-journal="pool"] .journal-workspace{gap:8px}
+ body[data-csh-journal="pool"] .journal-sidebar{grid-template-columns:minmax(140px,1fr) 136px auto auto;gap:8px}
+ body[data-csh-journal="pool"] .journal-sidebar>.album-search{display:block}
+ body[data-csh-journal="pool"] .album-navigation{display:none}
+ body[data-csh-journal="pool"] .album-mobile-volume{display:block;width:100%;padding:6px 8px}
+ body[data-csh-journal="pool"] #album-goals{margin:0;border:0}
+ body[data-csh-journal="pool"] #album-goals>summary,body[data-csh-journal="pool"] #pool-options>summary{padding:6px 10px;min-height:44px;border:1px solid var(--jp-line);border-radius:5px;background:var(--jp-surface);gap:6px;white-space:nowrap}
+ body[data-csh-journal="pool"] #album-goals[open]>summary{border-color:var(--jp-accent)}
+ body[data-csh-journal="pool"] #pool-options[open] .journal-filter-content,body[data-csh-journal="pool"] #album-goals[open] .album-goals-panel{position:absolute;left:0;right:0;top:52px;z-index:5;max-height:calc(100% - 52px);overflow:auto;overscroll-behavior:contain;padding:12px;background:var(--jp-surface);border:1px solid var(--jp-line);border-radius:6px;box-shadow:0 10px 20px #0005}
+ body[data-csh-journal="pool"] .journal-filter-content>.filters{grid-template-columns:repeat(4,minmax(0,1fr))}
+ body[data-csh-journal="pool"] .album-goals-panel .csh-goal-items{grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr))}
+ body[data-csh-journal="pool"] .album-goals-panel .csh-goal-item{display:grid;grid-template-columns:minmax(0,1fr) 108px;gap:3px 12px;padding:9px}
+ body[data-csh-journal="pool"] .album-goals-panel .csh-goal-item>:not(button){grid-column:1}
+ body[data-csh-journal="pool"] .album-goals-panel .csh-goal-item button{grid-column:2;grid-row:1/5;align-self:center}
+ body[data-csh-journal="pool"] .journal-sidebar>.album-search{order:1}
+ body[data-csh-journal="pool"] .album-mobile-volume{order:2}
+ body[data-csh-journal="pool"] #pool-options{order:3}
+ body[data-csh-journal="pool"] #album-goals{order:4}
+ body[data-csh-journal="pool"] #list .row{padding:10px 10px 0;gap:8px 10px;grid-template-columns:minmax(0,1fr) 108px}
+ body[data-csh-journal="pool"] #list .row[data-claimable="true"]{padding-left:8px}
+ body[data-csh-journal="pool"] #list .row .name{font-size:var(--jp-body-size);gap:8px}
+ body[data-csh-journal="pool"] .album-context{margin-bottom:4px;min-height:24px}
+ body[data-csh-journal="pool"] #rule-note,body[data-csh-journal="pool"] #collection-note{margin-top:8px}
+}
+@media(max-width:760px) and (orientation:landscape){
+ body[data-csh-journal="pool"] .journal-sidebar{grid-template-columns:minmax(100px,1fr) 116px auto auto;gap:6px}
+ body[data-csh-journal="pool"] #album-goals>summary,body[data-csh-journal="pool"] #pool-options>summary{padding:6px 8px}
+ body[data-csh-journal="pool"] #list{gap:9px}
+ body[data-csh-journal="pool"] .condition-preview{-webkit-line-clamp:2;margin-top:5px}
+ body[data-csh-journal="pool"] #list .achievement-actions{padding-left:10px}
+ body[data-csh-journal="pool"] #album-filter-reset{padding:4px 7px}
+}
+@media(forced-colors:active){body[data-csh-journal="pool"] .album-navigation button[aria-pressed="true"]{border-left:3px solid Highlight}body[data-csh-journal="pool"] #album-goals[open] .album-goals-panel{background:Canvas}}
+
+body[data-csh-journal="pool"] #list .achievement-actions span.claim{display:block;min-height:0;padding:0;font-size:var(--jp-note-size);line-height:1.5;color:var(--jp-muted);background:transparent}

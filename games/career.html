@@ -703,16 +703,19 @@ body{--fs-card-title:16px;--fs-control:14px;--fs-label:13px;--fs-subtitle:18px;-
       </div>
     </div>
 
-    <!-- 官阶图鉴 -->
+    <!-- 官阶：先看当前荣誉与下一步，完整名录按需查看。 -->
     <div class="page" id="p-rank">
-      <div class="sect"><h3>五段 × 十阶</h3>
+      <div id="rank-honor" aria-live="polite"><p class="honor-status">正在读取官阶…</p></div>
+      <details class="honor-catalog" id="rank-catalog-disclosure">
+        <summary>完整官阶名录<span>查看门槛与各阶权益</span></summary>
         <div id="rank-catalog"></div>
-      </div>
-      <div class="sect"><h3>方位将军 · 4×4 矩阵</h3>
-        <div class="axlabel"><span>东</span><span>南</span><span>西</span><span>北</span></div>
-        <div class="matrix" id="rank-matrix"></div>
-        <div class="diffbox">行 = 平 → 安 → 镇 → 征（低 → 高）</div>
-      </div>
+        <details class="honor-matrix">
+          <summary>方位将军索引</summary>
+          <div class="axlabel"><span>东</span><span>南</span><span>西</span><span>北</span></div>
+          <div class="matrix" id="rank-matrix"></div>
+          <div class="diffbox">行 = 平 → 安 → 镇 → 征（低 → 高）</div>
+        </details>
+      </details>
     </div>
 
     <!-- 排行 -->
@@ -1076,7 +1079,7 @@ function renderOverview() {
 
   /* 段名：从钱包真值取（2026-09-29 起不再自造） */
   var seg = segOfRank(cur);
-  var color = segColor(seg.color);
+  var color = segColor(seg.seg);
   var pos = Math.max(1, Math.min(10, cur - seg.from + 1));
   $("#ov-segtag").textContent = seg.name + " · " + pos + "/10";
   $("#ov-segtag").style.color = color;
@@ -1480,7 +1483,30 @@ function bindAchFilters() {
    ============================================================ */
 var DIRS = ["东", "南", "西", "北"];
 var PRE = ["平", "安", "镇", "征"];
+function renderHonor() {
+  var box=$("#rank-honor"),ranks=State.ranks&&State.ranks.ranks,snap=State.snap&&State.snap.rank;
+  if(!box)return;box.textContent="";
+  if(!snap||!ranks||!ranks.length||!segList()||!segList().length||!Array.isArray(State.ranks.perksAll)||State.ranks.perksAll.length<segList().length){box.appendChild(el("p","honor-status",(State.rankReadFailed||State.honorWalletFailed)?"官阶资料暂未读到，重新打开生涯后可重试。":"正在读取官阶…"));return;}
+  var lv=Number(snap.rank)||0,merit=Number(snap.merit)||0,rec=null,next=null;
+  ranks.forEach(function(r){if(r.rank===lv)rec=r;if(r.rank===lv+1)next=r;});
+  if(!rec||lv<50&&!next){box.appendChild(el("p","honor-status","官阶资料暂未完整读取，稍后重新打开查看。"));return;}
+  var seg=segOfRank(lv),perks=perksOf(lv),hero=el("section","honor-hero"),current=el("section","honor-current"),seal=el("div","honor-seal"),badge=el("div","honor-seal-badge");
+  badge.innerHTML=State.badges&&State.badges[lv]||fallbackBadge(lv,segColor(seg.seg));seal.appendChild(badge);seal.appendChild(el("span","honor-seal-word",seg.name));seal.setAttribute("aria-hidden","true");current.appendChild(seal);
+  var info=el("div","honor-identity");info.appendChild(el("p","honor-eyebrow","当前官阶 · 第 "+lv+" 阶"));info.appendChild(el("h3","honor-name",rec.name));
+  var score=el("p","honor-merit");score.appendChild(el("span","","累计功勋"));score.appendChild(el("b","",fmt(merit)));info.appendChild(score);
+  var progress=next?Math.max(0,Math.min(100,(merit-rec.merit)/Math.max(1,next.merit-rec.merit)*100)):100;
+  var bar=el("div","honor-progress"),fill=el("i");fill.style.width=progress+"%";bar.appendChild(fill);bar.setAttribute("role","progressbar");bar.setAttribute("aria-label","通往下一阶的进度");bar.setAttribute("aria-valuemin","0");bar.setAttribute("aria-valuemax","100");bar.setAttribute("aria-valuenow",String(Math.round(progress)));info.appendChild(bar);
+  info.appendChild(el("p","honor-progress-note",next?"本阶 "+fmt(rec.merit)+" → 下一阶 "+fmt(next.merit):"已抵达最高官阶"));current.appendChild(info);hero.appendChild(current);
+  var target=el("section","honor-next");target.appendChild(el("p","honor-eyebrow",next?"下一阶":"功业已成"));target.appendChild(el("h4","",next?next.name:"大将军"));
+  var need=el("p","honor-need");need.appendChild(el("span","",next?"还需功勋":"最高官阶"));need.appendChild(el("b","",next?fmt(Math.max(0,next.merit-merit)):"50 阶"));target.appendChild(need);
+  var hint=next?(segOfRank(next.rank).seg===seg.seg?"晋升后沿用本段权益。":"晋升后进入「"+segOfRank(next.rank).name+"」段，权益随新段生效。") : "现有权益继续生效。";target.appendChild(el("p","honor-next-note",hint));
+  if(next){var view=el("button","btn ghost","查看下一阶权益");view.type="button";view.id="honor-next-detail";view.addEventListener("click",function(){showRankModal(next.rank,next);});target.appendChild(view);}hero.appendChild(target);box.appendChild(hero);
+  var benefits=el("section","honor-benefits");benefits.setAttribute("aria-label","当前已生效权益");
+  [["门票折扣",perks.discount>0?Math.round(perks.discount*100)+"%":"原价"],["签到加成","+"+fmt(perks.sign)+" CBY"],["带入上限",fmt(perks.maxStake)+" CBY"]].forEach(function(f){var cell=el("div","honor-benefit");cell.appendChild(el("span","",f[0]));cell.appendChild(el("b","",f[1]));benefits.appendChild(cell);});box.appendChild(benefits);
+  var trail=el("ol","honor-stage-track");trail.setAttribute("aria-label","五段进阶路线");segList().forEach(function(stage){var item=el("li",stage.seg<seg.seg?"past":stage.seg===seg.seg?"current":""),mark=el("span","honor-stage-mark",String(stage.seg+1));mark.setAttribute("aria-hidden","true");item.appendChild(mark);item.appendChild(el("b","",stage.name));item.appendChild(el("span","honor-stage-range",stage.from+"–"+stage.to+" 阶"));if(stage.seg===seg.seg)item.setAttribute("aria-current","step");trail.appendChild(item);});box.appendChild(trail);
+}
 function renderCatalog() {
+  renderHonor();
   var box = $("#rank-catalog");
   box.innerHTML = "";
   var ranks = (State.ranks && State.ranks.ranks) || [];
@@ -1489,19 +1515,20 @@ function renderCatalog() {
   for (var s = 0; s < 5; s++) {
     var blk = el("div", "segblock");
     var hd = el("div", "seghd");
-    var segInfo = segOfRank(s * 10 + 1);
-    var dot = el("i"); dot.style.background = segColor(segInfo.color);
+    var segInfo = segOfRank(s * 10);
+    var dot = el("i"); dot.style.background = segColor(segInfo.seg);
     hd.appendChild(dot);
     hd.appendChild(el("span", "", "第 " + (s + 1) + " 段「" + segInfo.name + "」（第 " + segInfo.from + "–" + (segInfo.to >= 50 ? 50 : segInfo.to) + " 阶）"));
     blk.appendChild(hd);
     var grid = el("div", "rgrid");
-    for (var i = s * 10 + 1; i <= s * 10 + 10 && i <= 50; i++) {
+    for (var i = segInfo.from; i <= segInfo.to && i <= 50; i++) {
       (function (lv) {
         var rec = null;
         for (var j = 0; j < ranks.length; j++) if (ranks[j].rank === lv) { rec = ranks[j]; break; }
-        var cell = el("div", "rcell" + (lv < cur ? " past" : lv === cur ? " cur" : ""));
+        var cell = el("button", "rcell" + (lv < cur ? " past" : lv === cur ? " cur" : ""));
+        cell.type = "button"; cell.setAttribute("data-rank",String(lv)); if(lv===cur)cell.setAttribute("aria-current","true");
         var rb = el("div", "rb");
-        rb.innerHTML = (State.badges && State.badges[lv]) ? State.badges[lv] : fallbackBadge(lv, segColor(segOfRank(lv).color));
+        rb.innerHTML = (State.badges && State.badges[lv]) ? State.badges[lv] : fallbackBadge(lv, segColor(segOfRank(lv).seg));
         cell.appendChild(rb);
         cell.appendChild(el("div", "rn", (rec && rec.name) || ("第 " + lv + " 阶")));
         cell.appendChild(el("div", "rm", fmt((rec && rec.merit) || 0)));
@@ -1519,17 +1546,17 @@ function renderMatrix() {
   var ranks = (State.ranks && State.ranks.ranks) || [];
   var cur = (State.snap && State.snap.rank && State.snap.rank.rank) || 0;
   var curName = "";
-  for (var i = 0; i < ranks.length; i++) if (ranks[i].rank === cur) curName = ranks[i].name || "";
+  for (var i = 0; i < ranks.length; i++) if (ranks[i].rank === cur) curName = (ranks[i].name || "").replace(/将军$/, "");
   for (var p = 0; p < PRE.length; p++) {
     for (var d = 0; d < DIRS.length; d++) {
       (function (pre, dir) {
         var nm = pre + dir;
-        var cell = el("div", "mx" + (curName === nm ? " cur" : ""));
-        cell.appendChild(el("div", "mn", nm));
+        var cell = el("button", "mx" + (curName === nm ? " cur" : ""));
+        cell.type = "button";cell.appendChild(el("div", "mn", nm));
         cell.addEventListener("click", function () {
           var rec = null;
-          for (var k = 0; k < ranks.length; k++) if (ranks[k].name === nm) { rec = ranks[k]; break; }
-          showRankModal(rec ? rec.rank : 0, rec);
+          for (var k = 0; k < ranks.length; k++) if (ranks[k].name === nm || ranks[k].name === nm + "将军") { rec = ranks[k]; break; }
+          if(rec)showRankModal(rec.rank, rec);
         }, false);
         box.appendChild(cell);
       })(PRE[p], DIRS[d]);
@@ -1539,7 +1566,7 @@ function renderMatrix() {
 function showRankModal(lv, rec) {
   modalFocusBack = document.activeElement;
   var seg = segOfRank(lv);
-  $("#md-badge").innerHTML = (State.badges && State.badges[lv]) ? State.badges[lv] : fallbackBadge(lv, segColor(seg.color));
+  $("#md-badge").innerHTML = (State.badges && State.badges[lv]) ? State.badges[lv] : fallbackBadge(lv, segColor(seg.seg));
   $("#md-name").textContent = (rec && rec.name) || ("第 " + lv + " 阶");
   var merit = (State.snap && State.snap.rank && State.snap.rank.merit) || 0;
   var need = Math.max(0, ((rec && rec.merit) || 0) - merit);
@@ -1819,13 +1846,14 @@ function fallbackSnap() {
   return snap;
 }
 function adoptSnap(snap) {
-  State.snap = snap;
+  State.honorWalletFailed=false;State.snap = snap;
   if (snap && snap.tasks && snap.tasks.defs) {
     State.tasks = snap.tasks;
     renderTasksInto($("#ov-tasks"));
     renderTasksInto($("#tk-list"));
   }
   renderOverview();
+  renderCatalog(); renderMatrix();
   renderAch();          /* 成就墙依赖快照里的实时统计 */
   if (State.world) renderBoard();
 }
@@ -1848,6 +1876,7 @@ function loadWalletSnap(round) {
     if (round === 0) { setTimeout(function () { loadWalletSnap(1); }, 1200); return; }
     var fb = fallbackSnap();
     if (fb) adoptSnap(fb);
+    else {State.honorWalletFailed=true;renderHonor();}
   });
 }
 function reloadAll() {
@@ -1873,7 +1902,8 @@ function reloadAll() {
       if (r.ranks && r.ranks.length && r.ranks[0].lv != null && r.ranks[0].rank == null) {
         for (var i = 0; i < r.ranks.length; i++) r.ranks[i].rank = r.ranks[i].lv;
       }
-      State.ranks = r; renderCatalog(); renderMatrix(); renderOverview();
+      State.rankReadFailed=false;State.ranks = r; renderCatalog(); renderMatrix(); renderOverview();
+    } else {State.rankReadFailed=true;renderHonor();
     }
   });
   refreshWorld();

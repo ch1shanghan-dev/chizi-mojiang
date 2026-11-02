@@ -1,3 +1,4 @@
+import { auditTempRoot, removeAuditScratch, disposeAuditBrowser } from './lib/audit_scratch.mjs';
 // Real career HTML + achievement engine in fresh headless Chromium profiles.
 // Only the host transport is simulated; no installed game data is accessed.
 import fs from 'node:fs';
@@ -7,7 +8,8 @@ import {pathToFileURL} from 'node:url';
 import {root} from './lib/skill_audit.mjs';
 import {withChromium} from './lib/chromium_audit.mjs';
 const option=(n,f)=>{const i=process.argv.indexOf(n);return i<0?f:process.argv[i+1];};
-const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'csh-career-audit-'));
+const tmp=fs.mkdtempSync(path.join(auditTempRoot(),'csh-career-audit-'));
+process.once("exit",()=>{try{removeAuditScratch(tmp);}catch(e){console.warn("Audit cleanup:",e.message);}});
 const out=option('--out',path.join(root,'docs/audit/ui/career-achievements'));fs.mkdirSync(out,{recursive:true});
 let source=fs.readFileSync(option('--source',path.join(root,'games/career.html')),'utf8');
 source=source.replace(/(src|href)="\.\.\/([^"]+)"/g,(_,attr,f)=>attr+'="'+pathToFileURL(path.join(root,f)).href+'"');

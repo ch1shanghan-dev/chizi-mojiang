@@ -179,3 +179,55 @@ body[data-csh-journal="career"] #app:not(.career-collection) #career-top :is(#ac
 body[data-csh-journal="career"] #p-ach .ach-controls{margin:0 0 8px}
 
 body[data-csh-journal="pool"] .journal-mode{display:inline-block;margin-left:12px;font:400 var(--jp-note-size)/1.5 system-ui,"Microsoft YaHei",sans-serif;color:var(--jp-muted);letter-spacing:0}
+/* Honor chapter: the current seal and useful progression, then the optional register. */
+/* The measured 21px compact name sits between the existing 20px and 22px scale stops. */
+body[data-csh-journal="career"]{--jp-honor-compact-name-size:21px}
+body[data-csh-journal="career"] #p-rank.on{display:grid;gap:16px;max-width:1120px}
+body[data-csh-journal="career"] #rank-honor{display:grid;gap:16px;min-width:0}
+body[data-csh-journal="career"] .honor-hero{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(200px,.75fr);min-width:0;background:var(--ink-1);border:1px solid var(--jp-line);border-radius:8px;overflow:hidden}
+body[data-csh-journal="career"] .honor-current{display:grid;grid-template-columns:104px minmax(0,1fr);align-items:center;gap:22px;min-width:0;padding:24px}
+body[data-csh-journal="career"] .honor-seal{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;align-self:stretch;min-height:140px;border:1px solid var(--jp-line);border-bottom:3px solid var(--jp-accent);border-radius:4px 4px 18px 18px;background:linear-gradient(150deg,var(--ink-2),var(--ink-0));color:var(--jp-accent)}
+body[data-csh-journal="career"] .honor-seal-badge,body[data-csh-journal="career"] .honor-seal-badge svg{width:68px;height:68px;display:block}
+body[data-csh-journal="career"] .honor-seal-word{font:600 var(--jp-body-size)/1.4 var(--jp-title);letter-spacing:.25em;padding-left:.25em}
+body[data-csh-journal="career"] .honor-identity{min-width:0}
+body[data-csh-journal="career"] .honor-eyebrow{font:400 var(--jp-note-size)/1.5 var(--ff-body);color:var(--jp-muted);margin:0 0 5px}
+body[data-csh-journal="career"] .honor-name{font:600 var(--csh-lfs-display,24px)/1.35 var(--jp-title);color:var(--jp-text);margin:0 0 14px;overflow-wrap:anywhere}
+body[data-csh-journal="career"] .honor-merit,body[data-csh-journal="career"] .honor-need{display:flex;align-items:baseline;gap:10px;margin:0 0 10px;flex-wrap:wrap;color:var(--jp-muted);font-size:var(--jp-note-size)}
+body[data-csh-journal="career"] .honor-merit b,body[data-csh-journal="career"] .honor-need b{font:600 var(--jp-icon-size)/1.2 var(--ff-num);color:var(--jp-text)}
+body[data-csh-journal="career"] .honor-progress{height:5px;background:var(--ink-3);overflow:hidden;border-radius:2px}
+body[data-csh-journal="career"] .honor-progress i{display:block;height:100%;background:var(--jp-accent)}
+body[data-csh-journal="career"] .honor-progress-note,body[data-csh-journal="career"] .honor-next-note{font:400 var(--jp-note-size)/1.6 var(--ff-body);color:var(--jp-muted);margin:7px 0 0;overflow-wrap:anywhere}
+body[data-csh-journal="career"] .honor-next{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;min-width:0;padding:24px;border-left:1px solid var(--jp-line);background:var(--ink-0)}
+body[data-csh-journal="career"] .honor-next h4{font:600 var(--jp-rank-size)/1.45 var(--jp-title);margin:0 0 10px;color:var(--jp-text);overflow-wrap:anywhere}
+body[data-csh-journal="career"] .honor-next .btn{font-size:var(--jp-note-size);margin:12px 0 0;padding:6px 12px;min-height:44px;line-height:1.4}
+body[data-csh-journal="career"] .honor-benefits{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));min-width:0;border-bottom:1px solid var(--jp-line);padding:0 0 14px}
+body[data-csh-journal="career"] .honor-benefit{display:flex;align-items:baseline;justify-content:space-between;gap:8px;flex-wrap:wrap;min-width:0;padding:0 18px;border-right:1px solid var(--jp-line);font-size:var(--jp-note-size);color:var(--jp-muted)}
+body[data-csh-journal="career"] .honor-benefit:first-child{padding-left:0}
+body[data-csh-journal="career"] .honor-benefit:last-child{border-right:0;padding-right:0}
+body[data-csh-journal="career"] .honor-benefit b{font:600 var(--csh-lfs-xl2,17px)/1.5 var(--ff-num);color:var(--jp-text);overflow-wrap:anywhere}
+body[data-csh-journal="career"] .honor-stage-track{list-style:none;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));padding:0;margin:0;gap:12px}
+body[data-csh-journal="career"] .honor-stage-track li{position:relative;display:grid;grid-template-columns:24px minmax(0,1fr);gap:1px 8px;min-width:0;padding:8px 0;color:var(--jp-muted);border-top:2px solid var(--jp-line)}
+body[data-csh-journal="career"] .honor-stage-track li.current{color:var(--jp-accent);border-top-color:var(--jp-accent)}
+body[data-csh-journal="career"] .honor-stage-track li.past{border-top-color:var(--jp-muted)}
+body[data-csh-journal="career"] .honor-stage-mark{grid-row:1/3;align-self:center;font:600 var(--jp-rank-size)/1.4 var(--ff-num)}
+body[data-csh-journal="career"] .honor-stage-track b{font:600 var(--jp-label-size)/1.5 var(--jp-title)}
+body[data-csh-journal="career"] .honor-stage-range{font:400 var(--jp-note-size)/1.5 var(--ff-body);white-space:nowrap}
+body[data-csh-journal="career"] .honor-catalog{min-width:0;border-top:1px solid var(--jp-line)}
+body[data-csh-journal="career"] .honor-catalog>summary,body[data-csh-journal="career"] .honor-matrix>summary{display:flex;align-items:center;gap:12px;min-height:44px;font-size:var(--jp-body-size);color:var(--jp-text);padding:8px 0;list-style:none}
+body[data-csh-journal="career"] .honor-catalog>summary::after,body[data-csh-journal="career"] .honor-matrix>summary::after{content:"＋";margin-left:auto;color:var(--jp-muted)}
+body[data-csh-journal="career"] .honor-catalog[open]>summary::after,body[data-csh-journal="career"] .honor-matrix[open]>summary::after{content:"−"}
+body[data-csh-journal="career"] .honor-catalog>summary span{font-size:var(--jp-note-size);color:var(--jp-muted)}
+body[data-csh-journal="career"] #rank-catalog{padding-top:8px}
+body[data-csh-journal="career"] #rank-catalog .segblock{margin:0 0 16px}
+body[data-csh-journal="career"] #rank-catalog .seghd{font-size:var(--jp-label-size);padding-bottom:8px}
+body[data-csh-journal="career"] #rank-catalog .rgrid{grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
+body[data-csh-journal="career"] #rank-catalog button.rcell{min-height:92px;min-width:0;font-family:var(--ff-body);color:var(--jp-text);cursor:pointer;box-shadow:none;background:var(--ink-1);border:1px solid var(--jp-line);border-radius:5px;padding:9px 5px;text-align:center}
+body[data-csh-journal="career"] #rank-catalog button.rcell.cur{border-color:var(--jp-accent);background:var(--ink-2)}
+body[data-csh-journal="career"] #rank-catalog .rn{font-size:var(--jp-label-size);overflow-wrap:anywhere}
+body[data-csh-journal="career"] #rank-catalog .rm{font-size:var(--jp-note-size)}
+body[data-csh-journal="career"] #rank-matrix button.mx{cursor:pointer;color:var(--jp-text);min-height:44px;font-family:var(--ff-body);font-size:var(--jp-label-size)}
+body[data-csh-journal="career"] .honor-status{font-size:var(--jp-body-size);line-height:1.7;color:var(--jp-muted);margin:0;padding:18px 0}
+@media(max-height:500px){body[data-csh-journal="career"] #p-rank.on,body[data-csh-journal="career"] #rank-honor{gap:10px}body[data-csh-journal="career"] .honor-current{padding:14px;grid-template-columns:76px minmax(0,1fr);gap:14px}body[data-csh-journal="career"] .honor-seal{min-height:118px}body[data-csh-journal="career"] .honor-seal-badge,body[data-csh-journal="career"] .honor-seal-badge svg{width:56px;height:56px}body[data-csh-journal="career"] .honor-name{font-size:var(--jp-honor-compact-name-size);margin-bottom:8px}body[data-csh-journal="career"] .honor-next{padding:14px}body[data-csh-journal="career"] .honor-next h4{font-size:var(--jp-title-size);margin-bottom:6px}body[data-csh-journal="career"] .honor-next .btn{margin-top:8px}body[data-csh-journal="career"] .honor-benefits{padding-bottom:10px}body[data-csh-journal="career"] .honor-stage-track li{padding:5px 0}}
+@media(max-width:760px) and (orientation:landscape){body[data-csh-journal="career"] .honor-hero{grid-template-columns:minmax(0,1.2fr) minmax(180px,.8fr)}body[data-csh-journal="career"] .honor-current{grid-template-columns:60px minmax(0,1fr);gap:10px;padding:12px}body[data-csh-journal="career"] .honor-seal{min-height:112px}body[data-csh-journal="career"] .honor-seal-badge,body[data-csh-journal="career"] .honor-seal-badge svg{width:46px;height:46px}body[data-csh-journal="career"] .honor-seal-word{font-size:var(--jp-note-size)}body[data-csh-journal="career"] .honor-name{font-size:var(--jp-rank-size)}body[data-csh-journal="career"] .honor-merit b,body[data-csh-journal="career"] .honor-need b{font-size:var(--jp-rank-size)}body[data-csh-journal="career"] .honor-next{padding:12px}body[data-csh-journal="career"] .honor-benefit{padding:0 9px}body[data-csh-journal="career"] .honor-benefit b{font-size:var(--jp-body-size)}body[data-csh-journal="career"] .honor-stage-track{gap:6px}body[data-csh-journal="career"] .honor-stage-track li{grid-template-columns:minmax(0,1fr);gap:0}body[data-csh-journal="career"] .honor-stage-mark{display:none}body[data-csh-journal="career"] #rank-catalog .rgrid{grid-template-columns:repeat(4,minmax(0,1fr))}}
+
+body[data-csh-journal="career"] .honor-catalog:not([open])>:not(summary),body[data-csh-journal="career"] .honor-matrix:not([open])>:not(summary){display:none}

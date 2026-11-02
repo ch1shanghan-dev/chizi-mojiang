@@ -998,6 +998,1021 @@
 
 
 	/* 索引：事件 → 规则（只跑相关规则，别让每次事件都扫全表） */
+
+    /* Concrete card plans and cross-match tactical collections. No new event taps. */
+    var EXTRA_TACTICAL_CHALLENGES = [
+    {
+        "id": "nx_draw_discard",
+        "name": "取舍成章",
+        "cat": "操作",
+        "rare": 1,
+        "needs": [
+            [
+                "c:wuzhong",
+                1
+            ],
+            [
+                "l:discard",
+                2
+            ]
+        ],
+        "desc": "同一局本人使用或打出至少1张【无中生有】，并实际弃置至少2张牌"
+    },
+    {
+        "id": "nx_steal_dismantle",
+        "name": "取势破局",
+        "cat": "连击",
+        "rare": 2,
+        "needs": [
+            [
+                "c:shunshou",
+                1
+            ],
+            [
+                "c:guohe",
+                1
+            ],
+            [
+                "c:sha",
+                2
+            ]
+        ],
+        "desc": "同一局使用或打出【顺手牵羊】【过河拆桥】各至少1张与【杀】至少2张"
+    },
+    {
+        "id": "nx_duel_answers",
+        "name": "对策双全",
+        "cat": "连击",
+        "rare": 2,
+        "needs": [
+            [
+                "c:juedou",
+                1
+            ],
+            [
+                "c:respond",
+                2
+            ]
+        ],
+        "desc": "同一局使用或打出至少1张【决斗】，并在响应事件中打出至少2张牌"
+    },
+    {
+        "id": "nx_arrows_guard",
+        "name": "箭雨有备",
+        "cat": "操作",
+        "rare": 2,
+        "needs": [
+            [
+                "c:wanjian",
+                1
+            ],
+            [
+                "c:shan",
+                1
+            ]
+        ],
+        "desc": "同一局使用或打出至少1张【万箭齐发】和1张【闪】，并获胜",
+        "win": true
+    },
+    {
+        "id": "nx_southern_offense",
+        "name": "南征北御",
+        "cat": "连击",
+        "rare": 2,
+        "needs": [
+            [
+                "c:nanman",
+                1
+            ],
+            [
+                "c:sha",
+                2
+            ],
+            [
+                "c:shan",
+                1
+            ]
+        ],
+        "desc": "同一局使用或打出至少1张【南蛮入侵】、2张【杀】和1张【闪】，并获胜",
+        "win": true
+    },
+    {
+        "id": "nx_fire_answers",
+        "name": "火策留守",
+        "cat": "连击",
+        "rare": 3,
+        "needs": [
+            [
+                "c:huogong",
+                1
+            ],
+            [
+                "d:fire",
+                2
+            ],
+            [
+                "c:wuxie",
+                1
+            ]
+        ],
+        "desc": "同一局使用或打出至少1张【火攻】和1张【无懈可击】，本人累计造成至少2点火焰伤害"
+    },
+    {
+        "id": "nx_wine_stand",
+        "name": "从容饮战",
+        "cat": "逆境",
+        "rare": 2,
+        "needs": [
+            [
+                "c:jiu",
+                1
+            ],
+            [
+                "c:sha",
+                2
+            ],
+            [
+                "r:recover",
+                1
+            ]
+        ],
+        "desc": "同一局使用或打出至少1张【酒】与2张【杀】，本人实际回复至少1点体力，并获胜",
+        "win": true
+    },
+    {
+        "id": "nx_duel_pressure",
+        "name": "争锋不息",
+        "cat": "连击",
+        "rare": 2,
+        "needs": [
+            [
+                "c:juedou",
+                1
+            ],
+            [
+                "c:sha",
+                2
+            ],
+            [
+                "d:all",
+                4
+            ]
+        ],
+        "desc": "同一局使用或打出至少1张【决斗】与2张【杀】，本人累计造成至少4点伤害，并获胜",
+        "win": true
+    },
+    {
+        "id": "nx_break_attack",
+        "name": "破阵先拆",
+        "cat": "操作",
+        "rare": 2,
+        "needs": [
+            [
+                "c:guohe",
+                2
+            ],
+            [
+                "c:sha",
+                2
+            ]
+        ],
+        "desc": "同一局使用或打出至少2张【过河拆桥】与2张【杀】"
+    },
+    {
+        "id": "nx_steal_equip",
+        "name": "借牌成军",
+        "cat": "操作",
+        "rare": 2,
+        "needs": [
+            [
+                "c:shunshou",
+                2
+            ],
+            [
+                "e:equip",
+                1
+            ]
+        ],
+        "desc": "同一局使用或打出至少2张【顺手牵羊】，且本人至少1次新装备实际进入装备区"
+    },
+    {
+        "id": "nx_supply_guard",
+        "name": "补给有度",
+        "cat": "操作",
+        "rare": 2,
+        "needs": [
+            [
+                "g:cards",
+                8
+            ],
+            [
+                "c:tao",
+                1
+            ],
+            [
+                "c:wuxie",
+                1
+            ]
+        ],
+        "desc": "同一局本人实际获得至少8张牌，并使用或打出【桃】【无懈可击】各至少1张"
+    },
+    {
+        "id": "nx_discard_answers",
+        "name": "舍牌应变",
+        "cat": "逆境",
+        "rare": 2,
+        "needs": [
+            [
+                "l:discard",
+                4
+            ],
+            [
+                "c:respond",
+                2
+            ],
+            [
+                "c:type.trick",
+                1
+            ]
+        ],
+        "desc": "同一局本人实际弃置至少4张牌、响应至少2张牌，并使用或打出至少1张锦囊牌后获胜",
+        "win": true
+    },
+    {
+        "id": "nx_judge_guard",
+        "name": "问卜有守",
+        "cat": "操作",
+        "rare": 2,
+        "needs": [
+            [
+                "q:judge",
+                2
+            ],
+            [
+                "c:shan",
+                2
+            ]
+        ],
+        "desc": "同一局本人完成至少2次有效判定，使用或打出至少2张【闪】，并获胜",
+        "win": true
+    },
+    {
+        "id": "nx_compare_scheme",
+        "name": "论点成谋",
+        "cat": "连击",
+        "rare": 2,
+        "needs": [
+            [
+                "q:compare",
+                1
+            ],
+            [
+                "c:type.trick",
+                2
+            ],
+            [
+                "c:wuxie",
+                1
+            ]
+        ],
+        "desc": "同一局本人实际参与至少1次未取消的拼点，使用或打出至少2张锦囊牌（含1张【无懈可击】），并获胜",
+        "win": true
+    },
+    {
+        "id": "nx_equip_guard",
+        "name": "整装御敌",
+        "cat": "操作",
+        "rare": 2,
+        "needs": [
+            [
+                "e:equip",
+                2
+            ],
+            [
+                "c:shan",
+                2
+            ]
+        ],
+        "desc": "同一局本人至少2次新装备实际进入装备区，并使用或打出至少2张【闪】"
+    },
+    {
+        "id": "nx_wine_recover",
+        "name": "回气再战",
+        "cat": "逆境",
+        "rare": 2,
+        "needs": [
+            [
+                "r:recover",
+                2
+            ],
+            [
+                "c:jiu",
+                1
+            ],
+            [
+                "d:sha",
+                2
+            ]
+        ],
+        "desc": "同一局本人实际回复至少2点体力、使用或打出至少1张【酒】，并以【杀】累计造成至少2点伤害后获胜",
+        "win": true
+    },
+    {
+        "id": "nx_trick_answers",
+        "name": "妙手留招",
+        "cat": "连击",
+        "rare": 2,
+        "needs": [
+            [
+                "c:shunshou",
+                1
+            ],
+            [
+                "c:wuxie",
+                1
+            ],
+            [
+                "c:respond",
+                2
+            ]
+        ],
+        "desc": "同一局使用或打出【顺手牵羊】【无懈可击】各至少1张，并在响应事件中打出至少2张牌后获胜",
+        "win": true
+    },
+    {
+        "id": "nx_thunder_guard",
+        "name": "雷发自守",
+        "cat": "连击",
+        "rare": 3,
+        "needs": [
+            [
+                "d:thunder",
+                3
+            ],
+            [
+                "c:shan",
+                2
+            ],
+            [
+                "c:wuxie",
+                1
+            ]
+        ],
+        "desc": "同一局本人累计造成至少3点雷电伤害，并使用或打出至少2张【闪】与1张【无懈可击】"
+    },
+    {
+        "id": "nx_peach_armor",
+        "name": "活水护阵",
+        "cat": "逆境",
+        "rare": 2,
+        "needs": [
+            [
+                "c:tao",
+                2
+            ],
+            [
+                "e:equip",
+                1
+            ]
+        ],
+        "desc": "同一局使用或打出至少2张【桃】，本人至少1次新装备实际进入装备区，并获胜",
+        "win": true
+    },
+    {
+        "id": "nx_lord_control",
+        "name": "主公借势",
+        "cat": "模式",
+        "rare": 2,
+        "needs": [
+            [
+                "c:shunshou",
+                1
+            ],
+            [
+                "c:guohe",
+                1
+            ],
+            [
+                "c:wuxie",
+                1
+            ]
+        ],
+        "desc": "身份模式以主公出战，同局使用或打出【顺手牵羊】【过河拆桥】【无懈可击】各至少1张，并获胜",
+        "win": true,
+        "modes": [
+            "identity"
+        ],
+        "identity": "zhu"
+    },
+    {
+        "id": "nx_loyal_answers",
+        "name": "忠心应战",
+        "cat": "模式",
+        "rare": 2,
+        "needs": [
+            [
+                "c:tao",
+                2
+            ],
+            [
+                "c:shan",
+                2
+            ]
+        ],
+        "desc": "身份模式以忠臣出战，同局使用或打出至少2张【桃】与2张【闪】，并获胜",
+        "win": true,
+        "modes": [
+            "identity"
+        ],
+        "identity": "zhong"
+    },
+    {
+        "id": "nx_rebel_advance",
+        "name": "反锋齐发",
+        "cat": "模式",
+        "rare": 2,
+        "needs": [
+            [
+                "c:nanman",
+                1
+            ],
+            [
+                "c:juedou",
+                1
+            ],
+            [
+                "d:all",
+                4
+            ]
+        ],
+        "desc": "身份模式以反贼出战，同局使用或打出【南蛮入侵】【决斗】各至少1张、本人造成至少4点伤害，并获胜",
+        "win": true,
+        "modes": [
+            "identity"
+        ],
+        "identity": "fan"
+    },
+    {
+        "id": "nx_spy_equipment",
+        "name": "藏锋成器",
+        "cat": "模式",
+        "rare": 3,
+        "needs": [
+            [
+                "e:equip",
+                2
+            ],
+            [
+                "q:judge",
+                1
+            ],
+            [
+                "c:shan",
+                2
+            ]
+        ],
+        "desc": "身份模式以内奸出战，同局本人至少2次新装备实际入区、完成1次有效判定，使用或打出2张【闪】，并获胜",
+        "win": true,
+        "modes": [
+            "identity"
+        ],
+        "identity": "nei"
+    },
+    {
+        "id": "nx_farmer_scheme",
+        "name": "田畴谋定",
+        "cat": "模式",
+        "rare": 2,
+        "needs": [
+            [
+                "c:guohe",
+                1
+            ],
+            [
+                "c:shan",
+                2
+            ],
+            [
+                "c:type.trick",
+                2
+            ]
+        ],
+        "desc": "无名杀斗地主模式以农民出战，同局使用或打出至少1张【过河拆桥】、2张【闪】及2张锦囊牌，并获胜",
+        "win": true,
+        "modes": [
+            "doudizhu"
+        ],
+        "landlord": false
+    },
+    {
+        "id": "nx_landlord_balance",
+        "name": "独擎攻守",
+        "cat": "模式",
+        "rare": 2,
+        "needs": [
+            [
+                "c:juedou",
+                1
+            ],
+            [
+                "c:wuxie",
+                1
+            ],
+            [
+                "c:sha",
+                2
+            ]
+        ],
+        "desc": "无名杀斗地主模式以地主出战，同局使用或打出【决斗】【无懈可击】各至少1张与【杀】至少2张，并获胜",
+        "win": true,
+        "modes": [
+            "doudizhu"
+        ],
+        "landlord": true
+    },
+    {
+        "id": "nx_versus_counter",
+        "name": "两阵拆招",
+        "cat": "模式",
+        "rare": 2,
+        "needs": [
+            [
+                "c:guohe",
+                1
+            ],
+            [
+                "c:wuxie",
+                1
+            ],
+            [
+                "q:compare",
+                1
+            ]
+        ],
+        "desc": "无名杀对决模式同局使用或打出【过河拆桥】【无懈可击】各至少1张，本人实际参与至少1次未取消拼点，并获胜",
+        "win": true,
+        "modes": [
+            "versus"
+        ]
+    }
+];
+    EXTRA_TACTICAL_CHALLENGES.forEach(function(spec){
+        RULES.push({id:spec.id,name:spec.name,cat:spec.cat,rare:spec.rare,
+            modes:spec.modes||[],on:['over'],collection:'tactics-20261101',tactic:spec,
+            desc:spec.desc,hint:'全部条件在同一局由本人完成；不要求操作先后或因果。只记普通单机身份、无名杀斗地主和对决，非休闲小游戏。',
+            test:function(ev,a){
+                if(spec.win&&!ev.win)return false;
+                if(spec.identity&&a.meIdentity!==spec.identity)return false;
+                if(typeof spec.landlord==='boolean'&&a.isLandlord!==spec.landlord)return false;
+                return spec.needs.every(function(pair){return masteryMetric(a,pair[0])>=pair[1];});
+            }
+        });
+    });
+    var TACTICAL_JOURNEYS = [
+    {
+        "id": "jr_arms_and_plans",
+        "name": "兵策互通",
+        "cat": "连击",
+        "rare": 3,
+        "groups": [
+            [
+                "nx_break_attack"
+            ],
+            [
+                "nx_steal_equip"
+            ],
+            [
+                "nx_duel_answers"
+            ]
+        ],
+        "desc": "跨对局收藏「破阵先拆」「借牌成军」「对策双全」三项战术"
+    },
+    {
+        "id": "jr_medicine_and_armor",
+        "name": "药甲成章",
+        "cat": "逆境",
+        "rare": 3,
+        "groups": [
+            [
+                "nx_wine_stand"
+            ],
+            [
+                "nx_peach_armor"
+            ],
+            [
+                "tc_equip_recover"
+            ]
+        ],
+        "desc": "跨对局收藏「从容饮战」「活水护阵」「整甲重来」三项战术"
+    },
+    {
+        "id": "jr_three_realms",
+        "name": "三境四席",
+        "cat": "模式",
+        "rare": 3,
+        "groups": [
+            [
+                "tc_lord_stand",
+                "tc_loyal_guard",
+                "tc_rebel_scheme",
+                "tc_spy_answers"
+            ],
+            [
+                "nx_landlord_balance"
+            ],
+            [
+                "nx_farmer_scheme"
+            ],
+            [
+                "nx_versus_counter"
+            ]
+        ],
+        "desc": "跨对局完成一项指定身份战术，以及「独擎攻守」「田畴谋定」「两阵拆招」",
+        "hint": "身份战术任选「主阵不坠」「丹心有守」「破阵成谋」「藏谋待时」之一；另三项分别需要地主、农民与对决出战。"
+    },
+    {
+        "id": "jr_eight_arts",
+        "name": "八艺策藏",
+        "cat": "操作",
+        "rare": 3,
+        "groups": [
+            [
+                "nx_draw_discard"
+            ],
+            [
+                "nx_break_attack"
+            ],
+            [
+                "nx_judge_guard"
+            ],
+            [
+                "nx_compare_scheme"
+            ],
+            [
+                "nx_equip_guard"
+            ],
+            [
+                "nx_fire_answers"
+            ],
+            [
+                "nx_peach_armor"
+            ],
+            [
+                "nx_trick_answers"
+            ]
+        ],
+        "desc": "跨对局收藏取舍成章、破阵先拆、问卜有守、论点成谋、整装御敌、火策留守、活水护阵、妙手留招八项战术"
+    }
+];
+    var JOURNEY_SOURCES={};RULES.forEach(function(r){if(r.tactic)JOURNEY_SOURCES[r.id]=r;});
+    function journeyGroupMet(group,ev,a){
+        var got=a.masteryState&&a.masteryState.got||{};
+        return group.some(function(id){
+            if(got[id])return true;
+            var rule=JOURNEY_SOURCES[id];
+            return !!(rule&&(!rule.modes.length||rule.modes.indexOf(a.mode)>=0)&&rule.test(ev,a));
+        });
+    }
+    TACTICAL_JOURNEYS.forEach(function(spec){
+        RULES.push({id:spec.id,name:spec.name,cat:spec.cat,rare:spec.rare,modes:[],on:['over'],
+            collection:'journeys-20261101',journey:{groups:spec.groups},desc:spec.desc,
+            hint:spec.hint||'各战术可以在不同普通单机对局收藏；最后一项符合时，本路线也会同时记录。',
+            test:function(ev,a){return ev.t==='over'&&spec.groups.every(function(group){return journeyGroupMet(group,ev,a);});}
+        });
+    });
+    /* 第二批战术：复用现有牌名、公开峰值和成功事实；不扩采集器。 */
+    var SECOND_TACTICAL_CHALLENGES = [
+    {
+        "id": "tx_public_bounty",
+        "name": "同泽广施",
+        "cat": "操作",
+        "rare": 2,
+        "needs": [
+            [
+                "c:taoyuan",
+                1
+            ],
+            [
+                "c:wugu",
+                1
+            ]
+        ],
+        "desc": "同一局本人使用或打出【桃园结义】【五谷丰登】各至少1张，并获胜",
+        "win": true
+    },
+    {
+        "id": "tx_borrowed_arms",
+        "name": "借刃解甲",
+        "cat": "连击",
+        "rare": 2,
+        "needs": [
+            [
+                "c:jiedao",
+                1
+            ],
+            [
+                "c:guohe",
+                1
+            ],
+            [
+                "c:sha",
+                1
+            ]
+        ],
+        "desc": "同一局本人使用或打出【借刀杀人】【过河拆桥】【杀】各至少1张"
+    },
+    {
+        "id": "tx_delayed_siege",
+        "name": "双计牵阵",
+        "cat": "连击",
+        "rare": 2,
+        "needs": [
+            [
+                "c:lebu",
+                1
+            ],
+            [
+                "c:bingliang",
+                1
+            ]
+        ],
+        "desc": "同一局本人使用或打出【乐不思蜀】【兵粮寸断】各至少1张，并获胜",
+        "win": true
+    },
+    {
+        "id": "tx_thunder_counter",
+        "name": "雷策有备",
+        "cat": "连击",
+        "rare": 3,
+        "needs": [
+            [
+                "c:shandian",
+                1
+            ],
+            [
+                "c:wuxie",
+                1
+            ],
+            [
+                "d:thunder",
+                1
+            ]
+        ],
+        "desc": "同一局本人使用或打出【闪电】【无懈可击】各至少1张，且本人造成至少1点雷电伤害（不限来源牌）"
+    },
+    {
+        "id": "tx_linked_expansion",
+        "name": "连环拓势",
+        "cat": "连击",
+        "rare": 2,
+        "needs": [
+            [
+                "c:tiesuo",
+                1
+            ],
+            [
+                "c:huogong",
+                1
+            ],
+            [
+                "c:nanman",
+                1
+            ]
+        ],
+        "desc": "同一局本人使用或打出【铁索连环】【火攻】【南蛮入侵】各至少1张"
+    },
+    {
+        "id": "tx_double_front",
+        "name": "两路齐发",
+        "cat": "连击",
+        "rare": 2,
+        "needs": [
+            [
+                "c:nanman",
+                1
+            ],
+            [
+                "c:wanjian",
+                1
+            ],
+            [
+                "c:respond",
+                1
+            ]
+        ],
+        "desc": "同一局本人使用或打出【南蛮入侵】【万箭齐发】各至少1张，并在响应事件中打出至少1张牌，最终获胜",
+        "win": true
+    },
+    {
+        "id": "tx_bounty_choice",
+        "name": "丰年取舍",
+        "cat": "操作",
+        "rare": 2,
+        "needs": [
+            [
+                "c:wugu",
+                1
+            ],
+            [
+                "c:shunshou",
+                1
+            ],
+            [
+                "l:discard",
+                2
+            ]
+        ],
+        "desc": "同一局本人使用或打出【五谷丰登】【顺手牵羊】各至少1张，并实际弃置至少2张牌"
+    },
+    {
+        "id": "tx_delay_and_break",
+        "name": "缓急有度",
+        "cat": "操作",
+        "rare": 2,
+        "needs": [
+            [
+                "c:lebu",
+                1
+            ],
+            [
+                "c:guohe",
+                1
+            ],
+            [
+                "c:wuxie",
+                1
+            ]
+        ],
+        "desc": "同一局本人使用或打出【乐不思蜀】【过河拆桥】【无懈可击】各至少1张，并获胜",
+        "win": true
+    },
+    {
+        "id": "tx_armored_strike",
+        "name": "甲重锋坚",
+        "cat": "逆境",
+        "rare": 3,
+        "needs": [
+            [
+                "p:armor",
+                3
+            ],
+            [
+                "e:equip",
+                1
+            ],
+            [
+                "d:sha",
+                2
+            ]
+        ],
+        "desc": "同一局本人护甲曾达到3点，实际完成至少1次装备，以【杀】造成至少2点伤害，并获胜",
+        "win": true
+    },
+    {
+        "id": "tx_reserved_answers",
+        "name": "满囊藏招",
+        "cat": "操作",
+        "rare": 2,
+        "needs": [
+            [
+                "p:hand",
+                10
+            ],
+            [
+                "c:wuxie",
+                2
+            ]
+        ],
+        "desc": "同一局本人手牌数曾达到10张，且使用或打出至少2张【无懈可击】"
+    },
+    {
+        "id": "tx_equipped_sortie",
+        "name": "四装赴阵",
+        "cat": "操作",
+        "rare": 3,
+        "needs": [
+            [
+                "p:equip",
+                4
+            ],
+            [
+                "c:sha",
+                2
+            ]
+        ],
+        "desc": "同一局本人装备区牌数曾达到4，且使用或打出至少2张【杀】，并获胜",
+        "win": true
+    },
+    {
+        "id": "tx_abundant_vitality",
+        "name": "厚生持战",
+        "cat": "逆境",
+        "rare": 3,
+        "needs": [
+            [
+                "p:maxhp",
+                6
+            ],
+            [
+                "r:recover",
+                3
+            ]
+        ],
+        "desc": "同一局本人体力上限曾达到6点，且实际回复至少3点体力，并获胜",
+        "win": true
+    },
+    {
+        "id": "tx_two_arbiters",
+        "name": "衡断有守",
+        "cat": "操作",
+        "rare": 3,
+        "needs": [
+            [
+                "q:compare",
+                2
+            ],
+            [
+                "q:judge",
+                2
+            ],
+            [
+                "c:wuxie",
+                1
+            ]
+        ],
+        "desc": "同一局本人实际参与至少2次未取消拼点、进行至少2次有效判定，且使用或打出至少1张【无懈可击】，并获胜",
+        "win": true
+    }
+];
+    SECOND_TACTICAL_CHALLENGES.forEach(function(spec){
+        var rule={id:spec.id,name:spec.name,cat:spec.cat,rare:spec.rare,
+            modes:[],on:['over'],collection:'tactics-20261101b',tactic:spec,
+            desc:spec.desc,hint:'全部条件在同一局由本人完成；不要求操作先后或因果。峰值可在本局不同时刻达到。只记普通单机身份、无名杀斗地主和对决，非休闲小游戏。',
+            test:function(ev,a){return (!spec.win||ev.win)&&spec.needs.every(function(pair){return masteryMetric(a,pair[0])>=pair[1];});}};
+        RULES.push(rule);JOURNEY_SOURCES[rule.id]=rule;
+    });
+    var SECOND_TACTICAL_JOURNEYS = [
+    {
+        "id": "jx_eight_strategies",
+        "name": "八策博览",
+        "cat": "连击",
+        "rare": 3,
+        "groups": [
+            [
+                "tx_public_bounty"
+            ],
+            [
+                "tx_borrowed_arms"
+            ],
+            [
+                "tx_delayed_siege"
+            ],
+            [
+                "tx_thunder_counter"
+            ],
+            [
+                "tx_linked_expansion"
+            ],
+            [
+                "tx_double_front"
+            ],
+            [
+                "tx_bounty_choice"
+            ],
+            [
+                "tx_delay_and_break"
+            ]
+        ],
+        "desc": "跨对局收藏同泽广施、借刃解甲、双计牵阵、雷策有备、连环拓势、两路齐发、丰年取舍、缓急有度八项战术"
+    },
+    {
+        "id": "jx_four_reserves",
+        "name": "四境备战",
+        "cat": "逆境",
+        "rare": 3,
+        "groups": [
+            [
+                "tx_armored_strike"
+            ],
+            [
+                "tx_reserved_answers"
+            ],
+            [
+                "tx_equipped_sortie"
+            ],
+            [
+                "tx_abundant_vitality"
+            ]
+        ],
+        "desc": "跨对局收藏甲重锋坚、满囊藏招、四装赴阵、厚生持战四种资源构筑挑战"
+    }
+];
+    SECOND_TACTICAL_JOURNEYS.forEach(function(spec){
+        RULES.push({id:spec.id,name:spec.name,cat:spec.cat,rare:spec.rare,modes:[],on:['over'],
+            collection:'journeys-20261101b',journey:{groups:spec.groups},desc:spec.desc,
+            hint:'各战术可以在不同普通单机对局收藏；最后一项符合时，本路线也会同时记录。',
+            test:function(ev,a){return ev.t==='over'&&spec.groups.every(function(group){return journeyGroupMet(group,ev,a);});}});
+    });
 	var INDEX = {};
 	for (var i = 0; i < RULES.length; i++) {
 		var r = RULES[i];
@@ -1204,7 +2219,9 @@
 	PROGRESS["cb_kinds3"] = { field: "skillKinds", goal: 3 };
 	PROGRESS["cb_kinds4"] = { field: "skillKinds", goal: 4 };
 	function progress(r, state) {
-		state = state || load(); if(r.hero)return masteryProgress(r,state); var m = PROGRESS[r.id], done = !!state.got[r.id];
+        state = state || load();
+        if(r.journey){var n=r.journey.groups.filter(function(g){return g.some(function(id){return !!(state.got||{})[id];});}).length;return {value:state.got[r.id]?r.journey.groups.length:n,target:r.journey.groups.length,label:'战术路线',done:!!state.got[r.id]};}
+		if(r.hero)return masteryProgress(r,state); var m = PROGRESS[r.id], done = !!state.got[r.id];
 		var cumulative = m && (m.field === "charWins" || m.field === "distinctWins"), value = Number((state.progress || {})[r.id]) || 0;
 		if (cumulative) { var wins = Object.keys(state.chars || {}).map(function(k){return Number(state.chars[k]) || 0;}); value = Math.max(value, m.field === "charWins" ? Math.max.apply(null,[0].concat(wins)) : wins.filter(function(n){return n>0;}).length); }
 		return { value: done ? (m ? m.goal : 1) : Math.min(m ? m.goal : 1, value),

@@ -22,18 +22,22 @@ header #claim-all{margin:0;align-self:center;flex:0 0 auto}@media(min-width:900p
 <link rel="stylesheet" href="../core/csh_experience.css">
 <link rel="stylesheet" href="../core/csh_achievement_badges.css">
 <link rel="stylesheet" href="../core/csh_journal.css">
+<link rel="stylesheet" href="../core/csh_achievement_album.css">
 </head><body class="csh-experience" data-csh-journal="pool">
 <header class="journal-header"><div class="journal-title"><h1>池子成就<span class="journal-mode">单机 · 身份 / 斗地主 / 对决</span></h1><div id="summary"></div></div><button id="claim-all" type="button">领取已达成</button></header>
 <div class="journal-workspace">
  <aside class="journal-sidebar" aria-label="成就查找与目标">
-  <div class="filters" aria-label="查找成就"><input id="search" type="search" placeholder="搜索成就，如：郝昭 史诗" aria-label="搜索名称、条件、稀有度或模式；空格分隔多个关键词"><select id="status" aria-label="状态"><option>全部状态</option><option>待领取</option><option>未解锁</option><option>已领取</option></select></div>
-  <details id="pool-options"><summary>筛选与目标</summary><div class="journal-filter-content">
-   <div class="filters"><label>武将<select id="hero" aria-label="武将专属成就"><option value="all">全部</option><option value="general">通用</option></select></label><label>分类<select id="category" aria-label="分类"><option>全部分类</option><option>操作</option><option>连击</option><option>逆境</option><option>模式</option><option>武将</option><option>专属</option><option>同局挑战</option></select></label><label>排序<select id="sort" aria-label="排序"><option>待领优先</option><option>进度优先</option><option>最近达成</option><option>原始顺序</option></select></label></div>
-   <p id="collection-note"></p><p class="note" id="rule-note"></p>
-   <section id="goal-bar" aria-label="正在追踪的操作成就" hidden></section>
+  <div class="filters album-search" aria-label="查找成就"><input id="search" type="search" placeholder="搜索名称、武将、稀有度…" aria-label="搜索名称、条件、稀有度或模式；空格分隔多个关键词"></div>
+  <nav class="album-navigation" aria-label="收藏分卷"><p class="album-label">收藏分卷</p><button type="button" data-volume="all" aria-pressed="true">全部成就</button><button type="button" data-volume="hero" aria-pressed="false">武将专属</button><button type="button" data-volume="match" aria-pressed="false">同局挑战</button><button type="button" data-volume="general" aria-pressed="false">通用收藏</button></nav>
+  <select id="album-volume" class="album-mobile-volume" aria-label="收藏分卷"><option value="all">全部成就</option><option value="hero">武将专属</option><option value="match">同局挑战</option><option value="general">通用收藏</option><option value="custom" hidden>当前筛选</option></select>
+  <details id="album-goals"><summary>目标 <span id="album-goal-count">0 / 3</span></summary><div class="album-goals-panel"><p class="album-goal-empty">选择一枚成就，点“追踪目标”，便可在这里查看进度。最多同时追踪三项。</p><section id="goal-bar" aria-label="正在追踪的操作成就" hidden></section></div></details>
+  <details id="pool-options"><summary>筛选</summary><div class="journal-filter-content">
+   <div class="filters"><label>状态<select id="status" aria-label="状态"><option>全部状态</option><option>待领取</option><option>未解锁</option><option>已领取</option></select></label><label>武将<select id="hero" aria-label="武将专属成就"><option value="all">全部</option><option value="general">通用</option></select></label><label>分类<select id="category" aria-label="分类"><option>全部分类</option><option>操作</option><option>连击</option><option>逆境</option><option>模式</option><option>武将</option><option>专属</option><option>同局挑战</option></select></label><label>排序<select id="sort" aria-label="排序"><option>待领优先</option><option>进度优先</option><option>最近达成</option><option>原始顺序</option></select></label></div>
+   <p id="collection-note"></p><p class="note" id="rule-note"></p><button id="album-filter-reset" type="button" hidden>清除筛选</button>
   </div></details>
+
  </aside>
- <section class="journal-results" aria-label="成就目录"><div id="message" role="status" aria-live="polite"></div><main id="list" aria-label="成就列表"></main></section>
+ <section class="journal-results" aria-label="成就目录"><div id="message" role="status" aria-live="polite"></div><div class="album-context"><h2 id="album-context-title">全部成就</h2><span id="album-context-count"></span></div><main id="list" aria-label="成就列表"></main></section>
 </div>
 <script>
 (function(){
@@ -53,6 +57,8 @@ function matchesSearch(r,tokens){
 function clearFilters(){
  $("search").value="";$("hero").value="all";$("category").value="全部分类";$("status").value="全部状态";$("sort").value="待领优先";rowLimit=80;render();$("search").focus();
 }
+function volume(){var h=$("hero").value,c=$("category").value;return h==="general"&&c==="全部分类"?"general":h==="all"&&c==="专属"?"hero":h==="all"&&c==="同局挑战"?"match":h==="all"&&c==="全部分类"?"all":"custom";}
+function chooseVolume(value){if(value==="custom")return;$("hero").value=value==="general"?"general":"all";$("category").value=value==="hero"?"专属":value==="match"?"同局挑战":"全部分类";rowLimit=80;render();}
 function earnedRecord(record){
  var raw=record&&typeof record==="object"&&!Array.isArray(record)?record.t:null;
  var number=typeof raw==="number"||typeof raw==="string"&&raw.trim()!==""?Number(raw):NaN;
@@ -72,41 +78,49 @@ function appendEarned(main,r){
 var originalOrder=Object.create(null);PA.RULES.forEach(function(r,i){originalOrder[r.id]=i;});
 function state(r){return pending[r.id]?"待领取":store.seen[r.id]?"已领取":store.got[r.id]?"待领取":"未解锁";}
 function render(){
+ var focusNode=document.activeElement,focusRow=focusNode&&focusNode.closest?focusNode.closest(".row"):null,focusId=focusRow&&focusRow.dataset.id,focusKind=focusRow?(focusNode.classList.contains("csh-goal-pin")?"pin":focusNode.matches("button.claim")?"claim":focusNode.matches(".achievement-details>summary")?"details":null):null;
  PA.reconcile();store=PA.load();var total=PA.RULES.length,general=PA.RULES.filter(function(r){return !r.hero;}).length,got=0,paid=0;
  PA.RULES.forEach(function(r){if(store.got[r.id])got++;if(store.got[r.id]&&store.seen[r.id]&&!pending[r.id])paid++;});
  $("summary").textContent="已解锁 "+got+" / "+total+" · 待领取 "+(got-paid)+" · 已领取 "+paid;$("collection-note").textContent="通用 "+general+" 项 · "+(PA.PROFILES||[]).length+" 位武将专属 "+(total-general)+" 项";
  $("hero").options[0].textContent="全部 · "+total+" 项";$("hero").options[1].textContent="通用 · "+general+" 项";
  var ready=got-paid,bulk=$("claim-all");bulk.disabled=bulkPending||!ready;bulk.textContent=bulkPending?"领取中…":"领取全部已达成"+(ready?" · "+ready+"枚":"");
  if(window.CSHGoals)CSHGoals.paint($("goal-bar"),"pool",PA.RULES.map(function(r){var p=PA.progress(r,store);return {id:r.id,label:r.name,description:r.desc,current:p.value,target:p.target,done:!!store.got[r.id],claimed:!!store.seen[r.id]};}),render);
+ var pinCount=window.CSHGoals?CSHGoals.list("pool").length:0;$("album-goal-count").textContent=pinCount+" / 3";$("album-goals").classList.toggle("has-goals",!$("goal-bar").hidden);
  if(PA.storageError())$("message").textContent=PA.storageError();
  var q=searchText($("search").value).trim().split(/\s+/).filter(Boolean),cat=$("category").value,st=$("status").value,hero=$("hero").value;
  var rows=PA.RULES.filter(function(r){return (hero==="all"||(hero==="general"?!r.hero:r.hero===hero))&&(cat==="全部分类"||(cat==="同局挑战"?isSameMatch(r):r.cat===cat))&&(st==="全部状态"||state(r)===st)&&matchesSearch(r,q);});
  $("rule-note").textContent=cat==="同局挑战"?"同局挑战 · "+rows.length+" 项；须在同一局满足全部条件，不合并不同对局。":"单机身份、斗地主、对决中记录；单局条件显示历史最佳，武将胜场跨局累计。";
+ var vol=volume(),volumeNames={all:"全部成就",hero:"武将专属",match:"同局挑战",general:"通用收藏"},profile=(PA.PROFILES||[]).find(function(p){return p.id===hero;}),title=profile?profile.name+" · 专属成就":volumeNames[vol]||(cat!=="全部分类"?cat:"当前筛选");
+ $("album-volume").value=vol;document.querySelectorAll("[data-volume]").forEach(function(n){n.setAttribute("aria-pressed",String(n.dataset.volume===vol));});
+ $("album-context-title").textContent=title;$("album-context-count").textContent=rows.length+" 项"+(q.length?" · 搜索结果":"");$("album-filter-reset").hidden=!q.length&&hero==="all"&&cat==="全部分类"&&st==="全部状态";
  var sort=$("sort").value,recent=Object.create(null);
  if(sort==="最近达成")rows.forEach(function(r){var date=earnedRecord(store.got[r.id]);recent[r.id]={group:date?0:store.got[r.id]||store.seen[r.id]?1:2,stamp:date?date.stamp:0};});
  rows.sort(function(a,b){if(sort==="最近达成"){var ra=recent[a.id],rb=recent[b.id];return ra.group-rb.group||rb.stamp-ra.stamp||originalOrder[a.id]-originalOrder[b.id];}if(sort==="待领优先")return (state(a)==="待领取"?-1:state(a)==="未解锁"?0:1)-(state(b)==="待领取"?-1:state(b)==="未解锁"?0:1);if(sort==="进度优先"){var pa=PA.progress(a,store),pb=PA.progress(b,store);return pb.value/pb.target-pa.value/pa.target;}return 0;});
- var list=$("list");list.textContent="";
+ var list=$("list"),opened=Object.create(null);list.querySelectorAll(".achievement-details[open]").forEach(function(n){opened[n.closest(".row").dataset.id]=true;});list.textContent="";
  if(!rows.length){var empty=el("div","empty","没有匹配的成就，试试其他筛选条件。");var reset=el("button","clear-filters","清除筛选");reset.type="button";reset.addEventListener("click",clearFilters);empty.appendChild(el("div","","")).appendChild(reset);list.appendChild(empty);return;}
  var totalMatching=rows.length,lastGroup='';rows.slice(0,rowLimit).forEach(function(r){
   if(hero!=='all'&&hero!=='general'&&r.hero){var profile=PA.PROFILES.find(function(p){return p.id===r.hero;}),path=profile&&profile.paths.find(function(p){return p.metric===r.metric;}),group=r.scope==='wins'?'长期里程碑':r.scope==='feat'?'同局组合挑战':'成长路线 · '+(path?path.title:'特色操作');if(group!==lastGroup){var heading=el('h2','route-heading',group);heading.style.cssText='grid-column:1/-1;font-size:var(--pfs-md);margin:14px 0 4px';list.appendChild(heading);lastGroup=group;}}
 
   var row=el("article","row"),main=el("div"),aside=el("div"),nm=el("div","name"),nameText=el("span","achievement-name-text",r.name),rw=PA.reward(r),pr=PA.progress(r,store);
-  main.className="achievement-main";aside.className="achievement-actions";row.dataset.claimable=String(!!store.got[r.id]&&!store.seen[r.id]);row.dataset.id=r.id;try{if(window.CSHAchievementBadges)nm.appendChild(window.CSHAchievementBadges.create(r,document));}catch(badgeError){}var meta=el("span","meta"),rarity=el("span","rarity-label",rarityName(r));rarity.setAttribute("aria-label","稀有度："+rarityName(r));meta.appendChild(rarity);meta.appendChild(document.createTextNode(" · "+(isSameMatch(r)?"同局挑战 · ":"")+r.cat+" · "+(r.modes.length?r.modes.map(function(m){return mode[m];}).join(" / "):"三种模式")));nameText.appendChild(meta);nm.appendChild(nameText);main.appendChild(nm);
-  main.appendChild(el("div","condition",r.desc));
+  main.className="achievement-main";aside.className="achievement-actions";row.dataset.claimable=String(!!store.got[r.id]&&!store.seen[r.id]);row.dataset.id=r.id;try{if(window.CSHAchievementBadges)nm.appendChild(window.CSHAchievementBadges.create(r,document));}catch(badgeError){}var meta=el("span","meta"),rarity=el("span","rarity-label",rarityName(r));rarity.setAttribute("aria-label","稀有度："+rarityName(r));meta.appendChild(rarity);meta.appendChild(document.createTextNode(" · "+(isSameMatch(r)?"同局挑战 · ":"")+r.cat));nameText.appendChild(meta);nm.appendChild(nameText);main.appendChild(nm);
+  main.appendChild(el("div","condition-preview",r.desc));
   var pg=el("div","progress"),bar=el("progress");bar.max=pr.target;bar.value=pr.value;bar.setAttribute("aria-label",r.name+"进度");pg.appendChild(bar);pg.appendChild(el("span","",pr.label+" "+pr.value+" / "+pr.target));main.appendChild(pg);
-  appendEarned(main,r);
-  if(r.hint)main.appendChild(el("div","hint",r.hint));
-  if(r.scope==='feat'){var live=null;try{if(window.parent&&window.parent.CSH_POOL_ACHV&&window.parent.CSH_POOL_ACHV.live)live=window.parent.CSH_POOL_ACHV.live(r.hero);}catch(e){}if(live){var complete=live.steps.filter(function(step){return step.current>=step.target;}).length;main.appendChild(el('div','hint feat-live',(live.ended?'刚结束的一局':'本局')+' · 已满足 '+complete+'/'+live.steps.length+' 个条件（不同局不合并）'));live.steps.forEach(function(step){main.appendChild(el('div','hint feat-live',(step.current>=step.target?'✓ ':'· ')+step.label+' · '+Math.min(step.current,step.target)+' / '+step.target));});}}
+  var details=el("details","achievement-details"),detailSummary=el("summary","","条件与达成记录"),detailBody=el("div","achievement-detail-body");detailSummary.setAttribute("aria-label",r.name+" · 条件与达成记录");details.appendChild(detailSummary);details.appendChild(detailBody);details.open=!!opened[r.id];if(details.open)row.classList.add("details-open");details.addEventListener("toggle",function(){row.classList.toggle("details-open",details.open);if(details.open&&document.activeElement===detailSummary)details.scrollIntoView({block:"start"});});
+  detailBody.appendChild(el("p","condition",r.desc));detailBody.appendChild(el("p","achievement-scope",(isSameMatch(r)?"须在同一局满足全部条件，不同局不合并。":"")+"适用模式："+(r.modes.length?r.modes.map(function(m){return mode[m];}).join(" / "):"身份 / 斗地主 / 对决")));
+  appendEarned(detailBody,r);
+  if(r.hint)detailBody.appendChild(el("div","hint",r.hint));
+  if(r.scope==='feat'){var live=null;try{if(window.parent&&window.parent.CSH_POOL_ACHV&&window.parent.CSH_POOL_ACHV.live)live=window.parent.CSH_POOL_ACHV.live(r.hero);}catch(e){}if(live){var complete=live.steps.filter(function(step){return step.current>=step.target;}).length;detailBody.appendChild(el('div','hint feat-live',(live.ended?'刚结束的一局':'本局')+' · 已满足 '+complete+'/'+live.steps.length+' 个条件（不同局不合并）'));live.steps.forEach(function(step){detailBody.appendChild(el('div','hint feat-live',(step.current>=step.target?'✓ ':'· ')+step.label+' · '+Math.min(step.current,step.target)+' / '+step.target));});}}
 
   aside.appendChild(el("div","reward",rw.pc+" 池子币 · "+rw.merit+" 基础功勋"));
-  var stateNow=state(r),button=el("button","claim"+(stateNow==="待领取"?" ready":stateNow==="已领取"?" done":""),pending[r.id]?"领取中…":stateNow==="待领取"?"领取奖励":stateNow);
-  button.type="button";button.disabled=stateNow!=="待领取"||!!pending[r.id];button.addEventListener("click",function(){claim(r);});aside.appendChild(button);if(window.CSHGoals)aside.appendChild(CSHGoals.button("pool",r.id,r.name,render,function(msg){$("message").textContent=msg;}));row.appendChild(main);row.appendChild(aside);list.appendChild(row);
+  var stateNow=state(r),button=el(stateNow==="待领取"?"button":"span","claim"+(stateNow==="待领取"?" ready":stateNow==="已领取"?" done":""),pending[r.id]?"领取中…":stateNow==="待领取"?"领取奖励":stateNow);
+  if(stateNow==="待领取"){button.type="button";button.disabled=!!pending[r.id];button.addEventListener("click",function(){claim(r);});}aside.appendChild(button);if(window.CSHGoals)aside.appendChild(CSHGoals.button("pool",r.id,r.name,function(){render();var pin=$("list").querySelector('[data-id="'+r.id+'"] .csh-goal-pin');if(pin)pin.focus();},function(msg){$("message").textContent=msg;}));row.appendChild(main);row.appendChild(aside);row.appendChild(details);list.appendChild(row);
  });
+ if(focusId&&focusKind){var focusRowNext=$("list").querySelector('[data-id="'+focusId+'"]'),focusNext=focusRowNext&&(focusKind==="pin"?focusRowNext.querySelector(".csh-goal-pin"):focusKind==="claim"?(focusRowNext.querySelector("button.claim:not(:disabled)")||focusRowNext.querySelector(".achievement-details>summary")):focusRowNext.querySelector(".achievement-details>summary"));if(focusNext)focusNext.focus({preventScroll:true});}
  if(totalMatching>rowLimit){var more=el("button","load-more","继续查看 · 还有 "+(totalMatching-rowLimit)+" 项");more.type="button";more.addEventListener("click",function(){rowLimit+=80;render();});list.appendChild(more);}
 }
 function claim(r){
  if(pending[r.id])return;pending[r.id]=true;$("message").textContent="";render();
- T.call("shell-pool-ach-claim",{key:r.id},function(ok,data){delete pending[r.id];$("message").textContent=ok?(data&&data.already?"已领取过该奖励":"已领取「"+r.name+"」奖励"):(data&&data.reason||"领取未完成，请回主界面后重试");render();var row=$("list").querySelector('[data-id="'+r.id+'"] button');if(row&&!row.disabled)row.focus();});
+ T.call("shell-pool-ach-claim",{key:r.id},function(ok,data){delete pending[r.id];$("message").textContent=ok?(data&&data.already?"已领取过该奖励":"已领取「"+r.name+"」奖励"):(data&&data.reason||"领取未完成，请回主界面后重试");render();var row=$("list").querySelector('[data-id="'+r.id+'"]'),focus=row&&(row.querySelector("button.claim:not(:disabled)")||row.querySelector(".achievement-details>summary"));if(focus)focus.focus();});
 }
 $("claim-all").addEventListener("click",function(){
  if(bulkPending)return;bulkPending=true;var total={count:0,gained:0,meritGained:0},lastRemaining=-1;render();
@@ -117,8 +131,12 @@ $("claim-all").addEventListener("click",function(){
   });
  }next();
 });
+document.querySelectorAll("[data-volume]").forEach(function(n){n.addEventListener("click",function(){chooseVolume(n.dataset.volume);});});$("album-volume").addEventListener("change",function(){chooseVolume(this.value);});$("album-filter-reset").addEventListener("click",clearFilters);
 ["hero","category","status","sort"].forEach(function(id){$(id).addEventListener("change",function(){rowLimit=80;if(id==="hero")$("category").value="全部分类";if(id==="category"&&$("category").value==="专属"&&$("hero").value==="general")$("hero").value="all";render();});});$("search").addEventListener("input",function(){rowLimit=80;render();});
 window.addEventListener("storage",function(e){if(!e.key||[PA.KEY,PA.PAY_KEY,"csh_wallet","csh_rank"].indexOf(e.key)>=0)render();});render();
+function compactAlbum(){return !layout||!layout.matches;}
+["pool-options","album-goals"].forEach(function(id){$(id).addEventListener("toggle",function(){if(this.open&&compactAlbum())$(id==="pool-options"?"album-goals":"pool-options").open=false;});});
+document.addEventListener("keydown",function(e){if(e.key!=="Escape"||!compactAlbum())return;var open=$("pool-options").open?$("pool-options"):$("album-goals").open?$("album-goals"):null;if(open){open.open=false;open.querySelector("summary").focus();e.preventDefault();}});
 var layout=typeof window.matchMedia==="function"?window.matchMedia("(min-width:1200px) and (min-height:600px)"):null;function syncLayout(){ $("pool-options").open=!!(layout&&layout.matches); }syncLayout();if(layout){if(layout.addEventListener)layout.addEventListener("change",syncLayout);else layout.addListener(syncLayout);}
 })();
 </script></body></html>

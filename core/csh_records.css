@@ -1,0 +1,64 @@
+/* Two record views: a quiet ranking sheet and a stitched challenge book. */
+body[data-csh-records]{--record-note:var(--pfs-sm,12px);--record-text:var(--pfs-md,13px);--record-title:var(--pfs-xl,16px)}
+body[data-csh-records] :is(button,input,summary):focus-visible{outline:2px solid var(--gold);outline-offset:-2px}
+body[data-csh-records="rank"] #wrap{max-width:1180px;padding:6px 12px 10px}
+body[data-csh-records="rank"] #rank-tools{border-radius:6px;box-shadow:none;padding:6px 176px 6px 10px;gap:4px 10px;grid-template-columns:auto auto minmax(0,1fr)}
+body[data-csh-records="rank"] #rank-tools h1{font-size:var(--record-title);font-weight:600;letter-spacing:.04em;line-height:1.4}
+body[data-csh-records="rank"] #rank-tools h1 small{display:none}
+body[data-csh-records="rank"] #rank-tools .net-controls{padding:0;justify-content:flex-end;flex-wrap:nowrap}
+body[data-csh-records="rank"] #rank-tools :is(button,input){font-size:var(--record-note);border-radius:5px}
+body[data-csh-records="rank"] #rank-tools #local-best{display:block;min-width:0;margin-top:6px;font-size:var(--record-note);line-height:1.5;color:var(--ink-dim)}
+body[data-csh-records="rank"] #local-profile[open]{grid-column:1/-1}
+body[data-csh-records="rank"] #local-profile[open]~.net-controls{grid-column:1/-1;justify-content:flex-start}
+body[data-csh-records="rank"] :is(#net-policy,#stat,.foot,.tm,.sgr,.chsub,.chph,.chpr,.chtot .u,.seg,.cheer-pending){font-size:var(--record-note)!important;line-height:1.55}
+body[data-csh-records="rank"] #wrap .card.sheet{border-radius:6px;box-shadow:none;padding:8px 10px}
+body[data-csh-records="rank"] .rank-navigation{gap:6px}
+body[data-csh-records="rank"] .rank-navigation :is(.tabs,.viewbar) button{border-radius:5px;box-shadow:none;letter-spacing:0}
+body[data-csh-records="rank"] .rank-navigation :is(.tabs,.viewbar) button.on{background:var(--ink);border-color:var(--ink);color:var(--paper,#fff)}
+body[data-csh-records="rank"] #rows>.row{align-items:center;gap:10px;min-height:56px;padding:7px 4px;border-bottom-style:solid;border-bottom-color:var(--line);border-radius:0;background:none}
+body[data-csh-records="rank"] #rows>.row.me{background:var(--paper-2);border-left:3px solid var(--gold)}
+body[data-csh-records="rank"] #rows>.row .rk{width:32px;flex:none;text-align:center;background:none!important;color:var(--ink-dim)!important;box-shadow:none!important;font-size:var(--record-title);border-radius:0}
+body[data-csh-records="rank"] #rows>.row .rk.top{color:#9b2234!important;font-weight:700}
+body[data-csh-records="rank"] .nm{font-size:var(--record-text);line-height:1.5}
+body[data-csh-records="rank"] .vl{font-family:"Times New Roman",serif;font-size:var(--record-title)}
+body[data-csh-records="rank"] .mebar{border-radius:5px;border-left:3px solid var(--gold);background:var(--paper-2);box-shadow:none;padding:7px 10px;margin-bottom:6px}
+body[data-csh-records="rank"] .chief{border-radius:7px;box-shadow:none;border-color:var(--line)}
+body[data-csh-records="rank"] .wall-cell{border-radius:6px;box-shadow:none}
+body[data-csh-records="bossbook"]{--fs-tiny:var(--csh-lfs-sm,12px);--fs-cap:var(--csh-lfs-md,13px);--fs-body:var(--csh-lfs-lg,14px);--fs-menu:var(--csh-lfs-xl,16px)}
+body[data-csh-records="bossbook"] #cover .cv-inner{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:center;width:min(74%,760px);height:auto;max-height:calc(100% - 80px);gap:28px}
+body[data-csh-records="bossbook"] #cover .cv-title{writing-mode:horizontal-tb;max-height:none;overflow:visible;font-size:calc(var(--fs-base) * 2.8);letter-spacing:.22em;line-height:1.3;text-shadow:none}
+body[data-csh-records="bossbook"] #cover .cv-side{height:auto;align-items:flex-start;gap:8px;border-left:1px solid #d8bd7a55;padding-left:24px}
+body[data-csh-records="bossbook"] #cover .cv-sub{writing-mode:horizontal-tb;max-height:none;overflow:visible;font-size:var(--fs-tiny);letter-spacing:.08em;line-height:1.7;color:#e8e2d1}
+body[data-csh-records="bossbook"] #cover .cv-seal{width:48px;height:48px;filter:none}
+body[data-csh-records="bossbook"] #cover .cv-count{font-size:var(--fs-tiny);color:#e8e2d1}
+body[data-csh-records="bossbook"] #cover .cv-hint{min-height:44px;align-content:center;margin:0;font-size:var(--fs-body);animation:none;letter-spacing:.2em;opacity:1}
+body[data-csh-records="bossbook"] .phead{min-height:50px;padding:3px 176px 3px 26px}
+body[data-csh-records="bossbook"] .pt-home{min-height:44px;min-width:56px;padding:5px 10px;border-radius:5px;font-size:var(--fs-tiny)}
+body[data-csh-records="bossbook"] .pt-name{font-size:var(--fs-menu);letter-spacing:.06em}
+body[data-csh-records="bossbook"] .pt-name::after{display:none}
+body[data-csh-records="bossbook"] .pt-num{font-size:var(--fs-tiny);letter-spacing:.05em}
+body[data-csh-records="bossbook"] .pbody{padding:8px 14px 8px 26px}
+body[data-csh-records="bossbook"] .pfoot{min-height:52px;padding:4px 10px 4px 24px;gap:6px;background-color:var(--paper-2)}
+body[data-csh-records="bossbook"] .pg-btn{min-width:44px;width:44px;height:44px;font-size:var(--fs-lead)}
+body[data-csh-records="bossbook"] .pg-jump{flex-wrap:nowrap;justify-content:space-between;gap:2px;min-width:0;overflow-x:auto;scrollbar-width:none}
+body[data-csh-records="bossbook"] .pg-jump button{min-height:44px;min-width:44px;padding:5px 6px;flex:1 0 auto;font-size:var(--fs-tiny);letter-spacing:0;border-radius:4px}
+body[data-csh-records="bossbook"] .vol-head{gap:8px;margin-bottom:6px}
+body[data-csh-records="bossbook"] .vol-num{font-size:var(--fs-lead)}
+body[data-csh-records="bossbook"] .vol-name{font-size:var(--fs-menu);letter-spacing:.06em}
+body[data-csh-records="bossbook"] .fchips{gap:4px;margin-bottom:6px}
+body[data-csh-records="bossbook"] .fchip{min-height:44px;padding:5px 10px;font-size:var(--fs-tiny);border-radius:5px}
+body[data-csh-records="bossbook"] .vgrid{grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px}
+body[data-csh-records="bossbook"] .cback{overflow-y:auto;overscroll-behavior:contain}
+body[data-csh-records="bossbook"] .ribbon{right:18px;top:50px;height:42px;opacity:.8}
+@media(orientation:landscape) and (max-height:430px){
+ body[data-csh-records="bossbook"] .vgrid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}
+ body[data-csh-records="bossbook"] .bcard{aspect-ratio:3/3.4}
+ body[data-csh-records="bossbook"] .pre-wrap{gap:8px 18px}
+}
+@media(orientation:landscape) and (max-height:330px){
+ body[data-csh-records="bossbook"] .vgrid{grid-template-columns:repeat(auto-fill,minmax(132px,1fr))}
+ body[data-csh-records="bossbook"] .bcard{aspect-ratio:4/3}
+ body[data-csh-records="bossbook"] .pbody{padding-top:4px;padding-bottom:4px}
+ body[data-csh-records="rank"] #rank-tools{padding-top:3px;padding-bottom:3px}
+}
+@media(prefers-reduced-motion:reduce){body[data-csh-records="bossbook"] :is(.page,.cin){animation:none!important;transition:none!important}}

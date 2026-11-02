@@ -46,6 +46,7 @@ import { MINIONS } from "./csh_bossdata.js";
 	if (lib.cshWorld) return;
 
 	var K_WORLD = "csh_world";
+    var gambleRevision=0,gambleSerial=0;
 	var AI_MIN_STAKE = 200;          // 最低带入（§I.2 退隐线）
 	var AI_FUND_CAP = 500000000;     // AI 资金上限 5 亿（2026-09-29：由 1 亿上调，容纳豪赌席）
 	var AI_WIN_RATE = 0.95;          // AI 赢下底池的留存率（§I.2）
@@ -507,10 +508,11 @@ import { MINIONS } from "./csh_bossdata.js";
 			if (world.ai[i] && typeof world.ai[i].id === "string" && idInRoster(world.ai[i].id)) { anyMatch = true; break; }
 		}
 		if (anyMatch) return false;
-		var gambles = world.gambles;
+		var gambles = world.gambles,career=world.careerUnlocks;
 		logInfo("检测到旧版/脏世界档案（首 id=" + (world.ai[0] && world.ai[0].id) + "，无一命中名册）→ 重建为 " + AI_COUNT + " 人");
 		world = defaultWorld();
 		if (gambles) world.gambles = gambles;
+        if(career!=null)world.careerUnlocks=career;
 		saveWorld();
 		return true;
 	}
@@ -643,7 +645,7 @@ import { MINIONS } from "./csh_bossdata.js";
 	/* 迁移/重置后采用磁盘真值，不能让旧内存把已删除的世界重新写回。
 	   只规整内存；恢复流程自己负责持久化，不能在这里推进心跳或补写存档。 */
 	function reloadSave(snapshot) {
-        invitedId=null;
+        invitedId=null; invitedReply="";
 		var stored, next = null;
 		if (arguments.length) {
 			/* 迁移事务已严格预读；采用其 parsed object/null，避免再次读盘失败
@@ -657,7 +659,7 @@ import { MINIONS } from "./csh_bossdata.js";
 		}
 		var before = world;
 		world = next && typeof next === "object" && Array.isArray(next.ai) ? next : defaultWorld();
-		try { normalizeWorld(false); return true; }
+		try { if(world.careerUnlocks!=null)lib.cshWallet.validateCareerUnlocks(world.careerUnlocks);normalizeWorld(false);validateGambleStats(world.gambles);gambleRevision++;return true; }
 		catch (eN) { world = before; logError("规整重载世界失败", eN); return false; }
 	}
 	/* 有效牌技：资金派生的 skill + 实战经验（最多 +0.15）。
@@ -1414,17 +1416,73 @@ import { MINIONS } from "./csh_bossdata.js";
 	}
 
 	/* 抽取 n 个对手：性格混合（不出现全员同一性格）、同桌不同名、资金足够 */
-    var invitedId=null;
-    function inviteNext(id){if(saveBlocked())return {ok:false,reason:"存档恢复期间不能邀约"};var a=activeList().find(function(p){return String(p.id)===String(id);});if(!a)return {ok:false,reason:"这位牌友暂未在场"};invitedId=a.id;return {ok:true,id:a.id,name:a.name};}
-    function storylines(limit){
-        var known=activeList().slice().sort(function(a,b){return playerTable(b.withPlayer).hands-playerTable(a.withPlayer).hands||stableHash(String(a.id)+dayIndex())-stableHash(String(b.id)+dayIndex());});
-        return known.slice(0,clampNum(limit||3,1,6)).map(function(a){var p=playerTable(a.withPlayer),P=PERSONAS[a.persona]||PERSONAS.math,title,text;
-            if(p.hands===0){title="初次相识";text=a.name+" · "+P.name+"，尚未与你同桌。可以从一场小桌认识这位牌友。";}
-            else if(p.wins&&p.losses){title=p.revenge?"你来我往":"胜负未定";text="你与"+a.name+"已同桌"+p.hands+"手，对方"+p.wins+"胜、"+p.losses+"负；下一桌仍有故事可续。";}
-            else{title="熟人再会";text=a.name+"与你已有"+p.hands+"手交集，"+(p.wins?"此前占了上风":"此前还未占到上风")+"。邀约下一桌，再续这段牌缘。";}
-            return {id:a.id,name:a.name,title:title,text:text,persona:P.name,fund:a.fund,invited:String(invitedId)===String(a.id),hands:p.hands};});
+    var invitedId = null, invitedReply = '';
+    var INVITE_LINES = {
+        aggro: ['来，下一桌接着较量。', '别等了，桌上见真章。'],
+        tight: ['好，选个合适的小桌，慢慢来。', '应下了，稳稳打完这一桌。'],
+        bluff: ['来吧，这回你猜我在想什么？', '桌上见，先别急着信我的话。'],
+        math: ['可以，输赢留到桌上算。', '带入合适就来，按自己的节奏打。'],
+        wild: ['走，下一桌凭本事痛快一回。', '来了，今天换个手气。'],
+        chaser: ['好，下一桌再找机会。', '来吧，还想看看下一桌的故事。'],
+        trapper: ['我在，慢慢等你落座。', '应邀了，桌上见。'],
+        grinder: ['好，一桌一桌慢慢打。', '来了，稳着把这一桌打完。'],
+        bull: ['行，我会耐心等合适的机会。', '桌上见，我还是按自己的节奏来。'],
+        maniac: ['有桌就来，开场再说！', '走吧，下一桌热闹起来！'],
+        reader: ['好，下一桌再看看你的选择。', '应下了，桌上慢慢聊。'],
+        lucky: ['来了，看看这回运气眷顾谁。', '好，下一桌讨个好彩头。']
+    };
+    function invitationBlocked() {
+        if (saveBlocked()) return '存档恢复期间不能更改邀约';
+        if (_status.connectMode || _status.video || game.online || game.observe) return '当前模式暂不支持牌友邀约';
+        return '';
+    }
+    function normalStake(a, buyIn) { return Math.min(buyIn, Math.floor(a.fund * 0.3)); }
+    function invitationReply(a) {
+        var p = playerTable(a.withPlayer), lines = INVITE_LINES[a.persona] || INVITE_LINES.math;
+        var greeting = p.hands >= 10 ? '老牌友，又见面了。' : p.hands ? '又见面了。' : '初次同桌，多关照。';
+        if (p.hands && p.draws === p.hands) greeting = '前面还没分出胜负，这次再来。';
+        else if (p.wins && p.losses) greeting = '你我都赢过，下一桌再较量。';
+        else if (p.wins > 0) greeting = '前面让你占了上风，下一桌再来。';
+        else if (p.losses > 0) greeting = '前面我占了上风，这回也别客气。';
+        return (p.hands >= 10 && greeting.indexOf('老牌友') !== 0 ? '老牌友，' : '') + greeting + lines[stableHash(String(a.id) + '|' + p.hands) % lines.length];
+    }
+    function inviteNext(id) {
+        var blocked = invitationBlocked(); if (blocked) return { ok: false, reason: blocked };
+        var a = activeList().find(function (p) { return String(p.id) === String(id); });
+        if (!a) return { ok: false, reason: '这位牌友暂未在场' };
+        if (normalStake(a, AI_MIN_STAKE) < AI_MIN_STAKE) return { ok: false, reason: a.name + '暂时凑不齐带入，稍后再邀或换位牌友吧' };
+        var repeated = String(invitedId) === String(a.id);
+        if (!repeated) { invitedId = a.id; invitedReply = invitationReply(a); }
+        return { ok: true, id: a.id, name: a.name, response: invitedReply, repeated: repeated };
+    }
+    function cancelInvite(id) {
+        var blocked = invitationBlocked(); if (blocked) return { ok: false, reason: blocked };
+        if (invitedId === null) return { ok: true, already: true };
+        if (String(invitedId) !== String(id)) return { ok: false, reason: '邀约已更新，请刷新后再试' };
+        invitedId = null; invitedReply = ''; return { ok: true };
+    }
+    function pruneInvitation() {
+        var a = invitedId === null ? null : byId(invitedId);
+        if (invitedId !== null && (!a || a.retired || normalStake(a, AI_MIN_STAKE) < AI_MIN_STAKE)) { invitedId = null; invitedReply = ''; }
+    }
+    function storylines(limit) {
+        pruneInvitation();
+        var known = activeList().slice().sort(function (a, b) {
+            return Number(String(b.id) === String(invitedId)) - Number(String(a.id) === String(invitedId)) ||
+                playerTable(b.withPlayer).hands - playerTable(a.withPlayer).hands || stableHash(String(a.id) + dayIndex()) - stableHash(String(b.id) + dayIndex());
+        });
+        return known.slice(0, clampNum(limit || 3, 1, 6)).map(function (a) {
+            var p = playerTable(a.withPlayer), P = PERSONAS[a.persona] || PERSONAS.math, title, text;
+            if (p.hands === 0) { title = '初次相识'; text = a.name + ' · ' + P.name + '，尚未与你同桌。可以从一场小桌认识这位牌友。'; }
+            else if (p.draws === p.hands) { title = '平局未了'; text = '你与' + a.name + '已同桌' + p.hands + '手，' + p.draws + '次和局，胜负留给下一桌。'; }
+            else if (p.wins && p.losses) { title = p.revenge ? '你来我往' : '胜负未定'; text = '你与' + a.name + '已同桌' + p.hands + '手，你' + p.wins + '胜、' + p.losses + '负' + (p.draws ? '、' + p.draws + '和' : '') + '；下一桌仍有故事可续。'; }
+            else { title = '熟人再会'; text = a.name + '与你已有' + p.hands + '手交集，' + (p.wins ? '此前是你占了上风' : '此前是对方占了上风') + '。邀约下一桌，再续这段牌缘。'; }
+            var invited = String(invitedId) === String(a.id);
+            return { id: a.id, name: a.name, title: title, text: text, persona: P.name, fund: a.fund, invited: invited, response: invited ? invitedReply : '', hands: p.hands };
+        });
     }
 	function seat(n, buyIn, opts) {		opts = opts || {};
+        pruneInvitation();
 		n = clampNum(Math.floor(Number(n) || 0), 0, 5);
 		buyIn = Math.max(AI_MIN_STAKE, Math.floor(Number(buyIn) || 1000));
 		var gamble = buyIn >= GAMBLE_FROM;
@@ -1432,14 +1490,14 @@ import { MINIONS } from "./csh_bossdata.js";
 		var pool = gamble
 			? gamblePool()
 			: activeList().filter(function (a) {
-				return Math.min(buyIn, Math.floor(a.fund * 0.3)) >= AI_MIN_STAKE;
+				return normalStake(a, buyIn) >= AI_MIN_STAKE;
 			});
 		if (!pool.length) return [];
 
 		var chosen = [];
 		var usedPersona = {};
 		var invited=pool.find(function(a){return String(a.id)===String(invitedId);});
-		if(n>0&&invited){chosen.push(invited);usedPersona[invited.persona]=1;invitedId=null;}
+		if(n>0&&invited){chosen.push(invited);usedPersona[invited.persona]=1;invitedId=null;invitedReply="";}
 		var guard = 0;
 		while (chosen.length < n && guard < 400) {
 			guard++;
@@ -1514,23 +1572,59 @@ import { MINIONS } from "./csh_bossdata.js";
 		};
 	}
 	/* 记录一次豪赌桌出战（玩家视角）：profit 为玩家本局净收益（可为负） */
-	function noteGamble(profit) {
-		if (saveBlocked()) return null;
-		if (!world.gambles) world.gambles = freshGambles();
-		var g = world.gambles;
-		profit = Math.floor(Number(profit) || 0);
-		g.plays += 1;
-		g.net += profit;
-		/* 三态：>0 赢 / <0 输 / =0 平。平局此前落进 else 分支被记成 bust、还清零连胜 ——
-		   而平局是真实存在的（壳的会话结算里 profit === 0 走"平局补记"分支）。
-		   平局不计胜负，也不中断连胜（连胜只被"输"中断）。 */
-		if (profit > 0) { g.wins += 1; g.streak += 1; if (g.streak > g.bestStreak) { g.bestStreak = g.streak; pushHistory({ kind: "gstreak", c: g.bestStreak }); } }
-		else if (profit < 0) { g.streak = 0; g.bust += 1; }
-		else g.push = (g.push || 0) + 1;
-		if (profit > g.best) g.best = profit;
-		saveWorld();
-		return gambleStats();
-	}
+    function validateGambleStats(g) {
+        if(!g||typeof g!=="object"||Array.isArray(g))throw Error("豪赌统计格式异常");
+        ["plays","wins","bust","push","streak","bestStreak","best","net"].forEach(function(key){var n=g[key]==null?0:g[key];if(!Number.isSafeInteger(n)||(key!=="net"&&n<0))throw Error("豪赌统计字段异常");});
+        if((g.wins||0)+(g.bust||0)+(g.push||0)>(g.plays||0)||(g.streak||0)>(g.bestStreak||0)||(g.bestStreak||0)>(g.wins||0))throw Error("豪赌统计凭据不一致");
+        gambleReceipts(g);return g;
+    }
+    function gambleSaved() {
+        if(world.careerUnlocks!=null)lib.cshWallet.validateCareerUnlocks(world.careerUnlocks);
+        validateGambleStats(world.gambles);
+        return JSON.parse(JSON.stringify({gambles:world.gambles,careerUnlocks:world.careerUnlocks}));
+    }
+    function gambleReceipts(value) {
+        var ids=value&&value.receipts;
+        if(ids==null)return [];
+        if(!Array.isArray(ids)||ids.length>64||ids.some(function(id,i){return typeof id!=="string"||!/^[a-zA-Z0-9_-]{10,100}$/.test(id)||ids.indexOf(id)!==i;}))throw Error("豪赌结算凭据异常");
+        return ids.slice();
+    }
+    function commitGambleResult(data,id) {
+        if(saveBlocked())return {ok:false,reason:"存档暂不可写"};
+        if(!data||!Number.isSafeInteger(data.profit)||Math.abs(data.profit)>100000000000||!Number.isSafeInteger(data.t)||data.t<0||typeof id!=="string"||!/^[a-zA-Z0-9_-]{10,100}$/.test(id))return {ok:false,reason:"豪赌结果无效"};
+        var before=world,prepared=null;
+        try {
+            validateGambleStats(before.gambles);
+            var receipts=gambleReceipts(before.gambles);
+            if(receipts.indexOf(id)>=0)return {ok:true,already:true};
+            if(before.careerUnlocks!=null)lib.cshWallet.validateCareerUnlocks(before.careerUnlocks);
+            world=JSON.parse(JSON.stringify(before));
+            if(!world.gambles)world.gambles=freshGambles();
+            var g=world.gambles=Object.assign(freshGambles(),world.gambles),profit=data.profit;
+            g.plays+=1;g.net+=profit;
+            if(!Number.isSafeInteger(g.net))throw Error("豪赌累计统计超出保存范围");
+            if(profit>0){g.wins+=1;g.streak+=1;if(g.streak>g.bestStreak){g.bestStreak=g.streak;pushHistory({kind:"gstreak",c:g.bestStreak});}}
+            else if(profit<0){g.streak=0;g.bust+=1;}
+            else g.push=(g.push||0)+1;
+            if(profit>g.best)g.best=profit;
+            g.receipts=receipts.concat(id).slice(-64);
+            var observer=lib.cshCareerObserver;
+            if(observer&&observer.prepareGamble)prepared=observer.prepareGamble(world,before,data.t);
+            if(prepared)world.careerUnlocks=prepared.record;
+            localStorage.setItem(K_WORLD,JSON.stringify(world));gambleRevision++;
+        }catch(error){world=before;logError("豪赌战绩待保存",error);return {ok:false,reason:"豪赌战绩尚未保存，请恢复存储后重试"};}
+        try{if(lib.cshCareerObserver&&lib.cshCareerObserver.gambleCommitted)lib.cshCareerObserver.gambleCommitted(world,prepared);}catch(error){logError("豪赌生涯记录待同步",error);}
+        return {ok:true};
+    }
+    function noteGamble(profit) {
+        if(saveBlocked())return null;
+        profit=Number(profit);
+        if(!Number.isFinite(profit)||Math.abs(profit)>100000000000)return null;
+        profit=Math.floor(profit);
+        var id="gamble-"+Date.now().toString(36)+"-"+Math.random().toString(36).slice(2,12)+"-"+(++gambleSerial).toString(36),data={profit:profit,t:Date.now()},Q=lib.cshWallet&&lib.cshWallet.pending;
+        var result=Q?Q.put("gamble",id,data):commitGambleResult(data,id);
+        return result&&result.ok?gambleStats():null;
+    }
 
 	/* ============================================================
 	   5. 排行榜（§I.3）
@@ -1710,6 +1804,7 @@ import { MINIONS } from "./csh_bossdata.js";
 		/* 只记战果不动钱：名次制牌桌（UNO）让同桌 AI 也长战绩与心态（2026-10-03） */
 		settleResult: settleResult,
 		gambleStats: gambleStats, noteGamble: noteGamble,
+        gambleSaved:gambleSaved,gambleRevision:function(){return gambleRevision;},
 		stats: stats,
 		tick: tick,
 		leaderboard: leaderboard,
@@ -1741,7 +1836,7 @@ import { MINIONS } from "./csh_bossdata.js";
 		   effectiveSkill / mentalFactor —— 供游戏页展示"真实发挥水平"。 */
 		worldStory: worldStory,
 		/* 世界动态（流言）：最近 n 条值得说的事，人物化措辞，只读派生（2026-10-03 新增） */
-		news: news, storylines:storylines, inviteNext:inviteNext,
+		news: news, storylines:storylines, inviteNext:inviteNext, cancelInvite:cancelInvite,
 		effectiveSkill: effectiveSkill,
 		mentalFactor: mentalFactor,
 		advanceState: advanceState,
@@ -1767,4 +1862,5 @@ import { MINIONS } from "./csh_bossdata.js";
 	var st = stats();
 	logInfo("AI 世界已加载：" + st.chars + " 名角色，在场 " + activeList().length +
 		" 名；资金 " + st.fundMin + " ~ " + st.fundMax + "；牌技上限 " + st.skillTop.toFixed(3));
+    if(lib.cshWallet&&lib.cshWallet.pending)lib.cshWallet.pending.register("gamble",commitGambleResult);
 })();

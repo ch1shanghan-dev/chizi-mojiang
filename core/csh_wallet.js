@@ -436,11 +436,31 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 			/* 生涯峰值：只增不减（真实可核，成就/大厅用它替代已删除的死字段 bank） */
 			if (!(wallet.pcPeak >= wallet.pc)) wallet.pcPeak = wallet.pc;
 			wallet._sig = sigOf(wallet);
-			localStorage.setItem(K_WALLET, JSON.stringify(wallet));
+			/* Exports may commit passive witnesses; a busy restore still cannot. */
+			persistWallet(wallet, forMigration && saveBlocked());
 			snapshot(forMigration);
 			return true;
 		} catch (e) { logError("saveWallet 失败", e); }
 		return false;
+	}
+	/* All strict wallet writes share this point. A career draft is adopted only
+	   after the same durable write as its economic evidence succeeds. */
+	function persistWallet(value, skipCareer) {
+		var observer = !skipCareer && lib.cshCareerObserver, prepared = null, draft = value;
+		try { if (observer) prepared = observer.prepareWallet(value); }
+		catch (error) { logError("生涯资格采集待重试", error); }
+		if (prepared) {
+			draft = Object.assign({}, value, { careerUnlocks: prepared.record });
+			draft._sig = sigOf(draft);
+		}
+		localStorage.setItem(K_WALLET, JSON.stringify(draft));
+		if (prepared) { value.careerUnlocks = draft.careerUnlocks; value._sig = draft._sig; }
+		try { if (observer) observer.committed(value, prepared); }
+		catch (error) { logError("生涯达成反馈待恢复", error); }
+	}
+	function stageCareerWallet() {
+		try { if (lib.cshCareerObserver) lib.cshCareerObserver.stageWallet(wallet); }
+		catch (error) { logError("生涯资格采集待重试", error); }
 	}
 	function snapshot(forMigration) {
 		if (saveBlocked(forMigration)) return false;
@@ -467,7 +487,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 		var before = wallet.pc;
 		wallet.pc = clampNum(before + n, 0, PC_CAP);
 		var got = wallet.pc - before;
-		if (got > 0) { appendChain(got); pushLedger(got, reason, wallet.pc); }
+		if (got > 0) { wallet.pcPeak = Math.max(wallet.pcPeak, wallet.pc); appendChain(got); pushLedger(got, reason, wallet.pc); stageCareerWallet(); }
 		scheduleSave();
 		logInfo("入账 " + got + " CBY（" + (reason || "") + "）→ " + wallet.pc);
 		return got;
@@ -481,6 +501,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 		wallet.pc -= n;
 		appendChain(-n);
 		pushLedger(-n, reason, wallet.pc);
+		stageCareerWallet();
 		scheduleSave();
 		logInfo("出账 " + n + " CBY（" + (reason || "") + "）→ " + wallet.pc);
 		return true;
@@ -522,7 +543,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 			fields.forEach(function (key) { saved[key] = JSON.parse(JSON.stringify(patch[key])); });
 			var next = JSON.parse(JSON.stringify(before)); next.bossSaved = saved; next._sig = sigOf(next);
 			if (saveBlocked()) return false;
-			localStorage.setItem(K_WALLET, JSON.stringify(next));
+			persistWallet(next);
 			wallet = next;
 			return true;
 		} catch (e) { logError("讨伐保全失败，原数据保留", e); return false; }
@@ -560,7 +581,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 					nextRank.merit+=gained;nextRank.meritToday+=gained;nextRank.rank=rankOfMerit(nextRank.merit);
 				}
 				nextRank.bossReceipt={origin:state.origin,seq:p.seq,gained:gained};
-				localStorage.setItem(K_RANK,JSON.stringify(nextRank));rankData=nextRank;
+				saveRank(nextRank);
 			}
 			if(p.pc){
 				var ledger=JSON.parse(localStorage.getItem(K_LEDGER)||"[]");if(!Array.isArray(ledger))throw Error("流水格式异常");
@@ -570,7 +591,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 				}
 			}
 			var next=JSON.parse(JSON.stringify(wallet));next.bossRewards.pending=null;next._sig=sigOf(next);
-			localStorage.setItem(K_WALLET,JSON.stringify(next));wallet=next;return true;
+			persistWallet(next);wallet=next;return true;
 		}catch(e){logError("讨伐收益待恢复",e);return false;}
 	}
 	function commitBossEvent(spec,token) {
@@ -586,7 +607,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 			state.pending={seq:state.seq,id:state.origin+"-"+state.seq,pc:got,baseMerit:spec.merit,reason:spec.reason,t:Date.now(),balance:next.pc};
 			next.bossRewards=validateBossRewards(state);
 			// appendChain operates on wallet; restore the old object if the strict write fails.
-			var before=wallet;wallet=next;try{if(got)appendChain(got);wallet._sig=sigOf(wallet);localStorage.setItem(K_WALLET,JSON.stringify(wallet));}catch(error){wallet=before;throw error;}
+			var before=wallet;wallet=next;try{if(got)appendChain(got);wallet._sig=sigOf(wallet);persistWallet(wallet);}catch(error){wallet=before;throw error;}
 			var complete=flushBossRewards(),receipt=rankData.bossReceipt;
 			var result={ok:true,recordCommitted:true,gained:got,meritGained:receipt&&receipt.origin===state.origin&&receipt.seq===state.seq?receipt.gained:0,meritPending:!receipt||receipt.origin!==state.origin||receipt.seq!==state.seq,pending:!complete};
 			if(token&&typeof token==="object")bossEventCache.set(token,result);
@@ -627,7 +648,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 				t: Date.now(), d: got, r: reason.slice(0, 40), c: catOf(reason), b: wallet.pc, marketTx: id,
 			} : null };
 			wallet._sig = sigOf(wallet);
-			localStorage.setItem(K_WALLET, JSON.stringify(wallet));
+			persistWallet(wallet);
 		} catch (e) {
 			wallet = before;
 			logError("金鳞市提交失败", e);
@@ -647,7 +668,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 			wallet.marketSaved = wallet.marketPending.state;
 			delete wallet.marketPending;
 			wallet._sig = sigOf(wallet);
-			localStorage.setItem(K_WALLET, JSON.stringify(wallet));
+			persistWallet(wallet);
 			return true;
 		} catch (e) { wallet = before; logError("金鳞市检查点待清理", e); return false; }
 	}
@@ -694,7 +715,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 			var list=JSON.parse(localStorage.getItem(K_LEDGER)||"[]");if(!Array.isArray(list))throw Error("流水格式异常");
 			pending.forEach(function(e){if(!list.some(function(r){return r&&r.checkpointTx===e.checkpointTx;}))list.unshift(e);});
 			localStorage.setItem(K_LEDGER,JSON.stringify(list.sort(function(a,b){return b.t-a.t;}).slice(0,LEDGER_MAX)));
-			var next=JSON.parse(JSON.stringify(before));delete next.checkpointPending;next._sig=sigOf(next);localStorage.setItem(K_WALLET,JSON.stringify(next));wallet=next;return true;
+			var next=JSON.parse(JSON.stringify(before));delete next.checkpointPending;next._sig=sigOf(next);persistWallet(next);wallet=next;return true;
 		}catch(e){wallet=before;logError("付费操作流水待恢复",e);return false;}
 	}
 	function flushCheckpoints() {
@@ -703,20 +724,20 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 		try {if(wallet.affectionSaved!=null)localStorage.setItem("csh_affection",JSON.stringify(affectionSaved()));}catch(e){mirrorOK=false;}
 		return ledgerOK&&mirrorOK;
 	}
-	function commitCheckpoint(field,state,charge,reason) {
+	function commitCheckpoint(field,state,charge,reason,taskHistory) {
 		if(saveBlocked())return saveRefused();
 		if(!Number.isSafeInteger(charge)||typeof reason!=="string"||!reason.trim()||reason.length>120||charge>PC_CAP||charge< -SINGLE_ADD_CAP)return {ok:false,reason:"付费操作参数无效"};
 		if(charge>0&&wallet.pc<charge)return {ok:false,reason:"poor",balance:wallet.pc};
 		if(charge<0&&wallet.pc-charge>PC_CAP)return {ok:false,reason:"余额空间不足",balance:wallet.pc};
 		var safe;try{safe=field==="affectionSaved"?validateAffectionState(state):field==="cheerState"?validateCheerState(state):field==="dailyTaskSaved"?validateTaskState(state):null;if(!safe)throw Error("empty");}catch(e){return {ok:false,reason:"付费操作状态无效"};}
-		try{validateCheckpointLedger(wallet.checkpointPending);}catch(e){return {ok:false,reason:"付费操作流水检查点异常"};}
+		try{validateCheckpointLedger(wallet.checkpointPending);if(taskHistory!==undefined){if(field!=="dailyTaskSaved")throw Error("field");taskHistory=validateTaskLifetime(taskHistory);}}catch(e){return {ok:false,reason:"付费操作流水或日课累计记录异常"};}
 		flushCheckpointLedger();
 		if(charge&&Array.isArray(wallet.checkpointPending)&&wallet.checkpointPending.length>=100)return {ok:false,reason:"历史流水正在恢复，请稍后重试"};
 		var before=wallet;
 		try {
-			wallet=JSON.parse(JSON.stringify(before));wallet[field]=safe;wallet.pc-=charge;wallet.pcPeak=Math.max(wallet.pcPeak,wallet.pc);
+			wallet=JSON.parse(JSON.stringify(before));wallet[field]=safe;if(taskHistory!==undefined)wallet.taskLifetime=taskHistory;wallet.pc-=charge;wallet.pcPeak=Math.max(wallet.pcPeak,wallet.pc);
 			if(charge){appendChain(-charge);wallet.checkpointSeq=(Number.isSafeInteger(wallet.checkpointSeq)?wallet.checkpointSeq:0)+1;var id="cp-"+Date.now().toString(36)+"-"+wallet.checkpointSeq+"-"+Math.random().toString(36).slice(2,10);if(!Array.isArray(wallet.checkpointPending))wallet.checkpointPending=[];wallet.checkpointPending.push({t:Date.now(),d:-charge,r:reason.slice(0,40),c:catOf(reason),b:wallet.pc,checkpointTx:id});}
-			wallet._sig=sigOf(wallet);if(saveBlocked())throw Error("save blocked");localStorage.setItem(K_WALLET,JSON.stringify(wallet));
+			wallet._sig=sigOf(wallet);if(saveBlocked())throw Error("save blocked");persistWallet(wallet);
 		}catch(e){wallet=before;return {ok:false,reason:"存档写入失败，本次操作未完成",balance:wallet.pc};}
 		flushCheckpoints();return {ok:true,balance:wallet.pc,charged:charge,ledgerPending:!!(wallet.checkpointPending&&wallet.checkpointPending.length)};
 	}
@@ -742,7 +763,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 			wallet = JSON.parse(JSON.stringify(before));
 			delete wallet.careerPending;
 			wallet._sig = sigOf(wallet);
-			localStorage.setItem(K_WALLET, JSON.stringify(wallet));
+			persistWallet(wallet);
 			return true;
 		} catch (e) { wallet = before; logError("成就流水待恢复", e); return false; }
 	}
@@ -757,23 +778,27 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
         return out;
     }
     function careerUnlocks(){return validateCareerUnlocks(wallet.careerUnlocks);}
-    function syncCareerUnlocks(keys) {
+    function syncCareerUnlocks(keys, options) {
         if(saveBlocked())return saveRefused();
         var before=wallet;
         try {
             if(!Array.isArray(keys)||keys.length>16384||keys.some(function(k){return typeof k!=="string"||!/^[a-zA-Z0-9_]{1,60}$/.test(k)||["__proto__","prototype","constructor"].includes(k);}))throw Error("生涯达成候选无效");
+            var historical=options&&options.historicalKeys||[];
+            if(!Array.isArray(historical)||historical.length>16384||historical.some(function(k){return typeof k!=="string"||!/^[a-zA-Z0-9_]{1,60}$/.test(k)||["__proto__","prototype","constructor"].includes(k);}))throw Error("历史生涯候选无效");
+            var source=options&&options.sourceRecord?validateCareerUnlocks(options.sourceRecord):null;
+            var history=Object.create(null);historical.forEach(function(k){history[k]=true;});
             var record=careerUnlocks(),initial=!record;record=record||{v:1,baseline:true,entries:{}};
             var raw=localStorage.getItem("csh_career_achv"),legacy=raw?JSON.parse(raw):{};
             if(!legacy||typeof legacy!=="object"||Array.isArray(legacy))throw Error("旧生涯领奖记录无法读取");
             var claims=wallet.careerClaims||{};if(typeof claims!=="object"||Array.isArray(claims))throw Error("生涯领奖凭据格式异常");
             var paid=Object.create(null),fresh=[],changed=initial,stamp=Date.now();[legacy,claims].forEach(function(source){Object.keys(source).forEach(function(k){if(source[k])paid[k]=1;});});
             Object.keys(paid).forEach(function(k){if(!paid[k])return;if(!/^[a-zA-Z0-9_]{1,60}$/.test(k)||["__proto__","prototype","constructor"].includes(k))throw Error("旧生涯领奖条目无效");if(!Object.prototype.hasOwnProperty.call(record.entries,k)){record.entries[k]={observedAt:0};changed=true;}});
-            keys.forEach(function(k){if(!Object.prototype.hasOwnProperty.call(record.entries,k)){record.entries[k]={observedAt:initial?0:stamp};if(!initial)fresh.push(k);changed=true;}});
+            keys.forEach(function(k){if(!Object.prototype.hasOwnProperty.call(record.entries,k)){record.entries[k]={observedAt:source&&source.entries[k]?source.entries[k].observedAt:initial||history[k]?0:stamp};if(record.entries[k].observedAt>0)fresh.push(k);changed=true;}});
             record=validateCareerUnlocks(record);
             if(!changed)return {ok:true,record:record,fresh:[],baseline:false};
             var next=JSON.parse(JSON.stringify(before));next.careerUnlocks=record;next._sig=sigOf(next);
-            localStorage.setItem(K_WALLET,JSON.stringify(next));wallet=next;
-            return {ok:true,record:validateCareerUnlocks(record),fresh:fresh,baseline:initial};
+            persistWallet(next);wallet=next;
+            return {ok:true,record:validateCareerUnlocks(next.careerUnlocks),fresh:fresh,baseline:initial};
         } catch(e){wallet=before;return {ok:false,reason:"生涯达成记录未保存，请恢复存储后重试"};}
     }
 
@@ -803,7 +828,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 			wallet.careerPending = { key: key, entry: { t: Date.now(), d: amount, r: reason.slice(0, 40),
 				c: catOf(reason), b: wallet.pc, careerTx: key } };
 			wallet._sig = sigOf(wallet);
-			localStorage.setItem(K_WALLET, JSON.stringify(wallet));
+			persistWallet(wallet);
 		} catch (e) {
 			wallet = before; logError("成就奖励提交失败", e);
 			return { ok: false, reason: "存档写入失败，本次领取未完成" };
@@ -830,7 +855,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 			if (dirty) localStorage.setItem(K_LEDGER, JSON.stringify(list.sort(function(a,b){return b.t-a.t;}).slice(0, LEDGER_MAX)));
 			var before = wallet, next = JSON.parse(JSON.stringify(wallet)), clean = false;
 			ids.forEach(function (id) { if (next.poolClaims[id].entry) { delete next.poolClaims[id].entry; clean = true; } });
-			if (clean) { next._sig = sigOf(next); localStorage.setItem(K_WALLET, JSON.stringify(next)); wallet = next; }
+			if (clean) { next._sig = sigOf(next); persistWallet(next); wallet = next; }
 			return true;
 		} catch (e) { logError("池子成就流水待恢复", e); return false; }
 	}
@@ -846,7 +871,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 				wallet = JSON.parse(JSON.stringify(before)); wallet.pc += pc; wallet.pcPeak = Math.max(wallet.pcPeak, wallet.pc); appendChain(pc);
 				if (!wallet.poolClaims || typeof wallet.poolClaims !== "object") wallet.poolClaims = {};
 				wallet.poolClaims[id] = { pc:pc, merit:merit, t:Date.now(), entry:{ t:Date.now(), d:pc, r:("池子成就/"+label).slice(0,40), c:"成就", b:wallet.pc, poolTx:id } };
-				wallet._sig = sigOf(wallet); localStorage.setItem(K_WALLET, JSON.stringify(wallet)); gained = pc;
+				wallet._sig = sigOf(wallet); persistWallet(wallet); gained = pc;
 			} catch (e) { wallet = before; logError("池子成就奖励提交失败",e); return {ok:false,reason:"存档写入失败，请重试"}; }
 		}
 		var meritDone = rankData.poolClaims && Object.prototype.hasOwnProperty.call(rankData.poolClaims,id), meritGained = 0;
@@ -860,7 +885,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 				next.merit += meritGained; next.meritToday += meritGained; next.rank = rankOfMerit(next.merit);
 				if (!next.poolClaims || typeof next.poolClaims !== "object") next.poolClaims = {};
 				next.poolClaims[id] = meritGained;
-				localStorage.setItem(K_RANK,JSON.stringify(next)); rankData = next;
+				saveRank(next);
 			} catch(e) { rankData = rankBefore; logError("池子成就功勋待补领",e); return {ok:false,partial:true,gained:gained,reason:"池子币已到账，功勋待补领，请重试"}; }
 		}
 		flushPoolLedger(); snapshot();
@@ -887,7 +912,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 			claims.forEach(function (r) { if (r.entry && !list.some(function (e) { return e && e.matchTx === r.id; })) list.push(r.entry); });
 			localStorage.setItem(K_LEDGER, JSON.stringify(list.sort(function (a,b) { return b.t-a.t; }).slice(0,LEDGER_MAX)));
 			var next = JSON.parse(JSON.stringify(wallet)); next.matchClaims.forEach(function (r) { delete r.entry; }); next._sig = sigOf(next);
-			localStorage.setItem(K_WALLET, JSON.stringify(next)); wallet = next;
+			persistWallet(next); wallet = next;
 			return true;
 		} catch (e) { logError("对局奖励流水待恢复",e); return false; }
 	}
@@ -905,7 +930,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
             var field=win?"wins":"losses";if(s[field]>=Number.MAX_SAFE_INTEGER)return {ok:false,reason:"战绩已达上限"};
             s[field]++;s.receipts=s.receipts.slice(-63).concat(id);
             var next=JSON.parse(JSON.stringify(wallet));next.assistedStats=s;next._sig=sigOf(next);
-            if(saveBlocked())return saveRefused();localStorage.setItem(K_WALLET,JSON.stringify(next));wallet=next;
+            if(saveBlocked())return saveRefused();persistWallet(next);wallet=next;
             return {ok:true,stats:assistedStats(),gained:0};
         }catch(e){return {ok:false,reason:"辅助战绩保存失败"};}
     }
@@ -925,7 +950,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 			wallet.matchClaims.push({ id:id, mode:mode, win:win, pc:gained, t:Date.now(), entry:gained ? {t:Date.now(),d:gained,r:reason,c:"对局奖励",b:wallet.pc,matchTx:id} : null });
 			wallet._sig = sigOf(wallet);
 			if (saveBlocked()) { wallet = before; return saveRefused(); }
-			localStorage.setItem(K_WALLET,JSON.stringify(wallet));
+			persistWallet(wallet);
 		} catch (e) { wallet = before; logError("对局奖励提交失败",e); return { ok:false, reason:"奖励保存失败，请重试" }; }
 		flushMatchLedger(); snapshot();
 		return { ok:true, gained:gained, balance:wallet.pc };
@@ -1058,7 +1083,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
             credited=r.payout>SINGLE_ADD_CAP?0:Math.max(0,Math.min(r.payout,PC_CAP-wallet.pc));
             wallet.pc+=credited;wallet.pcPeak=Math.max(wallet.pcPeak,wallet.pc);
             if(credited){appendChain(credited);wallet.checkpointSeq=(Number.isSafeInteger(wallet.checkpointSeq)?wallet.checkpointSeq:0)+1;if(!Array.isArray(wallet.checkpointPending))wallet.checkpointPending=[];wallet.checkpointPending.push({t:Date.now(),d:credited,r:'结算/'+gameKey,c:catOf('结算/'+gameKey),b:wallet.pc,checkpointTx:'cp-'+Date.now().toString(36)+'-'+wallet.checkpointSeq+'-'+Math.random().toString(36).slice(2,10)});}
-            wallet._sig=sigOf(wallet);if(saveBlocked())throw Error('save blocked');localStorage.setItem(K_WALLET,JSON.stringify(wallet));
+            wallet._sig=sigOf(wallet);if(saveBlocked())throw Error('save blocked');persistWallet(wallet);
         }catch(e){wallet=before;return {ok:false,credited:0,balance:wallet.pc,reason:'结算尚未保存，请保留页面后重试'};}
         flushCheckpoints();snapshot();r.ok=true;
 		r.credited = credited;
@@ -1090,8 +1115,19 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
         var s={day:o.day,claimed:[]};["hands","wins","bigPot"].forEach(function(k){var n=o[k]==null?0:o[k];if(!Number.isSafeInteger(n)||n<0||n>1000000000)throw Error("每日任务进度无效");s[k]=n;});
         if(!Array.isArray(o.claimed)||o.claimed.some(function(k){return ["hands","wins","bigPot"].indexOf(k)<0;}))throw Error("每日任务凭据无效");s.claimed=o.claimed.filter(function(k,i,a){return a.indexOf(k)===i;});return s;
     }
+    function validateTaskLifetime(o){
+        if(!o||typeof o!=="object"||Array.isArray(o)||o.v!==1||!Number.isSafeInteger(o.completed)||o.completed<0||o.completed>1000000000||!Number.isSafeInteger(o.fullDays)||o.fullDays<0||o.fullDays>Math.floor(o.completed/3))throw Error("日课累计记录无效");
+        return {v:1,completed:o.completed,fullDays:o.fullDays};
+    }
+    function taskLifetimeOf(candidate,state){
+        var value=candidate||wallet;
+        if(value.taskLifetime!=null)return validateTaskLifetime(value.taskLifetime);
+        /* Only the retained paid task receipts prove an old save's lower bound. */
+        state=state||validateTaskState(value.dailyTaskSaved||DEFAULT_TASK());
+        return {v:1,completed:state.claimed.length,fullDays:state.claimed.length===3?1:0};
+    }
     function readTaskState(){try{return validateTaskState(wallet.dailyTaskSaved||lsJSON(K_TASK,null)||DEFAULT_TASK());}catch(e){logError("任务读取失败",e);return DEFAULT_TASK();}}
-    var taskData=readTaskState();
+    var taskData=readTaskState(), taskCareerOrigin=null;
     function taskTier(){return rankData.rank>=30?2:rankData.rank>=10?1:0;}
     function taskDefs(t){t=t==null?taskTier():t;return [
         {key:"hands",label:"打满手数",goal:[10,20,30][t],reward:[300,500,800][t],unit:"手"},
@@ -1100,9 +1136,15 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
     ];}
     function mergeTask(a,b){if(a.day!==b.day)return a.day>b.day?a:b;var s=validateTaskState(a);["hands","wins","bigPot"].forEach(function(k){s[k]=Math.max(a[k],b[k]);});s.claimed=a.claimed.concat(b.claimed).filter(function(k,i,x){return x.indexOf(k)===i;});return s;}
     function commitTaskResult(payload){
-        var next;try{next=validateTaskState(payload.state);if(!Number.isInteger(payload.tier)||payload.tier<0||payload.tier>2)throw Error("tier");next=mergeTask(readTaskState(),next);}catch(e){return {ok:false,reason:"每日任务结果无效"};}
+        var previous=readTaskState(),next;try{next=validateTaskState(payload.state);if(!Number.isInteger(payload.tier)||payload.tier<0||payload.tier>2)throw Error("tier");next=mergeTask(previous,next);}catch(e){return {ok:false,reason:"每日任务结果无效"};}
         var awards=[],sum=0;taskDefs(payload.tier).forEach(function(d){if(next[d.key]>=d.goal&&next.claimed.indexOf(d.key)<0){awards.push({key:d.key,label:d.label,reward:d.reward,gained:d.reward});sum+=d.reward;next.claimed.push(d.key);}});
-        var r=commitCheckpoint("dailyTaskSaved",next,-sum,"每日任务"+(awards.length?"/"+awards.map(function(a){return a.label;}).join("、"):"进度"));
+        var lifetime;try{
+            lifetime=taskLifetimeOf(wallet,previous);
+            lifetime.completed=Math.min(1000000000,lifetime.completed+awards.length);
+            if(awards.length&&next.claimed.length===3&&!(previous.day===next.day&&previous.claimed.length===3))lifetime.fullDays++;
+            lifetime.fullDays=Math.min(lifetime.fullDays,Math.floor(lifetime.completed/3));
+        }catch(error){return {ok:false,reason:"日课累计记录尚未完整恢复"};}
+        var r=commitCheckpoint("dailyTaskSaved",next,-sum,"每日任务"+(awards.length?"/"+awards.map(function(a){return a.label;}).join("、"):"进度"),lifetime);
         if(!r.ok)return r;
         taskData=mergeTask(taskData,next);try{localStorage.setItem(K_TASK,JSON.stringify(next));}catch(e){}
         return {ok:true,completed:awards,gained:sum};
@@ -1117,9 +1159,21 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
         if(saveBlocked()||["hands","wins","bigPot"].indexOf(kind)<0)return [];taskEnsureDay();n=Math.floor(Number(n)||0);if(n<=0)return [];
         taskData[kind]=Math.min(1000000000,kind==="bigPot"?Math.max(taskData[kind],n):taskData[kind]+n);var r=saveTask();return r.ok?r.completed||[]:[];
     }
+    /* Passive collection must not refresh days or retry/pay pending tasks. */
+    function taskPeek(candidate, includePast){
+        var raw=(candidate||wallet).dailyTaskSaved;
+        if(!raw){var text=localStorage.getItem(K_TASK);raw=text?JSON.parse(text):DEFAULT_TASK();}
+        var state=validateTaskState(raw),lifetime=taskLifetimeOf(candidate||wallet,state);
+        if(!includePast&&state.day!==today())state=DEFAULT_TASK();
+        var defs=taskDefs().map(function(d){return Object.assign({},d,{cur:Math.min(state[d.key],d.goal),done:state[d.key]>=d.goal,claimed:state.claimed.indexOf(d.key)>=0});});
+        return {day:includePast?state.day:today(),tier:taskTier(),defs:defs,lifetime:lifetime,pending:defs.some(function(d){return d.done&&!d.claimed;})};
+    }
+    /* Keep pre-rollover evidence for the passive collector that loads later. */
+    function captureTaskOrigin(candidate){try{taskCareerOrigin=taskPeek(candidate,true);}catch(e){taskCareerOrigin=null;}}
+    function taskOrigin(){if(!taskCareerOrigin)throw Error("日课历史来源尚未完整读取");return JSON.parse(JSON.stringify(taskCareerOrigin));}
     function taskState(){
         taskEnsureDay();if(!saveBlocked())resultRetry();var defs=taskDefs().map(function(d){return Object.assign({},d,{cur:Math.min(taskData[d.key],d.goal),done:taskData[d.key]>=d.goal,claimed:taskData.claimed.indexOf(d.key)>=0});});
-        return {day:taskData.day||today(),tier:taskTier(),defs:defs,pending:defs.some(function(d){return d.done&&!d.claimed;})};
+        return {day:taskData.day||today(),tier:taskTier(),defs:defs,lifetime:taskLifetimeOf(wallet,readTaskState()),pending:defs.some(function(d){return d.done&&!d.claimed;})};
     }
 
 
@@ -1169,13 +1223,14 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
         if(saveBlocked())return saveRefused();var state=reliefState();if(!state.available)return {ok:false,reason:state.reason};
         if(!flushCareerLedger())return {ok:false,reason:"上笔收益流水待恢复"};var before=wallet;
         try{wallet=JSON.parse(JSON.stringify(before));wallet.pc+=state.gained;wallet.pcPeak=Math.max(wallet.pcPeak,wallet.pc);wallet.reliefDate=today();appendChain(state.gained);
-            wallet.careerPending={key:"relief_"+today().replace(/-/g,"_"),entry:{t:Date.now(),d:state.gained,r:"回桌援助",c:"补给",b:wallet.pc,careerTx:"relief_"+today().replace(/-/g,"_")}};wallet._sig=sigOf(wallet);localStorage.setItem(K_WALLET,JSON.stringify(wallet));
+            wallet.careerPending={key:"relief_"+today().replace(/-/g,"_"),entry:{t:Date.now(),d:state.gained,r:"回桌援助",c:"补给",b:wallet.pc,careerTx:"relief_"+today().replace(/-/g,"_")}};wallet._sig=sigOf(wallet);persistWallet(wallet);
         }catch(e){wallet=before;return {ok:false,reason:"存档写入失败，领取资格已保留"};}flushCareerLedger();snapshot();return {ok:true,gained:state.gained,balance:wallet.pc};
     }
 
 	/* ============================================================
 	   5. 官阶（§G）
 	   ============================================================ */
+	var rankRevision = 0;
 	var rankDef = function () { return { rank: 0, merit: 0, meritToday: 0, meritDate: "" }; };
 	var rankData = lsJSON(K_RANK, null);
 	if (!rankData || typeof rankData !== "object") rankData = rankDef();
@@ -1211,14 +1266,15 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 		return clampNum(lv - s.from + 1, 1, 10);
 	}
 
-	function saveRank() {
-		if (saveBlocked()) return;
-		try {
-			rankData.rank = rankOfMerit(rankData.merit);
-			lsPut(K_RANK, rankData);
-		} catch (e) { logError("saveRank 失败", e); }
-	}
-
+    function saveRank(next) {
+        if(saveBlocked())throw Error("官阶存档暂不可写");
+        if(next.careerUnlocks!=null)validateCareerUnlocks(next.careerUnlocks);
+        next.rank=rankOfMerit(next.merit);
+        var observer=lib.cshCareerObserver,prepared=observer&&observer.prepareRank?observer.prepareRank(next,rankData):null;
+        if(prepared)next.careerUnlocks=prepared.record;
+        localStorage.setItem(K_RANK,JSON.stringify(next));rankData=next;rankRevision++;
+        try{if(observer&&observer.rankCommitted)observer.rankCommitted(next,prepared);}catch(error){logError("官阶生涯记录待同步",error);}
+    }
 	/* 每日功勋软上限（§G.2.1）：300 + 官阶×10 */
 	function softCap() {
 		return MERIT_SOFT_BASE + rankData.rank * MERIT_SOFT_PER;
@@ -1228,17 +1284,18 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 		if (wallet.bossRewards && wallet.bossRewards.pending && !flushBossRewards()) return {ok:false,gained:0,reason:"讨伐功勋待恢复"};
 		if (saveBlocked()) return saveRefused();
 		n = Number(n) || 0;
-		if (n <= 0) return { ok: false, gained: 0 };
+		if (!Number.isFinite(n) || n <= 0) return { ok: false, gained: 0 };
+        var next=JSON.parse(JSON.stringify(rankData));
 
 		var t = today();
-		if (rankData.meritDate !== t) { rankData.meritDate = t; rankData.meritToday = 0; }
+		if (next.meritDate !== t) { next.meritDate = t; next.meritToday = 0; }
 
 		var gain = n;
 		// 高段位衰减（§G.2.1）
 		if (rankData.rank >= HIGH_RANK_FROM) gain = gain * HIGH_RANK_DECAY;
 
 		// 每日软上限：超出部分按 50% 计
-		var room = Math.max(0, softCap() - rankData.meritToday);
+		var room = Math.max(0, softCap() - next.meritToday);
 		var effective;
 		if (gain <= room) effective = gain;
 		else effective = room + (gain - room) * MERIT_OVERFLOW_RATE;
@@ -1252,9 +1309,10 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 		//   「超出半价」机制失效，且成就「单日功勋」阶梯（最高 6,000）
 		//   在钳制下永远不可能达成 —— 单日入账封死在 300。
 		//   现在 meritToday 记录真实入账（含半价溢出），软上限只影响折价率。
-		rankData.meritToday += effective;
-		rankData.merit += effective;
-		saveRank();
+		next.meritToday += effective;
+		next.merit += effective;
+        if(!Number.isSafeInteger(next.merit)||next.merit>999999999||!Number.isSafeInteger(next.meritToday)||next.meritToday>999999999)return {ok:false,gained:0,reason:"功勋记录超出保存范围"};
+        try{saveRank(next);}catch(error){logError("官阶功勋未保存",error);return {ok:false,gained:0,reason:"功勋未保存，请恢复存储后重试"};}
 
 		var leveled = rankData.rank > beforeRank;
 		var crossedSeg = leveled && segOfRank(rankData.rank).seg > segOfRank(beforeRank).seg;
@@ -1934,6 +1992,9 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 		var memoryOnly = supplied && options && options.memoryOnly;
 		var raw = supplied ? snapshot.wallet : lsJSON(K_WALLET, null);
         if(raw&&raw.careerUnlocks!=null)validateCareerUnlocks(raw.careerUnlocks);
+        if(raw&&raw.taskLifetime!=null)validateTaskLifetime(raw.taskLifetime);
+        var rd = supplied ? snapshot.rank : lsJSON(K_RANK, null);
+        if(rd&&rd.careerUnlocks!=null)validateCareerUnlocks(rd.careerUnlocks);
 		try { if (lib.cshMatchReward && typeof lib.cshMatchReward.invalidate === "function") lib.cshMatchReward.invalidate(); } catch (e) { logError("对局奖励会话重置异常",e); }
 		adoptedSaveEpoch++; resultInvalidate();
 		bossEventCache = new WeakMap();
@@ -1947,7 +2008,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 		if (typeof wallet.lastSign !== "string") wallet.lastSign = "";
 		if (typeof wallet.reliefDate !== "string") wallet.reliefDate = "";
 		if (!Array.isArray(wallet.chain) || typeof wallet.chainBal !== "number") seedChain("reload");
-		var rd = supplied ? snapshot.rank : lsJSON(K_RANK, null);
+
 		rankData = rd && typeof rd === "object" && !Array.isArray(rd) ? rd : rankDef();
 		rankData.rank = clampNum(rankData.rank, 0, 50);
 		rankData.merit = clampNum(rankData.merit, 0, 999999999);
@@ -1960,8 +2021,15 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 		if (!Array.isArray(taskData.claimed)) taskData.claimed = [];
 		/* 迁移事务已经严格读取并保存恢复凭据。只采用这一批原值，不再二次
 		   容错读盘，也不在确认前补签名/补流水；之后正常保存会签名新对象。 */
-		if (memoryOnly) return { ok: true, action: "adopt-memory", pc: wallet.pc };
+		if (memoryOnly) {
+            captureTaskOrigin({dailyTaskSaved:taskData});
+			try { if (lib.cshCareerObserver && lib.cshCareerObserver.adopted) lib.cshCareerObserver.adopted(); } catch (eCareer) { logError("生涯采集新档初始化待重试", eCareer); }
+			return { ok: true, action: "adopt-memory", pc: wallet.pc };
+		}
 		var result = integrityCheck();
+        captureTaskOrigin();
+		/* A rejected raw balance must not become the new historical baseline. */
+		try { if (lib.cshCareerObserver && lib.cshCareerObserver.adopted) lib.cshCareerObserver.adopted(); } catch (eCareer) { logError("生涯采集新档初始化待重试", eCareer); }
 		flushCareerLedger(); flushPoolLedger(); flushCheckpoints();
 		return result;
 	}
@@ -2021,7 +2089,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
     function resultRead() {
         var raw=localStorage.getItem(K_RESULTS);if(raw==null)return [];
         var data=JSON.parse(raw);if(!data||data.v!==1||!Array.isArray(data.entries)||data.entries.length>64)throw Error("待保存记录格式异常，请先备份恢复");
-        var seen={};data.entries.forEach(function(e){if(!e||!["match","assisted","pool","task"].includes(e.kind)||typeof e.id!=="string"||!/^[a-zA-Z0-9_-]{10,100}$/.test(e.id)||seen[e.id]||!e.data||typeof e.data!=="object"||Array.isArray(e.data)||!Number.isSafeInteger(e.t)||e.t<0)throw Error("待保存记录损坏");seen[e.id]=1;});return data.entries;
+        var seen={};data.entries.forEach(function(e){if(!e||!["match","assisted","pool","task","gamble","interaction"].includes(e.kind)||typeof e.id!=="string"||!/^[a-zA-Z0-9_-]{10,100}$/.test(e.id)||seen[e.id]||!e.data||typeof e.data!=="object"||Array.isArray(e.data)||!Number.isSafeInteger(e.t)||e.t<0)throw Error("待保存记录损坏");seen[e.id]=1;});return data.entries;
     }
     function resultWrite(entries) { var value=JSON.stringify({v:1,entries:entries});if(value.length>524288)throw Error("待保存内容过多，请先恢复存储");if(entries.length)localStorage.setItem(K_RESULTS,value);else localStorage.removeItem(K_RESULTS); }
     function resultSchedule() {if(resultTimer!==null||typeof setTimeout!=="function")return;resultTimer=setTimeout(function(){resultTimer=null;resultRetry();},2000);}
@@ -2043,7 +2111,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
     }
     function resultPut(kind,id,data) {
         if(saveBlocked())return {ok:false,durable:false,reason:SAVE_BLOCK_REASON};
-        if(!["match","assisted","pool","task"].includes(kind)||typeof id!=="string"||!/^[a-zA-Z0-9_-]{10,100}$/.test(id))return {ok:false,durable:false,reason:"结果标识无效"};
+        if(!["match","assisted","pool","task","gamble","interaction"].includes(kind)||typeof id!=="string"||!/^[a-zA-Z0-9_-]{10,100}$/.test(id))return {ok:false,durable:false,reason:"结果标识无效"};
         var job={kind:kind,id:id,data:JSON.parse(JSON.stringify(data)),t:Date.now()};
         try{var entries=resultRead();if(!entries.some(function(e){return e.id===id;}))entries.push(job);if(entries.length>64)throw Error("待保存记录已满");resultWrite(entries);volatileResults=volatileResults.filter(function(e){return e.id!==id;});}
         catch(e){if(!volatileResults.some(function(e){return e.id===id;})&&volatileResults.length<64)volatileResults.push(job);resultError=String(e.message||e);resultSchedule();return {ok:false,durable:false,reason:"结果未能写入本机，请保持页面打开并恢复存储"};}
@@ -2117,10 +2185,12 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 		},
 		/* 每日任务（唯一真值）：五游戏共用同一个状态机 */
 		task: {
-			state: taskState, add: taskAdd, ensureDay: taskEnsureDay,
+			state: taskState, peek: taskPeek, origin: taskOrigin, lifetime: function(candidate){return taskPeek(candidate,true).lifetime;}, add: taskAdd, ensureDay: taskEnsureDay,
 			defs: taskDefs, progressOf: taskProgressOf,
 		},
 		rank: {
+            revision: function(){return rankRevision;},
+            saved: function(){if(rankData.careerUnlocks!=null)validateCareerUnlocks(rankData.careerUnlocks);return JSON.parse(JSON.stringify(rankData));},
 			get: function () {
 				var info = rankInfo(rankData.rank);
 				return {
@@ -2148,7 +2218,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 			pubkeys: function () { return CSH_PUBKEYS.slice(); },
 			setPubkeys: function (arr) { CSH_PUBKEYS = Array.isArray(arr) ? arr : []; },
 		},
-	pending: pendingResults, validateTaskState: validateTaskState, sign, flushSave, reloadSave, validateAffectionState: validateAffectionState, validateCheerState: validateCheerState, validateCheckpointLedger: validateCheckpointLedger,
+	pending: pendingResults, validateTaskState: validateTaskState, validateTaskLifetime: validateTaskLifetime, sign, flushSave, reloadSave, validateAffectionState: validateAffectionState, validateCheerState: validateCheerState, validateCheckpointLedger: validateCheckpointLedger,
 	integrity: { check: integrityCheck, crossCheck: crossCheck },
 		migrate: { legacy: legacyMigrate },
 	_sig: { sign: sigOf, verify: verifySig, fnv1a: fnv1a, verifyRSA: verifyPKCS1v15, sha256: _sha256 },
@@ -2191,11 +2261,14 @@ lib.cshWallet = CSH;
 		legacyMigrate();
 		integrityCheck();
 		crossCheck();
+        captureTaskOrigin();
 		taskEnsureDay();
 		flushCareerLedger(); flushPoolLedger(); flushMatchLedger(); flushBossRewards();
 	} catch (e) { logError("启动自检失败", e); }
 
+	var startupTaskCount=taskDefs().length;
+    try{startupTaskCount=taskState().defs.length;}catch(error){logError("日课累计读取失败，原记录已保留",error);}
 	logInfo("钱包模块已加载：PC=" + wallet.pc + " 峰值=" + wallet.pcPeak +
 		" 官阶=" + rankData.rank + "（" + rankInfo(rankData.rank).name + "）" +
-		" 今日任务 " + taskState().defs.length + " 条");
+		" 今日任务 " + startupTaskCount + " 条");
 })();

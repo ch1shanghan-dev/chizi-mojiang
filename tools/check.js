@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { auditTempRoot, removeAuditScratch, disposeAuditBrowser } from './lib/audit_scratch.mjs';
 /**
  * 池子魔将 · 改动门禁（只读检查，不改任何业务文件）
  *
@@ -108,7 +109,7 @@ try {
 
 function nodeCheck(file) {
 	if (!spawnOk || !execFileSync) return null;
-	const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "cshchk-"));
+	const tmpDir = fs.mkdtempSync(path.join(auditTempRoot(), "cshchk-"));
 	const tmp = path.join(tmpDir, "t" + tmpSeq++ + ".mjs");
 	try {
 		fs.copyFileSync(file, tmp);
@@ -743,7 +744,7 @@ async function runBossChecks() {
 		if (okStub) {
 			const os = await import("node:os");
 			const { pathToFileURL } = await import("node:url");
-			const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "csh-bj-"));
+			const tmpDir = fs.mkdtempSync(path.join(auditTempRoot(), "csh-bj-"));
 			const tmpFile = path.join(tmpDir, "boss_stub.mjs");
 			fs.writeFileSync(tmpFile, bjStub, "utf8");
 			BJ = await import(pathToFileURL(tmpFile).href);
@@ -3152,7 +3153,7 @@ async function runBossChecks() {
   if (spawnOk && execFileSync) {
     let tmp57;
     try {
-      tmp57 = fs.mkdtempSync(path.join(os.tmpdir(), 'csh-planning-'));
+      tmp57 = fs.mkdtempSync(path.join(auditTempRoot(), 'csh-planning-'));
       const target57 = path.join(tmp57, 'result.json');
       const result57 = JSON.parse(execFileSync(process.execPath, [path.join(ROOT, 'tools/probe_minigame_planning.mjs'), '--out', target57], {encoding:'utf8', timeout:20000, windowsHide:true}));
       if (result57.failed !== 0 || result57.passed < 42) fail('执行级 E57：小游戏提示/残局规划/公开记忆边界未通过');
@@ -3185,9 +3186,35 @@ async function runBossChecks() {
       if(facts69.failed!==0||facts69.passed<35)fail('执行级 E69：成就事件事实边界未通过');else ok('执行级 E69：装备前后事实/有效判定/去重/保存隔离（'+facts69.passed+'/0）');
       const career58=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_career_unlocks.mjs'),'--out',path.join(tmp57,'career.json')],{encoding:'utf8',timeout:20000,windowsHide:true}));
       if(career58.failed!==0||career58.passed<40)fail('执行级 E58：生涯首次达成与永久资格未通过');else ok('执行级 E58：生涯首次达成/旧档/失败/迁移/资格（'+career58.passed+'/0）');
-    } catch(error) { fail('执行级 E57—E69：小游戏/生涯/赠礼执行回归失败（'+String(error.message).slice(0,160)+'）'); }
-    finally { if(tmp57){for(const file of ['blackjack-matrix.json','ddz-rounds.json','gift-quantity.json','goals.json','bj-exit.json','spirit-owner-boundaries.json','feedback-lifecycle.json']){try{fs.unlinkSync(path.join(tmp57,file));}catch{}}try{fs.unlinkSync(path.join(tmp57,'uno-rounds.json'));}catch{}try{fs.unlinkSync(path.join(tmp57,'blackjack-rules.json'));}catch{}try{fs.unlinkSync(path.join(tmp57,'career.json'));}catch{}try{fs.unlinkSync(path.join(tmp57,'blackjack.json'));}catch{}try{fs.unlinkSync(path.join(tmp57,'result.json'));}catch{}try{fs.rmdirSync(tmp57);}catch{}} }
-  } else warn('执行级 E57—E69：当前环境不能启动Node，小游戏/生涯/赠礼执行回归待运行');
+      const taskLife58=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_task_lifetime.mjs'),'--out',path.join(tmp57,'task-lifetime.json')],{encoding:'utf8',timeout:20000,windowsHide:true}));
+      if(taskLife58.failed!==0)fail('执行级 E58B：累计日课事实与新档拒绝未通过');else ok('执行级 E58B：累计日课同写/跨日/旧档/失败/采用预检（'+taskLife58.passed+'/0）');
+      const bossCareer58=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_career_boss_unlocks.mjs'),'--out',path.join(tmp57,'boss-career.json')],{encoding:'utf8',timeout:20000,windowsHide:true}));
+      if(bossCareer58.failed!==0||bossCareer58.passed<24)fail('执行级 E58C：讨伐生涯同写与旧档/代次边界未通过');else ok('执行级 E58C：22条讨伐/无钱应战/旧档/失败/导入回滚（'+bossCareer58.passed+'/0）');
+      const expansion70=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_achievement_expansion_20261101.mjs'),'--out',path.join(tmp57,'expansion.json')],{encoding:'utf8',timeout:20000,windowsHide:true}));
+      if(expansion70.failed!==0||expansion70.passed<233)fail('执行级 E70：战术与跨局收藏扩容边界未通过');else ok('执行级 E70：26战术/4收藏/原队列失败恢复/换局/领奖（'+expansion70.passed+'/0）');
+      const gamble71=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_gamble_achievement_quality.mjs'),'--out',path.join(tmp57,'gamble-quality.json')],{encoding:'utf8',timeout:20000,windowsHide:true}));
+      if(gamble71.failed!==0||gamble71.passed<79)fail('执行级 E71：豪赌四组条件去重未通过');else ok('执行级 E71：四组条件区分/真实统计/旧ID与奖励保留（'+gamble71.passed+'/0）');
+      const rankCareer58=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_career_rank_unlocks.mjs'),'--out',path.join(tmp57,'rank-career.json')],{encoding:'utf8',timeout:20000,windowsHide:true}));
+      if(rankCareer58.failed!==0||rankCareer58.passed<32)fail('执行级 E58D：官阶功勋后台来源未通过');else ok('执行级 E58D：94条官阶功勋/同写/跨日/失败/迁移/缓存（'+rankCareer58.passed+'/0）');
+      const semantics72=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_career_semantic_quality.mjs'),'--out',path.join(tmp57,'career-semantics.json')],{encoding:'utf8',timeout:20000,windowsHide:true}));
+      if(semantics72.failed!==0||semantics72.passed<63)fail('执行级 E72：生涯成就语义与来源未通过');else ok('执行级 E72：34条语义/真实世界投影/原条件与奖励保全（'+semantics72.passed+'/0）');
+      const expansion73=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_achievement_expansion_batch2_20261101.mjs'),'--out',path.join(tmp57,'expansion-batch2.json')],{encoding:'utf8',timeout:20000,windowsHide:true}));
+      if(expansion73.failed!==0||expansion73.passed<134)fail('执行级 E73：第二批战术与收藏未通过');else ok('执行级 E73：13战术/2收藏/真实事件适配/原1438条哈希保全（'+expansion73.passed+'/0）');
+      const gambleCareer58=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_career_gamble_unlocks.mjs'),'--out',path.join(tmp57,'gamble-career.json')],{encoding:'utf8',timeout:20000,windowsHide:true}));
+      if(gambleCareer58.failed!==0||gambleCareer58.passed<41)fail('执行级 E58E：豪赌后台与待保存恢复未通过');else ok('执行级 E58E：76豪赌/源同写/瞬时净赢/队列恢复/旧档/迁移（'+gambleCareer58.passed+'/0）');
+      const interactionCareer58=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_career_interaction_unlocks.mjs'),'--out',path.join(tmp57,'interaction-career.json')],{encoding:'utf8',timeout:20000,windowsHide:true}));
+      if(interactionCareer58.failed!==0||interactionCareer58.passed<48)fail('执行级 E58F：互动后台与待保存恢复未通过');else ok('执行级 E58F：20条互动/原生成功/同写/恢复/旧档/迁移（'+interactionCareer58.passed+'/0）');
+      const memoir74=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_world_memoir_facts.mjs'),'--out',path.join(tmp57,'memoir-facts.json')],{encoding:'utf8',timeout:20000,windowsHide:true}));
+      if(memoir74.failed!==0||memoir74.passed<40)fail('执行级 E74：牌友回忆来源与日期边界未通过');else ok('执行级 E74：亲历/世界事件隔离/未知日期/同名/只读（'+memoir74.passed+'/0）');
+      const ddzTeam75Dir=path.join(tmp57,'ddz-team');
+      const ddzTeam75=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_doudizhu_presentation_20261102.mjs'),'--facts-only','--out',ddzTeam75Dir],{encoding:'utf8',timeout:20000,windowsHide:true}));
+      if(ddzTeam75.failed!==0||ddzTeam75.passed<135)fail('执行级 E75：斗地主阵营胜负/经济一致性未通过');else ok('执行级 E75：3角色×3先出完者/练习/功勋/净额/重复/失败重试（'+ddzTeam75.passed+'/0）');
+      const ddzRefund76Dir=path.join(tmp57,'ddz-refund');
+      const ddzRefund76=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_doudizhu_refund_20261102.mjs'),'--out',ddzRefund76Dir],{encoding:'utf8',timeout:20000,windowsHide:true}));
+      if(ddzRefund76.failed!==0||ddzRefund76.passed<62)fail('执行级 E76：斗地主未终局退款/统一结算重试未通过');else ok('执行级 E76：未终局仅退本金/异常终局/收工重开同载荷/失败迟到ACK（'+ddzRefund76.passed+'/0）');
+    } catch(error) { fail('执行级 E57—E76/E58F：小游戏/生涯/赠礼执行回归失败（'+String(error.message).slice(0,160)+'）'); }
+    finally { if(tmp57){try{fs.unlinkSync(path.join(tmp57,'ddz-refund','result.json'));fs.rmdirSync(path.join(tmp57,'ddz-refund'));}catch{}try{fs.unlinkSync(path.join(tmp57,'ddz-team','result.json'));fs.rmdirSync(path.join(tmp57,'ddz-team'));}catch{}for(const file of ['memoir-facts.json','interaction-career.json','gamble-career.json','expansion-batch2.json','rank-career.json','career-semantics.json','boss-career.json','expansion.json','gamble-quality.json','blackjack-matrix.json','ddz-rounds.json','gift-quantity.json','goals.json','bj-exit.json','spirit-owner-boundaries.json','feedback-lifecycle.json']){try{fs.unlinkSync(path.join(tmp57,file));}catch{}}try{fs.unlinkSync(path.join(tmp57,'uno-rounds.json'));}catch{}try{fs.unlinkSync(path.join(tmp57,'blackjack-rules.json'));}catch{}try{fs.unlinkSync(path.join(tmp57,'career.json'));}catch{}try{fs.unlinkSync(path.join(tmp57,'task-lifetime.json'));}catch{}try{fs.unlinkSync(path.join(tmp57,'blackjack.json'));}catch{}try{fs.unlinkSync(path.join(tmp57,'result.json'));}catch{}try{fs.rmdirSync(tmp57);}catch{}} }
+  } else warn('执行级 E57—E76/E58F：当前环境不能启动Node，小游戏/生涯/赠礼执行回归待运行');
 	log("");
 }
 

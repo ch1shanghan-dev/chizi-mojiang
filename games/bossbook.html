@@ -348,8 +348,9 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--cover-deep);co
 }
 </style>
 <link rel="stylesheet" href="../core/csh_experience.css">
+<link rel="stylesheet" href="../core/csh_records.css">
 </head>
-<body class="csh-experience">
+<body class="csh-experience" data-csh-records="bossbook">
 <div id="book"></div>
 
 <script>
@@ -541,6 +542,8 @@ function makePage(name, num) {
   var foot = el("footer", "pfoot");
   var prev = el("button", "pg-btn", "‹"); prev.type = "button";
   var next = el("button", "pg-btn", "›"); next.type = "button";
+  prev.setAttribute("aria-label", "上一页");
+  next.setAttribute("aria-label", "下一页");
   prev.addEventListener("click", function () { go(cur - 1); }, false);
   next.addEventListener("click", function () { go(cur + 1); }, false);
   var jump = el("nav", "pg-jump");
@@ -564,6 +567,10 @@ function buildAll() {
 
   /* 封面 */
   var cv = el("section", "page"); cv.id = "cover";
+  cv.setAttribute("role", "button");
+  cv.setAttribute("aria-label", "翻开讨伐录");
+  cv.tabIndex = 0;
+  cv.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(1); } }, false);
   cv.appendChild(el("div", "cv-frame"));
   var inner = el("div", "cv-inner");
   inner.appendChild(el("div", "cv-title", "讨伐录"));
@@ -1128,7 +1135,12 @@ function updateNav() {
     pg._prev.disabled = p === 0;
     pg._next.disabled = p === pages.length - 1;
     var btns = pg._jump.children || [];
-    for (var b = 0; b < btns.length; b++) btns[b].classList.toggle("on", pages[p].vol === cur - 2);
+    for (var b = 0; b < btns.length; b++) {
+      var selected = b === cur - 2;
+      btns[b].classList.toggle("on", selected);
+      if (selected) btns[b].setAttribute("aria-current", "page");
+      else btns[b].removeAttribute("aria-current");
+    }
   }
 }
 

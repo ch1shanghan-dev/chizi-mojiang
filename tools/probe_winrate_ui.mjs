@@ -1,3 +1,4 @@
+import { auditTempRoot, removeAuditScratch, disposeAuditBrowser } from './lib/audit_scratch.mjs';
 // Real module + DOM/CSS in headless Chromium, with fixture data and host stubs.
 import fs from 'node:fs';
 import os from 'node:os';
@@ -9,12 +10,12 @@ const option=(n,f)=>{const i=process.argv.indexOf(n);return i>=0?process.argv[i+
 const browser=option('--browser','C:/Program Files/Google/Chrome/Application/chrome.exe');
 const source=fs.readFileSync(option('--source',path.join(root,'core/csh_winrate.js')),'utf8').replace(/^import[^\n]*\n/gm,'').replace(/^export default null;.*$/gm,'');
 const out=path.resolve(option('--out',path.join(root,'docs/audit/ui')));fs.mkdirSync(out,{recursive:true});
-const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'csh-winrate-audit-'));
+const tmp=fs.mkdtempSync(path.join(auditTempRoot(),'csh-winrate-audit-'));
 const cases=[{name:'desktop',w:1200,h:820,scale:1},{name:'portrait',w:390,h:844,scale:1},{name:'landscape',w:915,h:412,scale:0.6},{name:'zoom',w:720,h:600,scale:1.5}];
 const all=[];
 async function capture(htmlPath, screenshot, test) {
   const profile=path.join(tmp,'profile-'+test.name);
-  const process=spawn(browser,['--headless=new','--no-sandbox','--disable-gpu','--no-first-run','--no-default-browser-check','--disable-background-networking','--remote-debugging-port=0','--user-data-dir='+profile,'about:blank'],{windowsHide:true,stdio:'ignore'});
+  const process=spawn(browser,['--headless=new','--no-sandbox','--disable-gpu','--no-first-run','--no-default-browser-check','--disable-background-networking','--remote-debugging-port=0','--user-data-dir='+profile,'about:blank'],{windowsHide:true,stdio:'ignore',env:{...globalThis.process.env,TEMP:tmp,TMP:tmp}});
   let ws;
   try {
     const portFile=path.join(profile,'DevToolsActivePort');
@@ -38,7 +39,7 @@ async function capture(htmlPath, screenshot, test) {
       await new Promise(r=>setTimeout(r,50));
     }
     throw Error('Browser probe timed out');
-  } finally {ws?.close();process.kill();}
+  } finally {ws?.close();await disposeAuditBrowser(process,tmp);}
 }
 for(const test of cases){
   const html=`<!doctype html><meta charset="utf-8"><style>html,body{margin:0;background:#eee;font-family:sans-serif}html *{animation:none!important;transition:none!important}body{transform:scale(${test.scale});transform-origin:top left}body *{box-sizing:border-box}body{ text-shadow:0 0 18px #f00 } #outside{color:#222} table{table-layout:fixed} div{position:absolute;display:inline-block}</style><body><span id="outside">宿主文字保持原样</span><script>

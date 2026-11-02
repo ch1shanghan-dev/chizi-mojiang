@@ -1,0 +1,81 @@
+// Actual world data and world-view source, disposable Chromium and explicit fixture adoption.
+import fs from 'node:fs';import path from 'node:path';import {pathToFileURL} from 'node:url';import {root} from './lib/skill_audit.mjs';import {withChromium} from './lib/chromium_audit.mjs';import {auditTempRoot,removeAuditScratch} from './lib/audit_scratch.mjs';
+const i=process.argv.indexOf('--out');if(i<0)throw Error('External D: --out required');const out=path.resolve(process.argv[i+1]);fs.mkdirSync(out,{recursive:true});
+const read=p=>fs.readFileSync(path.join(root,p),'utf8'),clean=s=>s.replace(/^import .*?;.*\r?\n/gm,'').replace(/^export default /gm,'var cshCharacter = ').replace(/^export /gm,'').replace(/<\/script/gi,'<\\/script');
+const source=['character/index.js','core/csh_bossdata.js','core/csh_world.js','core/csh_theme.js','core/csh_world_view.js'].map(p=>clean(read(p))).join('\n');
+const css=read('core/csh_experience.css'),tmp=fs.mkdtempSync(path.join(auditTempRoot(),'csh-world-memoir-')),cases=[];
+try{
+ for(const [name,width,height]of [['desktop',1365,768],['phone',915,412],['short',640,286]]){
+  const fixture=path.join(tmp,name+'.html');fs.writeFileSync(fixture,`<!doctype html><meta charset="utf-8"><style>:root{--csh-paper:#191712;--csh-bg:#eee4d1;--csh-gray:#bcad92;--csh-bg-rgb:238,228,209;--csh-accent:#ceaa52;--csh-accent-rgb:206,170,82;--csh-fg:#242017}*{box-sizing:border-box}body{margin:0;background:#191712;color:#eee4d1;font-family:Microsoft YaHei,system-ui}#csh-dbg-panel{width:100%;height:100vh;overflow:hidden;display:flex;flex-direction:column}#csh-dbg-body{overflow:auto;flex:1;min-height:0}.csh-dbg-gamelist{display:grid}.csh-dbg-gamebtn{min-height:88px;color:inherit;background:#28241c;border:1px solid #66593e}.gb-name,.gb-desc{display:block}${css}</style><div id="csh-dbg-panel" data-view="world"><div id="csh-dbg-body"></div></div><script>
+  document.documentElement.classList.add('csh-world-view');const lib={config:{},skill:{},translate:{}},game={},ui={},get={poptip:()=>''},ai={},_status={},cshVoices={};window.auditErrors=[];addEventListener('error',e=>auditErrors.push(e.message));
+  ${source}
+  const W=lib.cshWorld,raw=W.raw(),first=raw.ai[0];window.personId=first.id;first.name='长名牌友·天地玄黄宇宙洪荒日月盈昃';first.hands=9999;first.wins=9000;first.withPlayer={hands:0,wins:0,losses:0,draws:0};W.reloadSave(raw);
+  // Only the card order is deterministic; details read the unmodified actual byId API.
+  const realStories=W.storylines;W.storylines=n=>{let r=realStories(6),chosen=r.find(r=>r.id===personId);if(!chosen){const a=W.byId(personId);chosen={id:a.id,name:a.name,persona:W.PERSONAS[a.persona].name,text:'本页验证牌友',invited:false};}chosen={...chosen,name:"长名牌友·天地玄黄宇宙洪荒日月盈昃"};return[chosen,...r.filter(r=>r.id!==personId)].slice(0,n)};
+  const list=document.createElement('div');list.className='csh-dbg-gamelist';for(const [key,title]of [['texas','德州扑克'],['career','生涯大厅'],['achv','池子成就']]){let b=document.createElement('button');b.className='csh-dbg-gamebtn gb-'+key+(key==='texas'?' gb-table':'');b.innerHTML='<span class="gb-name">'+title+'</span><span class="gb-desc">完整内容入口</span>';list.appendChild(b)};
+  const extra=document.createElement('section');extra.id='extra-widget';extra.textContent='第三方模块说明';extra.style.setProperty('display','grid','important');document.getElementById('csh-dbg-body').appendChild(extra);const hiddenExtra=document.createElement('section');hiddenExtra.id='already-hidden-widget';hiddenExtra.hidden=true;hiddenExtra.textContent='先前已经隐藏的模块';document.getElementById('csh-dbg-body').appendChild(hiddenExtra);window.extraStyle=extra.getAttribute('style');
+  lib.cshShell={walletSnapshot:()=>({pc:2000,signedToday:false})};lib.cshUI={toast(){}};window.openedGames=[];CSHWorldView.mount({body:document.getElementById('csh-dbg-body'),list,lib,openGame:k=>openedGames.push(k)});
+ </script>`);
+  await withChromium({width,height},async send=>{
+   const checks=[],check=(name,passed,detail)=>checks.push({name,passed:!!passed,...(detail===undefined?{}:{detail})});
+   const value=async expression=>{const r=await send('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true});if(r.exceptionDetails)throw Error(r.exceptionDetails.exception?.description||r.exceptionDetails.text);return r.result.value};
+   const click=async selector=>{const p=await value(`(()=>{let n=document.querySelector(${JSON.stringify(selector)});n.scrollIntoView({block:'nearest'});let r=n.getBoundingClientRect();return{x:r.x+r.width/2,y:r.y+r.height/2}})()`);await send('Input.dispatchMouseEvent',{type:'mousePressed',button:'left',clickCount:1,...p});await send('Input.dispatchMouseEvent',{type:'mouseReleased',button:'left',clickCount:1,...p});await new Promise(r=>setTimeout(r,35));};
+   const key=async key=>{await send('Input.dispatchKeyEvent',{type:'keyDown',key,code:key,windowsVirtualKeyCode:key==='Enter'?13:32,text:key==='Enter'?'\r':' ',unmodifiedText:key==='Enter'?'\r':' '});await send('Input.dispatchKeyEvent',{type:'keyUp',key,code:key,windowsVirtualKeyCode:key==='Enter'?13:32});await new Promise(r=>setTimeout(r,35))};
+   await send('Page.navigate',{url:pathToFileURL(fixture).href});for(let n=0;n<100;n++){if(await value('!!document.querySelector(".csh-world-relationship")'))break;await new Promise(r=>setTimeout(r,30));}
+   const summary='.csh-world-digest article:first-child summary';
+   const baseline=await value('JSON.stringify(W.raw())');
+   await click('.csh-world-open-memory');
+   check('global empty library is truthful and does not borrow AI lifetime counters',await value('document.querySelector(".csh-world-memory").textContent.includes("还没有同桌回忆")&&!document.querySelector(".csh-memory-person")'));
+   check('unrelated sibling module is hidden while reading despite its important display rule',await value('getComputedStyle(document.getElementById("extra-widget")).display==="none"&&document.getElementById("already-hidden-widget").hidden'));
+   check('reader hides main overview and makes it inert',await value('document.querySelector(".csh-world-columns").hidden&&document.querySelector(".csh-world-columns").hasAttribute("inert")&&getComputedStyle(document.querySelector(".csh-world-columns")).display==="none"'));
+   await click('.csh-memory-back');
+   check('back restores third-party module display without changing original styles or hidden state',await value('getComputedStyle(document.getElementById("extra-widget")).display==="grid"&&document.getElementById("extra-widget").getAttribute("style")===extraStyle&&document.getElementById("already-hidden-widget").hidden'));
+   check('back restores global opener and normal overview',await value('!document.querySelector(".csh-world-memory")&&!document.querySelector(".csh-world-columns").hidden&&!document.querySelector(".csh-world-columns").hasAttribute("inert")&&document.activeElement===document.querySelector(".csh-world-open-memory")'));
+   await click(summary);await click('.csh-world-digest article:first-child .csh-world-read-memory');
+   check('named unfamiliar person can be read without inventing meetings',await value('document.querySelector(".csh-memory-person h3").textContent===W.byId(personId).name&&document.querySelector(".csh-memory-intro").textContent.includes("还未同桌")&&[...document.querySelectorAll(".csh-memory-facts dd")].every(n=>n.textContent==="0")'));
+   check('zero-history read remains a pure world read',baseline===await value('JSON.stringify(W.raw())'));
+   await click('.csh-memory-back');
+   check('named reader returns focus to same expanded record button',await value('document.activeElement===document.querySelector(".csh-world-digest article:first-child .csh-world-read-memory")&&document.querySelector(".csh-world-digest article:first-child details").open'));
+   // Accepted original world APIs; player victory is the opponent's loss.
+   await value('W.settleWin(personId,1000);W.settleLose(personId,500);W.settleResult(personId,null);for(let i=0;i<7;i++)W.settleResult(personId,false);window.retiredId=W.raw().ai[1].id;const copy=W.raw();const old=copy.ai[1];old.withPlayer={hands:3,wins:0,losses:0,draws:3};old.retired=true;old.fund=0;W.reloadSave(copy)');
+   const recorded=await value('JSON.stringify(W.raw())');await click('.csh-world-digest article:first-child .csh-world-read-memory');
+   check('reader shows real player perspective after accepted settlements',await value('JSON.stringify([...document.querySelectorAll(".csh-memory-facts dd")].map(n=>n.textContent))===JSON.stringify(["10","8","1","1"])'));
+   check('explicit personal events carry dates while first encounter stays undated',await value('document.querySelectorAll(".csh-memory-timeline time[datetime]").length===2&&document.querySelector(".csh-memory-timeline").textContent.includes("再战破局")&&document.querySelector(".csh-memory-timeline").textContent.includes("日期未记")'));
+   const layout=await value('(()=>{let b=document.getElementById("csh-dbg-body"),r=document.querySelector(".csh-world-memory").getBoundingClientRect(),toolbar=document.querySelector(".csh-memory-toolbar").getBoundingClientRect(),leaf=[...document.querySelectorAll(".csh-world-memory p,.csh-world-memory time,.csh-world-memory dt,.csh-world-memory b")];return{reader:{left:r.left,right:r.right},overflow:b.scrollWidth>b.clientWidth+1,toolbar:toolbar.height,minimumFont:Math.min(...leaf.map(n=>parseFloat(getComputedStyle(n).fontSize))),controls:[...document.querySelectorAll(".csh-world-memory button,.csh-world-memory select")].map(n=>{let r=n.getBoundingClientRect();return{w:r.width,h:r.height,left:r.left,right:r.right}})}})()');
+   check('memoir keeps compact toolbar and horizontal content priority',!layout.overflow&&layout.reader.left>=0&&layout.reader.right<=width+1&&layout.toolbar<=70,layout);
+   check('memoir body readable and all controls meet 44px target',layout.minimumFont>=12&&layout.controls.every(r=>r.h>=44&&r.w>=44&&r.left>=0&&r.right<=width+1),layout);
+   await value('document.getElementById("csh-dbg-body").scrollTop=0');
+   const shot=await send('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(out,'memoir-'+name+'.png'),Buffer.from(shot.data,'base64'));
+   if(name==='phone'){
+    await value('lib.cshTheme.setSkin("warm");document.body.style.background="var(--csh-paper)";document.body.style.color="var(--csh-bg)"');
+    const light=await value('(()=>{let r=document.querySelector(".csh-world-memory").getBoundingClientRect(),b=document.getElementById("csh-dbg-body");return {right:r.right,overflow:b.scrollWidth>b.clientWidth+1,colors:{background:getComputedStyle(document.body).backgroundColor,text:getComputedStyle(document.querySelector(".csh-memory-intro")).color,muted:getComputedStyle(document.querySelector(".csh-memory-person p")).color,fragment:getComputedStyle(document.querySelector(".csh-memory-timeline b")).color,invite:getComputedStyle(document.querySelector(".csh-memory-invite")).color}}})()');
+    const ratio=(a,b)=>{const lum=s=>{const c=s.match(/[\d.]+/g).slice(0,3).map(v=>{v=Number(v)/255;return v<=.04045?v/12.92:((v+.055)/1.055)**2.4});return c[0]*.2126+c[1]*.7152+c[2]*.0722};const x=lum(a),y=lum(b);return(Math.max(x,y)+.05)/(Math.min(x,y)+.05)};
+    const contrast=Object.fromEntries(Object.entries(light.colors).filter(([k])=>k!=='background').map(([k,v])=>[k,ratio(v,light.colors.background)]));
+    check('actual warm theme preserves memoir width and body readability',!light.overflow&&light.right<=width+1&&contrast.text>=4.5&&contrast.muted>=4.5,{...light,contrast});
+    check('actual warm theme maintains readable fragment and invite text contrast',contrast.fragment>=4.5&&contrast.invite>=4.5,contrast);
+    const shot=await send('Page.captureScreenshot',{format:'png'});fs.writeFileSync(path.join(out,'memoir-phone-warm.png'),Buffer.from(shot.data,'base64'));
+    await value('lib.cshTheme.setSkin("sgs");document.body.style.background="var(--csh-paper)"');
+   }
+   await value('document.querySelector(".csh-memory-picker select").focus()');
+   await send('Input.dispatchKeyEvent',{type:'keyDown',key:'End',code:'End',windowsVirtualKeyCode:35});await send('Input.dispatchKeyEvent',{type:'keyUp',key:'End',code:'End',windowsVirtualKeyCode:35});await new Promise(r=>setTimeout(r,80));
+   check('native keyboard picker reaches known retired person without reviving them',await value('document.querySelector(".csh-memory-picker select").value===String(retiredId)&&document.querySelector(".csh-memory-invite").disabled&&document.querySelector(".csh-memory-person").textContent.includes("暂未在场")&&W.byId(retiredId).retired&&W.byId(retiredId).fund===0'));
+   check('native person switch retains keyboard focus on new select',await value('document.activeElement===document.querySelector(".csh-memory-picker select")'));
+   await send('Input.dispatchKeyEvent',{type:'keyDown',key:'Home',code:'Home',windowsVirtualKeyCode:36});await send('Input.dispatchKeyEvent',{type:'keyUp',key:'Home',code:'Home',windowsVirtualKeyCode:36});await new Promise(r=>setTimeout(r,80));
+   check('keyboard switch returns to original person and original facts',await value('document.querySelector(".csh-memory-picker select").value===String(personId)&&[...document.querySelectorAll(".csh-memory-facts dd")][0].textContent==="10"'));
+   await click('.csh-memory-invite');
+   check('reader invite routes original Texas entry with actual response',await value('openedGames.at(-1)==="texas"&&W.storylines(1)[0].id===personId&&W.storylines(1)[0].invited&&document.querySelector(".csh-memory-person footer p").textContent.includes(W.storylines(1)[0].response)'));
+   check('reading switching and inviting do not fabricate money meetings or history',recorded===await value('JSON.stringify(W.raw())'));
+   await click('.csh-memory-back');
+   check('return after card rerender restores same person summary instead of body',await value('document.activeElement===document.querySelector(".csh-world-digest article:first-child summary")&&document.querySelector(".csh-world-digest article:first-child details").open'));
+   await click('.csh-world-invite-actions button:nth-child(2)');check('existing explicit cancel remains functional after memoir invitation',await value('W.storylines(6).every(r=>!r.invited)'));
+   await click('.csh-world-open-memory');await click('.csh-memory-back');check('repeat open close leaves one entry and no orphan reader',await value('document.querySelectorAll(".csh-world-open-memory").length===1&&!document.querySelector(".csh-world-memory")'));
+   await value('window.originalMemoirRaw=W.raw;W.raw=()=>{throw Error("isolated source unavailable")}');await click('.csh-world-open-memory');
+   check('unavailable memoir source shows retryable failure instead of zero-history success',await value('document.querySelector(".csh-world-memory").textContent.includes("暂未读取")&&!document.querySelector(".csh-world-memory").textContent.includes("还没有同桌回忆")&&!!document.querySelector(".csh-memory-back")'));
+   await click('.csh-memory-back');await value('W.raw=originalMemoirRaw');await click('.csh-world-open-memory');
+   check('return and retry after source recovery restores actual memoir',await value('!!document.querySelector(".csh-memory-facts")&&document.querySelector(".csh-memory-person h3").textContent===W.byId(personId).name'));await click('.csh-memory-back');
+   const errors=await value('auditErrors');check('all memoir UI operations remain error free',errors.length===0,errors);
+   cases.push({name,width,height,checks});
+  });
+ }
+}finally{removeAuditScratch(tmp)}
+const rows=cases.flatMap(c=>c.checks.map(r=>({...r,case:c.name}))),failures=rows.filter(r=>!r.passed),result={scope:'Actual world/character and memoir source in Chromium; real pointer/native select keyboard and accepted world APIs, explicit retired snapshot fixture. Not complete Noname host or physical device.',passed:rows.length-failures.length,failed:failures.length,cases};fs.writeFileSync(path.join(out,'result.json'),JSON.stringify(result,null,2));console.log(JSON.stringify({passed:result.passed,failed:result.failed,failures}));process.exitCode=failures.length?1:0;

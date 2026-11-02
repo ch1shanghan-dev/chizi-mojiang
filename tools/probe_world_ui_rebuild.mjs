@@ -1,3 +1,4 @@
+import { auditTempRoot, removeAuditScratch, disposeAuditBrowser } from './lib/audit_scratch.mjs';
 // Real career document, isolated host transport and fresh Chromium profiles.
 import fs from 'node:fs';
 import os from 'node:os';
@@ -8,7 +9,8 @@ import {withChromium} from './lib/chromium_audit.mjs';
 const outIndex=process.argv.indexOf('--out');
 const out=outIndex<0?path.join(root,'docs/audit/ui/world-ui-rebuild'):process.argv[outIndex+1];
 fs.mkdirSync(out,{recursive:true});
-const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'csh-world-ui-'));
+const tmp=fs.mkdtempSync(path.join(auditTempRoot(),'csh-world-ui-'));
+process.once("exit",()=>{try{removeAuditScratch(tmp);}catch(e){console.warn("Audit cleanup:",e.message);}});
 let source=fs.readFileSync(path.join(root,'games/career.html'),'utf8').replace(/src="\.\.\/([^"]+)"/g,(_,f)=>'src="'+pathToFileURL(path.join(root,f)).href+'"');
 const fixture=`<script>
 window.auditWorld={hold:false,queue:[],fail:false,rev:0,closed:0};

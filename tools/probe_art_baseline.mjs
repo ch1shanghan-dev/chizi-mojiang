@@ -1,3 +1,4 @@
+import { auditTempRoot, removeAuditScratch, disposeAuditBrowser } from './lib/audit_scratch.mjs';
 // S0: actual module DOM/CSS in isolated Chrome fixtures. Never imports Noname or user saves.
 import fs from 'node:fs';
 import os from 'node:os';
@@ -9,7 +10,8 @@ const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const opt=(n,f)=>{const i=process.argv.indexOf(n);return i<0?f:process.argv[i+1];};
 const out=path.resolve(opt('--out','D:/noname-audit-backups/chizi-mojiang/20261022-art-rebuild'));
 fs.mkdirSync(out,{recursive:true});
-const temp=fs.mkdtempSync(path.join(os.tmpdir(),'csh-art-s0-'));
+const temp=fs.mkdtempSync(path.join(auditTempRoot(),'csh-art-s0-'));
+process.once("exit",()=>{try{removeAuditScratch(temp);}catch(e){console.warn("Audit cleanup:",e.message);}});
 const clean=s=>s.replace(/^import .*?;\r?\n/gm,'').replace(/^export default null;.*$/gm,'').replace(/^export /gm,'').replace(/<\/script/gi,'<\\/script');
 const read=f=>clean(fs.readFileSync(path.join(root,f),'utf8'));
 const common=['core/csh_theme.js','core/csh_uikit.js','core/csh_registry.js','core/csh_games.js'].map(read).join('\n');

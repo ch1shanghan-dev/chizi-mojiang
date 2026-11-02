@@ -678,6 +678,25 @@
 </style>
 <link rel="stylesheet" href="../../core/csh_tables.css">
 <link rel="stylesheet" href="../../core/csh_duel_tables.css">
+<style id="texas-result-presentation-20261102">
+/* The accepted net and public cards lead; accounting remains one disclosure away. */
+#banner .rs-panel{overflow:hidden}
+#banner .rs-head{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:baseline;gap:3px 12px;text-align:left}
+#banner .rs-head .rs-title{font-size:var(--pfs-lg,14px);letter-spacing:1px;text-align:left}
+#banner .rs-head .rs-net{font-size:var(--pfs-xl2,22px);letter-spacing:0;text-align:right}
+#banner .rs-net:empty{display:none}
+#banner .rs-head .rs-sub{grid-column:1/-1;text-align:left;font-size:var(--pfs-sm,12px);line-height:1.5}
+#banner .rs-foot .btn{min-height:44px}
+#banner details.tx-extra{display:block;border-top:1px solid var(--gold-line)}
+#banner details.tx-extra[hidden]{display:none}
+#banner .tx-extra summary{display:flex;align-items:center;justify-content:space-between;min-height:44px;margin:0;padding:8px 0;list-style:none;cursor:pointer;font-size:var(--pfs-sm,12px);color:var(--text);letter-spacing:0}
+#banner .tx-extra summary::-webkit-details-marker{display:none}
+#banner .tx-extra summary::after{content:"展开";margin-left:10px;color:var(--text-dim);font-size:var(--pfs-sm,12px);font-weight:400}
+#banner .tx-extra[open] summary::after{content:"收起"}
+#banner .tx-extra summary:focus-visible{outline:2px solid var(--gold);outline-offset:2px;border-radius:3px}
+#banner .rs-row .rs-hand{white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere}
+@media(orientation:landscape) and (max-height:430px){#banner .rs-head .rs-net{font-size:var(--pfs-xl,20px)}#banner .rs-head{gap:2px 10px}#banner .rs-foot .btn{min-height:44px}}
+</style>
 </head>
 <body class="csh-experience" data-csh-table="texas">
 
@@ -835,15 +854,18 @@
         <div class="rs-cap">摊牌比牌</div>
         <div class="rs-rows" id="banner-sd"></div>
       </div>
-      <div class="rs-sec">
-        <div class="rs-cap">底池明细</div>
+      <details class="rs-sec tx-extra" id="banner-pots-section">
+        <summary class="rs-cap">底池明细</summary>
         <div class="rs-rows" id="banner-pots"></div>
-      </div>
-      <div class="rs-sec">
-        <div class="rs-cap">你的账本</div>
+      </details>
+      <details class="rs-sec tx-extra" id="banner-ledger-section">
+        <summary class="rs-cap">你的账本</summary>
         <div class="rs-rows" id="banner-ledger"></div>
-      </div>
-      <div class="banner-detail" id="banner-detail"></div>
+      </details>
+      <details class="tx-extra" id="banner-review" hidden>
+        <summary class="rs-cap">关键手复盘</summary>
+        <div class="banner-detail" id="banner-detail"></div>
+      </details>
     </div>
     <div class="banner-row rs-foot" id="banner-row"></div>
   </div>
@@ -2698,10 +2720,14 @@ function toast(msg, cls) {
   }, 1900);
 }
 
-function hideBanner() { $('#banner').classList.add('hidden'); }
+var resultEpoch = 0;
+function hideBanner() { resultEpoch++; $('#banner').classList.add('hidden'); }
 
 function showHandBanner() {
   if (!G) return;
+  resultEpoch++;
+  ["banner-pots-section", "banner-ledger-section", "banner-review"].forEach(function(id){var d=document.getElementById(id);if(d)d.open=false;});
+  document.getElementById("banner-review").hidden=!(G.review&&G.review.length);
   var me = G.players[0];
   var won = G.winners.indexOf(me) >= 0;
   if (!won) G.winStreak = 0;
@@ -2750,7 +2776,7 @@ function showHandBanner() {
   var net = meLed ? meLed.net : 0;
   netEl.className = 'rs-net ' + (net > 0 ? 'plus' : (net < 0 ? 'minus' : ''));
   netEl.textContent = '本手净变化 ' + (net > 0 ? '+' : '') + fmt(net);
-  s.innerHTML = '你的筹码 <b>' + fmt(me.chips) + '</b> · 池 <b>' + fmt(me.contrib) + '</b>' +
+  s.innerHTML = '你的筹码 <b>' + fmt(me.chips) + '</b> · 本手投入 <b>' + fmt(me.contrib) + '</b>' +
     ' · 带入 <b>' + fmt(G.buyIn) + '</b> · 第 <b>' + G.handNo + '</b> 手';
 
   /* ---------- 玩家结果（方案 §12 第一层）：按本手净变化排序 ---------- */
@@ -2858,20 +2884,13 @@ function showHandBanner() {
   det.innerHTML = '';
   var ih = window.innerHeight || 800;
   var revMax = ih <= 480 ? 1 : (ih <= 560 ? 2 : 4);
-  var revHead = ih > 560;
   if (G.review.length) {
     det.classList.remove('hidden');
-    if (revHead) {
-      var head = document.createElement('div');
-      head.className = 'rev-item';
-      head.innerHTML = '<div class="rt">关键手复盘</div>';
-      det.appendChild(head);
-    }
     for (i = 0; i < G.review.length && i < revMax; i++) {
       var rv = G.review[i];
       var it = document.createElement('div');
       it.className = 'rev-item';
-      it.innerHTML = '<div class="rt">' + (revHead || i > 0 ? '' : '关键手复盘 · ') + streetName(rv.street) + ' · 胜率 ' + Math.round(rv.eq * 100) + '% · 池 ' + fmt(rv.pot) + '</div>' +
+      it.innerHTML = '<div class="rt">' + streetName(rv.street) + ' · 胜率 ' + Math.round(rv.eq * 100) + '% · 池 ' + fmt(rv.pot) + '</div>' +
         '<div class="rb">你选了 <em>' + actName(rv.actual) + '</em>，建议 <i>' + actName(rv.best) + '</i>' +
         (rv.gap > 0 ? '（期望差 ≈ ' + fmt(rv.gap) + '）' : '（与最优一致）') + '</div>';
       det.appendChild(it);
@@ -2900,6 +2919,8 @@ function showHandBanner() {
 }
 
 function showSessionBanner(reason, left, capped, buyIn, chips, discarded) {
+  var feedbackEpoch=++resultEpoch;
+  var reviewSection=document.getElementById("banner-review");if(reviewSection){reviewSection.open=false;reviewSection.hidden=true;}
   var t = $('#banner-title'), s = $('#banner-sub'), row = $('#banner-row'), det = $('#banner-detail');
   det.classList.add('hidden'); det.innerHTML = '';
   /* 本场结算复用同一层骨架：把只有手结算才有的几段清掉，避免残留上一手的账本 */
@@ -2954,7 +2975,7 @@ function showSessionBanner(reason, left, capped, buyIn, chips, discarded) {
     if (Bridge.active && Bridge.call) {
       Bridge.call('shell-world', {}, function (ok, d) {
         try {
-          if (!ok || !d || !d.news || !d.news.length) return;
+          if (!alive || feedbackEpoch!==resultEpoch || $("#banner").classList.contains("hidden") || !ok || !d || !d.news || !d.news.length) return;
           var n0 = d.news[0];
           var fb = document.createElement('div');
           fb.className = 'sd-caption';

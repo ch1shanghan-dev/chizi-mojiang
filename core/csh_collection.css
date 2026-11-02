@@ -1,0 +1,107 @@
+/* Marketplace = price-led gallery; codex = personal archive. Only these two pages. */
+body[data-csh-collection]{--collection-note:var(--pfs-sm,12px);--collection-text:var(--pfs-lg,14px);--collection-title:var(--pfs-xl,16px);--collection-name:var(--pfs-2xl,22px)}
+body[data-csh-collection] #app .brand{font-family:var(--ff-title);font-size:var(--collection-title);font-weight:600;letter-spacing:.08em;line-height:1.4}
+body[data-csh-collection] #app .brand small{display:none}
+body[data-csh-collection] :is(button,select,input,summary):focus-visible{outline:2px solid var(--gold);outline-offset:-2px}
+body[data-csh-collection] .collection-details{flex:none;min-width:0;border-top:1px solid var(--line-2);font-size:var(--collection-note);color:var(--ink-dim)}
+body[data-csh-collection] :is(.collection-details,.market-assets)>summary{min-height:44px;align-content:center;cursor:pointer;font-size:var(--collection-note);line-height:1.5;color:var(--gold);list-style-position:inside}
+body[data-csh-collection] .collection-details[open]{padding-bottom:10px}
+body[data-csh-collection] :is(.fact,.affbox,.lgroup,.ecbook){border-radius:6px;box-shadow:none}
+body[data-csh-collection] :is(.affbox::before,.affbox::after,.affbar::after){display:none}
+body[data-csh-collection] :is(.afftitle,.afflv,.affhearts,.affbar,.affheart){animation:none!important;filter:none!important;text-shadow:none!important}
+body[data-csh-collection] .afftitle{font-family:var(--ff-title);font-size:var(--collection-text);letter-spacing:.06em;color:#f1b7cb;-webkit-text-fill-color:#f1b7cb;background:none;line-height:1.5;padding:0}
+body[data-csh-collection] .affhearts{gap:4px;margin:3px 0}
+body[data-csh-collection] .affheart{width:18px;height:18px}
+body[data-csh-collection] .affheart .b{filter:none!important}
+body[data-csh-collection] .affbar{height:5px}
+body[data-csh-collection] :is(.affval,.affmeta,.affnote,.affhint,.affperk .td,.affperk .ts,.affperk .tk,.ecnote){font-size:var(--collection-note);line-height:1.6}
+body[data-csh-collection] :is(.affbtn,.pinbtn,.pkbox>summary,.ecbook>summary){min-height:44px}
+body[data-csh-collection] :is(.affbtn,.pinbtn){border-radius:5px;box-shadow:none;transform:none}
+body[data-csh-collection] .affbtn:hover{box-shadow:none;transform:none}
+/* A compact gallery header; only the host owns the persistent wallet. */
+body[data-csh-collection="goldfish"] #app{padding:6px 12px 8px;gap:4px}
+body[data-csh-collection="goldfish"] #app .topbar{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:0 12px;min-height:44px;padding-right:176px}
+body[data-csh-collection="goldfish"] #app .brand{min-height:0;padding:0}
+body[data-csh-collection="goldfish"] .market-assets{min-width:0;justify-self:end}
+body[data-csh-collection="goldfish"] .market-assets[open]{grid-column:1/-1;justify-self:stretch}
+body[data-csh-collection="goldfish"] #app .stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));margin:0 0 8px;gap:8px}
+body[data-csh-collection="goldfish"] #app .stat{border:0;border-radius:0;border-left:1px solid var(--line);padding:0 8px;background:none;font-size:var(--collection-note)}
+body[data-csh-collection="goldfish"] #app .stat b{font-size:var(--collection-title);line-height:1.4}
+body[data-csh-collection="goldfish"] #app .gridwrap{padding:4px 2px 8px}
+body[data-csh-collection="goldfish"] #app .grid{grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px}
+body[data-csh-collection="goldfish"] #app .card{border-radius:7px;border-color:var(--line-2);background:var(--panel);box-shadow:none}
+body[data-csh-collection="goldfish"] #app .card:active{transform:none;border-color:var(--gold)}
+body[data-csh-collection="goldfish"] #app .face::after{height:84px;background:linear-gradient(0deg,#0d1714,transparent)}
+body[data-csh-collection="goldfish"] #app .cinfo{background:#14221ff2;padding:7px 9px;gap:6px;min-height:40px}
+body[data-csh-collection="goldfish"] #app .cname{font-size:var(--pfs-card-title);font-weight:600;letter-spacing:.02em}
+body[data-csh-collection="goldfish"] #app .csub{padding:6px 9px;font-size:var(--collection-note);line-height:1.5}
+body[data-csh-collection="goldfish"] #app :is(.hold-tag,.heat-tag,.affbadge){border-radius:4px;font-size:var(--collection-note);text-shadow:none;box-shadow:none;animation:none}
+body[data-csh-collection="goldfish"] #app .tipchip{font-size:var(--collection-note);border-radius:5px}
+body[data-csh-collection="goldfish"] #panel .pwrap{border-radius:9px;background:var(--bg2);box-shadow:0 12px 40px #0006}
+body[data-csh-collection="goldfish"] #panel .pstage{flex-basis:34%}
+body[data-csh-collection="goldfish"] #panel .pstage::after{box-shadow:inset -20px 0 28px -24px #000}
+body[data-csh-collection="goldfish"] #panel .pcontent{padding:10px 14px;scrollbar-gutter:stable}
+body[data-csh-collection="goldfish"] #panel .pcontent>div{margin-bottom:8px}
+body[data-csh-collection="goldfish"] #panel .pname{font-size:var(--collection-name);letter-spacing:.04em;font-weight:600}
+body[data-csh-collection="goldfish"] #panel .pcontent>div:first-child{display:flex;align-items:baseline;gap:4px 8px;flex-wrap:wrap;padding-right:44px}
+body[data-csh-collection="goldfish"] #panel .pname{padding-right:0}
+body[data-csh-collection="goldfish"] #panel .ptag{font-size:var(--collection-note);letter-spacing:.04em}
+body[data-csh-collection="goldfish"] #panel .facts{grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;margin-top:0}
+body[data-csh-collection="goldfish"] #panel .fact{padding:5px 7px;border:0;border-left:1px solid var(--line-2);border-radius:0;background:none;min-width:0}
+body[data-csh-collection="goldfish"] #panel .fact .k{font-size:var(--collection-note);line-height:1.4}
+body[data-csh-collection="goldfish"] #panel .fact .v{font-size:var(--collection-title);line-height:1.4;overflow-wrap:anywhere}
+body[data-csh-collection="goldfish"] #panel .say{font-size:var(--collection-text);min-height:0;padding:9px 10px;border-radius:6px;line-height:1.7;margin:4px 0 10px}
+body[data-csh-collection="goldfish"] #panel .say::before{display:none}
+body[data-csh-collection="goldfish"] #panel .pbio{font-size:var(--collection-text);line-height:1.75;margin-bottom:10px}
+body[data-csh-collection="goldfish"] #panel .affbox{padding:8px 10px;background:#33272b40;border-color:#b88b9c44}
+body[data-csh-collection="goldfish"] #panel .ops{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"quantity quantity" "quote actions";align-items:center;gap:6px 10px;padding:8px 14px}
+body[data-csh-collection="goldfish"] #panel .qty{grid-area:quantity;gap:5px;flex-wrap:nowrap;min-width:0;overflow-x:auto;scrollbar-width:none}
+body[data-csh-collection="goldfish"] #panel .qty::-webkit-scrollbar{display:none}
+body[data-csh-collection="goldfish"] #panel .qbtn{min-width:44px;min-height:44px;flex:none;padding:5px 8px;font-size:var(--collection-text);border-radius:5px}
+body[data-csh-collection="goldfish"] #panel .cost-hint{grid-area:quote;font-size:var(--collection-note);line-height:1.5;overflow-wrap:anywhere}
+body[data-csh-collection="goldfish"] #panel .act{grid-area:actions;gap:6px}
+body[data-csh-collection="goldfish"] #panel .act button{min-width:78px;height:44px;font-size:var(--collection-text);letter-spacing:.02em;border-radius:5px}
+body[data-csh-collection="goldfish"] #panel .sell{border:1px solid var(--line);background:var(--panel);color:var(--gold)}
+/* The codex is an archive for encounters; conversation gets the first screen. */
+body[data-csh-collection="codex"] .dossier{border-radius:8px;background:var(--bg2);box-shadow:none}
+body[data-csh-collection="codex"] .dstage{flex-basis:34%}
+body[data-csh-collection="codex"] .dstage::after{box-shadow:inset -24px 0 32px -28px #000}
+body[data-csh-collection="codex"] .dinfo{padding:12px 16px;gap:8px}
+body[data-csh-collection="codex"] .dhead{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+body[data-csh-collection="codex"] .dname{font-size:var(--collection-name);font-weight:600;letter-spacing:.04em;line-height:1.5}
+body[data-csh-collection="codex"] .dtag{font-size:var(--collection-note);margin:0;letter-spacing:.04em}
+body[data-csh-collection="codex"] .affbox{padding:8px 10px;background:linear-gradient(140deg,#a97d8c14,transparent 75%);border-color:#a97d8c44}
+body[data-csh-collection="codex"] .affhead{gap:6px;flex-wrap:wrap}
+body[data-csh-collection="codex"] :is(.afflv,.afflock,.affsay.bad){color:var(--ink)}
+body[data-csh-collection="codex"] .afflock{background:var(--panel);border-color:var(--line);border-radius:5px}
+body[data-csh-collection="codex"] .pinbtn:not(.on){color:var(--ink)}
+body[data-csh-collection="codex"] .affmeta{gap:4px 10px;margin-top:4px}
+body[data-csh-collection="codex"] .affsay{min-height:0;padding:7px 9px;margin:6px 0;border-radius:5px;font-size:var(--collection-text);line-height:1.6}
+body[data-csh-collection="codex"] .affops{display:grid;grid-template-columns:repeat(auto-fit,minmax(104px,1fr));gap:6px;margin-top:6px}
+body[data-csh-collection="codex"] .affops .affbtn{font-size:var(--collection-note);padding:7px 8px;line-height:1.5;letter-spacing:0}
+body[data-csh-collection="codex"] .gitem{border-radius:5px;background:transparent;border-color:transparent;min-height:62px}
+body[data-csh-collection="codex"] .gitem.on{background:var(--panel);border-color:var(--line);box-shadow:inset 3px 0 var(--gold)}
+body[data-csh-collection="codex"] .gname{font-size:var(--collection-text);letter-spacing:.02em}
+body[data-csh-collection="codex"] .gface{border-radius:4px}
+body[data-csh-collection="codex"] .dbio{font-size:var(--collection-text);line-height:1.8;margin:4px 0 8px}
+body[data-csh-collection="codex"] .dfacts{margin-top:0;padding-top:4px}
+body[data-csh-collection="codex"] :is(.ecbook,.pkbox){border-top-style:solid;border-radius:0}
+@media(orientation:landscape) and (max-height:430px){
+ body[data-csh-collection="goldfish"] #app .grid{grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px}
+ body[data-csh-collection="goldfish"] #app .face{aspect-ratio:4/3}
+ body[data-csh-collection="goldfish"] #app .face{margin-bottom:40px;overflow:visible}
+ body[data-csh-collection="goldfish"] #app .face::after{display:none}
+ body[data-csh-collection="goldfish"] #app .cinfo{bottom:-40px}
+ body[data-csh-collection="goldfish"] #panel .pstage{flex-basis:28%}
+ body[data-csh-collection="goldfish"] #panel .pcontent{padding:6px 10px}
+ body[data-csh-collection="goldfish"] #panel .ops{padding:6px 10px;gap:4px 8px}
+ body[data-csh-collection="goldfish"] #panel .pname{font-size:var(--collection-title);line-height:1.4}
+ body[data-csh-collection="goldfish"] #panel .fact{padding:2px 4px}
+ body[data-csh-collection="goldfish"] #panel .fact .v{font-size:var(--collection-text);line-height:1.25}
+ body[data-csh-collection="goldfish"] #panel .fact .k{line-height:1.25}
+ body[data-csh-collection="goldfish"] #panel .pcontent>div{margin-bottom:4px}
+ body[data-csh-collection="codex"] .dstage{flex-basis:28%}
+ body[data-csh-collection="codex"] .dinfo{padding:8px 10px;gap:6px}
+ body[data-csh-collection="codex"] .affbox{padding:6px 8px}
+}
+@media(prefers-reduced-motion:reduce){body[data-csh-collection] :is(img,.card,.dossier,.affbar i){animation:none!important;transition:none!important}}

@@ -1,10 +1,11 @@
+import { auditTempRoot, removeAuditScratch, disposeAuditBrowser } from './audit_scratch.mjs';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {spawn} from 'node:child_process';
 export async function withChromium({width,height,browser='C:/Program Files/Google/Chrome/Application/chrome.exe'},run){
-  const profile=fs.mkdtempSync(path.join(os.tmpdir(),'csh-browser-audit-'));
-  const proc=spawn(browser,['--headless=new','--no-sandbox','--disable-gpu','--no-first-run','--disable-background-networking','--remote-debugging-port=0','--user-data-dir='+profile,'about:blank'],{windowsHide:true,stdio:'ignore'});
+  const profile=fs.mkdtempSync(path.join(auditTempRoot(),'csh-browser-audit-'));
+  const proc=spawn(browser,['--headless=new','--no-sandbox','--disable-gpu','--no-first-run','--disable-background-networking','--remote-debugging-port=0','--user-data-dir='+profile,'about:blank'],{windowsHide:true,stdio:'ignore',env:{...globalThis.process.env,TEMP:profile,TMP:profile}});
   let ws;
   try{
     const portFile=path.join(profile,'DevToolsActivePort');
@@ -18,5 +19,5 @@ export async function withChromium({width,height,browser='C:/Program Files/Googl
     const send=(method,params={})=>new Promise((resolve,reject)=>{const id=++seq;pending.set(id,{resolve,reject});ws.send(JSON.stringify({id,method,params}));});
     await send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:false});
     return await run(send);
-  }finally{ws?.close();proc.kill();}
+  }finally{ws?.close();await disposeAuditBrowser(proc,profile);}
 }

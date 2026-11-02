@@ -17,7 +17,9 @@ check('actual two systems have no structural errors', () => baseline.errors.leng
 check('qualified natural count is explicitly unknown', () => baseline.counts.qualifiedNaturalCount === null);
 check('raw count includes both systems with namespaces', () => baseline.counts.definitions === original.career.length + original.rules.length && baseline.counts.uniqueIds === baseline.counts.definitions);
 check('every registered profile is inventoried', () => baseline.heroRows.length === original.profiles.length && baseline.heroRows.every(h => h.definitions >= 10));
-check('repeated descriptions remain review items', () => baseline.review.some(r => r.code === 'SAME_DESCRIPTION') && !baseline.errors.some(r => r.code === 'SAME_DESCRIPTION'));
+const repeatedModel = await loadModel(root); repeatedModel.career[1].desc = repeatedModel.career[0].desc;
+const repeatedAudit = auditModel(repeatedModel);
+check('controlled duplicate descriptions are review items without requiring real duplicates', () => repeatedAudit.review.some(r => r.code === 'SAME_DESCRIPTION') && !repeatedAudit.errors.some(r => r.code === 'SAME_DESCRIPTION'));
 check('shared metrics retain hero identities', () => baseline.sharedMetrics.every(g => new Set(g.heroes).size === g.heroes.length));
 check('human report distinguishes definitions and qualification', () => markdown(baseline).includes('自然实战合格数尚未认定'));
 check('four reference sources have sha256 evidence', () => Object.keys(baseline.sourceHashes).length === 4 && Object.values(baseline.sourceHashes).every(s => /^[a-f0-9]{64}$/.test(s)));

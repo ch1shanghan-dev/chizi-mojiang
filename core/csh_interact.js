@@ -45,6 +45,7 @@ import GEN_LINES from "./csh_interact_lines_gen.js";
 	};
 	var K_PLAYER_INTERACT = "csh_player_interact";
 	var playerThrowHooked = false;
+    var interactionRevision = 0, interactionSerial = 0;
 	var skipPlayerThrow = 0;
 	// 冻结扩展持久化写入，原生道具与普通聊天仍照常执行。
 	function saveBlocked() {
@@ -69,18 +70,45 @@ import GEN_LINES from "./csh_interact_lines_gen.js";
 				? Math.max(0, Math.min(1000000000, Math.floor(data.total))) : 0;
 		} catch (e) { return 0; }
 	}
+    function interactionReceipts(value) {
+        var ids=value&&value.receipts;
+        if(ids==null)return [];
+        if(!Array.isArray(ids)||ids.length>64||ids.some(function(id,i){return typeof id!=="string"||!/^[a-zA-Z0-9_-]{10,100}$/.test(id)||ids.indexOf(id)!==i;}))throw Error("互动计数凭据异常");
+        return ids.slice();
+    }
+    function interactionSaved() {
+        var raw=localStorage.getItem(K_PLAYER_INTERACT),value=raw==null?{v:1,total:0}:JSON.parse(raw);
+        if(!value||typeof value!=="object"||Array.isArray(value)||(value.v!=null&&value.v!==1)||!Number.isSafeInteger(value.total)||value.total<0||value.total>1000000000)throw Error("互动计数格式异常");
+        interactionReceipts(value);
+        if(value.careerUnlocks!=null)lib.cshWallet.validateCareerUnlocks(value.careerUnlocks);
+        return value;
+    }
+    function commitPlayerThrow(data,id) {
+        if(saveBlocked())return {ok:false,reason:"存档暂不可写"};
+        if(!data||!Number.isSafeInteger(data.t)||data.t<0||typeof id!=="string"||!/^[a-zA-Z0-9_-]{10,100}$/.test(id))return {ok:false,reason:"互动记录无效"};
+        var prepared=null,value;
+        try {
+            var before=interactionSaved(),receipts=interactionReceipts(before);
+            if(receipts.indexOf(id)>=0)return {ok:true,already:true};
+            value={v:1,total:Math.min(1000000000,before.total+1),receipts:receipts.concat(id).slice(-64)};
+            if(before.careerUnlocks!=null)value.careerUnlocks=before.careerUnlocks;
+            var observer=lib.cshCareerObserver;
+            if(observer&&observer.prepareInteraction)prepared=observer.prepareInteraction(value,before,data.t);
+            if(prepared)value.careerUnlocks=prepared.record;
+            localStorage.setItem(K_PLAYER_INTERACT,JSON.stringify(value));interactionRevision++;
+        }catch(error){logError("玩家道具计数待保存",error);return {ok:false,reason:"互动记录尚未保存，请恢复存储后重试"};}
+        try{if(lib.cshCareerObserver&&lib.cshCareerObserver.interactionCommitted)lib.cshCareerObserver.interactionCommitted(value,prepared);}catch(error){logError("互动生涯记录待同步",error);}
+        return {ok:true};
+    }
 	function recordPlayerThrow(from, to, emotion) {
 		if (saveBlocked()) return;
 		if (skipPlayerThrow || from !== game.me || !usable(from) || !isAI(to)) return;
 		if (!["flower", "wine", "egg", "shoe"].includes(emotion)) return;
 		if (!_status.gameStarted || _status.video || _status.over || _status.connectMode || game.online || game.observe) return;
 		if (!game.players || game.players.indexOf(to) < 0 || game.players.indexOf(from) < 0) return;
-		try {
-			/* 同步落盘后才进入成就快照；不从 AI 场景次数回填历史。 */
-			var nextTotal = Math.min(1000000000, playerThrowTotal() + 1);
-			if (saveBlocked()) return;
-			localStorage.setItem(K_PLAYER_INTERACT, JSON.stringify({ v: 1, total: nextTotal }));
-		} catch (e) { logError("玩家道具计数未保存", e); }
+        /* Capture only after native success. Recovery saves the fact, never replays a prop. */
+        var id="interact-"+Date.now().toString(36)+"-"+Math.random().toString(36).slice(2,12)+"-"+(++interactionSerial).toString(36),data={t:Date.now()},Q=lib.cshWallet&&lib.cshWallet.pending;
+        if(Q)Q.put("interaction",id,data);else commitPlayerThrow(data,id);
 	}
 	function hookPlayerThrow() {
 		if (playerThrowHooked) return;
@@ -1177,6 +1205,8 @@ import GEN_LINES from "./csh_interact_lines_gen.js";
 			return true;
 		},
 		fire: fire,
+        careerSaved:interactionSaved,
+        careerRevision:function(){return interactionRevision;},
 		stats: function () {
 			return { total: total, playerThrows: playerThrowTotal(), round: roundState.round, roundCount: roundState.count };
 		},
@@ -2099,4 +2129,5 @@ import GEN_LINES from "./csh_interact_lines_gen.js";
 
 	lib.cshInteract.openPanel = openPanel;
 	lib.cshInteract.closePanel = closePanel;
+    if(lib.cshWallet&&lib.cshWallet.pending)lib.cshWallet.pending.register("interaction",commitPlayerThrow);
 })();

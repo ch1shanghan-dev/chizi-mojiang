@@ -442,6 +442,14 @@
 </style>
 <link rel="stylesheet" href="../../core/csh_tables.css">
 <link rel="stylesheet" href="../../core/csh_trick_tables.css">
+<style id="doudizhu-presentation-20261102">
+/* Details scroll independently; original settlement controls remain visible. */
+#banner .rs-panel{overflow:hidden}
+#banner .rs-body{display:flex;flex-direction:column;gap:8px;min-height:0;overflow-y:auto;overscroll-behavior:contain;width:100%}
+#banner .rs-head,#banner .rs-foot{flex:0 0 auto;width:100%}
+#banner .rs-foot .btn{min-height:44px;flex-shrink:0}
+@media(orientation:landscape) and (max-height:430px){#banner .rs-body{gap:5px}}
+</style>
 </head>
 <body class="csh-experience" data-csh-table="doudizhu">
 
@@ -558,11 +566,13 @@
      结算依据本身必须可见，否则玩家只能看到一句"你赢了"（原来的问题）。 -->
 <div class="csh-result hidden" id="banner">
   <div class="rs-panel">
-    <div class="rs-title" id="banner-title"></div>
-    <div class="rs-sub" id="banner-sub"></div>
-    <div class="rs-rows" id="banner-rows"></div>
-    <div class="rs-sub" id="banner-econ"></div>
-    <div class="rs-acts">
+    <div class="rs-head"><div class="rs-title" id="banner-title"></div></div>
+    <div class="rs-body">
+      <div class="rs-sub" id="banner-sub"></div>
+      <div class="rs-rows" id="banner-rows"></div>
+      <div class="rs-sub" id="banner-econ"></div>
+    </div>
+    <div class="rs-acts rs-foot">
       <button class="btn" id="btn-again" type="button">再来一局</button>
       <button class="btn ghost" id="btn-back-start" type="button">返回开局</button>
     </div>
@@ -1334,6 +1344,25 @@ var goodMode = false;
    3. 牌局流程
    ============================================================ */
 function isLandlord(p) { return game.landlord === p; }
+/* Outcome follows the known landlord/farmer side, not only the finishing seat. */
+function sideWon(p, winner) {
+  return Number.isInteger(game.landlord) && game.landlord >= 0 && game.landlord < 3 &&
+    Number.isInteger(p) && p >= 0 && p < 3 && Number.isInteger(winner) && winner >= 0 && winner < 3 &&
+    isLandlord(p) === isLandlord(winner);
+}
+/* 一个会话只交回个人筹码；未终局离场原路退回，不兑现 AI 带入。
+   终局主入口、收工与重开使用同一载荷，重试不丢世界联动。 */
+function sessionSettlementData() {
+  var buyIn = Math.max(0, Math.floor(Number(Bridge.buyIn()) || 0));
+  var complete = game.over === true && game.phase === 'over' &&
+    Number.isInteger(game.landlord) && game.landlord >= 0 && game.landlord < 3 &&
+    Number.isInteger(game.winner) && game.winner >= 0 && game.winner < 3;
+  var seats = complete ? (Bridge.opponents() || []).map(function (p, i) {
+    return { id: p.id, stake: (game.aiStakes && game.aiStakes[i]) || p.stake || 0 };
+  }) : [];
+  return { key: 'doudizhu', buyIn: buyIn,
+    chips: complete ? Math.max(0, Math.floor(Number(game.chips) || 0)) : buyIn, seats: seats };
+}
 function nextIdx(p) { return (p + 1) % 3; }
 function logLine(s) { lastLog = s; var el = $('#status-line'); if (el) el.textContent = s; }
 
@@ -1429,7 +1458,7 @@ function newGame() {
       game.aiStakes[0] = Math.max(0, Math.floor(opp[0].stake || 0));
       if (opp[1]) game.aiStakes[1] = Math.max(0, Math.floor(opp[1].stake || 0));
       for (var q = 0; q < opp.length; q++) game.stake += Math.max(0, Math.floor(opp[q].stake || 0));
-      game.chips = game.stake;
+      /* 整桌带入只用于桌面展示，未终局的个人筹码仍为自己的本金。 */
     }
   }
   /* 【2026-10-03 牌桌拟人】开局让一位对手说句话：语气按它的性格、内容看它当前的心态与
@@ -1693,10 +1722,11 @@ function doPass(p) {
 }
 
 function endGame(winner) {
+  if (game.over) return;
   game.over = true;
   game.phase = 'over';
   game.winner = winner;
-  var lordWin = (winner === game.landlord);
+  var lordWin = (winner === game.landlord), playerWin = sideWon(0, winner);
   var i, farmers = [];
   for (i = 0; i < 3; i++) if (i !== game.landlord) farmers.push(i);
 
@@ -1724,7 +1754,7 @@ function endGame(winner) {
     var net = practice ? 0 : Math.min(netRaw, netCap);
     var capped = !practice && netRaw > netCap;
     /* 玩家赢：chips = 带入 + 净赢；玩家输：chips = 带入 − min(带入, 净亏)；练习局：原路退回 */
-    if (winner === 0) game.chips = myBase + net;
+    if (playerWin) game.chips = myBase + net;
     else game.chips = practice ? myBase : Math.max(0, myBase - Math.min(myBase, netRaw));
     econ = {
       aiTotal: aiTotal, net: net, netRaw: netRaw, capped: capped,
@@ -1733,22 +1763,22 @@ function endGame(winner) {
   }
 
   var title = (lordWin ? '地主胜利' : '农民胜利') + (practice ? ' · 练习' : '');
-  var sub = '本局赢家：<b>' + esc(game.names[winner]) + '</b>（' + (lordWin ? '地主' : '农民') + ')' +
+  var sub = '先出完：<b>' + esc(game.names[winner]) + '</b>（' + (lordWin ? '地主' : '农民') + ')' +
     (game.mult > 1 ? ' · 倍数 <b>×' + game.mult + '</b>' : '');
   logLine(title + ' · ' + game.names[winner] + ' 先出完' + (game.mult > 1 ? '（×' + game.mult + '）' : ''));
-  if (winner === 0) sfxPlay(spring ? "spring" : "win"); else sfx.lose();
+  if (playerWin) sfxPlay(spring ? "spring" : "win"); else sfx.lose();
 
   /* 功勋上报（§G.6.3）：每局 play，赢再 win，倍数≥4 追加大胜。
      【2026-09-30】练习局（好牌模式）不报——功勋虽不直接换钱，但也是成长资源，不能靠强化手牌刷。 */
   if (Bridge.active && !practice) {
     try {
       Bridge.merit(1, 'play');
-      if (winner === 0) Bridge.merit(2, 'win');
-      if (winner === 0 && game.mult >= 4) Bridge.merit(5, 'bigwin');
+      if (playerWin) Bridge.merit(2, 'win');
+      if (playerWin && game.mult >= 4) Bridge.merit(5, 'bigwin');
     } catch (eM) {}
   }
 
-  showBanner(title, sub, null, (winner === 0), econ);
+  showBanner(title, sub, null, playerWin, econ);
 
   /* 2026-09-28 用户反馈「赢了 CBY 没加」：原先结算只在玩家点「再来一局/收工结算/
      游戏内关闭」时才交回宿主——走壳层「关闭」直接退出就会把胜局弄丢。
@@ -1756,37 +1786,19 @@ function endGame(winner) {
      （入账提示由壳层统一 toast，避免双份。） */
   if (Bridge.active && !Bridge.isSettled()) {
     /* ★ 2026-09-29：改走 shell-settle-session（玩家入账 + AI 世界双向记账一次完成） */
-    var __opp = Bridge.opponents() || [];
-    var __seats = [];
-    for (var __q = 0; __q < __opp.length; __q++) {
-      __seats.push({
-        id: __opp[__q].id,
-        stake: (game.aiStakes && game.aiStakes[__q]) || __opp[__q].stake || 0
-      });
-    }
     try {
-      Bridge.settleSession({
-        key: 'doudizhu',
-        buyIn: Math.max(0, Math.floor(Bridge.buyIn())),
-        chips: Math.max(0, Math.floor(game.chips)),
-        seats: __seats
-      }, function (ok) {
+      Bridge.settleSession(sessionSettlementData(), function (ok) {
         /* 主结算路径失败必须可见（§审计 B-11）：其余结算入口都有失败提示，唯独这里曾静默 */
         if (ok === false) { try { toast('结算未成功，本局未入账（页面会保留，可再次点击结算重试）'); } catch (eT3) {} }
       });
     } catch (eSettle) {}
   }
-  /* 【2026-10-03 牌桌拟人】本局收尾时，输家嘴硬一句 / 赢家说一句场面话。
-     winner 0 = 玩家：对手说"输了"的话；1/2 = 哪一位对手赢了，就由它来说。 */
+  /* A teammate may finish the hand; the short response follows its actual side. */
   try {
     var rq = (Bridge.active && Bridge.opponents) ? (Bridge.opponents() || []) : [];
     if (rq.length) {
-      if (winner === 0) {
-        var li = (rq.length > 1 && Math.random() < 0.5) ? 1 : 0;
-        CSHPage.sayThrottled($('#seat-' + (li + 1)), rq[li], 'lose');
-      } else if (rq[winner - 1]) {
-        CSHPage.sayThrottled($('#seat-' + winner), rq[winner - 1], 'win');
-      }
+      var speaker = winner > 0 ? winner : [1, 2].filter(function (p) { return !sideWon(p, winner); })[0];
+      if (rq[speaker - 1]) CSHPage.sayThrottled($('#seat-' + speaker), rq[speaker - 1], sideWon(speaker, winner) ? 'win' : 'lose');
     }
   } catch (eQ2) {}
   renderAll();
@@ -2170,8 +2182,8 @@ function showBanner(title, sub, counts, win, econ) {
   var lord = game.landlord, wp = game.winner;
   var html = '<div class="rs-cap">结果对照 · 地主 ' + esc(game.names[lord] || '-') + '</div>';
   for (var i = 0; i < 3; i++) {
-    var isLord = (i === lord), isWin = (i === wp);
-    var last = (isWin && game.lastPlay && game.lastPlay.player === i) ? game.lastPlay : null;
+    var isLord = (i === lord), isFinisher = (i === wp), isWin = sideWon(i, wp);
+    var last = (isFinisher && game.lastPlay && game.lastPlay.player === i) ? game.lastPlay : null;
     html += '<div class="rs-row' + (i === 0 ? ' me' : '') + (isWin ? ' win' : '') + '">' +
       '<span class="rs-name">' + (i === 0 ? '你' : esc(game.names[i])) + (isLord ? ' · 地主' : '') + '</span>' +
       (last ? '<span class="rs-cards">' + cardsInnerHTML(last.cards, 'xs', 5) + '</span>' : '') +
@@ -2187,8 +2199,8 @@ function showBanner(title, sub, counts, win, econ) {
   if (econ) {
     et = (econ.practice ? '<b>好牌练习局 · 不计输赢</b> · ' : '') +
       '带入 <b>' + fmtNum(econ.myBase) + '</b> · 倍数 <b>×' + game.mult + '</b> · 本局' +
-      (wp === 0 ? '净赢' : '净亏') + ' <b>' + fmtNum(econ.net) + '</b>' +
-      (econ.capped ? '（上限 ' + fmtNum(econ.aiTotal) + '，受对手带入限制）' : '');
+      (sideWon(0, wp) ? '净赢' : '净亏') + ' <b>' + fmtNum(Math.abs(econ.chips - econ.myBase)) + '</b>' +
+      (sideWon(0, wp) && econ.capped ? '（上限 ' + fmtNum(econ.aiTotal) + '，受对手带入限制）' : '');
   }
   ec.innerHTML = et;
   $('#banner').classList.remove('hidden');
@@ -2269,9 +2281,7 @@ function leavePage(reload) {
   }
   try {
     if (Bridge.active && !Bridge.isSettled()) {
-      if (reload) { Bridge.settle(game.chips, finish); return; }
-      var seats = (Bridge.opponents() || []).map(function (p, i) { return { id: p.id, stake: (game.aiStakes && game.aiStakes[i]) || p.stake || 0 }; });
-      Bridge.settleSession({ key: 'doudizhu', buyIn: Math.max(0, Math.floor(Bridge.buyIn() || 0)), chips: game.phase === 'idle' ? Math.max(0, Math.floor(Bridge.buyIn() || 0)) : Math.max(0, Math.floor(Number(game.chips) || 0)), seats: seats }, finish);
+      Bridge.settleSession(sessionSettlementData(), finish);
     } else finish(true);
   } catch (e) { finish(false); }
 }

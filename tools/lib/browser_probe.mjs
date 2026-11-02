@@ -1,3 +1,4 @@
+import { auditTempRoot, removeAuditScratch, disposeAuditBrowser } from './audit_scratch.mjs';
 // Disposable Chromium profile; never attach to the player's browser or game.
 import fs from 'node:fs';
 import os from 'node:os';
@@ -5,9 +6,9 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 export async function openProbe(html, browser='C:/Program Files/Google/Chrome/Application/chrome.exe') {
-  const temp=fs.mkdtempSync(path.join(os.tmpdir(),'csh-maintenance-browser-'));
+  const temp=fs.mkdtempSync(path.join(auditTempRoot(),'csh-maintenance-browser-'));
   const file=path.join(temp,'probe.html');fs.writeFileSync(file,html);
-  const child=spawn(browser,['--headless=new','--no-sandbox','--disable-gpu','--no-first-run','--no-default-browser-check','--disable-background-networking','--remote-debugging-port=0','--user-data-dir='+path.join(temp,'profile'),'about:blank'],{windowsHide:true,stdio:'ignore'});
+  const child=spawn(browser,['--headless=new','--no-sandbox','--disable-gpu','--no-first-run','--no-default-browser-check','--disable-background-networking','--remote-debugging-port=0','--user-data-dir='+path.join(temp,'profile'),'about:blank'],{windowsHide:true,stdio:'ignore',env:{...globalThis.process.env,TEMP:temp,TMP:temp}});
   let ws, launchError;
   child.on('error',e=>{launchError=e;});
   try {
@@ -24,6 +25,6 @@ export async function openProbe(html, browser='C:/Program Files/Google/Chrome/Ap
     const evaluate=async expression=>{const r=await send('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true});if(r.exceptionDetails)throw Error(r.exceptionDetails.text+' '+JSON.stringify(r.exceptionDetails.exception));return r.result.value;};
     await send('Page.navigate',{url:pathToFileURL(file).href});
     for(let n=0;n<160;n++){if(await evaluate('document.readyState === "complete"'))break;await new Promise(r=>setTimeout(r,25));}
-    return {send,evaluate,temp,async close(){try{await send('Browser.close');}catch{}ws.close();child.kill();}};
-  } catch(e){ws?.close();child.kill();throw e;}
+    return {send,evaluate,temp,async close(){try{await send('Browser.close');}catch{}ws.close();await disposeAuditBrowser(child,temp);}};
+  } catch(e){ws?.close();await disposeAuditBrowser(child,temp);throw e;}
 }

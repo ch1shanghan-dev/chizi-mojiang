@@ -437,6 +437,23 @@
 </style>
 <link rel="stylesheet" href="../../core/csh_tables.css">
 <link rel="stylesheet" href="../../core/csh_duel_tables.css">
+<style id="blackjack-presentation-20261102">
+/* Acting identity is read from the existing phase; keep both card rows in place. */
+#view-game .bj-side{border-left:2px solid transparent;border-right:2px solid transparent;border-radius:7px;min-width:180px;padding:0 9px}
+#view-game .bj-side.acting{border-color:#a9c8c0;background:linear-gradient(90deg,transparent,#b7d6cd12,transparent)}
+#view-game .turn-mark{display:none;min-height:18px;padding:0 6px;border:1px solid #b7d6cd66;border-radius:4px;color:#e4f1e9;font:500 12px/1.4 "Microsoft YaHei",sans-serif;letter-spacing:0;white-space:nowrap}
+#view-game .bj-side.acting .turn-mark{display:inline-block}
+/* Final cards can scroll; ending the table must remain an ordinary visible action. */
+#banner .rs-panel{overflow:hidden}
+#banner .rs-body{display:flex;flex-direction:column;gap:9px;min-height:0;overflow-y:auto;overscroll-behavior:contain;width:100%}
+#banner .rs-head,#banner .rs-foot{flex:0 0 auto;width:100%}
+#banner .rs-foot .btn,#btn-rules-close{min-height:44px;flex-shrink:0}
+.rules-card{overflow:hidden}
+.rules-title{flex-shrink:0}
+.rules-body{min-height:0;overflow-y:auto;overscroll-behavior:contain}
+@media(orientation:landscape) and (max-height:430px){#view-game .bj-side{min-width:150px;padding:0 6px}#banner .rs-body{gap:6px}.rules-card{max-height:calc(100% - 8px);padding:12px 16px;gap:8px}.rules-mask{padding:8px}}
+@media(prefers-reduced-motion:reduce){#view-game .bj-side{transition:none}}
+</style>
 </head>
 <body class="csh-experience" data-csh-table="blackjack">
 
@@ -516,14 +533,14 @@
           </div>
         </div>
         <div class="csh-center">
-          <div class="bj-side">
-            <div class="side-h"><span class="opp-av" id="dealer-av"></span><span id="dealer-table-name">庄家</span></div>
+          <div class="bj-side" id="dealer-side">
+            <div class="side-h"><span class="opp-av" id="dealer-av"></span><span id="dealer-table-name">庄家</span><span class="turn-mark" id="dealer-turn">行动中</span></div>
             <div class="hand-row" id="dealer-hand"></div>
             <div class="side-v"><b id="dealer-val" class="num">—</b></div>
           </div>
           <div class="bj-div"></div>
-          <div class="bj-side">
-            <div class="side-h">你</div>
+          <div class="bj-side" id="player-side">
+            <div class="side-h"><span>你</span><span class="turn-mark" id="player-turn">行动中</span></div>
             <div class="hands-row" id="player-hands"></div>
           </div>
         </div>
@@ -577,10 +594,12 @@
      面板内容顺序：结果标题 → 庄家点数 vs 你的点数 → 双方最终牌对照表 → 按钮。 -->
 <div class="csh-result hidden" id="banner">
   <div class="rs-panel">
-    <div class="rs-title" id="banner-title"></div>
-    <div class="rs-sub" id="banner-sub"></div>
-    <div class="rs-rows" id="banner-detail"></div>
-    <div class="rs-acts" id="banner-row"></div>
+    <div class="rs-head"><div class="rs-title" id="banner-title"></div></div>
+    <div class="rs-body">
+      <div class="rs-sub" id="banner-sub"></div>
+      <div class="rs-rows" id="banner-detail"></div>
+    </div>
+    <div class="rs-acts rs-foot" id="banner-row"></div>
   </div>
 </div>
 
@@ -1180,8 +1199,9 @@ try { CRD = (typeof window !== 'undefined' && window.CSH && window.CSH.cards) ? 
     }
     renderRow($('#dealer-hand'), 'dealer', slots);
     var v = $('#dealer-val');
-    if (!state.dealer.length) { v.textContent = '—'; v.classList.add('dimv'); return; }
+    if (!state.dealer.length) { v.textContent = '—'; v.classList.add('dimv'); v.classList.remove('bustv'); return; }
     if (state.holeHidden) {
+      v.classList.remove('bustv');
       v.textContent = bjValue([state.dealer[0]]).total + ' + ?';
       v.classList.add('dimv');
     } else {
@@ -1283,6 +1303,10 @@ try { CRD = (typeof window !== 'undefined' && window.CSH && window.CSH.cards) ? 
     else if (state.phase === 'dealer') t = '你已停牌 · 庄家要牌中…';
     else t = '本手结束';
     el.textContent = t;
+    var currentHand = state.hands[state.activeHand];
+    var dealerSide = document.getElementById('dealer-side'), playerSide = document.getElementById('player-side');
+    if (dealerSide) dealerSide.classList.toggle('acting', state.phase === 'dealer');
+    if (playerSide) playerSide.classList.toggle('acting', state.phase === 'play' && !!currentHand && !currentHand.done);
   }
 
   var ACT_NAME = { hit: '要牌', stand: '停牌', double: '加倍', split: '分牌', surrender: '投降' };

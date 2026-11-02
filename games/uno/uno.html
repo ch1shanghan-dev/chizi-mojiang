@@ -442,6 +442,17 @@
 </style>
 <link rel="stylesheet" href="../../core/csh_tables.css">
 <link rel="stylesheet" href="../../core/csh_trick_tables.css">
+<style id="uno-presentation-20261102">
+/* Public color and current actor remain readable beside the actual cards. */
+body[data-csh-table="uno"] #view-game .opp{display:grid!important;grid-template-columns:auto minmax(0,1fr) auto!important;column-gap:6px!important;row-gap:0!important;align-items:center!important}
+body[data-csh-table="uno"] #view-game .opp-av{grid-column:1;grid-row:1/3}
+body[data-csh-table="uno"] #view-game .opp .oname{grid-column:2;grid-row:1;max-width:100%}
+body[data-csh-table="uno"] #view-game .opp .ocount{grid-column:3;grid-row:1}
+body[data-csh-table="uno"] #view-game .opp .uno-flag{grid-column:3;grid-row:2;justify-self:end}
+body[data-csh-table="uno"] #view-game .opp-turn{grid-column:2;grid-row:2;color:#f1d9a2;font:500 12px/1.3 "Microsoft YaHei",sans-serif;white-space:nowrap}
+body[data-csh-table="uno"] #view-game .active-color{display:inline-flex;align-items:center;flex:0 0 auto;gap:5px;padding:1px 8px;border:1px solid #879aaf66;border-radius:5px;background:#1c2c3c;color:#e3e6db;font:500 12px/1.4 "Microsoft YaHei",sans-serif;white-space:nowrap}
+body[data-csh-table="uno"] #view-game .active-color::before{content:"";width:9px;height:9px;border:1px solid #ffffff99;border-radius:2px;background:var(--active-color,#2a2a2a);flex:none}
+</style>
 </head>
 <body class="csh-experience" data-csh-table="uno">
 
@@ -506,6 +517,7 @@
              「UNO!」提醒保留在手牌数胶囊里（me.uno && 剩 1 张时出现）。 -->
         <div class="info-bar">
           <span class="direction-ind" id="direction-ind"><span class="arrow">⟳</span> <span id="dir-text">顺序</span></span>
+          <span class="active-color" id="active-color" aria-label="当前颜色待定">待选色</span>
           <span class="turn-banner" id="turn-banner"></span>
           <span class="mycount-chip" id="my-count">0 张</span>
           <span class="uno-log" id="game-log-line"></span>
@@ -1531,12 +1543,19 @@ function renderGame() {
     html += '<span class="oname">' + esc(p.name) + '</span>';
     html += '<span class="ocount"><b>' + p.count + '</b> 张</span>';
     if (p.uno) html += '<span class="uno-flag">UNO!</span>';
+    if (p.isTurn) html += '<span class="opp-turn">出牌中</span>';
     el.innerHTML = html;
     opps.appendChild(el);
   }
 
   $('#direction-ind').className = 'direction-ind' + (view.direction === -1 ? ' rev' : '');
   $('#dir-text').textContent = view.direction === -1 ? '逆序' : '顺序';
+  var colorNames = { red: '红色', yellow: '黄色', green: '绿色', blue: '蓝色' };
+  var colorName = colorNames[view.activeColor] || '待选色', colorLabel = $('#active-color');
+  colorLabel.textContent = colorName;
+  colorLabel.title = '当前有效颜色：' + colorName;
+  colorLabel.setAttribute('aria-label', colorLabel.title);
+  colorLabel.style.setProperty('--active-color', colorHex(view.activeColor || 'black'));
   $('#deck-count').textContent = '剩 ' + view.deckCount + ' 张';
   var logs = view.log || [];
   $('#game-log-line').textContent = logs.length ? logs[logs.length - 1] : '';

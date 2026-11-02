@@ -40,6 +40,7 @@ import "../core/csh_games.js";
 /* 成就引擎（2026-09-28）：零 import 双载——主文档这份供壳层 shell-ach-claim 领奖复核，
    career.html 用经典 <script> 引同一份源码渲染成就墙。 */
 import "../core/csh_achv.js";
+import "../core/csh_career_observer.js";
 /* 池子成就（2026-10-20）：操作型成就引擎，零 import 双载——
    主文档这份负责局内事件采集（install 由 content.js 调），成就页用经典 <script> 引同一份源码渲染。 */
 import "../core/csh_pool_achv.js";

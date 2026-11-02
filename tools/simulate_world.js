@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { auditTempRoot, removeAuditScratch, disposeAuditBrowser } from './lib/audit_scratch.mjs';
 /**
  * 池子魔将 · 世界 / 存档 / 结算桥 验收器
  * （审计 §13「最值得增加的一套世界模拟验收器」的落地版；§12 的
@@ -51,7 +52,7 @@ const section = (t) => console.log("\n== " + t + " ==");
 /* ------------------------------------------------------------------ *
  * 一、沙箱：镜像树 + 桩 + 可控时钟/随机数
  * ------------------------------------------------------------------ */
-const SANDBOX = fs.mkdtempSync(path.join(os.tmpdir(), "cshsim-"));
+const SANDBOX = fs.mkdtempSync(path.join(auditTempRoot(), "cshsim-"));
 const APP = path.join(SANDBOX, "app");
 const EXT = path.join(APP, "extension", "池子魔将");
 

@@ -1,5 +1,6 @@
+import { auditTempRoot, removeAuditScratch, disposeAuditBrowser } from './lib/audit_scratch.mjs';
 import fs from 'node:fs';import path from 'node:path';import os from 'node:os';import {pathToFileURL} from 'node:url';import {root} from './lib/skill_audit.mjs';import {openProbe} from './lib/browser_probe.mjs';
-const arg=process.argv.indexOf('--out'),out=arg>=0?process.argv[arg+1]:fs.mkdtempSync(path.join(os.tmpdir(),'csh-fee-ui-'));fs.mkdirSync(out,{recursive:true});
+const arg=process.argv.indexOf('--out'),out=arg>=0?process.argv[arg+1]:fs.mkdtempSync(path.join(auditTempRoot(),'csh-fee-ui-'));fs.mkdirSync(out,{recursive:true});
 let html=fs.readFileSync(root+'/games/texas/texas.html','utf8').replace(/\r\n/g,'\n').replace(/(src|href)="\.\.\/\.\.\/([^"]+)"/g,(_,attr,f)=>attr+'="'+pathToFileURL(path.join(root,f)).href+'"');
 const marker='\n})();\n</script>';if(!html.includes(marker))throw Error('texas scope anchor');
 html=html.replace(marker,`
@@ -16,3 +17,5 @@ const rows=[],check=(name,v)=>rows.push({name,passed:!!v});const page=await open
  }
 }finally{await page.close();}
 const result={scope:'actual Texas page isolated Chromium, fixed hand; no user wallet or live multiplayer game',passed:rows.filter(r=>r.passed).length,failed:rows.filter(r=>!r.passed).length,failures:rows.filter(r=>!r.passed)};console.log(JSON.stringify(result,null,2));if(result.failed)process.exitCode=1;
+
+if(!process.argv.includes("--out"))process.once("exit",()=>{try{removeAuditScratch(out);}catch(e){console.warn("Audit cleanup:",e.message);}});

@@ -1,3 +1,4 @@
+import { auditTempRoot, removeAuditScratch, disposeAuditBrowser } from './lib/audit_scratch.mjs';
 // Full unmodified localhost Noname entry + installed extension; disposable Chromium origin/profile only.
 import fs from 'node:fs';
 import {surveyNoncharacter} from './lib/noncharacter_host_survey.mjs';
@@ -70,8 +71,8 @@ const origin = 'http://127.0.0.1:' + server.address().port;
 stage('readonly-server-listening', { origin });
 let page, diagnosticSocket;
 async function launchIsolatedBrowser() {
-  const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'csh-host-smoke-'));
-  const child = spawn(opt('--browser', 'C:/Program Files/Google/Chrome/Application/chrome.exe'), ['--headless=new', '--no-sandbox', '--disable-gpu', '--no-first-run', '--no-default-browser-check', '--disable-background-networking', '--remote-debugging-port=0', '--user-data-dir=' + path.join(temp, 'profile'), 'about:blank'], { windowsHide: true, stdio: 'ignore' });
+  const temp = fs.mkdtempSync(path.join(auditTempRoot(), 'csh-host-smoke-'));
+  const child = spawn(opt('--browser', 'C:/Program Files/Google/Chrome/Application/chrome.exe'), ['--headless=new', '--no-sandbox', '--disable-gpu', '--no-first-run', '--no-default-browser-check', '--disable-background-networking', '--remote-debugging-port=0', '--user-data-dir=' + path.join(temp, 'profile'), 'about:blank'], { windowsHide: true, stdio: 'ignore', env: {...globalThis.process.env,TEMP:temp,TMP:temp} });
   let launchError;
   child.on('error', error => { launchError = error; });
   journal('isolated-browser-process', { pid: child.pid, temp });
@@ -84,9 +85,9 @@ async function launchIsolatedBrowser() {
       if (Date.now() - started > commandTimeout) throw Error('Isolated Chrome launch timed out');
       await new Promise(resolve => setTimeout(resolve, 50));
     }
-    const isolated = { temp, async close() { try { if (isolated.send) await bounded(isolated.send('Browser.close'), 'isolated Browser.close', 2500); } catch (error) { if (!/disconnected/.test(error.message)) throw error; } finally { diagnosticSocket?.close(); child.kill(); } } };
+    const isolated = { temp, async close() { try { if (isolated.send) await bounded(isolated.send('Browser.close'), 'isolated Browser.close', 2500); } catch (error) { if (!/disconnected/.test(error.message)) throw error; } finally { diagnosticSocket?.close(); await disposeAuditBrowser(child,temp); } } };
     return isolated;
-  } catch (error) { child.kill(); throw error; }
+  } catch (error) { await disposeAuditBrowser(child,temp); throw error; }
 }
 async function attachDiagnostics() {
   const port = fs.readFileSync(path.join(page.temp, 'profile', 'DevToolsActivePort'), 'utf8').split('\n')[0];

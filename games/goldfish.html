@@ -307,12 +307,13 @@ body[data-market-ready="true"] #storageStatus,body[data-market-ready="true"] #re
 @media(max-height:450px){#app{padding-top:8px;gap:4px}#panel{padding-top:52px;padding-bottom:8px}#panel .pstage{flex-basis:32%}#panel .pcontent{padding:10px 12px}#panel .ops{padding:8px 12px;gap:5px}#panel .qbtn{min-height:32px}#panel .pname{font-size:var(--pfs-compact-title)}#panel .say{min-height:0;padding:8px;font-size:var(--pfs-lg)}}
 </style>
 
+<link rel="stylesheet" href="../core/csh_collection.css">
 </head>
-<body class="csh-experience">
+<body class="csh-experience" data-csh-collection="goldfish">
 <div id="app">
   <div class="topbar">
     <div class="brand">金鳞市<small>池中金鳞 · 坐地生金</small></div>
-    <div class="stats" id="stats"></div>
+    <details class="market-assets"><summary>持仓与分红</summary><div class="stats" id="stats"></div></details>
   </div>
   <div id="storageStatus" role="status" style="padding:6px 12px;line-height:1.5;flex-shrink:0">正在读取存档…</div>
   <button id="retryMarket" type="button" style="min-height:44px;align-self:flex-start;margin:0 12px 6px">重新读取</button>
@@ -329,7 +330,7 @@ body[data-market-ready="true"] #storageStatus,body[data-market-ready="true"] #re
 
 <div id="panel" role="dialog" aria-modal="true" aria-labelledby="pname">
   <div class="pwrap">
-    <button class="pclose" id="pclose" type="button">✕</button>
+    <button class="pclose" id="pclose" type="button" aria-label="关闭人物行情">✕</button>
     <div class="pstage"><img id="pimg" alt=""></div>
     <div class="pinfo">
       <div class="pcontent">
@@ -337,9 +338,6 @@ body[data-market-ready="true"] #storageStatus,body[data-market-ready="true"] #re
         <div class="pname" id="pname">—</div>
         <div class="ptag" id="ptag"></div>
       </div>
-      <div class="say" id="psay"><span class="who" id="pwho">金鳞市</span><span id="ptext"></span></div>
-      <div class="pbio" id="pbio"></div>
-      <div class="affbox" id="affbox"></div>
       <div class="facts">
         <div class="fact"><div class="k">现价</div><div class="v" id="fPrice">—</div></div>
         <div class="fact"><div class="k">趋势偏离</div><div class="v" id="fDev">—</div></div>
@@ -348,6 +346,11 @@ body[data-market-ready="true"] #storageStatus,body[data-market-ready="true"] #re
         <div class="fact"><div class="k">成本</div><div class="v" id="fCost">—</div></div>
         <div class="fact"><div class="k">浮动盈亏</div><div class="v" id="fPnL">—</div></div>
       </div>
+      <details class="collection-details" id="market-character"><summary>人物与关系回报</summary>
+      <div class="say" id="psay"><span class="who" id="pwho">金鳞市</span><span id="ptext"></span></div>
+      <div class="pbio" id="pbio"></div>
+      <div class="affbox" id="affbox"></div>
+      </details>
       </div>
       <div class="ops">
         <div class="qty" id="qty"></div>

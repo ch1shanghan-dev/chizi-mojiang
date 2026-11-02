@@ -1,6 +1,7 @@
+import { auditTempRoot, removeAuditScratch, disposeAuditBrowser } from './lib/audit_scratch.mjs';
 import fs from 'node:fs';import path from 'node:path';import os from 'node:os';import vm from 'node:vm';import {pathToFileURL} from 'node:url';
 import {root} from './lib/skill_audit.mjs';import {openProbe} from './lib/browser_probe.mjs';
-const out=process.argv.includes('--out')?process.argv[process.argv.indexOf('--out')+1]:fs.mkdtempSync(path.join(os.tmpdir(),'csh-bond-'));
+const out=process.argv.includes('--out')?process.argv[process.argv.indexOf('--out')+1]:fs.mkdtempSync(path.join(auditTempRoot(),'csh-bond-'));
 fs.mkdirSync(out,{recursive:true});const rows=[];const check=(name,v,detail)=>rows.push({name,passed:!!v,...(!v?{detail}: {})});
 const ctx=vm.createContext({});vm.runInContext(fs.readFileSync(path.join(root,'core/csh_bond.js'),'utf8'),ctx);const B=ctx.CSHBond;
 for(const [v,key,current,target] of [[0,'D',0,2000],[99,'D',99,2000],[100,'D',100,2000],[101,'D',101,2000],[182,'D',182,2000],[1999,'D',1999,2000],[2000,'C',0,6000],[7999,'C',5999,6000],[8000,'B',0,10000],[18000,'A',0,20000],[38000,'S',0,50000],[87999,'S',49999,50000],[88000,'S',50000,50000]]){const p=B.resolveBondProgress(v);check('boundary '+v,p.level.key===key&&p.current===current&&p.target===target&&p.current<=p.target&&p.percent>=0&&p.percent<=100,p);}
@@ -19,3 +20,5 @@ const browser=await openProbe(html);try{
  }
 }finally{await browser.close();}
 const result={scope:'pure shared thresholds and actual codex DOM in isolated Chromium; no player saves',passed:rows.filter(x=>x.passed).length,failed:rows.filter(x=>!x.passed).length,failures:rows.filter(x=>!x.passed)};fs.writeFileSync(path.join(out,'result.json'),JSON.stringify({...result,checks:rows},null,2));console.log(JSON.stringify(result,null,2));if(result.failed)process.exitCode=1;
+
+if(!process.argv.includes("--out"))process.once("exit",()=>{try{removeAuditScratch(out);}catch(e){console.warn("Audit cleanup:",e.message);}});

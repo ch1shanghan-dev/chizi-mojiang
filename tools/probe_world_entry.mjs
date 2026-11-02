@@ -1,3 +1,4 @@
+import { auditTempRoot, removeAuditScratch, disposeAuditBrowser } from './lib/audit_scratch.mjs';
 // Actual theme, registry, game directory and debug/world UI in headless Chromium.
 import fs from 'node:fs';
 import os from 'node:os';
@@ -9,7 +10,8 @@ const option=(n,f)=>{const i=process.argv.indexOf(n);return i<0?f:process.argv[i
 const clean=s=>s.replace(/^import .*?;\r?\n/gm,'').replace(/^export default null;.*$/gm,'').replace(/^export /gm,'').replace(/<\/script/gi,'<\\/script');
 const source=clean(fs.readFileSync(option('--source',path.join(root,'core/csh_debug.js')),'utf8'));
 const modules=['core/csh_theme.js','core/csh_uikit.js','core/csh_registry.js','core/csh_games.js'].map(f=>clean(fs.readFileSync(path.join(root,f),'utf8'))).join('\n');
-const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'csh-world-entry-'));
+const tmp=fs.mkdtempSync(path.join(auditTempRoot(),'csh-world-entry-'));
+process.once("exit",()=>{try{removeAuditScratch(tmp);}catch(e){console.warn("Audit cleanup:",e.message);}});
 const out=option('--out',path.join(root,'docs/audit/ui/world-entry'));fs.mkdirSync(out,{recursive:true});
 const cases=[{name:'desktop',w:1200,h:820,scale:1},{name:'portrait',w:390,h:844,scale:1},{name:'landscape',w:915,h:412,scale:0.6},{name:'zoom',w:720,h:600,scale:1.5}];
 const all=[];

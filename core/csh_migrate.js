@@ -60,6 +60,8 @@ import { lib, game } from "../../../noname.js";
 	/* 故意不带（边界清单 · 页面会如实展示给玩家）：
 	     · 键名             —— 为什么 */
 	var EXCLUDED = [
+        ["csh_ui_panel_window_world", "本机池子世界窗口位置与显示偏好（随屏幕变化，不随行囊迁移）"],
+        ["csh_ui_panel_window_developer", "本机调试窗口位置与显示偏好（不属于玩家进度，不随行囊迁移）"],
         ["csh_achievement_ui_v1", "本机成就反馈开关、动效和声音偏好（不是成就进度，不随他人存档导入）"],
         ["csh_online_policy_v1", "本机联网与发布偏好（默认离线，导入他人存档不会代为开启）"],
         ["csh_online_backoff_v1", "本机网络退避记录（不影响本地游戏，不跨设备补发）"],
@@ -383,6 +385,7 @@ import { lib, game } from "../../../noname.js";
 			bossRewards: cleanBossRewards(o.bossRewards),
 			assistedStats: cleanAssisted(o.assistedStats),
             dailyTaskSaved:o.dailyTaskSaved==null?null:lib.cshWallet.validateTaskState(o.dailyTaskSaved),
+            taskLifetime:o.taskLifetime==null?null:lib.cshWallet.validateTaskLifetime(o.taskLifetime),
 			affectionSaved: o.affectionSaved == null ? null : lib.cshWallet.validateAffectionState(o.affectionSaved),
 			cheerState: o.cheerState == null ? null : lib.cshWallet.validateCheerState(o.cheerState),
 		};
@@ -396,6 +399,7 @@ import { lib, game } from "../../../noname.js";
 			meritDate: clampStr(o.meritDate, 20),
 			poolClaims: numMap(o.poolClaims, 8192, 0, 1000) || {},
 			bossReceipt: cleanBossReceipt(o.bossReceipt),
+            careerUnlocks:o.careerUnlocks==null?null:lib.cshWallet.validateCareerUnlocks(o.careerUnlocks),
 		};
 	}
 	/* A2：id 分类型清洗。字符串主键（97 人方案）走 clampStr，数字（旧档）走 clampNum。 */
@@ -404,7 +408,10 @@ import { lib, game } from "../../../noname.js";
 	}
 	function cleanGambles(g) {
 		if (!g || typeof g !== "object") return null;
+        var receipts=g.receipts==null?[]:g.receipts;
+        if(!Array.isArray(receipts)||receipts.length>64||receipts.some(function(id,i){return typeof id!=="string"||!/^[a-zA-Z0-9_-]{10,100}$/.test(id)||receipts.indexOf(id)!==i;}))throw Error("豪赌结算凭据异常");
 		return {
+            receipts:receipts.slice(),
 			plays: clampNum(g.plays, 0, 9999999),
 			wins: clampNum(g.wins, 0, 9999999),
 			net: clampNum(g.net, -99999999999, 99999999999),
@@ -522,6 +529,7 @@ import { lib, game } from "../../../noname.js";
 			heartbeatDay: clampNum(o.heartbeatDay, 0, 999999),
 			heartbeatMatches: clampNum(o.heartbeatMatches, 0, 999999),
 			gambles: cleanGambles(o.gambles),
+            careerUnlocks:o.careerUnlocks==null?null:lib.cshWallet.validateCareerUnlocks(o.careerUnlocks),
 			relations: cleanRelations(o.relations),
 			records: cleanRecords(o.records),
 			history: cleanHistory(o.history),
@@ -647,10 +655,12 @@ import { lib, game } from "../../../noname.js";
 		if (!isFinite(n)) return null;
 		return clampNum(n, 0, 10000000000);
 	}
-	function cleanPlayerInteract(o) {
-		if (!o || typeof o !== "object" || Array.isArray(o)) return null;
-		return { v: 1, total: clampNum(o.total, 0, 1000000000) };
-	}
+    function cleanPlayerInteract(o) {
+        if (!o || typeof o !== "object" || Array.isArray(o)) return null;
+        var receipts=o.receipts==null?[]:o.receipts;
+        if(!Array.isArray(receipts)||receipts.length>64||receipts.some(function(id,i){return typeof id!=="string"||!/^[a-zA-Z0-9_-]{10,100}$/.test(id)||receipts.indexOf(id)!==i;}))throw Error("互动计数凭据异常");
+        return {v:1,total:clampNum(o.total,0,1000000000),receipts:receipts.slice(),careerUnlocks:o.careerUnlocks==null?null:lib.cshWallet.validateCareerUnlocks(o.careerUnlocks)};
+    }
 	function cleanRankHigh(o) {
 		if (!o || typeof o !== "object" || Array.isArray(o)) return null;
 		return { cby: clampNum(o.cby, 0, PC_CAP()), merit: clampNum(o.merit, 0, 1000000000),
@@ -1368,6 +1378,8 @@ import { lib, game } from "../../../noname.js";
 	   失败时留下凭据，下一次恢复先完成，禁止继续覆盖半套存档。 */
 	function flushForMigration() {
         var Q=lib.cshWallet&&lib.cshWallet.pending;if(Q){var pending=Q.retry();if(pending.count||pending.error)throw Error("仍有待保存结果，请先在行囊恢复后再操作存档");}
+        var observer=lib.cshCareerObserver;
+        if(observer&&observer.flushForSnapshot&&!observer.flushForSnapshot())throw Error("生涯达成尚未保存，请稍后重试存档操作");
 		if (lib.cshWallet && lib.cshWallet.flushSave && lib.cshWallet.flushSave({ migration: true }) === false) {
 			throw new Error("钱包尚未保存，请先恢复未完成操作或腾出存储空间后重试");
 		}
@@ -1475,6 +1487,11 @@ import { lib, game } from "../../../noname.js";
 			return { ok: false, err: "兑换码正在验证，请完成后再操作存档" };
 		}
 		var Q=lib.cshWallet&&lib.cshWallet.pending;if(Q&&!recoveryState().pending){var state=Q.retry();if(state.count||state.error)return {ok:false,err:'仍有待保存结果，请先恢复后再更换存档'};}
+        /* Preserve current-save qualification before the restore lock is raised. */
+        try {
+            var observer=lib.cshCareerObserver;
+            if(!recoveryState().pending&&observer&&observer.flushForSnapshot&&!observer.flushForSnapshot())return {ok:false,err:"生涯达成尚未保存，请稍后重试存档操作"};
+        } catch(error) { return {ok:false,err:"生涯达成尚未保存，请稍后重试存档操作"}; }
         mutating = true;
         try {
 			await recoverPending();

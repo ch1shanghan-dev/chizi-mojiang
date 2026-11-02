@@ -1,5 +1,6 @@
 import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 import "./csh_world_view.js";
+import "./csh_panel_window.js";
 import "./csh_update.js";
 import "./csh_online.js";
 function onlineFetch(url,options){return window.CSHOnline.external(url,options);}
@@ -1587,6 +1588,7 @@ function onlineLocalFetch(url,options){return window.CSHOnline.local(url,options
             var el = document.getElementById("csh-dbg-overlay");
             if (el && el.__onKey) document.removeEventListener("keydown", el.__onKey, true);
             if (el && el.__worldObserver) el.__worldObserver.disconnect();
+            if (el && el.__panelWindow) el.__panelWindow.dispose();
             var focusBack = el && el.__focusBack;
             if (el && el.parentNode) el.parentNode.removeChild(el);
             if (focusBack && focusBack.isConnected && typeof focusBack.focus === "function") {
@@ -6651,6 +6653,7 @@ function onlineLocalFetch(url,options){return window.CSHOnline.local(url,options
 
                 overlay.appendChild(panel);
                 step("appendChild", function () { uiHost().appendChild(overlay); });
+                if (window.CSHPanelWindow) overlay.__panelWindow = window.CSHPanelWindow.mount(overlay, panel, head, headMain, function () { toggleHeadSettings(false); });
                 if (playerView && typeof MutationObserver !== "undefined") {
                     var hadShell = !!document.getElementById("csh-shell-overlay");
                     overlay.__worldObserver = new MutationObserver(function () {
@@ -6671,6 +6674,7 @@ function onlineLocalFetch(url,options){return window.CSHOnline.local(url,options
                 }
                 function isTopPanel() {
                     if (!overlay.isConnected) return false;
+                    if (overlay.__panelWindow && overlay.__panelWindow.isFloating() && !panel.contains(document.activeElement)) return false;
                     var active = document.activeElement;
                     if (active && !overlay.contains(active)) {
                         for (var parent = active; parent && parent !== document.documentElement; parent = parent.parentElement) {
@@ -6686,8 +6690,9 @@ function onlineLocalFetch(url,options){return window.CSHOnline.local(url,options
                     if (e.key === "Escape" || e.keyCode === 27) {
                         e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
                         if(panel.classList.contains("csh-head-settings-open")){toggleHeadSettings(false);headSettings.focus({preventScroll:true});return;}
+                        var memory=panel.querySelector(".csh-world-board");if(memory&&memory.__closeMemory&&memory.__closeMemory())return;
                         closePanel();
-                    } else if (e.key === "Tab") {
+                    } else if (e.key === "Tab" && !(overlay.__panelWindow && overlay.__panelWindow.isFloating())) {
                         var stops = Array.from(panel.querySelectorAll('button,input,select,textarea,a[href],[tabindex="0"]')).filter(function (node) {
                             return !node.disabled && node.getClientRects().length;
                         });

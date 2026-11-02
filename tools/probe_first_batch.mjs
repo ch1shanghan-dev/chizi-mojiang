@@ -1,3 +1,4 @@
+import { auditTempRoot, removeAuditScratch, disposeAuditBrowser } from './lib/audit_scratch.mjs';
 /* 第一批非武将修复：确认框生命周期 + 个人战绩。只使用临时 DOM/内存配置。
    node tools/probe_first_batch.mjs
    node tools/probe_first_batch.mjs --browser "C:/Program Files/Google/Chrome/Application/chrome.exe"
@@ -187,7 +188,8 @@ try {
 
     const browser = option("--browser", "");
     if (browser) {
-        const dir = fs.mkdtempSync(path.join(os.tmpdir(), "csh-first-batch-browser-"));
+        const dir = fs.mkdtempSync(path.join(auditTempRoot(), "csh-first-batch-browser-"));
+        process.once("exit",()=>{try{removeAuditScratch(dir);}catch(e){console.warn("Audit cleanup:",e.message);}});
         const file = path.join(dir, "confirm.html");
         const browserCode = `var lib={},game={};
 const handlers=new Set(),add=document.addEventListener.bind(document),remove=document.removeEventListener.bind(document);
@@ -198,7 +200,7 @@ ${uiCases.toString()}
 try{const result=uiCases(confirmBox,document,key=>document.dispatchEvent(new KeyboardEvent('keydown',{key,bubbles:true})),el=>el.click(),()=>handlers.size);document.getElementById('results').textContent=JSON.stringify(result);}
 catch(error){document.getElementById('results').textContent=JSON.stringify({error:String(error.stack)});}`;
         fs.writeFileSync(file, '<!doctype html><html><head><meta charset="utf-8"></head><body><pre id="results"></pre><script>' + browserCode.replace(/<\/script/gi, "<\\/script") + '</script></body></html>');
-        const html = execFileSync(browser, ["--headless=new", ...(args.includes("--no-browser-sandbox") ? ["--no-sandbox"] : []), "--disable-gpu", "--no-first-run", "--no-default-browser-check", "--user-data-dir=" + path.join(dir, "profile"), "--dump-dom", pathToFileURL(file).href], { encoding: "utf8", timeout: 30000, windowsHide: true, stdio: ["ignore", "pipe", "pipe"], maxBuffer: 2 * 1024 * 1024 });
+        const html = execFileSync(browser, ["--headless=new", ...(args.includes("--no-browser-sandbox") ? ["--no-sandbox"] : []), "--disable-gpu", "--no-first-run", "--no-default-browser-check", "--user-data-dir=" + path.join(dir, "profile"), "--dump-dom", pathToFileURL(file).href], { env: {...globalThis.process.env,TEMP:dir,TMP:dir}, encoding: "utf8", timeout: 30000, windowsHide: true, stdio: ["ignore", "pipe", "pipe"], maxBuffer: 2 * 1024 * 1024 });
         const match = html.match(/<pre id="results">([\s\S]*?)<\/pre>/);
         if (!match) throw new Error("Browser produced no report: " + dir);
         const report = JSON.parse(match[1].replace(/&quot;/g, '"').replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&"));

@@ -146,8 +146,13 @@ export const MINION_HEAT = { first: 1.5, repeat: 0.3, cap: 50 };  /* 金鳞市�
                                                     首次 +1.5% / 重复 +0.3% 每次 / 软上限 +50% */
 
 /* ---------- 存储读写（独立副本清洗，写走 saveConfig；恢复期只读） ---------- */
-function readStore() {
-	const s = readConfigCopy(KEY);
+function snapshotCopy(value) {
+    if(value==null)return {};
+    if(typeof value!=="object"||Array.isArray(value))throw new Error("讨伐快照格式异常");
+    return JSON.parse(JSON.stringify(value));
+}
+function readStore(snapshot) {
+    const s = arguments.length ? snapshotCopy(snapshot) : readConfigCopy(KEY);
 	for (const field of ["map", "ext", "extPool", "minions"]) {
 		if (s[field] != null && (typeof s[field] !== "object" || Array.isArray(s[field]))) throw new Error("讨伐存档字段异常，原值保留：" + field);
 	}
@@ -276,8 +281,8 @@ export function record(bossId,opts) {
    作者定案："趣味性的操纵魔王的战绩也可以挂上去"。
    判负 = 玩家即魔王且魔王死亡；判胜 = 玩家即魔王且最后一名挑战者倒下。
    由 skills/boss.js 的 csh_boss_watch / csh_boss_watch2 在 dieAfter 时机调用。 */
-function readAsBoss() {
-	const o = readConfigCopy(KEY_ASBOSS);
+function readAsBoss(snapshot) {
+	const o = arguments.length ? snapshotCopy(snapshot) : readConfigCopy(KEY_ASBOSS);
 	if (typeof o.win !== "number" || !isFinite(o.win) || o.win < 0) o.win = 0;
 	if (typeof o.lose !== "number" || !isFinite(o.lose) || o.lose < 0) o.lose = 0;
 	return o;
@@ -500,8 +505,8 @@ export function snapshotExt() {
      ② 当场动态枚举 extRoster()（boss 模式下含最新数据；非 boss 模式通常为空）
      ③ s.ext 已记录 id（历史战绩兜底——即便上面两源都没有也要显示"我讨伐过谁"）
    按 id 升序输出（与 extRoster 同口径）。 */
-export function extRosterAll() {
-	const s = readStore();
+export function extRosterAll(snapshot) {
+	const s = arguments.length ? readStore(snapshot) : readStore();
 	var map = {};
 	for (var pid in s.extPool) {
 		var p = s.extPool[pid];
@@ -546,8 +551,10 @@ export function extRosterAll() {
    ★ v4：同时输出 total / totalUlt / totalLord / totalEgg / totalElite / seriesTotal
      （档位与系列总量，动态随 allBossIds 变化）——供成就阈值与页面文案读取，
      避免"99 位"之类硬编码在名单变动后失真（成就从此数学上恒可达）。 */
-export function summary() {
-	const s = readStore();
+export function summary(saved, careerOnly) {
+    const candidate=arguments.length>0;
+    if(candidate&&(!saved||typeof saved!=="object"||Array.isArray(saved)))throw new Error("讨伐保全快照格式异常");
+    const s = candidate ? readStore(saved.bossKill) : readStore();
 	const map = s.map;
 	let kill = 0, killUlt = 0, killLord = 0, killEgg = 0, killElite = 0;
 	let total = 0, totalUlt = 0, totalLord = 0, totalEgg = 0, totalElite = 0;
@@ -580,6 +587,7 @@ export function summary() {
 			else if (tier === "egg") killEgg++;
 			else killElite++;
 		}
+		if(careerOnly){roster.push({tier:tier,best:e&&typeof e.best==="number"?e.best:null});continue;}
 		const ch = (lib.character && lib.character[orig]) || null;
 		/* v6.1 难度分（百分制）：纯函数派生自档位/血量/重整/妖灵/技数，
 		   页面只读不重算。base = 原角色基础技数（拿不到就取经验中位数 4）。 */
@@ -615,7 +623,7 @@ export function summary() {
 	/* v5.3 妖灵讨伐统计（总次数 + 逐只次数/热度/名） */
 	let minionKill = 0;
 	const minionMap = {};
-	for (const mid in s.minions) {
+	for (const mid in careerOnly ? {} : s.minions) {
 		const e3 = s.minions[mid];
 		if (e3 && e3.n > 0) {
 			minionKill += e3.n;
@@ -639,16 +647,16 @@ export function summary() {
 	   只数名册里的 1 位 ⇒ 序页"外传 0/1"、成就"外传全讨"分母=1，与卷八的 78 位完全不匹配。 */
 	if (seriesTotal["qunyou_lunwai"] != null) {
 		series["qunyou_lunwai"] += extKill;
-		seriesTotal["qunyou_lunwai"] += extRosterAll().length;
+		seriesTotal["qunyou_lunwai"] += (candidate?extRosterAll(s):extRosterAll()).length;
 	}
 	return {
 		kill: kill, killUlt: killUlt, killLord: killLord, killEgg: killEgg, killElite: killElite,
 		total: total, totalUlt: totalUlt, totalLord: totalLord, totalEgg: totalEgg, totalElite: totalElite,
 		series: series, seriesTotal: seriesTotal,
 		roster: roster,
-		map: JSON.parse(JSON.stringify(map)),
+		map: careerOnly ? {} : JSON.parse(JSON.stringify(map)),
 		speed: speed,
-		asBoss: readAsBoss(),
+		asBoss: candidate ? readAsBoss(saved.bossAsBoss) : readAsBoss(),
 		/* v5.3 妖灵讨伐统计（总次数 + 逐只次数/热度）——讨伐录妖灵段与调试面板共用 */
 		minionKill: minionKill,
 		minions: minionMap,
@@ -657,8 +665,16 @@ export function summary() {
 		/* 外传（批次 A）：击破明细深拷贝 + 已讨外传数 + 外传总量（动态枚举） */
 		ext: JSON.parse(JSON.stringify(s.ext)),
 		extKill: extKill,
-		extTotal: extRosterAll().length,
+		extTotal: (candidate?extRosterAll(s):extRosterAll()).length,
 	};
+}
+
+/* Pure candidate projection: no config mirror or old wallet can replace this write. */
+export function careerSnapshot(saved) {
+    const r=summary(saved,true);
+    return {bossKill:r.kill,bossKillUlt:r.killUlt,bossKillLord:r.killLord,bossKillEgg:r.killEgg,bossKillElite:r.killElite,
+        bossTotal:r.total,bossTotalUlt:r.totalUlt,bossTotalLord:r.totalLord,bossTotalEgg:r.totalEgg,bossTotalElite:r.totalElite,
+        bossSeries:r.series,bossSeriesTotal:r.seriesTotal,bossSpeed:r.speed,bossAsBossWin:r.asBoss.win,bossAsBossLose:r.asBoss.lose};
 }
 
 /* ---------- 安装（main/content.js 调用；幂等） ---------- */
@@ -725,7 +741,7 @@ export function installBossRecord() {
 			extRosterAll: extRosterAll,
 			snapshotExt: snapshotExt,
 			read: readStore,
-			summary: summary,
+			summary: summary, careerSnapshot: careerSnapshot,
 			REWARD_FIRST: REWARD_FIRST,
 			REWARD_DAILY: REWARD_DAILY,
 			MINION_CBY: MINION_CBY,

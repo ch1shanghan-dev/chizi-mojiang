@@ -879,7 +879,7 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 	}
 	/* 成就统计聚合（2026-09-28 新增）：只读，把各模块数据归成一张快照。
 	   任何子模块缺失都降级为 0，绝不抛错。 */
-	function buildStats() {
+	function buildStats(options) {
 		/* 统计口径（2026-09-29 重写）：
 		   每一项都必须是**真实可核**的字段，禁止任何占位/推算值。
 		   已删除：bank（全仓无写入）、quota（恒 1200）。 */
@@ -893,7 +893,7 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 			worldTopFund: 0, worldRetired: 0, worldSkillTop: 0,
 			billionaires: 0, billionaireBroke: 0,
 			interactTotal: 0,
-			taskDone: 0, taskTotal: 0,
+			taskDone: 0, taskTotal: 0, taskCompletedTotal: 0, taskFullDays: 0,
 			gamblePlays: 0, gambleWins: 0, gambleNet: 0, gambleBest: 0, gambleBust: 0, gambleBestStreak: 0,
 			nightOwl: false,
 		};
@@ -911,9 +911,10 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 					s.rank = r.rank || 0; s.merit = r.merit || 0; s.meritToday = r.meritToday || 0;
 					if (r.seg) { s.segIdx = r.seg.seg || 0; s.segName = r.seg.name || ""; }
 				}
-				var t = W.task.state();
+				var t = options && options.readOnly ? W.task.peek() : W.task.state();
 				if (t && t.defs) {
 					s.taskTotal = t.defs.length;
+                    if(t.lifetime){s.taskCompletedTotal=t.lifetime.completed;s.taskFullDays=t.lifetime.fullDays;}
 					for (var ti = 0; ti < t.defs.length; ti++) if (t.defs[ti].done) s.taskDone++;
 				}
 			}

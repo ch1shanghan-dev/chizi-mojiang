@@ -348,8 +348,9 @@ h1 small{display:block;font-size:var(--fs-cap);font-weight:400;letter-spacing:.1
 
 </style>
 <link rel="stylesheet" href="../core/csh_experience.css">
+<link rel="stylesheet" href="../core/csh_records.css">
 </head>
-<body class="csh-experience">
+<body class="csh-experience" data-csh-records="rank">
 <div id="wrap">
   <div class="card" id="rank-tools">
     <h1><span id="ttl">天下榜</span><small id="sub">一曲既罢 · 名姓自留</small></h1>
@@ -360,8 +361,9 @@ h1 small{display:block;font-size:var(--fs-cap);font-weight:400;letter-spacing:.1
       <button id="save" type="button">题名</button>
     </div>
     <div class="hint" id="hint"></div>
+    <span id="local-best" role="status"></span>
     </details>
-    <div class="net-controls"><button id="net-toggle" type="button">开启公开榜</button><button id="net-refresh" type="button">刷新</button><span id="local-best" role="status"></span></div>
+    <div class="net-controls"><button id="net-toggle" type="button">开启公开榜</button><button id="net-refresh" type="button">刷新</button></div>
     <div id="net-policy" class="hint"></div>
     <div class="stat" id="stat"></div>
   </div>

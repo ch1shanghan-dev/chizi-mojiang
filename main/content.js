@@ -397,6 +397,8 @@ export function cshContent(config, pack) { try {
     /* 妖灵好感度层（v6.2）：常驻挂 lib.cshAffection（讨伐/持股/聊天/送礼 四来源 + 五档台词；
        与金鳞市同源同一份 50 位；install 幂等）。 */
     installAffection();
+    /* Establish a silent historical baseline before passive wallet collection. */
+    try { if (lib.cshCareerObserver) lib.cshCareerObserver.start(); } catch (eCareer) { console.warn("[池子魔将] 生涯采集待就绪", eCareer); }
     /* 池子成就（2026-10-20 · 操作型成就）：挂局内事件采集器（幂等）。
        只统计 身份/斗地主/对决、非联机；解锁只写存档，这里给一次轻提示（页面见下一步）。
        任何异常都必须咽掉 —— 成就绝不能影响牌局。 */
