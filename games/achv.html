@@ -18,11 +18,24 @@ header{display:flex;align-items:center;gap:12px;min-height:44px;flex-shrink:0;pa
 header #claim-all{margin:0;align-self:center;flex:0 0 auto}@media(min-width:900px){#list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 20px;align-content:start}.row{grid-template-columns:minmax(0,1fr) 124px;gap:6px 12px}.load-more,.empty{grid-column:1/-1}}
 .row .name{display:flex;align-items:center;gap:8px;min-width:0}.achievement-name-text{min-width:0;overflow-wrap:anywhere}
 .earned-time{font-size:var(--pfs-sm);color:var(--muted);margin-top:3px;overflow-wrap:anywhere}
+#pool-read-state{display:flex;align-items:center;gap:10px;margin-bottom:8px}#pool-read-state[hidden]{display:none}#pool-read-note{flex:1;margin:0;font-size:var(--pfs-sm);line-height:1.5;color:var(--muted)}#pool-read-retry,.feat-refresh{min-height:44px;min-width:44px;padding:8px 12px;font:inherit;border:1px solid var(--line);border-radius:6px;background:transparent;color:var(--ink)}
 </style>
 <link rel="stylesheet" href="../core/csh_experience.css">
 <link rel="stylesheet" href="../core/csh_achievement_badges.css">
 <link rel="stylesheet" href="../core/csh_journal.css">
 <link rel="stylesheet" href="../core/csh_achievement_album.css">
+<style>
+body[data-csh-journal="pool"] .album-context{align-items:center;gap:8px}
+body[data-csh-journal="pool"] #album-context-title{flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#album-context-count{white-space:nowrap}
+#pool-pagination{display:flex;align-items:center;gap:4px;flex:0 0 auto}
+#pool-pagination[hidden]{display:none}
+#pool-pagination button,#pool-pagination select{min-height:44px;border:1px solid var(--line);background:var(--panel);color:var(--text);font:inherit;font-size:var(--pfs-sm);border-radius:6px;padding:4px 8px}
+#pool-pagination button{min-width:44px}
+#pool-pagination select{width:94px;max-width:94px}
+#pool-pagination button:disabled{opacity:.4;cursor:default}
+@media(max-width:1199px),(max-height:599px){body[data-csh-journal="pool"] .journal-sidebar{grid-template-columns:minmax(100px,1fr) 116px auto auto auto}#pool-pagination{order:5}}
+</style>
 </head><body class="csh-experience" data-csh-journal="pool">
 <header class="journal-header"><div class="journal-title"><h1>池子成就<span class="journal-mode">单机 · 身份 / 斗地主 / 对决</span></h1><div id="summary"></div></div><button id="claim-all" type="button">领取已达成</button></header>
 <div class="journal-workspace">
@@ -36,29 +49,33 @@ header #claim-all{margin:0;align-self:center;flex:0 0 auto}@media(min-width:900p
    <p id="collection-note"></p><p class="note" id="rule-note"></p><button id="album-filter-reset" type="button" hidden>清除筛选</button>
   </div></details>
 
+  <nav id="pool-pagination" aria-label="成就分页" hidden><button id="pool-page-prev" type="button" aria-label="上一页成就">‹</button><select id="pool-page-select" aria-label="跳转成就页码"></select><button id="pool-page-next" type="button" aria-label="下一页成就">›</button></nav>
  </aside>
- <section class="journal-results" aria-label="成就目录"><div id="message" role="status" aria-live="polite"></div><div class="album-context"><h2 id="album-context-title">全部成就</h2><span id="album-context-count"></span></div><main id="list" aria-label="成就列表"></main></section>
+ <section class="journal-results" aria-label="成就目录"><div id="pool-read-state" hidden><p id="pool-read-note" role="status"></p><button id="pool-read-retry" type="button">重新读取</button></div><div id="message" role="status" aria-live="polite"></div><div class="album-context"><h2 id="album-context-title">全部成就</h2><span id="album-context-count"></span></div><main id="list" aria-label="成就列表"></main></section>
 </div>
 <script>
 (function(){
 "use strict";
-var PA=window.CSH_POOL_ACHV,T=window.CSHPage.transport({closeName:"achv-close",timeout:3500}),pending={},store,bulkPending=false,rowLimit=80;
+var PA=window.CSH_POOL_ACHV,T=window.CSHPage.transport({closeName:"achv-close",timeout:3500}),pending={},store,lastRead=null,readError="",bulkPending=false,pageIndex=0,disposed=false,bulkEpoch=0,bulkTimer=null;
+var PAGE_SIZE=80,searchIndex=Object.create(null),lastFilterKey="";
 var $=function(id){return document.getElementById(id);},mode={identity:"身份",doudizhu:"斗地主",versus:"对决"};
 function el(tag,cls,text){var n=document.createElement(tag);if(cls)n.className=cls;if(text!=null)n.textContent=text;return n;}
 if(!PA){$("message").textContent="成就未就绪，请关闭后重开";return;}
-(PA.PROFILES||[]).forEach(function(p){var option=el("option","",p.name+" · "+PA.RULES.filter(function(r){return r.hero===p.id;}).length+" 项");option.value=p.id;$("hero").appendChild(option);});
+var profileCounts=Object.create(null);PA.RULES.forEach(function(r){if(r.hero)profileCounts[r.hero]=(profileCounts[r.hero]||0)+1;});
+(PA.PROFILES||[]).forEach(function(p){var option=el("option","",p.name+" · "+(profileCounts[p.id]||0)+" 项");option.value=p.id;$("hero").appendChild(option);});
 function isSameMatch(r){return r.scope==="feat"||!!r.tactic;}
 function rarityName(r){return r&&[1,2,3].indexOf(r.rare)>=0?["","普通","稀有","史诗"][r.rare]:"未标注";}
 function searchText(value){return String(value||"").normalize("NFKC").toLowerCase();}
 function matchesSearch(r,tokens){
- var text=searchText([r.name,r.desc,r.cat,r.heroName||"",rarityName(r),(r.modes.length?r.modes:Object.keys(mode)).map(function(m){return mode[m]||m;}).join(" "),isSameMatch(r)?"同局挑战":""].join(" "));
+ if(!tokens.length)return true;
+ var text=searchIndex[r.id]||(searchIndex[r.id]=searchText([r.name,r.desc,r.cat,r.heroName||"",rarityName(r),(r.modes.length?r.modes:Object.keys(mode)).map(function(m){return mode[m]||m;}).join(" "),isSameMatch(r)?"同局挑战":""].join(" ")));
  return tokens.every(function(token){return text.indexOf(token)>=0;});
 }
 function clearFilters(){
- $("search").value="";$("hero").value="all";$("category").value="全部分类";$("status").value="全部状态";$("sort").value="待领优先";rowLimit=80;render();$("search").focus();
+ $("search").value="";$("hero").value="all";$("category").value="全部分类";$("status").value="全部状态";$("sort").value="待领优先";pageIndex=0;render();$("search").focus();
 }
 function volume(){var h=$("hero").value,c=$("category").value;return h==="general"&&c==="全部分类"?"general":h==="all"&&c==="专属"?"hero":h==="all"&&c==="同局挑战"?"match":h==="all"&&c==="全部分类"?"all":"custom";}
-function chooseVolume(value){if(value==="custom")return;$("hero").value=value==="general"?"general":"all";$("category").value=value==="hero"?"专属":value==="match"?"同局挑战":"全部分类";rowLimit=80;render();}
+function chooseVolume(value){if(value==="custom")return;$("hero").value=value==="general"?"general":"all";$("category").value=value==="hero"?"专属":value==="match"?"同局挑战":"全部分类";pageIndex=0;render();}
 function earnedRecord(record){
  var raw=record&&typeof record==="object"&&!Array.isArray(record)?record.t:null;
  var number=typeof raw==="number"||typeof raw==="string"&&raw.trim()!==""?Number(raw):NaN;
@@ -77,17 +94,53 @@ function appendEarned(main,r){
 }
 var originalOrder=Object.create(null);PA.RULES.forEach(function(r,i){originalOrder[r.id]=i;});
 function state(r){return pending[r.id]?"待领取":store.seen[r.id]?"已领取":store.got[r.id]?"待领取":"未解锁";}
+function readStore(){
+ readError="";
+ try{
+  if(CSHPage.saveAllowed&&CSHPage.saveAllowed()!==true)throw Error("guard");
+  PA.reconcile();var fresh=PA.load();
+  if(PA.storageError())throw Error("read");
+  if(!fresh||typeof fresh!=="object"||Array.isArray(fresh))throw Error("shape");
+  ["got","seen","chars","progress"].forEach(function(k){if(fresh[k]!=null&&(typeof fresh[k]!=="object"||Array.isArray(fresh[k])))throw Error("shape");});
+  if(!fresh.got||!fresh.seen||!fresh.chars)throw Error("shape");
+  lastRead=JSON.parse(JSON.stringify(fresh));
+ }catch(error){readError="成就记录暂未读取，请恢复存储后重试；存档已更新时请关闭后重新进入。";}
+ store=lastRead;
+ $("pool-read-state").hidden=!readError;$("pool-read-note").textContent=readError+(lastRead?" 当前保留上次已读记录，暂不能领奖。":" 未读取到的进度不会显示为零。");
+ return !!store;
+}
+function updatePagination(total){
+ var count=Math.ceil(total/PAGE_SIZE),select=$("pool-page-select");pageIndex=Math.max(0,Math.min(pageIndex,count-1));
+ $("pool-pagination").hidden=count<2;
+ if(select.dataset.pages!==String(count)){select.textContent="";for(var i=0;i<count;i++){var option=el("option","",(i+1)+" / "+count);option.value=String(i);select.appendChild(option);}select.dataset.pages=String(count);}
+ select.value=String(pageIndex);$("pool-page-prev").disabled=pageIndex===0;$("pool-page-next").disabled=pageIndex>=count-1;
+ return pageIndex*PAGE_SIZE;
+}
+function changePage(index,control){
+ if(disposed||!Number.isInteger(index)||index<0)return;
+ var count=Number($("pool-page-select").dataset.pages)||0;if(index>=count)return;
+ pageIndex=index;render();$("list").scrollTop=0;
+ var next=control&&!control.disabled&&control.getClientRects().length?control:$("pool-page-select");if(!$("pool-pagination").hidden)next.focus({preventScroll:true});
+}
 function render(){
- var focusNode=document.activeElement,focusRow=focusNode&&focusNode.closest?focusNode.closest(".row"):null,focusId=focusRow&&focusRow.dataset.id,focusKind=focusRow?(focusNode.classList.contains("csh-goal-pin")?"pin":focusNode.matches("button.claim")?"claim":focusNode.matches(".achievement-details>summary")?"details":null):null;
- PA.reconcile();store=PA.load();var total=PA.RULES.length,general=PA.RULES.filter(function(r){return !r.hero;}).length,got=0,paid=0;
+ if(disposed)return;
+
+ var focusNode=document.activeElement,focusRow=focusNode&&focusNode.closest?focusNode.closest(".row"):null,focusId=focusRow&&focusRow.dataset.id,focusKind=focusRow?(focusNode.classList.contains("csh-goal-pin")?"pin":focusNode.matches("button.claim")?"claim":focusNode.matches(".feat-refresh")?"live":focusNode.matches(".achievement-details>summary")?"details":null):null;
+ if(!readStore()){
+  $("pool-pagination").hidden=true;
+  $("summary").textContent="成就记录暂未读取";$("claim-all").disabled=true;$("goal-bar").textContent="";$("goal-bar").hidden=true;$("album-goals").classList.remove("has-goals");$("album-goal-count").textContent="待读取";
+  $("album-context-title").textContent="成就记录";$("album-context-count").textContent="未读取";$("list").textContent="";$("list").appendChild(el("p","empty","记录恢复后，将继续显示已达成成就、历史最佳与待领奖励。"));return;
+ }
+ var total=PA.RULES.length,general=PA.RULES.filter(function(r){return !r.hero;}).length,got=0,paid=0;
  PA.RULES.forEach(function(r){if(store.got[r.id])got++;if(store.got[r.id]&&store.seen[r.id]&&!pending[r.id])paid++;});
  $("summary").textContent="已解锁 "+got+" / "+total+" · 待领取 "+(got-paid)+" · 已领取 "+paid;$("collection-note").textContent="通用 "+general+" 项 · "+(PA.PROFILES||[]).length+" 位武将专属 "+(total-general)+" 项";
  $("hero").options[0].textContent="全部 · "+total+" 项";$("hero").options[1].textContent="通用 · "+general+" 项";
- var ready=got-paid,bulk=$("claim-all");bulk.disabled=bulkPending||!ready;bulk.textContent=bulkPending?"领取中…":"领取全部已达成"+(ready?" · "+ready+"枚":"");
- if(window.CSHGoals)CSHGoals.paint($("goal-bar"),"pool",PA.RULES.map(function(r){var p=PA.progress(r,store);return {id:r.id,label:r.name,description:r.desc,current:p.value,target:p.target,done:!!store.got[r.id],claimed:!!store.seen[r.id]};}),render);
+ var ready=got-paid,bulk=$("claim-all");bulk.disabled=!!readError||bulkPending||Object.keys(pending).length>0||!ready;bulk.textContent=bulkPending?"领取中…":"领取全部已达成"+(ready?" · "+ready+"枚":"");
+ if(window.CSHGoals){var goalPins=CSHGoals.list("pool");CSHGoals.paint($("goal-bar"),"pool",PA.RULES.filter(function(r){return goalPins.indexOf(r.id)>=0;}).map(function(r){var p=PA.progress(r,store);return {id:r.id,label:r.name,description:r.desc,current:p.value,target:p.target,done:!!store.got[r.id],claimed:!!store.seen[r.id]};}),render);}
  var pinCount=window.CSHGoals?CSHGoals.list("pool").length:0;$("album-goal-count").textContent=pinCount+" / 3";$("album-goals").classList.toggle("has-goals",!$("goal-bar").hidden);
- if(PA.storageError())$("message").textContent=PA.storageError();
+
  var q=searchText($("search").value).trim().split(/\s+/).filter(Boolean),cat=$("category").value,st=$("status").value,hero=$("hero").value;
+ var filterKey=JSON.stringify([q,cat,st,hero,$("sort").value]);if(filterKey!==lastFilterKey){pageIndex=0;$("list").scrollTop=0;lastFilterKey=filterKey;}
  var rows=PA.RULES.filter(function(r){return (hero==="all"||(hero==="general"?!r.hero:r.hero===hero))&&(cat==="全部分类"||(cat==="同局挑战"?isSameMatch(r):r.cat===cat))&&(st==="全部状态"||state(r)===st)&&matchesSearch(r,q);});
  $("rule-note").textContent=cat==="同局挑战"?"同局挑战 · "+rows.length+" 项；须在同一局满足全部条件，不合并不同对局。":"单机身份、斗地主、对决中记录；单局条件显示历史最佳，武将胜场跨局累计。";
  var vol=volume(),volumeNames={all:"全部成就",hero:"武将专属",match:"同局挑战",general:"通用收藏"},profile=(PA.PROFILES||[]).find(function(p){return p.id===hero;}),title=profile?profile.name+" · 专属成就":volumeNames[vol]||(cat!=="全部分类"?cat:"当前筛选");
@@ -97,42 +150,77 @@ function render(){
  if(sort==="最近达成")rows.forEach(function(r){var date=earnedRecord(store.got[r.id]);recent[r.id]={group:date?0:store.got[r.id]||store.seen[r.id]?1:2,stamp:date?date.stamp:0};});
  rows.sort(function(a,b){if(sort==="最近达成"){var ra=recent[a.id],rb=recent[b.id];return ra.group-rb.group||rb.stamp-ra.stamp||originalOrder[a.id]-originalOrder[b.id];}if(sort==="待领优先")return (state(a)==="待领取"?-1:state(a)==="未解锁"?0:1)-(state(b)==="待领取"?-1:state(b)==="未解锁"?0:1);if(sort==="进度优先"){var pa=PA.progress(a,store),pb=PA.progress(b,store);return pb.value/pb.target-pa.value/pa.target;}return 0;});
  var list=$("list"),opened=Object.create(null);list.querySelectorAll(".achievement-details[open]").forEach(function(n){opened[n.closest(".row").dataset.id]=true;});list.textContent="";
- if(!rows.length){var empty=el("div","empty","没有匹配的成就，试试其他筛选条件。");var reset=el("button","clear-filters","清除筛选");reset.type="button";reset.addEventListener("click",clearFilters);empty.appendChild(el("div","","")).appendChild(reset);list.appendChild(empty);return;}
- var totalMatching=rows.length,lastGroup='';rows.slice(0,rowLimit).forEach(function(r){
+ if(!rows.length){updatePagination(0);var empty=el("div","empty","没有匹配的成就，试试其他筛选条件。");var reset=el("button","clear-filters","清除筛选");reset.type="button";reset.addEventListener("click",clearFilters);empty.appendChild(el("div","","")).appendChild(reset);list.appendChild(empty);return;}
+ var totalMatching=rows.length,pageStart=updatePagination(totalMatching),lastGroup='';$("album-context-count").textContent=(pageStart+1)+"–"+Math.min(totalMatching,pageStart+PAGE_SIZE)+" / "+totalMatching;rows.slice(pageStart,pageStart+PAGE_SIZE).forEach(function(r){
   if(hero!=='all'&&hero!=='general'&&r.hero){var profile=PA.PROFILES.find(function(p){return p.id===r.hero;}),path=profile&&profile.paths.find(function(p){return p.metric===r.metric;}),group=r.scope==='wins'?'长期里程碑':r.scope==='feat'?'同局组合挑战':'成长路线 · '+(path?path.title:'特色操作');if(group!==lastGroup){var heading=el('h2','route-heading',group);heading.style.cssText='grid-column:1/-1;font-size:var(--pfs-md);margin:14px 0 4px';list.appendChild(heading);lastGroup=group;}}
 
   var row=el("article","row"),main=el("div"),aside=el("div"),nm=el("div","name"),nameText=el("span","achievement-name-text",r.name),rw=PA.reward(r),pr=PA.progress(r,store);
-  main.className="achievement-main";aside.className="achievement-actions";row.dataset.claimable=String(!!store.got[r.id]&&!store.seen[r.id]);row.dataset.id=r.id;try{if(window.CSHAchievementBadges)nm.appendChild(window.CSHAchievementBadges.create(r,document));}catch(badgeError){}var meta=el("span","meta"),rarity=el("span","rarity-label",rarityName(r));rarity.setAttribute("aria-label","稀有度："+rarityName(r));meta.appendChild(rarity);meta.appendChild(document.createTextNode(" · "+(isSameMatch(r)?"同局挑战 · ":"")+r.cat));nameText.appendChild(meta);nm.appendChild(nameText);main.appendChild(nm);
+  main.className="achievement-main";aside.className="achievement-actions";row.dataset.claimable=String(!readError&&!!store.got[r.id]&&!store.seen[r.id]);row.dataset.id=r.id;try{if(window.CSHAchievementBadges)nm.appendChild(window.CSHAchievementBadges.create(r,document));}catch(badgeError){}var meta=el("span","meta"),rarity=el("span","rarity-label",rarityName(r));rarity.setAttribute("aria-label","稀有度："+rarityName(r));meta.appendChild(rarity);meta.appendChild(document.createTextNode(" · "+(isSameMatch(r)?"同局挑战 · ":"")+r.cat));nameText.appendChild(meta);nm.appendChild(nameText);main.appendChild(nm);
   main.appendChild(el("div","condition-preview",r.desc));
   var pg=el("div","progress"),bar=el("progress");bar.max=pr.target;bar.value=pr.value;bar.setAttribute("aria-label",r.name+"进度");pg.appendChild(bar);pg.appendChild(el("span","",pr.label+" "+pr.value+" / "+pr.target));main.appendChild(pg);
   var details=el("details","achievement-details"),detailSummary=el("summary","","条件与达成记录"),detailBody=el("div","achievement-detail-body");detailSummary.setAttribute("aria-label",r.name+" · 条件与达成记录");details.appendChild(detailSummary);details.appendChild(detailBody);details.open=!!opened[r.id];if(details.open)row.classList.add("details-open");details.addEventListener("toggle",function(){row.classList.toggle("details-open",details.open);if(details.open&&document.activeElement===detailSummary)details.scrollIntoView({block:"start"});});
   detailBody.appendChild(el("p","condition",r.desc));detailBody.appendChild(el("p","achievement-scope",(isSameMatch(r)?"须在同一局满足全部条件，不同局不合并。":"")+"适用模式："+(r.modes.length?r.modes.map(function(m){return mode[m];}).join(" / "):"身份 / 斗地主 / 对决")));
   appendEarned(detailBody,r);
   if(r.hint)detailBody.appendChild(el("div","hint",r.hint));
-  if(r.scope==='feat'){var live=null;try{if(window.parent&&window.parent.CSH_POOL_ACHV&&window.parent.CSH_POOL_ACHV.live)live=window.parent.CSH_POOL_ACHV.live(r.hero);}catch(e){}if(live){var complete=live.steps.filter(function(step){return step.current>=step.target;}).length;detailBody.appendChild(el('div','hint feat-live',(live.ended?'刚结束的一局':'本局')+' · 已满足 '+complete+'/'+live.steps.length+' 个条件（不同局不合并）'));live.steps.forEach(function(step){detailBody.appendChild(el('div','hint feat-live',(step.current>=step.target?'✓ ':'· ')+step.label+' · '+Math.min(step.current,step.target)+' / '+step.target));});}}
+  function paintLive(){
+   details.__livePainted=true;
+   detailBody.querySelectorAll('.feat-live,.feat-refresh').forEach(function(n){n.remove();});
+   if(readError||r.scope!=='feat'||store.got[r.id]||store.seen[r.id])return;
+   var live=null,failed=false;
+   try{if(window.parent&&window.parent.CSH_POOL_ACHV&&typeof window.parent.CSH_POOL_ACHV.live==='function')live=window.parent.CSH_POOL_ACHV.live(r.hero);}catch(e){failed=true;}
+   if(!live&&!failed)return;
+   var valid=live&&Array.isArray(live.steps)&&live.steps.length>0&&(!Array.isArray(r.requires)||r.requires.length===live.steps.length)&&live.steps.every(function(step,i){return step&&typeof step.label==='string'&&Number.isFinite(step.current)&&step.current>=0&&Number.isFinite(step.target)&&step.target>0&&(!Array.isArray(r.requires)||step.target===r.requires[i][1]);});
+   if(!valid)detailBody.appendChild(el('div','hint feat-live','本局条件暂未读取，可重试。'));
+   else{var complete=live.steps.filter(function(step){return step.current>=step.target;}).length;detailBody.appendChild(el('div','hint feat-live',(live.ended===true?'刚结束的一局':'本局')+' · 已满足 '+complete+'/'+live.steps.length+' 个条件（不同局不合并）'));live.steps.forEach(function(step){detailBody.appendChild(el('div','hint feat-live',(step.current>=step.target?'✓ ':'· ')+step.label+' · '+Math.min(step.current,step.target)+' / '+step.target));});}
+   var refresh=el('button','feat-refresh','刷新本局条件');refresh.type='button';refresh.addEventListener('click',function(){if(!disposed&&row.isConnected&&details.open)render();});detailBody.appendChild(refresh);
+  }
+  details.addEventListener('toggle',function(){if(!details.open){details.__livePainted=false;return;}if(!disposed&&row.isConnected&&!details.__livePainted)paintLive();});if(details.open)paintLive();
 
   aside.appendChild(el("div","reward",rw.pc+" 池子币 · "+rw.merit+" 基础功勋"));
   var stateNow=state(r),button=el(stateNow==="待领取"?"button":"span","claim"+(stateNow==="待领取"?" ready":stateNow==="已领取"?" done":""),pending[r.id]?"领取中…":stateNow==="待领取"?"领取奖励":stateNow);
-  if(stateNow==="待领取"){button.type="button";button.disabled=!!pending[r.id];button.addEventListener("click",function(){claim(r);});}aside.appendChild(button);if(window.CSHGoals)aside.appendChild(CSHGoals.button("pool",r.id,r.name,function(){render();var pin=$("list").querySelector('[data-id="'+r.id+'"] .csh-goal-pin');if(pin)pin.focus();},function(msg){$("message").textContent=msg;}));row.appendChild(main);row.appendChild(aside);row.appendChild(details);list.appendChild(row);
+  if(stateNow==="待领取"){button.type="button";button.disabled=!!readError||bulkPending||!!pending[r.id];button.addEventListener("click",function(){claim(r);});}aside.appendChild(button);if(window.CSHGoals)aside.appendChild(CSHGoals.button("pool",r.id,r.name,function(){render();var pin=$("list").querySelector('[data-id="'+r.id+'"] .csh-goal-pin');if(pin)pin.focus();},function(msg){$("message").textContent=msg;}));row.appendChild(main);row.appendChild(aside);row.appendChild(details);list.appendChild(row);
  });
- if(focusId&&focusKind){var focusRowNext=$("list").querySelector('[data-id="'+focusId+'"]'),focusNext=focusRowNext&&(focusKind==="pin"?focusRowNext.querySelector(".csh-goal-pin"):focusKind==="claim"?(focusRowNext.querySelector("button.claim:not(:disabled)")||focusRowNext.querySelector(".achievement-details>summary")):focusRowNext.querySelector(".achievement-details>summary"));if(focusNext)focusNext.focus({preventScroll:true});}
- if(totalMatching>rowLimit){var more=el("button","load-more","继续查看 · 还有 "+(totalMatching-rowLimit)+" 项");more.type="button";more.addEventListener("click",function(){rowLimit+=80;render();});list.appendChild(more);}
+ if(focusId&&focusKind){var focusRowNext=$("list").querySelector('[data-id="'+focusId+'"]'),focusNext=focusRowNext&&(focusKind==="pin"?focusRowNext.querySelector(".csh-goal-pin"):focusKind==="claim"?(focusRowNext.querySelector("button.claim:not(:disabled)")||focusRowNext.querySelector(".achievement-details>summary")):focusKind==="live"?(focusRowNext.querySelector(".feat-refresh")||focusRowNext.querySelector(".achievement-details>summary")):focusRowNext.querySelector(".achievement-details>summary"));if(focusNext)focusNext.focus({preventScroll:true});}
+
 }
 function claim(r){
- if(pending[r.id])return;pending[r.id]=true;$("message").textContent="";render();
- T.call("shell-pool-ach-claim",{key:r.id},function(ok,data){delete pending[r.id];$("message").textContent=ok?(data&&data.already?"已领取过该奖励":"已领取「"+r.name+"」奖励"):(data&&data.reason||"领取未完成，请回主界面后重试");render();var row=$("list").querySelector('[data-id="'+r.id+'"]'),focus=row&&(row.querySelector("button.claim:not(:disabled)")||row.querySelector(".achievement-details>summary"));if(focus)focus.focus();});
+ if(disposed||readError||bulkPending||pending[r.id]||!CSHPage.requireSave())return;
+ var token={received:false};pending[r.id]=token;$("message").textContent="";render();if(readError){delete pending[r.id];render();return;}
+ function done(ok,data){
+  if(disposed||token.received||pending[r.id]!==token)return;token.received=true;delete pending[r.id];
+  var active=document.activeElement,activeRow=active&&active.closest&&active.closest('.row'),restore=active===document.body||activeRow&&activeRow.dataset.id===r.id;
+  $("message").textContent=ok?(data&&data.already?"已领取过该奖励":"已领取「"+r.name+"」奖励"):(data&&data.reason||"领取未完成，请回主界面后重试");render();
+  if(restore){var row=$("list").querySelector('[data-id="'+r.id+'"]'),focus=row&&(row.querySelector("button.claim:not(:disabled)")||row.querySelector(".achievement-details>summary"));if(focus)focus.focus({preventScroll:true});}
+ }
+ try{T.call("shell-pool-ach-claim",{key:r.id},done);}catch(e){done(false,null);}
 }
 $("claim-all").addEventListener("click",function(){
- if(bulkPending)return;bulkPending=true;var total={count:0,gained:0,meritGained:0},lastRemaining=-1;render();
- function finish(ok,data){bulkPending=false;$("message").textContent=ok?"已领取 "+total.count+" 枚 · +"+total.gained+" CBY / +"+total.meritGained+" 功勋"+(data.remaining?" · 仍有 "+data.remaining+" 枚待领，可重试":"")+(data.reason?" · "+data.reason:""):data.reason||"领取未完成，资格已保留";render();}
- function next(){if(!window.CSHPage.requireSave()){finish(total.count>0,{reason:"存档已更新，请重新进入",remaining:lastRemaining>0?lastRemaining:0});return;}
-  T.call("shell-pool-ach-claim-all",{},function(ok,data){data=data||{};total.count+=Number(data.count)||0;total.gained+=Number(data.gained)||0;total.meritGained+=Number(data.meritGained)||0;
-   if(ok&&data.remaining>0&&!data.reason&&data.remaining!==lastRemaining){lastRemaining=data.remaining;$("message").textContent="已领取 "+total.count+" 枚，继续领取中…";render();setTimeout(next,0);}else finish(ok||total.count>0,data);
-  });
+ if(disposed||readError||bulkPending||Object.keys(pending).length)return;
+ var epoch=++bulkEpoch;bulkPending=true;var total={count:0,gained:0,meritGained:0},lastRemaining=-1;render();
+ function active(){return !disposed&&bulkPending&&epoch===bulkEpoch;}
+ function finish(ok,data){if(!active())return;bulkPending=false;bulkTimer=null;$("message").textContent=ok?"已领取 "+total.count+" 枚 · +"+total.gained+" CBY / +"+total.meritGained+" 功勋"+(data.remaining?" · 仍有 "+data.remaining+" 枚待领，可重试":"")+(data.reason?" · "+data.reason:""):data.reason||"领取未完成，资格已保留";render();}
+ function next(){
+  if(!active())return;
+  if(readError){finish(total.count>0,{reason:"成就记录尚未读回，请恢复后重试",remaining:lastRemaining>0?lastRemaining:0});return;}
+  if(!CSHPage.requireSave()){finish(total.count>0,{reason:"存档已更新，请重新进入",remaining:lastRemaining>0?lastRemaining:0});return;}
+  var received=false;
+  function done(ok,data){
+   if(!active()||received)return;received=true;data=data||{};
+   ["count","gained","meritGained"].forEach(function(k){if(Number.isSafeInteger(data[k])&&data[k]>0)total[k]+=data[k];});
+   if(ok&&Number.isSafeInteger(data.remaining)&&data.remaining>0&&!data.reason&&(lastRemaining<0||data.remaining<lastRemaining)){lastRemaining=data.remaining;$("message").textContent="已领取 "+total.count+" 枚，继续领取中…";render();bulkTimer=setTimeout(next,0);}
+   else finish(ok||total.count>0,data);
+  }
+  try{T.call("shell-pool-ach-claim-all",{},done);}catch(e){done(false,null);}
  }next();
 });
+window.addEventListener("pagehide",function(){disposed=true;bulkEpoch++;if(bulkTimer!==null)clearTimeout(bulkTimer);});
+
+$("pool-read-retry").addEventListener("click",function(){var restore=document.activeElement===this;render();if(restore&&!readError){var next=$("list").querySelector(".achievement-details>summary")||$("search");next.focus();}});
 document.querySelectorAll("[data-volume]").forEach(function(n){n.addEventListener("click",function(){chooseVolume(n.dataset.volume);});});$("album-volume").addEventListener("change",function(){chooseVolume(this.value);});$("album-filter-reset").addEventListener("click",clearFilters);
-["hero","category","status","sort"].forEach(function(id){$(id).addEventListener("change",function(){rowLimit=80;if(id==="hero")$("category").value="全部分类";if(id==="category"&&$("category").value==="专属"&&$("hero").value==="general")$("hero").value="all";render();});});$("search").addEventListener("input",function(){rowLimit=80;render();});
+$("pool-page-prev").addEventListener("click",function(){changePage(pageIndex-1,this);});
+$("pool-page-next").addEventListener("click",function(){changePage(pageIndex+1,this);});
+$("pool-page-select").addEventListener("change",function(){changePage(Number(this.value),this);});
+["hero","category","status","sort"].forEach(function(id){$(id).addEventListener("change",function(){pageIndex=0;if(id==="hero")$("category").value="全部分类";if(id==="category"&&$("category").value==="专属"&&$("hero").value==="general")$("hero").value="all";render();});});$("search").addEventListener("input",function(){pageIndex=0;render();});
 window.addEventListener("storage",function(e){if(!e.key||[PA.KEY,PA.PAY_KEY,"csh_wallet","csh_rank"].indexOf(e.key)>=0)render();});render();
 function compactAlbum(){return !layout||!layout.matches;}
 ["pool-options","album-goals"].forEach(function(id){$(id).addEventListener("toggle",function(){if(this.open&&compactAlbum())$(id==="pool-options"?"album-goals":"pool-options").open=false;});});

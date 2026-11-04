@@ -544,13 +544,23 @@ function networkControls() {
   var buttons = document.querySelectorAll ? document.querySelectorAll('.cheerbtn,.wb,.chbtn') : [];
   for (var i = 0; i < buttons.length; i++) if (!netCanPublish()) { buttons[i].disabled = true; buttons[i].title = '全球应援写入待接入，已付记录保留在本机'; }
 }
+var lastLocalBest = { cby:null, merit:null };
 function renderLocalBest() {
-  var node = el('local-best'); if (!node) return;
-  var high = rankHighRead(), cby = high.cby, merit = high.merit;
-  try { var w = JSON.parse(localStorage.getItem('csh_wallet') || '{}'); cby = Math.max(cby, Number(w.pcPeak) || 0, Number(w.pc) || 0); } catch (e) {}
-  try { var r = JSON.parse(localStorage.getItem('csh_rank') || '{}'); merit = Math.max(merit, Number(r.merit) || 0); } catch (e) {}
-  node.textContent = '本机历史最佳 · ' + fmt(cby) + ' 池子币 · ' + fmt(merit) + ' 功勋';
+  var target=el('local-best');if(!target)return;
+  function place(important){var profile=el('local-profile'),stat=el('stat');if(!profile||!stat)return;if(important){profile.parentNode.insertBefore(target,stat);target.style.gridColumn='1 / -1';target.style.marginTop='0';}else{profile.appendChild(target);target.style.gridColumn='';target.style.marginTop='';}}
+  if(typeof CSHPage!=="undefined"&&CSHPage.saveAllowed&&!CSHPage.saveAllowed()){target.textContent='存档已更新，请重新进入查看本机记录。';place(true);return;}
+  var failed=false;
+  function read(key){try{var raw=localStorage.getItem(key);if(raw==null)return {};var v=JSON.parse(raw);if(!v||typeof v!=="object"||Array.isArray(v))throw Error('format');return v;}catch(e){failed=true;return null;}}
+  function count(o,k){if(!o)return null;if(o[k]==null)return null;var v=o[k];if((typeof v!=="number"&&typeof v!=="string")||typeof v==="string"&&!v.trim()||!Number.isFinite(Number(v))||Number(v)<0){failed=true;return null;}return Math.floor(Number(v));}
+  var high=read(HIGH_KEY),wallet=read('csh_wallet'),rank=read('csh_rank');
+  function best(values,previous){var known=values.filter(function(n){return n!==null;});if(previous!==null)known.push(previous);return known.length?Math.max.apply(null,known):null;}
+  var cby=best([count(high,'cby'),count(wallet,'pcPeak'),count(wallet,'pc')],lastLocalBest.cby),merit=best([count(high,'merit'),count(rank,'merit')],lastLocalBest.merit);
+  if(!failed){if(cby===null)cby=0;if(merit===null)merit=0;}
+  lastLocalBest={cby:cby,merit:merit};
+  place(failed);
+  target.textContent=(failed?'本机记录未完整读取 · 已读最佳':'本机历史最佳')+' · '+(cby===null?'池子币未读取':fmt(cby)+' 池子币')+' · '+(merit===null?'功勋未读取':fmt(merit)+' 功勋');
 }
+
 function disposeNetwork() {
   NET.disposed = true;
   if (typeof CSHNet !== 'undefined' && CSHNet.cancelAll) CSHNet.cancelAll();
@@ -787,7 +797,7 @@ function netLoad(manual) {
   if (hasCache) netStat(tt('cacheStat', {cached: cacheAgo(cached.ts)}));
   if (!netOnline() || typeof navigator !== 'undefined' && navigator.onLine === false) {
     NET.busing = false;
-    netStat(hasCache ? tt('cacheOffline', {cached: cacheAgo(cached.ts)}) : '本机成绩正常，在线排行暂不可用。'); return;
+    netStat(hasCache ? tt('cacheOffline', {cached: cacheAgo(cached.ts)}) : '公开榜暂不可用，可稍后刷新。'); return;
   }
   NET.busing = true;
   var suffix = netCanPublish() && context.uid ? '&uid=' + encodeURIComponent(context.uid) : '';
@@ -795,7 +805,7 @@ function netLoad(manual) {
     if (seq !== NET.readSeq || !netContextValid(context, false)) return;
     NET.busing = false;
     if (!ok || !r || r.ok !== true || !Array.isArray(r.list)) {
-      netStat(hasCache ? tt('cacheOffline', {cached: cacheAgo(cached.ts)}) : meta && meta.code === 'backoff' ? '在线服务暂不可用，稍后可手动刷新；本机成绩正常。' : '本机成绩正常，在线排行暂不可用。'); return;
+      netStat(hasCache ? tt('cacheOffline', {cached: cacheAgo(cached.ts)}) : meta && meta.code === 'backoff' ? '在线服务暂不可用，稍后可手动刷新。' : '公开榜暂不可用，可稍后刷新。'); return;
     }
     var safe = CSHNet.board(r);
     NET.rows = safe.list; NET.me = safe.me; NET.total = safe.n; NET.unknown = false; NET.cacheTs = Date.now();
@@ -873,7 +883,7 @@ function netRender() {
   renderMeBar();
   var box = el("rows");
   if (!box) return;
-  if (!NET.rows.length) { box.innerHTML = '<div class="empty">' + (NET.unknown ? '本机成绩正常，在线排行暂不可用。' : T.rowsEmpty) + '</div>'; return; }
+  if (!NET.rows.length) { box.innerHTML = '<div class="empty">' + (NET.unknown ? '公开榜暂不可用，可稍后刷新。' : T.rowsEmpty) + '</div>'; return; }
   var oldScroll = box.scrollTop, sameKind = NET.renderKind === NET.kind; NET.renderKind = NET.kind;
   var h = "";
   for (var i = 0; i < NET.rows.length; i++) {

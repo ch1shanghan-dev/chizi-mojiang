@@ -10,7 +10,7 @@ if(from<0||to<0)throw Error('real harness anchors changed');
 const helpers=prefix+original.slice(from,to)+'\nexport {backgroundHarness,storage,feedbackTick};';
 const {backgroundHarness,storage,feedbackTick}=await import('data:text/javascript;base64,'+Buffer.from(helpers).toString('base64'));
 const checks=[],check=(name,passed,detail)=>checks.push({name,passed:!!passed,...(passed?{}:{detail})});
-function freeze(b){b.ctx.evalClock=Date.now();b.ctx.evalClock-=b.ctx.evalClock%86400000;b.ctx.evalClock+=43200000;/* midnight-independent noon */
+function freeze(b){var noon=new Date();noon.setHours(12,0,0,0);b.ctx.evalClock=noon.getTime();/* local-day noon must not go backwards before 08:00 in Asia/Shanghai */
  return import('node:vm').then(({default:vm})=>{vm.runInContext('var OriginalLifetimeDate=Date;Date=class extends OriginalLifetimeDate{constructor(...args){super(...(args.length?args:[evalClock]))}static now(){return evalClock}};',b.ctx);});}
 function advance(b,days=1){b.ctx.evalClock+=days*86400000;b.bank.task.ensureDay();}
 function complete(b){b.bank.task.add('hands',10);b.bank.task.add('wins',3);b.bank.task.add('bigPot',2000);}

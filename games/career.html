@@ -288,6 +288,10 @@ html,body{width:100%;height:100%;background:var(--ink-0);color:var(--text);-webk
 .ach .adetail{display:block;width:100%;border:0;background:transparent;color:var(--text);
   font:inherit;text-align:left;cursor:pointer;padding:0;min-height:44px}
 .ach .adetail strong{display:block;font-size:var(--fs-sm);line-height:1.5;overflow-wrap:anywhere}
+.ach .ach-detail-hint{display:block;color:var(--gold-hi);font-size:var(--fs-cap);line-height:1.5;margin-top:3px}
+.ach .ach-insight{font-size:var(--fs-xs);line-height:1.7;color:var(--text);margin:8px 0 4px;padding:8px 10px;border-left:2px solid var(--gold-line);background:var(--ink-1);overflow-wrap:anywhere}
+.ach .ach-insight[hidden]{display:none}
+#p-ach.has-inline-ach-detail #ach-note{position:absolute;width:1px;height:1px;padding:0;margin:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 .ach .adesc{font-size:var(--fs-xs);line-height:1.6;color:var(--text-dim);margin:5px 0;overflow-wrap:anywhere}
 .ach-controls{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
 .ach-controls label{display:flex;align-items:center;gap:6px;min-width:0;font-size:var(--fs-xs);color:var(--text-dim)}
@@ -485,6 +489,18 @@ html,body{width:100%;height:100%;background:var(--ink-0);color:var(--text);-webk
   .lg-row{grid-template-columns:56px minmax(0,1fr) auto 68px}
   .lg-row .tag{display:none}
 }
+#modal .mbox.person-profile{display:flex;flex-direction:column;overflow:hidden;text-align:left}
+.person-profile #md-name,.person-profile #md-close{flex-shrink:0}
+.person-profile #md-info{min-height:0;overflow-y:auto;overscroll-behavior:contain;white-space:normal}
+#md-info .person-lead{font-size:var(--fs-md);color:var(--gold-hi);margin:8px 0}
+#md-info .person-desc{line-height:1.7;margin:8px 0}
+#md-info .person-status{color:var(--text-dim);margin:8px 0}
+.person-records{border-top:1px solid var(--gold-line);margin-top:12px;white-space:normal}
+.person-records summary{min-height:44px;display:flex;align-items:center;cursor:pointer;color:var(--gold-hi);font-size:max(12px,var(--fs-sm))}
+.person-records summary::after{content:'展开';margin-left:auto;font-size:var(--fs-sm);color:var(--text-dim)}
+.person-records[open] summary::after{content:'收起'}
+.person-fact{display:flex;justify-content:space-between;gap:18px;padding:5px 0;font-size:max(12px,var(--fs-sm))}
+@media(orientation:landscape) and (max-height:330px){#modal .mbox.person-profile{padding:12px}.person-profile #md-info{margin:6px 0;padding:8px}#md-info .person-lead,#md-info .person-desc,#md-info .person-status{margin:4px 0;line-height:1.5}.person-records{margin-top:6px}}
 </style>
 <style id="world-task-layout">
 /* 以内容和任务为主，保留所有原有栏目。 */
@@ -643,14 +659,14 @@ body{--fs-card-title:16px;--fs-control:14px;--fs-label:13px;--fs-subtitle:18px;-
                  ③ 分类汇总 + 逐笔流水（可按分类过滤）
          数据来自 shell-ledger（宿主侧 csh_wallet 账本，单一写入点 = add/spend）。 -->
     <div class="page" id="p-ledger">
-      <div class="sect"><h3>池子币账本 · 来源与去处</h3>
+      <div class="sect"><h3>池子币账本 · 来源与去处</h3><div class="lg-toolbar" style="display:flex;align-items:center;gap:8px;min-height:44px;margin-bottom:8px"><span id="lg-status" role="status" style="flex:1;font-size:var(--fs-cap)"></span><button id="lg-retry" type="button" class="btn ghost" style="min-height:44px">重新读取</button></div>
         <div class="lg-sum">
           <div class="wl"><div class="k">累计入账</div><div class="v in" id="lg-inc">—</div></div>
           <div class="wl"><div class="k">累计支出</div><div class="v out" id="lg-out">—</div></div>
           <div class="wl"><div class="k">净额</div><div class="v net" id="lg-net">—</div></div>
           <div class="wl"><div class="k">记账笔数</div><div class="v" id="lg-n">—</div></div>
         </div>
-        <div class="diffbox" id="lg-note">只记最近 400 笔（滚动窗口）。每一笔都由钱包唯一的入账 / 出账出口写下，不会漏记。</div>
+        <div class="diffbox" id="lg-note">仅展示钱包已保存的最近流水（最多 400 笔）；超出保留范围的旧流水不再展示。</div>
       </div>
 
       <div class="sect"><h3>近 42 日收支</h3>
@@ -908,18 +924,26 @@ function bindTabs() {
      list = [{t(ms), d(±), r(说明), c(分类), b(结余)}]
    渲染三段：总额 / GitHub 式热力格 / 分类 + 流水（可按分类过滤）。
    ============================================================ */
-var LG = { sum: null, list: [], cat: "", loaded: false };
+var LG = { sum: null, list: [], cat: "", loaded: false, loading: false, error: false, seq: 0, disposed: false };
 
-function loadLedger(force) {
-  if (LG.loaded && !force) { renderLedger(); return; }
-  Bridge.call("shell-ledger", { days: 42 }, function (ok, r) {
-    LG.loaded = true;
-    if (!ok || !r) { LG.sum = null; LG.list = []; renderLedger(); return; }
-    LG.sum = r.sum || null;
-    LG.list = r.list || [];
-    renderLedger();
-  });
+function ledgerStatus() {
+  $("#lg-retry").disabled=LG.loading;
+  $("#lg-status").textContent=LG.loading?"正在读取流水…":LG.error?(LG.loaded?"读取失败，暂显示上次流水。":"流水暂未读取成功，请重试。"):LG.loaded?"已读取保存的流水":"";
 }
+function loadLedger(force) {
+  if(LG.disposed||LG.loading&&!force)return;
+  if(LG.loaded&&!force){renderLedger();ledgerStatus();return;}
+  var seq=++LG.seq,received=false;LG.loading=true;ledgerStatus();
+  function done(ok,r){
+    if(received||LG.disposed||seq!==LG.seq)return;received=true;LG.loading=false;
+    var valid=ok&&r&&r.sum&&typeof r.sum==="object"&&!Array.isArray(r.sum)&&Array.isArray(r.list)&&["inc","out","net","n"].every(function(k){return Number.isFinite(r.sum[k]);})&&r.sum.inc>=0&&r.sum.out>=0&&Number.isSafeInteger(r.sum.n)&&r.sum.n>=0&&r.list.every(function(e){return e&&typeof e==="object"&&!Array.isArray(e)&&Number.isFinite(e.d);})&&(!r.sum.daily||Array.isArray(r.sum.daily)&&r.sum.daily.every(function(e){return e&&typeof e==="object"&&!Array.isArray(e);}))&&(!r.sum.cats||Array.isArray(r.sum.cats)&&r.sum.cats.every(function(e){return e&&typeof e==="object"&&!Array.isArray(e);}));
+    if(valid){LG.loaded=true;LG.error=false;LG.sum=r.sum;LG.list=r.list;}else LG.error=true;
+    renderLedger();ledgerStatus();
+  }
+  try{Bridge.call("shell-ledger",{days:42},done);}catch(e){done(false,null);}
+}
+$("#lg-retry").addEventListener("click",function(){loadLedger(true);});
+window.addEventListener("pagehide",function(){LG.disposed=true;LG.seq++;});
 
 function lgFmt(n) {
   var v = Math.round(Number(n) || 0);
@@ -936,7 +960,7 @@ function renderLedger() {
   if (!sum) {
     $("#lg-inc").textContent = $("#lg-out").textContent = $("#lg-net").textContent = $("#lg-n").textContent = "—";
     $("#lg-heat").innerHTML = ""; $("#lg-cats").innerHTML = ""; $("#lg-chips").innerHTML = "";
-    $("#lg-list").innerHTML = ""; $("#lg-empty").style.display = "block";
+    $("#lg-list").innerHTML = ""; $("#lg-empty").style.display = "block"; $("#lg-empty").textContent=LG.error?"未能读取流水，当前不显示空账本。":"正在读取流水…";
     return;
   }
   $("#lg-inc").textContent = "+" + lgFmt(sum.inc);
@@ -1033,16 +1057,16 @@ function renderRows() {
   box.innerHTML = "";
   var rows = LG.list.filter(function (e) { return !LG.cat || e.c === LG.cat; });
   $("#lg-empty").style.display = rows.length ? "none" : "block";
+  $("#lg-empty").textContent=LG.cat?"当前分类没有流水，可切换其他分类。":"保存的流水中暂无记账记录。";
   for (var i = 0; i < rows.length; i++) {
     var e = rows[i];
     var r = el("div", "lg-row");
     var d = new Date(Number(e.t) || 0);
-    r.appendChild(el("div", "tm", (d.getMonth() + 1) + "/" + d.getDate() + " " +
-      ("0" + d.getHours()).slice(-2) + ":" + ("0" + d.getMinutes()).slice(-2)));
+    r.appendChild(el("div", "tm", Number(e.t)>0&&Number.isFinite(d.getTime())?(d.getMonth()+1)+"/"+d.getDate()+" "+("0"+d.getHours()).slice(-2)+":"+("0"+d.getMinutes()).slice(-2):"时间未记"));
     r.appendChild(el("div", "tag", e.c || "其它"));
     r.appendChild(el("div", "rr", e.r || "—"));
     r.appendChild(el("div", "dd " + (e.d >= 0 ? "in" : "out"), (e.d >= 0 ? "+" : "") + lgFmt(e.d)));
-    r.appendChild(el("div", "bb", lgFmt(e.b)));
+    r.appendChild(el("div", "bb", Number.isFinite(e.b)?lgFmt(e.b):"—"));
     box.appendChild(r);
   }
 }
@@ -1116,7 +1140,7 @@ function renderOverview() {
      · 「当前段「中垒」加成：…」→「加成：…」（段名已在页签数据槽与本卡段标显示）
      · 数据保留位数不变。 */
 function renderToday() {
-  var aux=document.getElementById("aux-summary"),record=State.snap&&State.snap.assisted;if(aux)aux.textContent=record?"辅助身份场 "+fmt(record.wins)+" 胜 "+fmt(record.losses)+" 负 · 独立统计，无普通奖励":"辅助战绩暂不可读取";
+  var aux=document.getElementById("aux-summary"),record=State.snap&&State.snap.assisted;if(aux)aux.textContent=record?"辅助身份场 "+fmt(record.wins)+" 胜 "+fmt(record.losses)+" 负 · 独立统计，完局奖励同身份场":"辅助战绩暂不可读取";
   var s = State.snap || {};
   var box = $("#ov-today");
   if (!box) return;
@@ -1266,6 +1290,8 @@ function loadTasks() {
    统计不依赖 State.snap 之外的任何东西；快照未到时给全 0 的兜底。
    ============================================================ */
 var achCat = "全部";           /* 当前筛选分类 */
+var achDetailKey = "";
+var achPersonalReadFailed=true,achPersonalHistoryText="个人对局记录尚未读到，请刷新后重试。";
 var achRows = [];              /* 最近一次 evalAll 结果 */
 var achQuery = "", achState = "all", achSort = "near", achLimit = 60, achRequest = 0;
 var achPending = Object.create(null), achSyncMessage = "", achRecommendationsReliable = false;
@@ -1296,9 +1322,11 @@ function renderAch() {
   if (!box) return;
   if (!AC) { box.innerHTML = ""; $("#ach-summary").textContent = "成就引擎未加载（core/csh_achv.js）"; return; }
   var request = ++achRequest;
-  var paint = function (rows, reliable) {
+  var paint = function (rows, reliable, sourceStats) {
     if (request !== achRequest) return; /* 迟到的旧快照不得覆盖新结果 */
     achRecommendationsReliable=reliable===true;
+    achPersonalReadFailed=!sourceStats||sourceStats.wrReadFailed===true||sourceStats.wrHistoryPartial!==true;
+    achPersonalHistoryText=achPersonalReadFailed?"个人对局记录尚未读到，请刷新后重试。":"场次、胜负与击杀按可靠新记录累计；旧档仅保留已知使用武将，缺失历史不倒推。已达成资格与已领保留。";
     achRows = rows;
     var done = 0, claimedN = 0, claimable = 0;
     for (var i = 0; i < rows.length; i++) {
@@ -1350,11 +1378,11 @@ function renderAch() {
       else {if(note.textContent===achSyncMessage)note.textContent="";achSyncMessage="";}
     }
     if(request!==achRequest)return;
-    if(result&&result.stats){paint(AC.evalAll(result.stats),result.stats.careerStatsReliable===true);status(ok3?"":result.reason||"生涯达成记录暂未更新");return;}
+    if(result&&result.stats){paint(AC.evalAll(result.stats),result.stats.careerStatsReliable===true,result.stats);status(ok3?"":result.reason||"生涯达成记录暂未更新");return;}
     /* A refused write must not replace confirmed history with incomplete local stats. */
     Bridge.call("shell-stats", null, function (readOK, stats) {
       if(request!==achRequest)return;
-      if(readOK&&stats)paint(AC.evalAll(stats),stats.careerStatsReliable===true);
+      if(readOK&&stats)paint(AC.evalAll(stats),stats.careerStatsReliable===true,stats);
       else {achRows=[];box.textContent="未能读取生涯达成记录，请刷新后重试。";$("#ach-claim-all").disabled=true;}
       status(result&&result.reason||"生涯达成记录暂未更新，请刷新后重试");
     });
@@ -1395,6 +1423,9 @@ function paintAchGrid() {
   $("#ach-empty").textContent=achState==="near"?(achRecommendationsReliable?"暂无符合筛选的进行中目标；可追踪感兴趣的成就，或游玩后刷新。":"生涯统计尚未完整读取，暂不推荐目标。请刷新后重试。") : "没有符合条件的成就，试试其他关键词或重置筛选。";
   $("#ach-results").textContent = (achState==="near"?"近期目标 · ":"")+"匹配 " + rows.length + " 枚 · 已显示 " + count + " 枚 / 全部 " + achRows.length + " 枚";
   $("#ach-empty").hidden = rows.length > 0;
+  var visibleDetail=rows.slice(0,count).some(function(row){return row.key===achDetailKey;});
+  $("#p-ach").classList.toggle("has-inline-ach-detail",visibleDetail);
+  if(!visibleDetail)$("#ach-note").textContent="点击查看进度；达成的成就点「领取」入账。";
   var more = $("#ach-more"); more.hidden = count >= rows.length;
   more.textContent = "继续查看 · 还有 " + (rows.length - count) + " 枚";
   for (var i = 0; i < count; i++) {
@@ -1403,12 +1434,17 @@ function paintAchGrid() {
       c.setAttribute("data-key", r.key);
       var detail = el("button", "adetail"); detail.type = "button";
       var icon = el("div", "ico", r.ico); icon.setAttribute("aria-hidden", "true"); detail.appendChild(icon);
-      detail.appendChild(el("strong", "", r.label)); c.appendChild(detail);
+      detail.appendChild(el("strong", "", r.label));
+      var detailOpen = achDetailKey === r.key, detailId = "career-ach-detail-" + r.key;
+      detail.setAttribute("aria-expanded",String(detailOpen));detail.setAttribute("aria-controls",detailId);detail.setAttribute("data-detail-label",r.label);
+      detail.setAttribute("aria-label",r.label + (detailOpen ? " · 收起详情" : " · 展开详情"));
+      var detailHint=el("span","ach-detail-hint",detailOpen?"收起详情":"展开详情");detail.appendChild(detailHint);c.appendChild(detail);
       c.appendChild(el("div", "adesc", r.desc));
       var bar = el("div", "abar"), fill = el("i");
       fill.style.width = (r.done ? 100 : Math.max(0, Math.min(100, Math.round((r.cur / r.goal) * 100)))) + "%";
       bar.setAttribute("aria-hidden", "true"); bar.appendChild(fill); c.appendChild(bar);
-      c.appendChild(el("div", "alab", (r.claimed ? "已领取" : r.done ? "可领取" : achProgress(r.cur,r.goal) + " / " + achProgress(r.goal)) +
+      var personalProgress=r.cat==="胜负"?(achPersonalReadFailed?"记录待读取":"已记录 "+achProgress(r.cur,r.goal)+" / "+achProgress(r.goal)):achProgress(r.cur,r.goal)+" / "+achProgress(r.goal);
+      c.appendChild(el("div", "alab", (r.claimed ? "已领取" : r.done ? "可领取" : personalProgress) +
         " · +" + fmt(r.reward) + " CBY" + (r.retired ? " · 绝版" : "")));
       if((achSort==="near"||achState==="near")&&Object.prototype.hasOwnProperty.call(nextRank,r.key)){
         var reason=pins.indexOf(r.key)>=0?"正在追踪":r.cat+"进展";
@@ -1436,11 +1472,28 @@ function paintAchGrid() {
           });
         }, false); c.appendChild(btn);
       }
-      detail.addEventListener("click", function () {
-        $("#ach-note").textContent = r.label + "（" + r.cat + "）：" + r.desc + " · 奖励 +" + fmt(r.reward) +
+      var insight=el("div","ach-insight");insight.id=detailId;insight.hidden=!detailOpen;
+      var insightText = r.label + "（" + r.cat + "）：" + r.desc + " · 奖励 +" + fmt(r.reward) +
           " CBY · " + (r.claimed ? "已领取" : r.done ? "可领取" : "进度 " + achProgress(r.cur,r.goal) + " / " + achProgress(r.goal)) +
           (r.recorded ? (r.observedAt === 0 ? " · 历史达成，时间未记录" : " · 首次记录于 " + new Date(r.observedAt).toLocaleString()) : "") +
           (r.recorded && !r.conditionMet ? " · 达成资格已保留，当前数值 " + achProgress(r.cur,r.goal) + " / " + achProgress(r.goal) : "");
+      insight.textContent = "奖励 +"+fmt(r.reward)+" CBY · "+(r.claimed?"已领取":r.done?"可领取":"进度 "+achProgress(r.cur,r.goal)+" / "+achProgress(r.goal))+
+        (r.recorded?(r.observedAt===0?" · 历史达成，时间未记录":" · 首次记录于 "+new Date(r.observedAt).toLocaleString()):(r.done||r.claimed?" · 达成时间未记录":" · 尚未达成"))+
+        (r.recorded&&!r.conditionMet?" · 达成资格已保留，当前数值 "+achProgress(r.cur,r.goal)+" / "+achProgress(r.goal):"");
+      if(r.cat==="胜负"){
+        if(achPersonalReadFailed&&!r.done&&!r.claimed)insight.textContent="奖励 +"+fmt(r.reward)+" CBY · 记录待读取";
+        insight.textContent+=" · "+achPersonalHistoryText;insightText+=" · "+achPersonalHistoryText;
+      }
+      insight.setAttribute("aria-label",r.label+" · 成就详情");
+      c.insertBefore(insight,bar);
+      detail.addEventListener("click", function () {
+        var open = detail.getAttribute("aria-expanded") !== "true";
+        achDetailKey = open ? r.key : "";
+        box.querySelectorAll(".ach-insight").forEach(function(node){node.hidden=true;});
+        box.querySelectorAll(".adetail").forEach(function(node){node.setAttribute("aria-expanded","false");node.setAttribute("aria-label",node.getAttribute("data-detail-label")+" · 展开详情");var hint=node.querySelector(".ach-detail-hint");if(hint)hint.textContent="展开详情";});
+        insight.hidden = !open;detail.setAttribute("aria-expanded",String(open));detail.setAttribute("aria-label",r.label+(open?" · 收起详情":" · 展开详情"));detailHint.textContent=open?"收起详情":"展开详情";
+        $("#p-ach").classList.toggle("has-inline-ach-detail",open);
+        $("#ach-note").textContent = open ? insightText : "点击查看进度；达成的成就点「领取」入账。";
       }, false);
       if(window.CSHGoals)c.appendChild(CSHGoals.button("career",r.key,r.label,paintAchGrid,toast));
       box.appendChild(c);
@@ -1564,6 +1617,7 @@ function renderMatrix() {
   }
 }
 function showRankModal(lv, rec) {
+  $("#modal .mbox").classList.remove("person-profile");
   modalFocusBack = document.activeElement;
   var seg = segOfRank(lv);
   $("#md-badge").innerHTML = (State.badges && State.badges[lv]) ? State.badges[lv] : fallbackBadge(lv, segColor(seg.seg));
@@ -1748,18 +1802,24 @@ function fillBoard(sel, arr, valFn, subFn, titleFn) {
     (function (person, entry) {
       function showPerson() {
         modalFocusBack = entry;
+        $("#modal .mbox").classList.add("person-profile");
         $("#md-badge").textContent = "";
         $("#md-name").textContent = person.name || "牌友";
-        var lines = person.isMe ? ["这是你在当前榜单的位置。", "池子币 " + fmt((State.snap || {}).pc)] : [
-          "资金 " + fmt(person.fund || 0),
-          "牌风 " + (person.personaName || "暂无记录"),
-          person.personaDesc || "",
-          "牌技 " + Number(person.skill || 0).toFixed(3),
-          "牌局 " + fmt(person.hands || 0) + " 手 · 获胜 " + fmt(person.wins || 0) + " 手",
-          "最大底池 " + fmt(person.biggestPot || 0),
-          person.retired ? "已退隐" : "在场"
-        ];
-        $("#md-info").textContent = lines.filter(Boolean).join("\n");
+        var info=$("#md-info");info.textContent="";
+        if(person.isMe){
+          info.appendChild(el("p","person-lead","这是你在当前榜单的位置。"));
+          info.appendChild(el("p","", "池子币 "+personValue((State.snap||{}).pc)));
+        }else{
+          info.appendChild(el("p","person-lead",person.personaName||"牌风尚无记录"));
+          if(person.personaDesc)info.appendChild(el("p","person-desc",person.personaDesc));
+          info.appendChild(el("p","person-status",person.retired===true?"已退隐":person.retired===false?"在场":"状态未记"));
+          var records=el("details","person-records"),summary=el("summary","","牌桌记录");
+          records.appendChild(summary);
+          [["资金",person.fund],["牌局",person.hands],["获胜",person.wins],["最大底池",person.biggestPot]].forEach(function(pair){
+            var line=el("div","person-fact");line.appendChild(el("span","",pair[0]));line.appendChild(el("span","",personValue(pair[1])));records.appendChild(line);
+          });
+          info.appendChild(records);
+        }
         $("#modal").className = "on";
         $("#md-close").focus();
       }
@@ -1948,10 +2008,13 @@ function bindActions() {
 bindTabs();
 bindPcLink();
 /* 弹窗关闭：原先挂在前一版的存档绑定函数里，摘掉那块时把这一行搬出来单独挂 */
+function personValue(value){return typeof value==='number'&&isFinite(value)&&value>=0?fmt(value):'未记录';}
 var modalFocusBack = null;
 function closeDetail() {
+  $("#modal .mbox").classList.remove("person-profile");
   $("#modal").className = "";
   if (modalFocusBack && modalFocusBack.isConnected) modalFocusBack.focus({ preventScroll: true });
+  else {var fallback=$("#bd-search");if(!fallback.getClientRects().length)fallback=document.querySelector("#tabs .tab.on");if(fallback)fallback.focus({preventScroll:true});}
 }
 var navToggle=$("#career-nav-toggle");
 function foldCareerNav(focus){$("#app").classList.remove("career-nav-open");navToggle.setAttribute("aria-expanded","false");if(focus&&navToggle.getClientRects().length)navToggle.focus({preventScroll:true});}
@@ -1965,14 +2028,19 @@ refineToggle.addEventListener("click",function(){var open=refinePanel.hidden;ref
 $("#md-close").addEventListener("click", closeDetail, false);
 $("#modal").addEventListener("click", function (e) { if (e.target === this) closeDetail(); });
 document.addEventListener("keydown", function (e) {
+  if(e.key==="Escape"&&e.repeat){e.preventDefault();e.stopImmediatePropagation();return;}
   if (!$("#modal").classList.contains("on")) {
     if(e.key === "Escape" && $("#app").classList.contains("career-nav-open")){e.preventDefault();e.stopImmediatePropagation();foldCareerNav(true);return;}
     if(e.key === "Escape" && !refinePanel.hidden && $("#p-ach").classList.contains("on")){e.preventDefault();e.stopImmediatePropagation();foldAchRefinements();return;}
     if (e.key === "Escape" && Bridge.active && typeof Bridge.close === "function") { e.preventDefault(); e.stopImmediatePropagation(); Bridge.close(); }
     return;
   }
-  if (e.key === "Escape") { e.preventDefault(); e.stopImmediatePropagation(); closeDetail(); }
-  if (e.key === "Tab") { e.preventDefault(); $("#md-close").focus(); }
+  if (e.key === "Escape") { e.preventDefault(); e.stopImmediatePropagation(); if(!e.repeat)closeDetail(); }
+  if (e.key === "Tab") {
+    var nodes=Array.prototype.filter.call($("#modal").querySelectorAll('button:not(:disabled),summary,[tabindex="0"]'),function(n){return n.getClientRects().length;});
+    var first=nodes[0],last=nodes[nodes.length-1],active=document.activeElement;
+    if(first&&(!$("#modal").contains(active)||(e.shiftKey&&active===first)||(!e.shiftKey&&active===last))){e.preventDefault();(e.shiftKey?last:first).focus();}
+  }
 }, true);
 $("#bd-search").addEventListener("input", renderBoard);
 $("#bd-refresh").addEventListener("click", function () { refreshWorld(); loadWalletSnap(); });

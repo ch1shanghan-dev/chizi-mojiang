@@ -2587,7 +2587,7 @@ async function runBossChecks() {
 		else if (!/for \(const k in api\) if \(lib\.cshBossRecord\[k\] === undefined\)/.test(br47))
 			e47.push("installBossRecord 缺「缺失补挂」分支（已装老实例拿不到新能力）");
 		if (!/cmd === "shell-bounty"/.test(sh47) || !/BR1\.bountyCheck\(bId\)/.test(sh47)) e47.push("宿主缺 shell-bounty（或未先校验再扣费）");
-		else if (!/悬赏失败回滚/.test(sh47) || !/W4\.wallet\.spend\(BR1\.BOUNTY_COST/.test(sh47)) e47.push("shell-bounty 未走钱包扣费 / 未做失败回滚");
+		else if (!/BR1\.bountyBuy\(bId\)/.test(sh47) || !/export function bountyBuy/.test(br47) || !/W\.commitBounty\(chk\.id,saved,BOUNTY_COST\)/.test(br47)) e47.push("shell-bounty 未使用余额与悬赏同写事务");
 		if (!/buildBossConfig\(\(lib\.cshBossRecord/.test(bm47)) e47.push("bossmode 未把 bountyGet() 传给 buildBossConfig（悬赏不会生效）");
 		if (!/K_CFG_BOUNTY\s*=\s*"extension_池子魔将_csh_bounty"/.test(mg47)) e47.push("存档键未登记 csh_migrate（行囊不覆盖 + E41 会红）");
 		else if (!/K_CFG_BOUNTY,/.test(mg47)) e47.push("K_CFG_BOUNTY 未进键表 / RESET_KEYS");
@@ -2596,7 +2596,7 @@ async function runBossChecks() {
 		else if (!/afflock/.test(cx47)) e47.push("悬赏按钮未挂在未讨伐锁定行（应为零新增行）");
 		else if (!/snapS\.bounty/.test(sh47)) e47.push("shell-stats 未下发 bounty（图鉴拿不到当前悬赏）");
 		if (e47.length) fail("执行级 E47：指定讨伐令（" + e47.slice(0, 4).join("；") + "）");
-		else ok("执行级 E47：指定讨伐令在位（pickMinions 带守卫 · 出怪入口接线 · 先校验后扣费+回滚 · 达成即清 · 键入行囊 · 图鉴挂未讨伐行）");
+		else ok("执行级 E47：指定讨伐令在位（pickMinions 带守卫 · 出怪入口接线 · 先校验后余额/悬赏同写 · 达成即清 · 键入行囊 · 图鉴挂未讨伐行）");
 	}
 
 	/* E48（2026-10-18 · 界面基座 + 网络容灾）：
@@ -3163,7 +3163,7 @@ async function runBossChecks() {
       const rules57=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_blackjack_rules_hint.mjs'),'--out',path.join(tmp57,'blackjack-rules.json')],{encoding:'utf8',timeout:20000,windowsHide:true}));
       if(rules57.failed!==0||rules57.passed<1653)fail('执行级 E57C：廿一点NDAS提示与合法动作未通过');else ok('执行级 E57C：廿一点NDAS与合法按钮（'+rules57.passed+'/0）');
       const uno59=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_uno_round_boundaries.mjs'),'--out',path.join(tmp57,'uno-rounds.json')],{encoding:'utf8',timeout:20000,windowsHide:true}));
-      if(uno59.failed!==0||uno59.passed<27)fail('执行级 E59：UNO轮次/关闭回调边界未通过');else ok('执行级 E59：UNO轮次/关闭与迟到ACK（'+uno59.passed+'/0）');
+      if(uno59.failed!==0||uno59.passed<32)fail('执行级 E59：UNO轮次/关闭回调边界未通过');else ok('执行级 E59：UNO轮次/关闭与迟到ACK（'+uno59.passed+'/0）');
       const matrix60=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_blackjack_strategy_matrix.mjs'),'--out',path.join(tmp57,'blackjack-matrix.json')],{encoding:'utf8',timeout:20000,windowsHide:true}));
       if(matrix60.failed!==0||matrix60.passed<24365)fail('执行级 E60：廿一点实际桌规策略矩阵未通过');else ok('执行级 E60：廿一点S17/H17与NDAS策略矩阵（'+matrix60.passed+'/0）');
       const ddz61=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_doudizhu_round_boundaries.mjs'),'--out',path.join(tmp57,'ddz-rounds.json')],{encoding:'utf8',timeout:20000,windowsHide:true}));
@@ -3211,10 +3211,47 @@ async function runBossChecks() {
       if(ddzTeam75.failed!==0||ddzTeam75.passed<135)fail('执行级 E75：斗地主阵营胜负/经济一致性未通过');else ok('执行级 E75：3角色×3先出完者/练习/功勋/净额/重复/失败重试（'+ddzTeam75.passed+'/0）');
       const ddzRefund76Dir=path.join(tmp57,'ddz-refund');
       const ddzRefund76=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_doudizhu_refund_20261102.mjs'),'--out',ddzRefund76Dir],{encoding:'utf8',timeout:20000,windowsHide:true}));
-      if(ddzRefund76.failed!==0||ddzRefund76.passed<62)fail('执行级 E76：斗地主未终局退款/统一结算重试未通过');else ok('执行级 E76：未终局仅退本金/异常终局/收工重开同载荷/失败迟到ACK（'+ddzRefund76.passed+'/0）');
-    } catch(error) { fail('执行级 E57—E76/E58F：小游戏/生涯/赠礼执行回归失败（'+String(error.message).slice(0,160)+'）'); }
+      if(ddzRefund76.failed!==0||ddzRefund76.passed<97)fail('执行级 E76：斗地主未终局退款/统一结算重试未通过');else ok('执行级 E76：未终局仅退本金/异常终局/收工重开同载荷/失败迟到ACK（'+ddzRefund76.passed+'/0）');
+      const fee77=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_shell_fee_session.mjs')],{encoding:'utf8',timeout:20000,windowsHide:true}));
+      if(fee77.failed||fee77.passed!==14)fail('执行级 E77：收费ACK与旧页开桌隔离未通过');else ok('执行级 E77：明确扣款成功/旧页与换档隔离（14/0）');
+      const money78=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_doudizhu_team_money.mjs')],{encoding:'utf8',timeout:20000,windowsHide:true}));
+      const partner78=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_world_team_result.mjs')],{encoding:'utf8',timeout:20000,windowsHide:true}));
+      if(money78.failed||money78.passed<85||partner78.failed||partner78.passed<9)fail('执行级 E78：阵营资金/合作战果未通过');else ok('执行级 E78：敌方资金/队友战果/旧档兼容/失败/重复（85+9/0）');
+      const world79=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_world_table_persistence.mjs')],{encoding:'utf8',timeout:20000,windowsHide:true}));
+      const wallet79=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_wallet_table_outbox.mjs')],{encoding:'utf8',timeout:20000,windowsHide:true}));
+      if(world79.failed||world79.passed<32||wallet79.failed||wallet79.passed<15)fail('执行级 E79：牌友记录同写恢复未通过');else ok('执行级 E79：余额与意图同写/整批回滚/去重/迁移/恢复（32+15/0）');
+      const chips80=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_other_table_recovery.mjs')],{encoding:'utf8',timeout:20000,windowsHide:true}));
+      const uno80=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_uno_table_recovery.mjs')],{encoding:'utf8',timeout:20000,windowsHide:true}));
+      const queue80=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_table_queue_extensions.mjs')],{encoding:'utf8',timeout:20000,windowsHide:true}));
+      if(chips80.failed||chips80.passed<58||uno80.failed||uno80.passed<13||queue80.failed||queue80.passed<8)fail('执行级 E80：其余牌桌可靠保存未通过');else ok('执行级 E80：德州/廿一点/UNO/非现金与豪赌同写（58+13+8/0）');
+      const paid81=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_oath_bounty_20261103.mjs'),'--gate'],{encoding:'utf8',timeout:20000,windowsHide:true}));
+      if(paid81.failed||paid81.passed<12)fail('执行级 E81：悬赏与结契事务未通过');else ok('执行级 E81：悬赏余额/目标同写与幂等、结契拒写/重试、迁移保全（12/0）');
+      const props82=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_manual_props_20261103.mjs'),'--gate'],{encoding:'utf8',timeout:20000,windowsHide:true}));
+      if(props82.failed||props82.passed<115)fail('执行级 E82：玩家批量四道具未通过');else ok('执行级 E82：四道具数量/停止/死亡复活/旧局存档/人物回应（115/0）');
+      const talk83=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_memoir_talk_20261103.mjs'),'--gate'],{encoding:'utf8',timeout:20000,windowsHide:true}));
+      if(talk83.failed||talk83.passed<203)fail('执行级 E83：牌友闲谈与邀约资格未通过');else ok('执行级 E83：12牌风/132句/亲历话题/只读与实际带入边界（203/0）');
+      const insurance84=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_blackjack_public_insurance_20261103.mjs'),'--gate'],{encoding:'utf8',timeout:20000,windowsHide:true}));
+      if(insurance84.failed||insurance84.passed<59)fail('执行级 E84：廿一点保险/公开牌靴守卫未通过');else ok('执行级 E84：购买能力/单次决策/拒旧操作/隐藏信息隔离（59/0）');
+      const backup85=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_backup_lifecycle_20261104.mjs'),'--gate'],{encoding:'utf8',timeout:20000,windowsHide:true}));
+      if(backup85.failed||backup85.passed<29)fail('执行级 E85：更新备份清理保护未通过');else ok('执行级 E85：保留副本/未完更新/预览变化/中断恢复（29/0）');
+      const public86=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_texas_public_read_20261104.mjs'),'--gate'],{encoding:'utf8',timeout:20000,windowsHide:true}));
+      if(public86.failed||public86.passed<43)fail('执行级 E86：德州公开观察策略未通过');else ok('执行级 E86：样本门槛/有界衰减/真实策略/暗牌隔离（43/0）');
+      const player87=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_player_match_wallet_20261104.mjs'),'--gate'],{encoding:'utf8',timeout:20000,windowsHide:true}));
+      if(player87.failed||player87.passed<29)fail('执行级 E87：个人终局严格记录未通过');else ok('执行级 E87：同写/重复/拒写/恢复/换档/迁移（29/0）');
+      const capture88=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_player_match_capture_20261104.mjs'),'--gate'],{encoding:'utf8',timeout:20000,windowsHide:true}));
+      if(capture88.failed||capture88.passed<34)fail('执行级 E88：本人终局采集与统计归属未通过');else ok('执行级 E88：本人/双将/模式/旧局/两类意图并存/真实聚合（34/0）');
+      for(const [tag,probe,minimum,label] of [
+        ['E89','probe_uno_reverse_20261104.mjs',45,'UNO多人反转方向/真实行动/公开信息'],
+        ['E90','probe_world_heartbeat_20261104.mjs',29,'休闲心跳同候选/读回/恢复屏障'],
+        ['E91','probe_career_player_unlocks_20261104.mjs',19,'70条本人胜负资格同写/原时间/旧资格'],
+        ['E92','probe_player_match_capacity_20261104.mjs',17,'16000场无损容量/第16001场/去重/迁移'],
+        ['E93','probe_aux_rewards_20261104.mjs',27,'助战现金/独立战绩/未入场回退/拒写恢复'],
+        ['E94','probe_spirit_skin_entry_20261104.mjs',22,'妖灵装扮注册/严格外观保存/别名/缺图回退']
+      ]){const result=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools',probe),'--gate'],{encoding:'utf8',timeout:30000,windowsHide:true}));if(result.failed||result.passed<minimum)fail('执行级 '+tag+'：'+label+'未通过');else ok('执行级 '+tag+'：'+label+'（'+result.passed+'/0）');}
+
+    } catch(error) { if(error.stdout)log(String(error.stdout).slice(0,2000)); fail('执行级 E57—E94/E58F：小游戏/生涯/赠礼执行回归失败（'+String(error.message).slice(0,160)+'）'); }
     finally { if(tmp57){try{fs.unlinkSync(path.join(tmp57,'ddz-refund','result.json'));fs.rmdirSync(path.join(tmp57,'ddz-refund'));}catch{}try{fs.unlinkSync(path.join(tmp57,'ddz-team','result.json'));fs.rmdirSync(path.join(tmp57,'ddz-team'));}catch{}for(const file of ['memoir-facts.json','interaction-career.json','gamble-career.json','expansion-batch2.json','rank-career.json','career-semantics.json','boss-career.json','expansion.json','gamble-quality.json','blackjack-matrix.json','ddz-rounds.json','gift-quantity.json','goals.json','bj-exit.json','spirit-owner-boundaries.json','feedback-lifecycle.json']){try{fs.unlinkSync(path.join(tmp57,file));}catch{}}try{fs.unlinkSync(path.join(tmp57,'uno-rounds.json'));}catch{}try{fs.unlinkSync(path.join(tmp57,'blackjack-rules.json'));}catch{}try{fs.unlinkSync(path.join(tmp57,'career.json'));}catch{}try{fs.unlinkSync(path.join(tmp57,'task-lifetime.json'));}catch{}try{fs.unlinkSync(path.join(tmp57,'blackjack.json'));}catch{}try{fs.unlinkSync(path.join(tmp57,'result.json'));}catch{}try{fs.rmdirSync(tmp57);}catch{}} }
-  } else warn('执行级 E57—E76/E58F：当前环境不能启动Node，小游戏/生涯/赠礼执行回归待运行');
+  } else warn('执行级 E57—E94/E58F：当前环境不能启动Node，小游戏/生涯/赠礼执行回归待运行');
 	log("");
 }
 

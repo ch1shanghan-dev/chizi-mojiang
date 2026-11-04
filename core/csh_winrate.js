@@ -258,6 +258,35 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
             else e.lose++;
             if(!saveBlocked()) game.saveConfig(STAT_KEY,d);
         }
+        // Personal career facts use the existing natural-match session and strict wallet journal.
+        // Legacy character tables remain character appearances, never player match totals.
+        var personalAccepted = new Set();
+        function capturePersonal(result, mode) {
+            if (game.observe || lib.config.connectMode || _status.reloading || _status.importingExtension) return;
+            var W=lib.cshWallet,R=lib.cshMatchReward;
+            if(!W||typeof W.commitPlayerMatch!=="function"||!R||typeof R.session!=="function")return;
+            var run=R.session(),current=W.saveEpoch();
+            if(!run||!run.active||run.epoch!==current||personalAccepted.has(run.id))return;
+            var actual=run.mode==="two"||run.mode==="2v2"?"versus":run.mode==="identity_normal"?"identity":run.mode;
+            if(actual!==mode)return;
+            var me=game.me&&(game.me._trueMe||game.me),all=(game.players||[]).concat(game.dead||[],game.additionaldead||[]);
+            if(!me||all.indexOf(me)<0)return;
+            var names=charNames(me).filter(function(id){return typeof id==="string"&&id.length>0&&id.length<=64&&["__proto__","prototype","constructor"].indexOf(id)<0;});
+            if(!names.length)return;
+            var killed=collect(me).kill;
+            if(!Number.isSafeInteger(killed)||killed<0)return;
+            var payload={id:"personal-"+run.id,mode:mode,win:result,kills:killed,chars:names,observedAt:Date.now()};
+            try{
+                var answer=W.commitPlayerMatch(payload,current);
+                if(answer&&answer.ok){personalAccepted.add(run.id);return;}
+            }catch(error){dbgError("personal match save pending",error);}
+            if(W.saveEpoch()!==current||saveBlocked())return;
+            if(W.pending&&typeof W.pending.put==="function"){
+                try { var queued=W.pending.put("player-match",payload.id,payload);personalAccepted.add(run.id);
+                    if(!queued.ok)noticeWR(queued.durable?"个人战绩已保留，存储恢复后自动补记；行囊可查看":"个人战绩暂未写入本机，请保持页面打开并恢复存储");
+                }catch(error){dbgError("personal match queue pending",error);}
+            }
+        }
         function capture(result,result2){
             if(_status.cshAssistedMatch) return;
             if(saveBlocked()) return;
@@ -271,6 +300,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
             if(Array.isArray(game.additionaldead)) all=all.concat(game.additionaldead);
             if(!all.length) return;
             if(result!==true&&result!==false) return; // 正常终局必为布尔；平局/异常终局（如谋攻篇无主公视角）不入账
+            capturePersonal(result,mode);
             var useCheck=(typeof game.checkOnlineResult=="function");
             var me2=game.me?(game.me._trueMe||game.me):null;
             var seen={};

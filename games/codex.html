@@ -7,7 +7,7 @@
      · 数据双通道：父窗直读优先（CSH.market.GIRLS / lib.cshBossRecord.summary），
        兜底走桥 shell-stats 的 snap.boss（仅在父窗缺失时）
      · 视觉：暗金 × 深底 —— 与 games/goldfish.html 同一套 CSS 变量与卡片语言
-     · 纯展示：本页无任何写操作
+     · 档案与既有互动；装扮只写外观偏好，不改变战斗状态
      ============================================================ -->
 <html lang="zh-CN" data-csh-palette="portrait">
 <head>
@@ -19,6 +19,7 @@
 <script src="../core/csh_online.js"></script>
 <script src="../core/csh_net.js"></script>
 <script src="../core/csh_bond.js"></script>
+<script src="../core/csh_spirit_skins.js"></script>
 <style>
 /* 书法体注册：ZMX3 = **全覆盖子集**（4058 字 · 由开源 Zhi Mang Xing 完整版子集化，
    2026-10-15）。此前本页误把 csh_fx_font_1/2（78/84 字的**游戏内技能横幅**专用子集）
@@ -148,7 +149,7 @@ body{background:
 body.empty #empty{display:flex}
 body.empty .main{display:none}
 body.empty .foot{display:none}
-#empty .e1{font-family:var(--ff-title);font-size:var(--pfs-3xl);letter-spacing:.34em;color:var(--gold)}
+#empty .e1{font-family:var(--ff-title);font-size:var(--pfs-xl);letter-spacing:.08em;color:var(--gold)}
 #empty .e2{font-size:var(--pfs-md2);letter-spacing:.08em;color:var(--ink-dim);line-height:1.9;max-width:560px}
 #empty .eline{width:150px;height:1px;background:linear-gradient(90deg,transparent,var(--line),transparent)}
 
@@ -282,7 +283,7 @@ body.empty .foot{display:none}
 .dstage.oath::after{content:"";position:absolute;inset:0;pointer-events:none;border-radius:10px;
   border:2px solid rgba(216,189,122,.75);box-shadow:inset 0 0 26px rgba(216,189,122,.35),inset 0 0 4px rgba(255,236,180,.8)}
 .gitem.oath .gface{box-shadow:0 0 0 2px rgba(216,189,122,.85),0 0 10px rgba(216,189,122,.45)}
-.oathov{position:fixed;inset:0;z-index:80;display:flex;flex-direction:column;align-items:center;justify-content:center;
+.oathov{pointer-events:none;position:fixed;inset:0;z-index:80;display:flex;flex-direction:column;align-items:center;justify-content:center;
   background:radial-gradient(ellipse at center,rgba(216,189,122,.22),rgba(18,12,8,.90));animation:oathIn .5s ease}
 .oathov.out{opacity:0;transition:opacity .7s ease}
 .oathbig{font-family:var(--ff-callig,serif);font-size:min(15vmin,72px);letter-spacing:.22em;color:#ffe9b0;
@@ -350,6 +351,23 @@ body.empty .foot{display:none}
  .stat{padding:4px 6px}
 }
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+
+/* Author-provided spirit skins: landscape preview, low-frequency control. */
+#codex-skin-dialog{position:fixed;inset:0;z-index:60;background:#0009;display:flex;align-items:center;justify-content:center;padding:12px;box-sizing:border-box}
+#codex-skin-dialog .skin-panel{position:relative;display:flex;flex-direction:column;box-sizing:border-box;width:min(850px,100%);height:min(560px,100%);min-height:0;padding:14px;border:1px solid var(--gold);border-radius:14px;background:var(--bg,#111b1b);color:var(--ink,#eee)}
+#codex-skin-dialog div{position:static;box-sizing:border-box}
+#codex-skin-dialog .skin-head{display:flex;align-items:center;gap:10px;flex:none}
+#codex-skin-dialog h2{font:600 var(--pfs-lg2,18px)/1.4 var(--ff-title);margin:0;flex:1;min-width:0}
+#codex-skin-dialog .skin-body{display:grid;grid-template-columns:1.1fr 1fr;gap:14px;flex:1;min-height:0;margin-top:10px}
+#codex-skin-dialog .skin-preview{display:flex;align-items:center;justify-content:center;min-height:0;overflow:hidden;border-radius:10px;background:#0003}
+#codex-skin-dialog .skin-preview img{display:block;max-height:100%;max-width:100%;object-fit:contain}
+#codex-skin-dialog .skin-options{min-height:0;overflow:auto;display:flex;flex-direction:column;gap:8px}
+#codex-skin-dialog .skin-options p{font:var(--pfs-sm,12px)/1.65 var(--ff-body);margin:0}
+#codex-skin-dialog button{font:var(--pfs-sm,12px)/1.4 var(--ff-body);min-height:44px;flex:none}
+#codex-skin-dialog .skin-option{text-align:left;padding:10px 12px}
+#codex-skin-dialog .skin-option[aria-pressed=true]{border-color:var(--gold);background:#d8bd7a20}
+@media(max-height:340px){#codex-skin-dialog .skin-panel{padding:10px}#codex-skin-dialog .skin-body{margin-top:6px;gap:10px}}
+
 </style>
 <link rel="stylesheet" href="../core/csh_experience.css">
 <style id="readable-ui-410">
@@ -415,6 +433,7 @@ body.empty .foot{display:none}
     <div class="stats" id="stats"></div>
   </div>
 
+  <div id="codex-read-status" role="status" style="display:flex;align-items:center;gap:8px;flex:none;min-height:44px;font-size:var(--pfs-sm)"><span id="codex-read-message" style="flex:1;min-width:0"></span><button id="codex-read-retry" class="affbtn" type="button" style="min-width:88px;min-height:44px;font:inherit" hidden>重新读取</button></div>
   <div class="main">
     <div class="rolodexwrap" id="codex-roster" role="region" aria-label="妖灵名录"><div class="rolodex" id="rolodex"></div></div>
 
@@ -427,6 +446,7 @@ body.empty .foot{display:none}
         <div class="dhead">
           <div class="dname" id="dname">—</div>
           <div class="dtag" id="dtag"></div>
+          <button class="affbtn" id="codex-skin-open" type="button" style="margin-left:auto;min-width:66px;min-height:44px">装扮</button>
         </div>
         <div class="affbox" id="affbox"></div>
         <details class="collection-details" id="character-story"><summary>人物小传与题壁</summary>
@@ -452,12 +472,11 @@ body.empty .foot{display:none}
     <span>点击左栏切换档案</span><span class="dot">·</span>
     <span>← / → 翻页</span>
   </div>
-</div>
-
 <div id="empty">
   <div class="e1">图鉴未开 · 妖灵尚未现身</div>
   <div class="eline"></div>
   <div class="e2">五十位妖灵在金鳞市挂牌、在魔王麾下出没。<br>请从「池子休闲」进入，或确认扩展已加载后重试。</div>
+</div>
 </div>
 
 <script>
@@ -501,7 +520,7 @@ function fetchShare(cb) {
   }, 6000);
 }
 
-var Data = { items: [], cur: -1, bridgeMinions: null };
+var Data = { items: [], cur: -1, bridgeMinions: null, viewEpoch: 0, disposed: false, readEpoch: 0 };
 
 /* 台词四类 → 中文标签（台词内容一律来自 GIRLS，不在此编造） */
 var LINEDEF = [
@@ -570,17 +589,18 @@ function pathOf(id, name, L, which) {
 }
 
 /* 采集：market 提供人设（GIRLS）与挂牌顺序（LISTED）；minions 提供次数/热度 */
-function collect() {
+function collect(bridgeMinions) {
   var d = parentData();
   var M = d.market, L = d.lib;
   var G = (M && M.GIRLS) ? M.GIRLS : null;
   var LISTED = (M && M.LISTED) ? M.LISTED : null;
-  if (!G || !LISTED || !LISTED.length) return null;
+  if (!G || typeof G !== "object" || Array.isArray(G) || !Array.isArray(LISTED)) return null;
   var minions = minionMap(d.rec);
-  if (!minions) minions = Data.bridgeMinions || {};
+  if (!minions) minions = bridgeMinions || null;
+  if (!minions || typeof minions !== "object" || Array.isArray(minions)) return null;
   /* 数据层名字（csh_bossdata.MINION_NAMES 由金鳞市转交）——与 GIRLS/LISTED 同源同时可用 */
   var names = (M && M.MINION_NAMES) ? M.MINION_NAMES : null;
-  return { G: G, LISTED: LISTED, minions: minions, names: names, lib: L };
+  return { G: G, LISTED: LISTED, minions: minions, names: names, lib: L, bounty: d.rec && typeof d.rec.bountyGet === "function" ? d.rec.bountyGet() : undefined };
 }
 
 /* 按 LISTED 顺序成表（只列 GIRLS 里有的人设 · 无任何硬编码名单） */
@@ -593,7 +613,7 @@ function buildItems(c) {
     var rec = c.minions[id] || null;
     var name = nameOf(id, c.names, c.minions, c.lib);
     out.push({
-      id: id, name: name,
+      id: id, name: name, order: i,
       tag: girl.tag || "", bio: girl.bio || "",
       lines: girl.lines || null,
       aff: affLines(id),                          /* v6.3 好感台词（950 句库，逐人考据） */
@@ -676,7 +696,7 @@ function affOf(id) {
 }
 function refreshAff(id) {
   AFF.cache = null;
-  var it = Data.items[Data.cur];
+  var it = id ? Data.items.filter(function (x) { return x.id === id; })[0] : Data.items[Data.cur];
   if (it) it.affState = affOf(it.id);
   return it ? it.affState : null;
 }
@@ -771,7 +791,7 @@ function renderAff(it) {
     var isBounty = (String(Data.bountyTarget || "") === it.id);
     var bBtn = el("button", "affbtn", isBounty ? "已悬赏 · 待她现身" : ("悬赏 " + BOUNTY_COST + " CBY · 指定她出战"));
     bBtn.title = "花 " + BOUNTY_COST + " CBY 指定：下一次进「挑战模式」必出这一只（击破除名即完成）";
-    if (isBounty) bBtn.setAttribute("disabled", "1");
+    if (isBounty || Data.bountyBusy) bBtn.setAttribute("disabled", "1");
     bBtn.addEventListener("click", function () { doBounty(it.id, bBtn); }, false);
     lockRow.appendChild(bBtn);
     box.appendChild(lockRow);
@@ -874,8 +894,9 @@ function renderAff(it) {
   } else if (st.v >= AFF.max && hunted) {
     var obox = el("div", "oathbox");
     obox.appendChild(el("div", "oathnote", "羁绊已满 · 立下誓约（星砂 ×2 + \u2665 偏爱礼物 ×3）"));
-    var total=0;try{var A=affApi(),fav=A.favOf(it.id);AFF.gifts.forEach(function(g){if(g.key==='stardust')total+=g.cost*2;if(g.key===fav)total+=g.cost*3;});}catch(e){}obox.appendChild(el('div','oathnote','直接花费 '+fmt(total)+' 池子币，无需物品库存'));
+    var quote=oathQuote(it.id);obox.appendChild(el("div","oathnote",quote?"直接花费 "+fmt(quote.cost)+" 池子币，无需物品库存":"费用暂未读取，请重新进入图鉴后再试。"));
     var obtn = el("button", "oathbtn", "\u269C 结 契");
+    obtn.disabled=!quote||!!Data.oathBusy||AFF.giftBusy;
     obtn.title = "与她立下誓约 —— 完成后获得契约台词与专属铭牌";
     obtn.addEventListener("click", function () { doOath(it.id); }, false);
     obox.appendChild(obtn);
@@ -896,17 +917,32 @@ function renderAff(it) {
 }
 
 /* ★ v6.9 结契（直调宿主；宿主缺失给中性提示） */
+function oathQuote(id) {
+  try {
+    var A=affApi(),costs=A&&A.OATH_COST,gifts=A&&A.AFF_GIFTS;
+    if(!costs||!Array.isArray(gifts)||typeof A.favOf!=="function")return null;
+    var fav=A.favOf(id),star=gifts.find(function(g){return g.key==="stardust";}),fg=gifts.find(function(g){return g.key===fav;});
+    if(!star||!fg||![star.cost,fg.cost,costs.stardust,costs.fav].every(function(n){return Number.isSafeInteger(n)&&n>0;}))return null;
+    var total=star.cost*costs.stardust+fg.cost*costs.fav;
+    return Number.isSafeInteger(total)?{cost:total}:null;
+  }catch(e){return null;}
+}
 function doOath(id) {
-  var A = affApi();
+  if (Data.disposed || AFF.giftBusy || Data.oathBusy || !CSHPage.requireSave()) return;
+  if (!oathQuote(id)) { giftStatus(id,"费用暂未读取，请重新进入图鉴后再试。"); return; }
+  var A = affApi(), view = Data.viewEpoch;
+  Data.oathBusy = true;
   var res = null;
   try { if (A && typeof A.oath === "function") res = A.oath(id); } catch (e) {}
-  if (!res || !res.ok) {
+  Data.oathBusy = false;
+  if (Data.disposed || view !== Data.viewEpoch || !CSHPage.saveAllowed()) return;
+  if (!res || res.ok !== true) {
     var WHYo = {
       "need-max": "羁绊还差一节——满 88000 才能立誓。",
       "already": "你们已经立过誓约了。",
       "poor": "池子币不足，结契按星砂×2与偏爱礼物×3的总价直接扣币。",
       "need-hunt": "先在挑战模式击破她，才能走到这一步。",
-      "no-wallet": "钱包未就绪。"
+      "no-wallet": "钱包未就绪。", "save": "保存未完成，本次结契未确认，请恢复存储后重试。", "recovery": "请先完成存档恢复，再来结契。"
     };
     AFF.say = { id: id, msg: (WHYo[res && res.reason] || "这一步没能走成。"), tone: "bad" };
     refreshAff(id);
@@ -922,7 +958,10 @@ function doOath(id) {
   if (it) { renderAff(it); renderEcho(it); renderList(); }
 }
 /* ★ v6.9 契约横幅（书法体大字 + 名字 · 纯 DOM 零新资源 · 2.9s 收场） */
+var oathOverlay = null, oathTimers = [];
+function clearOathBanner() { oathTimers.forEach(clearTimeout); oathTimers=[]; if(oathOverlay&&oathOverlay.parentNode)oathOverlay.parentNode.removeChild(oathOverlay); oathOverlay=null; }
 function oathBanner(id) {
+  clearOathBanner();
   try {
     var nm = "";
     var it = Data.items[Data.cur];
@@ -930,9 +969,9 @@ function oathBanner(id) {
     var ov = el("div", "oathov");
     ov.appendChild(el("div", "oathbig", "契 约"));
     ov.appendChild(el("div", "oathsub", (nm ? nm + " · " : "") + "誓约成立"));
-    document.body.appendChild(ov);
-    setTimeout(function () { ov.classList.add("out"); }, 2200);
-    setTimeout(function () { if (ov.parentNode) ov.parentNode.removeChild(ov); }, 2950);
+    document.body.appendChild(ov);oathOverlay=ov;
+    oathTimers.push(setTimeout(function () { ov.classList.add("out"); }, 2200));
+    oathTimers.push(setTimeout(clearOathBanner,2950));
   } catch (e) {}
 }
 
@@ -964,8 +1003,10 @@ function renderGiftConfirm(box,it){
   ops.appendChild(confirm);ops.appendChild(cancel);panel.appendChild(ops);box.appendChild(panel);
 }
 function doAff(id, act, giftKey, giftRequest) {
-  if(!CSHPage.requireSave()||AFF.giftBusy)return;
+  if(Data.disposed||!CSHPage.requireSave()||AFF.giftBusy||Data.oathBusy)return;
+  var view = Data.viewEpoch, completed = false;
   if(act==="gift"&&!giftRequest)return previewGift(id,giftKey);
+  var action = AFF.actionSeq = (AFF.actionSeq || 0) + 1;
   if(act==="gift"){AFF.giftBusy=true;var current=Data.items[Data.cur];if(current)renderAff(current);}
 
   var WHY = {
@@ -982,8 +1023,10 @@ function doAff(id, act, giftKey, giftRequest) {
     error: "出了点岔子。", save:"保存未完成，未确认的赠礼可重试。", max:"羁绊已满，无需再送礼。", stale:"好感或存档已变化，请重新选择礼物并确认。", "request-conflict":"赠礼凭据已变化，请重新选择礼物。", "bad-quantity":"请输入1到100之间的整数份数。"
   };
   var done = function (res) {
+    if (completed || Data.disposed) return;
+    completed = true;
     res = res || {};
-    AFF.giftBusy=false;
+    if (act === "gift") AFF.giftBusy=false;
     var ok = res.ok === true;
     if(act==="gift"&&(ok||res.reason==="stale"||res.reason==="request-conflict"))AFF.giftPending=null;
     var msgs = [];
@@ -991,12 +1034,12 @@ function doAff(id, act, giftKey, giftRequest) {
     if (ok && res.gain) msgs.push("好感 +" + res.gain);
     if (ok && res.cost) msgs.push("花费 " + fmt(res.cost) + " CBY");
     if (res.leveledUp) msgs.push("★ 升入「" + (res.upLevel || res.levelName || "") + "」");
-    if (!ok) msgs.push(WHY[res.reason] || (res.reason && !/^[a-z-]+$/.test(res.reason) ? res.reason : "尚未确认，请重试这笔赠礼。"));
+    if (!ok) msgs.push(WHY[res.reason] || (act === "gift" ? "尚未确认，请重试这笔赠礼。" : "暂未确认，请稍后重试。"));
     /* 回礼只在这条醒目气泡上说一次，不再在下面小字里重复（作者嫌啰嗦） */
     var top = "";
     if (res.give) top = "✦ 她塞给你 " + fmt(res.give) + " CBY" + (res.upLine ? "（" + res.upLine + "）" : "");
     else if (res.upLine) top = "✦ " + res.upLine;
-    AFF.say = {
+    if (action === AFF.actionSeq) AFF.say = {
       id: id, line: res.giveLine || res.line || "", up: top,
       tone: ok ? (res.leveledUp || res.give ? "levelup" : "good") : "bad",
       msg: msgs.filter(Boolean).join(" · ")
@@ -1005,7 +1048,8 @@ function doAff(id, act, giftKey, giftRequest) {
     if (res.give) { try { Bridge.call("shell-pc", null, function () {}); } catch (eP) {} }
     refreshAff(id);
     var it = Data.items[Data.cur];
-    if (it) { renderAff(it); renderEcho(it); renderList(); }
+    if (it && it.id === id && Data.viewEpoch === view && action === AFF.actionSeq) { renderAff(it); renderEcho(it); }
+    renderList();
   };
   /* ① 同源直读：直接调宿主 API（父窗缺失时才是桥） */
   var A = affApi();
@@ -1016,7 +1060,8 @@ function doAff(id, act, giftKey, giftRequest) {
     } catch (e) { done({ok:false,reason:"save"}); return; }
   }
   /* ② 桥兜底 */
-  Bridge.call("shell-aff-do", { id: id, act: act, gift: giftKey, quantity: giftRequest && giftRequest.quantity, request: giftRequest }, function (ok, res) { done(res || {ok:false,reason:"save"}); });
+  try { Bridge.call("shell-aff-do", { id: id, act: act, gift: giftKey, quantity: giftRequest && giftRequest.quantity, request: giftRequest }, function (ok, res) { done(ok && res ? res : {ok:false,reason:(res && res.reason) || "save"}); }); }
+  catch (e) { done({ok:false,reason:"save"}); }
 }
 
 /* ============================================================
@@ -1045,6 +1090,7 @@ function pinLS(k, v) { if (v !== undefined) return CSHPage.lsSet(k, v); return C
 function pinSave() { return pinLS("csh_codex_pins", JSON.stringify(PINS)); }
 function isPinned(id) { return PINS.indexOf(id) >= 0; }
 function sortItems() {
+  var selected = Data.items[Data.cur], selectedId = selected && selected.id;
   var orig = {};
   Data.items.forEach(function (it, i) { orig[it.id] = i; });
   Data.items.sort(function (a, b) {
@@ -1053,11 +1099,13 @@ function sortItems() {
     if (pa && pb) return PINS.indexOf(a.id) - PINS.indexOf(b.id);
     var va = (a.affState && a.affState.v) || 0, vb = (b.affState && b.affState.v) || 0;
     if (va !== vb) return vb - va;
-    return orig[a.id] - orig[b.id];
+    return (Number.isInteger(a.order) ? a.order : orig[a.id]) - (Number.isInteger(b.order) ? b.order : orig[b.id]);
   });
+  if (selectedId) Data.cur = Data.items.findIndex(function (it) { return it.id === selectedId; });
 }
 function togglePin(id) {
   if (!CSHPage.requireSave()) return;
+  var active = document.activeElement, restoreFocus = active && active.classList.contains("pinbtn");
   var next = PINS.slice(), i = next.indexOf(id);
   if (i >= 0) next.splice(i, 1); else next.unshift(id);
   if (!pinLS("csh_codex_pins", JSON.stringify(next))) return;
@@ -1066,6 +1114,7 @@ function togglePin(id) {
   renderList();
   var it = Data.items[Data.cur];
   if (it && it.id === id) renderAff(it);
+  if (restoreFocus) { var pin = $("#affbox .pinbtn"); if (pin) { pin.focus({preventScroll:true}); pin.scrollIntoView({block:"nearest"}); } }
 }
 function renderList() {
   sortItems();   /* 置顶 → 好感降序 → 原始（每次重渲染都随好感实时重排） */
@@ -1082,7 +1131,7 @@ function renderList() {
     img.onerror = function () { f.classList.add("noimg"); };
     f.appendChild(img);
     f.appendChild(el("span", "gph", String(it.name).slice(0, 1)));
-    img.src = it.face;
+    paintSpiritFace(img,it,f);
     row.appendChild(f);
     var meta = el("div", "gmeta");
     meta.appendChild(el("div", "gname", it.name));
@@ -1174,13 +1223,37 @@ function renderEcho(it) {
   box.appendChild(det);
 }
 
+var skinDialog=null,skinImageSeq=0;
+function skinStorage(){var storage=window.parent&&window.parent!==window?window.parent.localStorage:window.localStorage;if(!storage)throw Error("装扮偏好暂不可读取");return {getItem:function(k){return storage.getItem(k);},setItem:function(k,v){if(!CSHPage.saveAllowed())throw Error("当前存档不可写入");storage.setItem(k,v);}};}
+function skinCurrent(id,view){return !Data.disposed&&Data.viewEpoch===view&&Data.items[Data.cur]&&Data.items[Data.cur].id===id;}
+function paintSpiritFace(img,it,frame){
+  var chosen;try{chosen=CSHSpiritSkins.resolve(it.id,it.img,skinStorage()).skin;}catch(e){chosen={id:"classic"};}
+  var fallback=false;frame.classList.remove("noimg");img.onerror=function(){if(!img.isConnected)return;if(!fallback&&chosen.id!=="classic"){fallback=true;img.src=it.face;}else frame.classList.add("noimg");};img.src=chosen.id==="classic"?it.face:(chosen.face||chosen.portrait);
+}
+function paintSpiritImage(it){
+  var stage=$(".dstage"),img=$("#dimg"),view=Data.viewEpoch,seq=++skinImageSeq,chosen;
+  try{chosen=CSHSpiritSkins.resolve(it.id,it.img,skinStorage()).skin;}catch(e){chosen={id:"classic",portrait:it.img};}
+  stage.classList.remove("noimg");img.alt=it.name;var fallback=false;
+  img.onerror=function(){if(seq!==skinImageSeq||!skinCurrent(it.id,view))return;if(!fallback&&chosen.id!=="classic"){fallback=true;img.src=it.img;}else stage.classList.add("noimg");};img.src=chosen.portrait;
+}
+function closeSkinDialog(restoreFocus){if(!skinDialog)return;var state=skinDialog;skinDialog=null;state.layer.remove();document.removeEventListener("keydown",state.key,true);if(restoreFocus!==false&&state.opener&&state.opener.isConnected)state.opener.focus({preventScroll:true});}
+function openSkinDialog(){
+  var it=Data.items[Data.cur];if(!it||Data.disposed||!window.CSHSpiritSkins)return;
+  closeSkinDialog(false);var view=Data.viewEpoch,selected,readError="";try{selected=CSHSpiritSkins.resolve(it.id,it.img,skinStorage());}catch(e){selected={skin:{id:"classic",portrait:it.img},requested:"classic"};readError="装扮偏好暂未读到，当前显示经典；关闭后可重试。";}
+  var layer=el("section");layer.id="codex-skin-dialog";var panel=el("section","skin-panel"),head=el("div","skin-head"),title=el("h2","",it.name+" · 装扮"),back=el("button","affbtn","返回");back.type="button";back.onclick=function(){closeSkinDialog();};head.appendChild(title);head.appendChild(back);panel.appendChild(head);panel.setAttribute("role","dialog");panel.setAttribute("aria-modal","true");panel.setAttribute("aria-label",it.name+"的装扮");
+  var body=el("div","skin-body"),preview=el("div","skin-preview"),image=el("img"),options=el("div","skin-options"),status=el("p","",readError||(selected.unavailable?"原装扮暂不可用，当前显示经典；可恢复经典。":"")),apply=el("button","affbtn gold","使用此装扮"),restore=el("button","affbtn","恢复经典");image.alt=it.name+"装扮预览";preview.appendChild(image);status.setAttribute("role","status");apply.type=restore.type="button";var rows=CSHSpiritSkins.list(it.id,it.img),draft=selected.skin,loadSeq=0,loaded=false;
+  function live(){return skinDialog&&skinDialog.layer===layer&&skinCurrent(it.id,view);}
+  function show(row){draft=row;loaded=false;var token=++loadSeq;apply.disabled=true;image.onload=function(){if(!live()||token!==loadSeq)return;loaded=true;apply.disabled=!!readError||draft.id===selected.requested;};image.onerror=function(){if(!live()||token!==loadSeq)return;loaded=false;apply.disabled=true;status.textContent=row.id==="classic"?"经典图片暂不可用，人物档案仍可查看。":"这套装扮图片暂不可用，已显示经典；当前装扮未更改。";if(row.id!=="classic"){image.onload=null;image.onerror=null;image.src=it.img;}};image.src=row.portrait;options.querySelectorAll(".skin-option").forEach(function(n){n.setAttribute("aria-pressed",String(n.dataset.skinId===row.id));});}
+  rows.forEach(function(row){var b=el("button","affbtn skin-option",row.name+(row.id===selected.requested?" · 当前使用":""));b.type="button";b.dataset.skinId=row.id;b.onclick=function(){if(live())show(row);};options.appendChild(b);});options.appendChild(el("p","","更多装扮将在后续加入。装扮仅改变外观。"));options.appendChild(status);options.appendChild(apply);options.appendChild(restore);restore.disabled=!!readError||selected.requested==="classic";
+  function accept(id){if(!live()||readError||!CSHPage.requireSave())return;try{CSHSpiritSkins.select(it.id,id,skinStorage());selected=CSHSpiritSkins.resolve(it.id,it.img,skinStorage());paintSpiritImage(it);var face=document.querySelector(".gitem.on .gface");if(face)paintSpiritFace(face.querySelector("img"),it,face);status.textContent="已使用"+selected.skin.name+"，仅改变外观。";apply.disabled=draft.id===selected.requested;restore.disabled=selected.requested==="classic";options.querySelectorAll(".skin-option").forEach(function(n){var row=rows.find(function(r){return r.id===n.dataset.skinId;});n.textContent=row.name+(row.id===selected.requested?" · 当前使用":"");});}catch(e){status.textContent="装扮保存尚未确认，当前画面暂保留；恢复存储后可重试。";}}
+  apply.onclick=function(){if(loaded)accept(draft.id);};restore.onclick=function(){accept("classic");show(rows[0]);};body.appendChild(preview);body.appendChild(options);panel.appendChild(body);layer.appendChild(panel);
+  function key(e){if(!live())return;if(e.key==="Escape"){e.preventDefault();e.stopImmediatePropagation();closeSkinDialog();}else if(e.key==="Tab"){var stops=Array.prototype.filter.call(panel.querySelectorAll("button"),function(n){return !n.disabled&&n.getClientRects().length;});var first=stops[0],last=stops[stops.length-1];if(!panel.contains(document.activeElement)||(e.shiftKey&&document.activeElement===first)||(!e.shiftKey&&document.activeElement===last)){e.preventDefault();(e.shiftKey?last:first).focus();}}else if(e.key==="ArrowLeft"||e.key==="ArrowRight")e.stopImmediatePropagation();}
+  skinDialog={layer:layer,opener:$("#codex-skin-open"),key:key};document.addEventListener("keydown",key,true);layer.addEventListener("click",function(e){if(e.target===layer)closeSkinDialog();});document.body.appendChild(layer);show(draft);back.focus({preventScroll:true});
+}
+$("#codex-skin-open").addEventListener("click",openSkinDialog);
+
 function renderDossier(it) {
-  var stage = $(".dstage");
-  stage.classList.remove("noimg");
-  var img = $("#dimg");
-  img.alt = it.name;
-  img.onerror = function () { stage.classList.add("noimg"); };   /* 大图兜底：占位名 */
-  img.src = it.img;
+  paintSpiritImage(it);
   $("#dph").textContent = it.name;
   $("#dname").textContent = it.name;
   $("#dtag").textContent = it.tag || "金鳞市挂牌";
@@ -1221,6 +1294,9 @@ $("#codex-roster-toggle").addEventListener("click", function () {
 });
 
 function select(idx) {
+  closeSkinDialog(false);
+  clearOathBanner();
+  Data.viewEpoch++;
   AFF.giftQuoteSeq++;if(!AFF.giftBusy)AFF.giftPending=null;
   var n = Data.items.length;
   if (!n) return;
@@ -1257,42 +1333,70 @@ var BOUNTY_COST = 1000;
 /* 下单：**扣费与落标记全在宿主**（shell-bounty）——页面不碰钱包、不写存档；
    宿主先校验（池外/已讨伐直接拒）再扣费，落标记失败原额回滚。 */
 function doBounty(id, btn) {
-  if (!Bridge.active) { return; }
-  btn.disabled = true;
-  btn.textContent = "下单中…";
-  Bridge.call("shell-bounty", { bid: id }, function (ok, res) {
-    if (!ok) {
-      var why = (res && res.reason) || "fail";
-      try { console.warn("[池子魔将][悬赏] 下单失败：reason=" + why); } catch (eW) {}
-      btn.disabled = false;
-      btn.textContent = (why === "poor") ? ("CBY 不够（需 " + BOUNTY_COST + "）")
-        : ((why === "hunted") ? "她已被讨伐" : "悬赏失败 · 点我再试");
-      return;
-    }
-    Data.bountyTarget = id;
-    btn.textContent = "已悬赏 · 待她现身";
-    btn.setAttribute("disabled", "1");
-    try { Bridge.call("shell-pc", null, function () {}); } catch (eP) {}
-  });
+  if (Data.disposed || Data.bountyBusy || !CSHPage.requireSave() || !Bridge.active) return;
+  Data.bountyBusy = true;btn.disabled=true;btn.textContent="下单中…";
+  var received=false,view=Data.viewEpoch;
+  function done(ok,res) {
+    if(received||Data.disposed)return;received=true;Data.bountyBusy=false;
+    if(!CSHPage.saveAllowed())return;
+    if(ok&&res&&String(res.id)===String(id)){Data.bountyTarget=id;try{Bridge.call("shell-pc",null,function(){});}catch(e){}}
+    var current=Data.items[Data.cur];
+    if(current&&current.id===id&&view===Data.viewEpoch){
+      if(ok&&res&&String(res.id)===String(id)){renderAff(current);renderList();}
+      else{btn.disabled=false;btn.textContent=res&&res.reason==="poor"?"CBY 不够（需 "+BOUNTY_COST+"）":res&&res.reason==="hunted"?"她已被讨伐":"尚未确认 · 点我重试";}
+    } else if (current && !(current.n > 0)) { renderAff(current); }
+  }
+  try{Bridge.call("shell-bounty",{bid:id},done);}catch(e){done(false,null);}
 }
-function boot() {
-  var c = collect();
-  if (c) { Data.items = buildItems(c); renderAll(); return; }
-  if (Bridge.active) {
-    Bridge.call("shell-stats", null, function (ok, snap) {
-      if (ok && snap && snap.boss && snap.boss.minions && typeof snap.boss.minions === "object") {
-        Data.bridgeMinions = snap.boss.minions;
-      }
-      if (ok && snap) Data.bountyTarget = String(snap.bounty || "");
-      var c2 = collect();                 /* 人设仍需父窗 —— 拿不到则仍空态 */
-      Data.items = c2 ? buildItems(c2) : [];
-      renderAll();
-    });
-  } else {
-    Data.items = [];
-    renderAll();
+
+function paintRead(state) {
+  var hasItems = Data.items.length > 0, bar = $("#codex-read-status"), msg = $("#codex-read-message");
+  bar.hidden = state === "ready" && hasItems;
+  bar.style.display = bar.hidden ? "none" : "flex";
+  $("#codex-read-retry").hidden = state === "loading";
+  $("#stats").hidden = !hasItems;
+  $("#stats").style.display = hasItems ? "" : "none";
+  document.body.classList.toggle("empty", !hasItems);
+  msg.textContent = state === "ready" ? "名录已读取。" : state === "loading" ? "正在读取图鉴…" : (hasItems ? "更新失败，暂显示上次档案。可重新读取。" : "暂未读到图鉴，请重新读取。");
+  if (!hasItems) {
+    $("#empty .e1").textContent = state === "loading" ? "正在整理图鉴" : (state === "ready" ? "当前暂无人物资料" : "图鉴暂未读取成功");
+    $("#empty .e2").textContent = state === "ready" ? "名录读取成功，目前没有可展示的人物资料。" : "请从池子休闲进入；读取失败不会清空讨伐或羁绊记录。";
   }
 }
+function boot() {
+  if (Data.disposed) return;
+  if (AFF.giftBusy) { $("#codex-read-message").textContent = "赠礼正在确认，请稍后重新读取。"; return; }
+  var seq = ++Data.readEpoch, completed = false;
+  paintRead("loading");
+  function accept(c) {
+    if (completed || Data.disposed || seq !== Data.readEpoch) return;
+    completed = true;
+    if (!c) { paintRead("error"); return; }
+    try {
+      var items = buildItems(c), current = Data.items[Data.cur], id = current && current.id;
+      var scroll = $(".dinfo").scrollTop;
+      Data.items = items;
+      if (c.bounty !== undefined) Data.bountyTarget = String(c.bounty || "");
+      Data.cur = id ? items.findIndex(function (x) { return x.id === id; }) : -1;
+      renderStats();
+      if (items.length) { renderList(); select(Data.cur >= 0 ? Data.cur : 0); $(".dinfo").scrollTop = scroll; }
+      paintRead("ready");
+    } catch (e) { paintRead("error"); }
+  }
+  function read(map) { try { return collect(map); } catch (e) { return null; } }
+  var c = read();
+  if (c) { accept(c); return; }
+  if (!Bridge.active) { accept(null); return; }
+  try { Bridge.call("shell-stats", null, function (ok, snap) {
+    if (completed || Data.disposed || seq !== Data.readEpoch) return;
+    var map = ok && snap && snap.boss && snap.boss.minions;
+    if (!map || typeof map !== "object" || Array.isArray(map)) { accept(null); return; }
+    var next = read(map);
+    if (next) { Data.bridgeMinions = map; Data.bountyTarget = String(snap.bounty || ""); }
+    accept(next);
+  }); } catch (e) { accept(null); }
+}
+$("#codex-read-retry").addEventListener("click", function () { boot(); });
 
 /* 键盘翻页 */
 document.addEventListener("keydown", function (e) {
@@ -1308,7 +1412,7 @@ boot();
 /* 进页先取一次花榜（只读）；到手后把当前选中那只重绘一次，让魁首题壁出现（失败则沉默） */
 function refreshShareView() { try { if (Data.items.length && Data.cur >= 0) renderDossier(Data.items[Data.cur]); } catch (e) {} }
 var unsubscribeShare = CSHOnline.subscribe(function () { CSHNet.cancelAll(); fetchShare(refreshShareView); });
-window.addEventListener('pagehide', function () { shareDisposed = true; shareSeq++; unsubscribeShare(); CSHNet.cancelAll(); });
+window.addEventListener('pagehide', function () { closeSkinDialog(false);clearOathBanner(); Data.disposed = true; Data.readEpoch++; Data.viewEpoch++; AFF.giftQuoteSeq++; shareDisposed = true; shareSeq++; unsubscribeShare(); CSHNet.cancelAll(); });
 fetchShare(refreshShareView);
 })();
 </script>

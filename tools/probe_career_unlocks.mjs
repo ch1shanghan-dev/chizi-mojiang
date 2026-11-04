@@ -48,10 +48,11 @@ const feedbackTick=async()=>{await Promise.resolve();await Promise.resolve();};
 {
  let b=backgroundHarness(),initial=b.W.pc();
  check('background start persists a silent historical baseline without opening the hall',b.W.careerUnlocks()?.baseline&&b.W.careerUnlocks().entries.rich_1000?.observedAt===0&&b.ctx.feedback.length===0&&b.W.pc()===initial);
+ const walletComboKeys=new Set(),walletFields=new Set(['pc','pcPeak','streak']),definitionSource=src('csh_achv.js');walk(parse(definitionSource),n=>{if(n.type==='VariableDeclarator'&&n.id?.name==='ROWS')vm.runInNewContext('('+definitionSource.slice(...n.init.range)+')').forEach(r=>{if(r.a&&r.a.every(a=>walletFields.has(a[0])))walletComboKeys.add(r.k);});});
  let evaluated=[];b.A.defs.forEach(d=>{const original=d.prog;d.prog=function(stats){evaluated.push(d.key);return original(stats);};});
  b.W.add(2000,'fixture background gain');b.W.spend(2500,'fixture same batch spend');
  check('uncommitted eligibility stays out of permanent memory and disk',!b.W.careerUnlocks().entries.rich_3000&&!b.disk().careerUnlocks.entries.rich_3000&&b.ctx.feedback.length===0);
- check('background checks only indexed wallet rules, without scanning all career rules',evaluated.length>0&&evaluated.every(k=>b.A.byId(k).cat==='资产'||b.A.byId(k).cat==='签到'||b.A.byId(k).cat==='任务'||['egg_signed_first','egg_hungry','egg_rich_first','task_1','task_2','task_3','egg_task_full','egg_full_house'].includes(k)));
+ check('background checks only indexed wallet rules, without scanning all career rules',walletComboKeys.size===27&&evaluated.length>0&&evaluated.every(k=>walletComboKeys.has(k)||b.A.byId(k).cat==='资产'||b.A.byId(k).cat==='签到'||b.A.byId(k).cat==='任务'||['egg_signed_first','egg_hungry','egg_rich_first','task_1','task_2','task_3','egg_task_full','egg_full_house'].includes(k)));
  const writes=[],put=b.store.setItem.bind(b.store);b.store.setItem=(k,v)=>{put(k,v);if(k==='csh_wallet')writes.push(JSON.parse(v));};
  check('same debounce batch commits successfully',b.flush());await feedbackTick();
  const recorded=b.W.careerUnlocks().entries.rich_3000;

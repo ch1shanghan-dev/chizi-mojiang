@@ -226,20 +226,23 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 	var TABLE_WORLD = null;
 	var TABLE_SERIAL = 0;
 	function cshWorldTableFinish() {
-		if (sessionSaveBlocked() || persistenceBlocked()) return false;
 		var t = TABLE_WORLD, r = t && t.round;
-		if (!r) return;
-		cshTableAward(); // 壳直接关闭/同帧换桌也要收尾已真实开局的同桌好感
-		var W = lib.cshWorld;
-		Object.keys(t.ids).forEach(function (id) {
-			if (Object.prototype.hasOwnProperty.call(r.results, id)) return;
-			try {
-				var out = W && W.settlePlay ? W.settlePlay(id, false) : null;
-				if (out) r.results[id] = out;
-				else logError("未完成牌桌亲历未能补记（" + id + "）");
-			} catch (e) { logError("未完成牌桌亲历补记失败（" + id + "）", e); }
-		});
-		t.round = null;
+		if (!r || r.finished) return true;
+		/* A replaced save must never receive an abandoned old table's experience. */
+		if (sessionSaveBlocked()) { t.round = null; return true; }
+		if (persistenceBlocked()) return false;
+		var remaining = Object.keys(t.ids).filter(function (id) { return !Object.prototype.hasOwnProperty.call(r.results, id); });
+		if (remaining.length) {
+			var bank = wallet();
+			if (!bank || typeof bank.queueTableResult !== "function") return false;
+			if (!r.finishJob) r.finishJob = { id: t.token + "-r" + r.n + "-finish", t: Date.now(), ops: remaining.map(function (id) { return { id: id, kind: "play" }; }) };
+			var saved = bank.queueTableResult(r.finishJob);
+			if (!saved || saved.ok !== true) return false;
+			remaining.forEach(function (id) { r.results[id] = { id: id, pending: !!saved.worldPending }; });
+		}
+		cshTableAward();
+		r.finished = true;
+		return true;
 	}
 	function cshWorldTableBegin(table, round) {
 		if (sessionSaveBlocked() || persistenceBlocked()) return false;
@@ -247,11 +250,10 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 		if (current !== "uno" || !t || table !== t.token ||
 			typeof round !== "number" || !isFinite(round) || round < 1 ||
 			round > 1000000000 || Math.floor(round) !== round) return false;
-		if (t.round && t.round.n === round) return true; // 开局重试
-		if (round !== t.lastRound + 1) return false;
-		cshWorldTableFinish();
+		if (t.round && t.round.n === round) return true;
+		if (round !== t.lastRound + 1 || !cshWorldTableFinish()) return false;
 		t.lastRound = round;
-		t.round = { n: round, results: Object.create(null) };
+		t.round = { n: round, results: Object.create(null), jobs: Object.create(null) };
 		return true;
 	}
 	function cshWorldTableResult(table, round, id, won) {
@@ -261,22 +263,29 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 			typeof id !== "string" || !Object.prototype.hasOwnProperty.call(t.ids, id) ||
 			(won !== true && won !== false && won !== null)) return null;
 		if (Object.prototype.hasOwnProperty.call(r.results, id)) return r.results[id];
-		var W = lib.cshWorld;
-		var out = W && W.settleResult ? W.settleResult(id, won === true ? true : won === false ? false : null) : null;
-		/* 只有成功才占用，错误/暂未加载后重试仍可补记。 */
-		if (out) r.results[id] = out;
+		var bank = wallet();
+		if (!bank || typeof bank.queueTableResult !== "function") return null;
+		var job = r.jobs[id];
+		if (!job) job = r.jobs[id] = { id: t.token + "-r" + round + "-p" + Object.keys(t.ids).indexOf(id), t: Date.now(), ops: [{ id: id, kind: "result", won: won }] };
+		else if (job.ops[0].won !== won) return null;
+		var saved = bank.queueTableResult(job);
+		if (!saved || saved.ok !== true) return null;
+		var out = saved.results && saved.results[0] || { id: id, delta: 0, pending: !!saved.worldPending };
+		r.results[id] = out;
+		r.finishJob = null;
 		return out;
 	}
 	function cshTableRecord(seats) {
-		cshWorldTableFinish();
+		if (!cshWorldTableFinish()) return false;
 		var ids = Object.create(null);
 		(seats || []).forEach(function (s) { if (s && typeof s.id === "string") ids[s.id] = true; });
-		TABLE_WORLD = { token: "table-" + (++TABLE_SERIAL), ids: ids, lastRound: 0, round: null };
+		TABLE_WORLD = { token: "table-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 12) + "-" + (++TABLE_SERIAL), ids: ids, seats: (seats || []).map(function (s) { return { id: s && s.id, stake: Math.max(0, Math.floor(Number(s && s.stake) || 0)) }; }), lastRound: 0, round: null };
 		try {
 			TABLE_AFF.minions = (seats || []).map(function (s2) { return s2 && s2.id; })
 				.filter(function (id) { return typeof id === "string" && id.indexOf("csh_boss_minion_") === 0; });
 			TABLE_AFF.awarded = false;
 		} catch (e0) { TABLE_AFF.minions = []; TABLE_AFF.awarded = false; }
+		return true;
 	}
 	function cshTableAward() {
 		if (sessionSaveBlocked() || persistenceBlocked()) return 0;
@@ -769,11 +778,20 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 		if (persistenceBlocked()) { toast(persistenceRefused().reason); return false; }
 		var W = wallet();
 		if (!W) { toast("钱包未加载，无法收费"); closeFee(); return false; }
+		if (typeof W.tableResultStatus === "function") {
+			var tableStatus = W.tableResultStatus();
+			if (tableStatus.count || tableStatus.error) {
+				if (typeof W.flushTableResults === "function") W.flushTableResults();
+				tableStatus = W.tableResultStatus();
+				if (tableStatus.count || tableStatus.error) { toast("牌友记录尚待保存，请先到行囊重试"); return false; }
+			}
+		}
+		if (!cshWorldTableFinish()) { toast("牌友记录尚未保存，请恢复存储后再开桌"); return false; }
 		var total = tk + buyIn;
 		if (total > 0) {
 			// spendPC 返回布尔：false = 余额不足
 			var paid = W.wallet.spend(total, "入场:" + key);
-			if (paid !== true && (paid && paid.ok !== true)) { toast("池子币不足"); return false; }
+			if (paid !== true && !(paid && paid.ok === true)) { toast("池子币不足"); return false; }
 		}
 		closeFee();
 		logInfo("收费 " + key + " 门票 " + tk + " 带入 " + buyIn);
@@ -934,30 +952,18 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 			}
 		} catch (e1) { s.careerStatsReliable=false;}
 		try {
-			var d = lib.config["extension_池子魔将_winrateData"];
-			if (d && typeof d === "object") {
-				var chars = {};
-				for (var m in d) {
-					if (!Object.prototype.hasOwnProperty.call(d, m)) continue;
-					if (m === "camps" || m === "me") continue;
-					var md = d[m];
-					if (!md || typeof md !== "object" || Array.isArray(md)) continue;
-					var hasMode = false;
-					for (var n in md) {
-						if (!Object.prototype.hasOwnProperty.call(md, n)) continue;
-						var e2 = md[n];
-						if (!e2 || typeof e2 !== "object") continue;
-						if (!e2.games) continue;
-						s.wrGames += e2.games || 0; s.wrWin += e2.win || 0; s.wrLose += e2.lose || 0;
-						s.wrKill += e2.kill || 0;
-						chars[n] = 1; hasMode = true;
-					}
-					if (hasMode) s.wrModes++;
-				}
-				s.wrChars = 0;
-				for (var c in chars) if (Object.prototype.hasOwnProperty.call(chars, c)) s.wrChars++;
-			}
-		} catch (e3) { s.careerStatsReliable=false;}
+            s.wrHistoryPartial=true;s.wrObservedSince=null;s.wrReadFailed=false;
+            var chars=Object.create(null),oldWR=lib.config["extension_池子魔将_winrateData"];
+            // Personal character history proves names only. Dual generals never prove two games.
+            var oldChars=oldWR&&oldWR.me&&oldWR.me.chars;
+            if(oldChars&&typeof oldChars==="object"&&!Array.isArray(oldChars))Object.keys(oldChars).forEach(function(id){var e=oldChars[id];if(e&&Number.isSafeInteger(e.games)&&e.games>0)chars[id]=1;});
+            var personal=lib.cshWallet&&typeof lib.cshWallet.playerMatches==="function"?lib.cshWallet.playerMatches():null;
+            if(personal){
+                ["identity","versus","doudizhu","guozhan"].forEach(function(mode){var e=personal.modes[mode];if(!e)return;s.wrGames+=e.games;s.wrWin+=e.win;s.wrLose+=e.lose;s.wrKill+=e.kill;if(e.games>0)s.wrModes++;});
+                personal.chars.forEach(function(id){chars[id]=1;});s.wrObservedSince=personal.since;
+            }
+            s.wrChars=Object.keys(chars).length;
+		} catch (e3) { s.wrReadFailed=true;s.careerStatsReliable=false;}
 		try {
 			var wl = (lib.cshWorld && lib.cshWorld.list) ? lib.cshWorld.list() : [];
 			s.worldChars = wl.length;
@@ -976,10 +982,11 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 			try {
 				var wst = (lib.cshWorld && lib.cshWorld.stats) ? lib.cshWorld.stats() : null;
 				if (wst) {
-					s.worldHands = wst.playerHands || 0; s.worldSkillTop = wst.playerSkillTop || 0;
-					s.playerOpponents = wst.playerOpponents || 0; s.playerFamiliar = wst.playerFamiliar || 0;
-					s.playerRevenge = wst.playerRevenge || 0; s.playerBalanced = wst.playerBalanced || 0;
-					s.playerFundMin = wst.playerFundMin || 0; s.playerFundWitness = wst.playerFundWitness || 0;
+					var acceptedWorld=lib.cshWorld.worldCareerSaved?lib.cshWorld.worldCareerSaved():null;
+                    s.worldHands = acceptedWorld ? acceptedWorld.worldHands : (wst.playerHands || 0); s.worldSkillTop = acceptedWorld ? acceptedWorld.worldSkillTop : (wst.playerSkillTop || 0);
+					s.playerOpponents = acceptedWorld ? acceptedWorld.playerOpponents : (wst.playerOpponents || 0); s.playerFamiliar = acceptedWorld ? acceptedWorld.playerFamiliar : (wst.playerFamiliar || 0);
+					s.playerRevenge = acceptedWorld ? acceptedWorld.playerRevenge : (wst.playerRevenge || 0); s.playerBalanced = acceptedWorld ? acceptedWorld.playerBalanced : (wst.playerBalanced || 0);
+					s.playerFundMin = acceptedWorld ? acceptedWorld.playerFundMin : (wst.playerFundMin || 0); s.playerFundWitness = acceptedWorld ? acceptedWorld.playerFundWitness : (wst.playerFundWitness || 0);
 					s.billionaires = wst.tier3 || 0; s.billionaireBroke = wst.billionaireBroke || 0;
 					/* 世界动态的累计计数（2026-10-03）：成就引擎直接读这几个字段 */
 					s.recordsSeen = wst.recordsSeen || 0; s.tierDown = wst.tierDown || 0;
@@ -1069,85 +1076,91 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 		var chips = Math.max(0, Math.floor(Number(data.chips) || 0));
 		var seats = Array.isArray(data.seats) ? data.seats : [];
 
-		var aiTotal = 0, i;
-		for (i = 0; i < seats.length; i++) aiTotal += Math.max(0, Math.floor(Number(seats[i] && seats[i].stake) || 0));
+		/* New DDZ pages identify the public sides. Old pages retain the legacy bridge. */
+		var team = null, moneySeats = seats, i, teamWorld = lib.cshWorld;
+		if (Object.prototype.hasOwnProperty.call(data, "team") && data.team !== undefined) {
+			team = data.team;
+			var valid = k === "doudizhu" && current === "doudizhu" && Number.isSafeInteger(data.buyIn) && data.buyIn >= 0 && Number.isSafeInteger(data.chips) && data.chips >= 0 && team && typeof team === "object" &&
+				Number.isInteger(team.landlord) && team.landlord >= 0 && team.landlord < 3 &&
+				Number.isInteger(team.winner) && team.winner >= 0 && team.winner < 3 && typeof team.practice === "boolean" &&
+				seats.length === 2 && TABLE_WORLD && TABLE_WORLD.seats && TABLE_WORLD.seats.length === 2 && buyIn === currentBuyIn &&
+				teamWorld && typeof teamWorld.settleTeamResult === "function" && typeof teamWorld.settleResult === "function" &&
+				typeof teamWorld.settleWin === "function" && typeof teamWorld.settleLose === "function";
+			for (i = 0; valid && i < 2; i++) valid = seats[i] && typeof seats[i].id === "string" &&
+				seats[i].id === TABLE_WORLD.seats[i].id && seats[i].stake === TABLE_WORLD.seats[i].stake &&
+				(i === 0 || seats[i].id !== seats[0].id);
+			if (!valid) return { ok: false, reason: "牌桌信息已更新，请保留本局并重试" };
+			moneySeats = seats.filter(function (seat, index) { return ((index + 1) === team.landlord) !== (team.landlord === 0); });
+			var playerWon = (team.winner === team.landlord) === (team.landlord === 0);
+			var enemyTotal = moneySeats.reduce(function (n, seat) { return n + seat.stake; }, 0);
+			if (team.practice ? chips !== buyIn : playerWon ? chips < buyIn || chips > buyIn + enemyTotal : chips > buyIn || chips < Math.max(0, buyIn - enemyTotal))
+				return { ok: false, reason: "本局筹码与阵营结果不一致" };
+		}
+		if (!team && seats.length) {
+			var seenSeats = Object.create(null), validSeats = seats.length <= 5 && teamWorld && typeof teamWorld.byId === "function";
+			for (i = 0; validSeats && i < seats.length; i++) {
+				var oldSeat = seats[i];
+				validSeats = oldSeat && typeof oldSeat.id === "string" && !seenSeats[oldSeat.id] && !!teamWorld.byId(oldSeat.id) && Number.isSafeInteger(oldSeat.stake) && oldSeat.stake >= 0;
+				if (validSeats) seenSeats[oldSeat.id] = true;
+			}
+			if (!validSeats) return { ok: false, reason: "牌桌人物记录不一致，请保留本场并重试" };
+		}
+		var aiTotal = 0;
+		for (i = 0; i < moneySeats.length; i++) aiTotal += Math.max(0, Math.floor(Number(moneySeats[i] && moneySeats[i].stake) || 0));
 
+		/* The world intent is prepared from actual credit and saved with the wallet. */
+		var prepareWorldResult = null;
+		if ((team && !team.practice) || (!team && (seats.length || data.gamble))) {
+			var tableBank = wallet();
+			if (!tableBank || typeof tableBank.flushTableResults !== "function") return { ok: false, reason: "牌桌记录尚未就绪，请保留本局并重试" };
+			if (!teamWorld || typeof teamWorld.validateTableResult !== "function" || typeof teamWorld.commitTableResult !== "function")
+				return { ok: false, reason: "牌桌记录尚未就绪，请保留本局并重试" };
+			var tableEventId = "table-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 12), tableEventTime = Date.now();
+			prepareWorldResult = function (paidResult) {
+				var net = chips - buyIn, gain = net > 0 ? Math.max(0, paidResult.credited - buyIn) : 0;
+				var moved = net > 0 ? Math.min(aiTotal, gain, Math.floor(net * paidResult.rate)) : Math.min(aiTotal, -net);
+				var left = Math.max(0, moved), enemyIndex = 0, ops = [];
+				if (!team) {
+					var funded = seats.filter(function (seat) { return seat.stake > 0; }), fundedIndex = 0;
+					seats.forEach(function (seat) {
+						if (net === 0) { ops.push({ id: seat.id, kind: "result", won: null }); return; }
+						var share = 0;
+						if (seat.stake > 0) { fundedIndex++; share = fundedIndex === funded.length ? left : Math.floor(moved * seat.stake / Math.max(1, aiTotal)); left -= share; }
+						ops.push(share > 0 ? { id: seat.id, kind: net > 0 ? "lose" : "win", amount: share } : { id: seat.id, kind: "play" });
+					});
+					return Object.assign({ id: tableEventId, t: tableEventTime, ops: ops }, data.gamble ? { gambleProfit: net } : {});
+				}
+				seats.forEach(function (seat, index) {
+					var partner = ((index + 1) === team.landlord) === (team.landlord === 0);
+					var won = ((index + 1) === team.landlord) === (team.winner === team.landlord);
+					if (partner) { ops.push({ id: seat.id, kind: "team", won: won }); return; }
+					enemyIndex++;
+					var share = enemyIndex === moneySeats.length ? left : Math.floor(moved * seat.stake / Math.max(1, aiTotal));
+					left -= share;
+					ops.push(share > 0 ? { id: seat.id, kind: net > 0 ? "lose" : "win", amount: share } : { id: seat.id, kind: "result", won: won });
+				});
+				return Object.assign({ id: tableEventId, t: tableEventTime, ops: ops }, data.gamble ? { gambleProfit: net } : {});
+			};
+		}
 		/* 玩家侧：金额 + 入账 + 提示 + 事件，全部在 settle 内完成 */
-		var res = settle(k, { buyIn: buyIn, chips: chips, aiStakeTotal: aiTotal });
+		var res = settle(k, { buyIn: buyIn, chips: chips, aiStakeTotal: aiTotal, prepareWorldResult: prepareWorldResult });
 		if (!res || res.ok === false) return res;
 		var profit = res.profit || 0;
 		var credited = res.credited || 0;
 
-		/* —— AI 世界双向记账 ——
-		   ★ 玩家赢时，世界失血按玩家的**实际净增**（入账 − 带入）计算。
-		   pc 触顶（PC_CAP 上限）时 addPC 会截断，若仍按理论 profit×回收率 扣 AI，
-		   差额会凭空蒸发（玩家没拿到、AI 却被扣了，账不平）。 */
+		/* The wallet has committed money and the world intent together; only consume its result here. */
 		var world = lib.cshWorld;
-		var settled = [];
-		var encountered = Object.create(null);
-		if (world && aiTotal > 0 && seats.length && profit !== 0) {
-			var realGain = profit >= 0 ? Math.max(0, credited - buyIn) : 0;
-			var moved = profit >= 0
-				? Math.min(Math.floor(profit * (res.rate == null ? 0.9 : res.rate)), aiTotal, realGain)
-				: Math.min(-profit, aiTotal);
-			var left = moved;
-			for (i = 0; i < seats.length; i++) {
-				var s = seats[i] || {};
-				var st = Math.max(0, Math.floor(Number(s.stake) || 0));
-				if (st <= 0 || !s.id) continue;
-				var share = (i === seats.length - 1) ? left : Math.floor(moved * st / aiTotal);
-				if (share <= 0) continue;
-				left -= share;
-				encountered[s.id] = true; // 已尝试世界结算；失败仍如实报告，不在补记分支重试
-				var wr = null, wErr = null;
-				try {
-					wr = (profit >= 0) ? world.settleLose(s.id, share) : world.settleWin(s.id, share);
-				} catch (e2) { wErr = e2; logError("AI 侧结算异常（" + s.id + "）", e2); }
-				/* delta = AI 资金**真实**变动（settleWin 会抽 5% 台费、并受资金上限钳制），
-				   不是名义 share —— 否则消费方（UI / 成就）读到的账与真实资金对不上。
-				   ★ 2026-10-03（审计 §7）：结算抛异常时**不再拿名义 share 冒充 delta**——
-				   那是"看起来像结算成功"的假账，记账方会按已入账统计；改为如实记 0
-				   并打 failed 标记，异常同时进错误日志（不再静默吞掉）。 */
-				if (!wr || typeof wr._delta !== "number") {
-					settled.push({ id: s.id, delta: 0, asked: profit >= 0 ? -share : share, failed: true });
-				} else {
-					settled.push({ id: s.id, delta: wr._delta, asked: profit >= 0 ? -share : share });
-				}
-			}
-		} else if (world && seats.length && profit === 0) {
-			/* U10（2026-10-01 平局补记）：平局时 AI 的 hands 也要 +1，
-			   否则胜率榜分母虚高（此前 profit !== 0 守卫连 settlePlay 一起跳过）。
-			   ★ 2026-10-03：传 isDraw=true —— 平局还要走 advanceState 的和局分支
-			   （drew 计数 / 手感回归 / 经验），否则"平局数"永远显示 0。 */
-			for (i = 0; i < seats.length; i++) {
-				var s0 = seats[i] || {};
-				if (!s0.id) continue;
-				if (encountered[s0.id]) continue;
-				try { if (world.settlePlay(s0.id, true)) { settled.push({ id: s0.id, delta: 0, asked: 0 }); encountered[s0.id] = true; } }
-				catch (eP) { logError("平局补记失败（" + s0.id + "）", eP); }
-			}
-		}
-		/* 资金封顶、取整或零带入的同桌也确实参加了这场游戏。
-		   没有资金分摊，无法推断该对手的输赢：仅记相遇，不编造胜负/平局。
-		   未开局退款传 seats:[]，不会因为预取过座位而获得亲历。 */
-		if (world && world.settlePlay) {
-			for (i = 0; i < seats.length; i++) {
-				var se = seats[i] || {};
-				if (!se.id || encountered[se.id]) continue;
-				try {
-					if (world.settlePlay(se.id, false)) {
-						encountered[se.id] = true;
-						settled.push({ id: se.id, delta: 0, asked: 0, outcome: "unresolved" });
-					}
-				} catch (eE) { logError("同桌亲历补记失败（" + se.id + "）", eE); }
-			}
-		}
+		var settled = Array.isArray(res.worldResults) ? res.worldResults : [];
+		if (res.worldPending) toast("资金已结算，牌友记录待保存，可在行囊重试");
 
 		res.game = "session";
 		res.aiSettled = settled;
 		/* 豪赌桌战绩（成就 / 生涯大厅的真实数据源） */
-		if (data.gamble && world && world.noteGamble) {
-			try { res.gamble = world.noteGamble(profit); } catch (eG) {}
+		if (data.gamble && world) {
+			try {
+				if (res.worldJournaled) { if (!res.worldPending && world.gambleStats) res.gamble = world.gambleStats(); }
+				else if (world.noteGamble) res.gamble = world.noteGamble(profit);
+			} catch (eG) {}
 		}
 		paintTop();
 		logInfo("本场结算 " + k + " 带入 " + buyIn + " 结算筹码 " + chips + " → 入账 " + credited +
@@ -1268,6 +1281,7 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 	function openShell(key, opts) {
 		var m = META[key];
 		if (!m) return false;
+		if (TABLE_WORLD && TABLE_WORLD.round && !cshWorldTableFinish()) return false;
 		closeShell(true);
 		/* 【2026-09-30 修复 · 配乐叠播】进入小游戏时，必须先停掉主页面（池子休闲面板）的 BGM。
 		   主页面与游戏 iframe 是**两个独立 window、各有独立 AudioContext**，
@@ -1335,9 +1349,9 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 	}
 
 	function closeShell(silent) {
+		if (!cshWorldTableFinish()) { cancelSelfClose(); toast("牌友记录尚未保存，牌桌已保留，请恢复存储后重试"); return false; }
 		SHELL_GENERATION++;
 		cancelSelfClose();      /* 壳真要拆了：清掉委托关窗的兜底定时器与状态 */
-		cshWorldTableFinish();
 		TABLE_WORLD = null;
 		TABLE_AFF = { minions: [], awarded: false };
 		var ov = document.getElementById(OV_ID);
@@ -1441,7 +1455,7 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 			var mutatesSave = ["shell-settle", "shell-settle-session", "shell-task-add", "shell-merit",
 				"shell-sign", "shell-relief", "shell-career-sync", "shell-ach-claim", "shell-ach-claim-all", "shell-pool-ach-claim", "shell-pool-ach-claim-all", "shell-trade", "shell-goldfish", "shell-market-new",
 				"shell-aff-do", "shell-cheer", "shell-cheer-ack", "shell-cheer-import", "shell-bounty", "shell-seat", "shell-world-round",
-				"shell-world-result"].indexOf(cmd) >= 0 || (cmd === "shell-open" && !(META[d.key] && META[d.key].lobby));
+				"shell-world-result", "shell-world-finish"].indexOf(cmd) >= 0 || (cmd === "shell-open" && !(META[d.key] && META[d.key].lobby));
 			// postMessage 可能在导入前发出、导入后才处理；仍须在宿主拒绝旧壳写入。
 			if (mutatesSave && sessionSaveBlocked()) { ackToGame(cmd, false, sessionRefused()); return; }
 			if (mutatesSave && persistenceBlocked()) { ackToGame(cmd, false, persistenceRefused()); return; }
@@ -1694,6 +1708,11 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 			ackToGame("shell-world-round", cshWorldTableBegin(d.table, d.round), null);
 			return;
 		}
+		if (cmd === "shell-world-finish") {
+			var tableFinishValid = current === "uno" && TABLE_WORLD && d.table === TABLE_WORLD.token && Number.isInteger(d.round) && d.round >= 1 && d.round === TABLE_WORLD.lastRound;
+			ackToGame(cmd, !!(tableFinishValid && cshWorldTableFinish()), null);
+			return;
+		}
 		if (cmd === "shell-world-result") {
 			var rr = null;
 			try {
@@ -1710,7 +1729,7 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 					seats = (WSe && WSe.seat) ? WSe.seat(d.n, d.buyIn, { tier: d.tier }) : null;
 				} catch (eSe) {}
 				/* v6.7：记下本次同桌的妖灵（关壳 / 结算时给她们各 +1 好感） */
-				cshTableRecord(seats);
+				if (!cshTableRecord(seats)) { ackToGame("shell-seat", false, { seats: [] }); return; }
 				ackToGame("shell-seat", !!(seats && seats.length), { seats: seats || [], table: TABLE_WORLD.token });
 				return;
 			}
@@ -1824,32 +1843,16 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 				} catch (eCL) { ackToGame("shell-cheer-list", false, {}); }
 				return;
 			}
-			/* 指定讨伐令下单（2026-10-17 · A 方案）：顺序是**先校验 → 再扣费 → 再落标记** ——
-			   目标不合法（池外 / 已讨伐）直接拒（钱一分不动）；落标记若失败则**原额回滚**。
-			   定价与校验全部取自 csh_bossrecord（单一真源），页面只传一个 id。 */
-			if (cmd === "shell-bounty") {
-				try {
-					var bId = String(d.bid || "").replace(/[^0-9a-zA-Z_]/g, "").slice(0, 64);
-					var BR1 = lib.cshBossRecord;
-					var W4 = wallet();
-					if (!BR1 || typeof BR1.bountySet !== "function" || typeof BR1.bountyCheck !== "function") {
-						ackToGame("shell-bounty", false, { reason: "nomodule" }); return;
-					}
-					if (!W4) { ackToGame("shell-bounty", false, { reason: "nowallet" }); return; }
-					var chkB = BR1.bountyCheck(bId);
-					if (!chkB.ok) { ackToGame("shell-bounty", false, { reason: chkB.reason }); return; }
-					var paidB = W4.wallet.spend(BR1.BOUNTY_COST, "悬赏:" + bId);
-					if (paidB !== true) { paintPc(); ackToGame("shell-bounty", false, { reason: "poor", cost: BR1.BOUNTY_COST }); return; }
-					var setB = BR1.bountySet(bId);
-					if (!setB.ok) {
-						try { W4.wallet.add(BR1.BOUNTY_COST, "悬赏失败回滚:" + bId); } catch (eRB) {}
-						paintPc(); ackToGame("shell-bounty", false, { reason: setB.reason }); return;
-					}
-					paintPc();
-					ackToGame("shell-bounty", true, { id: bId, cost: BR1.BOUNTY_COST, pc: W4.wallet.pc() });
-				} catch (eB) { logError("shell-bounty", eB); ackToGame("shell-bounty", false, { reason: "error" }); }
-				return;
-			}
+            /* Bounty: validate first, then atomically persist the charge and active target. */
+            if (cmd === "shell-bounty") {
+                try {
+                    var bId=String(d.bid||""),BR1=lib.cshBossRecord;
+                    if(!BR1||typeof BR1.bountyBuy!=="function"||typeof BR1.bountyCheck!=="function"){ackToGame(cmd,false,{reason:"nomodule"});return;}
+                    var chkB=BR1.bountyCheck(bId);if(!chkB.ok){ackToGame(cmd,false,{reason:chkB.reason});return;}
+                    var boughtB=BR1.bountyBuy(bId);paintPc();ackToGame(cmd,!!(boughtB&&boughtB.ok),boughtB||{reason:"save"});
+                }catch(eB){logError("shell-bounty",eB);ackToGame(cmd,false,{reason:"error"});}
+                return;
+            }
 			if (cmd === "shell-open") {
 				var okOpen = !!(d.key && META[d.key]);
 				var bi = Math.max(0, Math.floor(Number(d.buyIn) || 0));
@@ -1860,7 +1863,13 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 				   现在：ack 同步发出（投递目标仍是当前子页面），开壳延到下一个事件循环。 */
 				ackToGame("shell-open", okOpen, { key: d.key || null });
 				if (okOpen) {
+					var openGeneration = SHELL_GENERATION;
+					var openFrame = document.getElementById("csh-shell-frame"), openDocument = null;
+					try { openDocument = openFrame && openFrame.contentDocument; } catch (readOpenError) {}
 					var doOpen = function () {
+						if (openGeneration !== SHELL_GENERATION || !openFrame || openFrame !== document.getElementById("csh-shell-frame") || !fromCurrentFrame(e)) return;
+						try { if (openDocument && openDocument !== openFrame.contentDocument) return; } catch (staleOpenError) { return; }
+						if (!(META[d.key] && META[d.key].lobby) && (sessionSaveBlocked() || persistenceBlocked())) return;
 						try { openFee(d.key, { buyIn: bi }); }
 						catch (eOp) { logError("shell-open", eOp); }
 					};
@@ -2133,7 +2142,7 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 			var chips = Math.max(0, Math.floor(Number(data.chips) || 0));
 			var aiTotal = Math.max(0, Math.floor(Number(data.aiStakeTotal) || 0));
 			var profit = chips - buyIn;
-			r = W.wallet.settleRun(key, { buyIn: buyIn, netWin: profit, aiStakeTotal: aiTotal });
+			r = W.wallet.settleRun(key, { buyIn: buyIn, netWin: profit, aiStakeTotal: aiTotal, prepareWorldResult: data.prepareWorldResult });
 			res.payout = r.payout; res.cap = r.cap; res.capped = !!r.capped;
 			res.discarded = r.discarded || 0;
 			/* ★ 2026-09-29 修复：把 wallet 算出的**真实回收率**透传给 settleSession。
@@ -2149,6 +2158,7 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 		}
 		if(r&&r.ok===false)return r;
         if (r && typeof r.credited === "number") res.credited = r.credited;
+        if (r && r.worldJournaled) { res.worldJournaled = true; res.worldResults = r.worldResults || []; res.worldPending = !!r.worldPending; }
 		res.balance = W.wallet.pc();
 		/* 功勋入账（见 sessionMeritOf）：结算成功即发，与金额同一幂等守卫。
 		   ★ 2026-09-29：纯退款不发功勋 —— 未开局离场（chips === buyIn，零和）
@@ -2269,9 +2279,9 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 	}
 	function doClose(reason) {
 		if (!current) return false;
-		var key = current;
-		emit("close", { key: key, reason: reason || "user", elapsed: elapsed() });
-		closeShell(false);
+		var key = current, played = elapsed();
+		if (!closeShell(false)) return false;
+		emit("close", { key: key, reason: reason || "user", elapsed: played });
 		closeFee();
 		return true;
 	}

@@ -138,6 +138,19 @@ export function bountySet(id) {
 	try { return saveConfigCopy(KEY_BOUNTY, chk.id) ? { ok: true, id: chk.id } : { ok: false, reason: saveBlocked() ? "recovery" : "error" }; }
 	catch (e) { return { ok: false, reason: "error" }; }
 }
+export function bountyBuy(id) {
+    if(saveBlocked())return {ok:false,reason:"recovery"};
+    const chk=bountyCheck(id);if(!chk.ok)return chk;
+    try {
+        const W=lib.cshWallet&&lib.cshWallet.wallet;
+        if(!W||typeof W.commitBounty!=="function")return {ok:false,reason:"nowallet"};
+        if(!preserveExisting())return {ok:false,reason:"save"};
+        const saved=W.bossSaved()||{};saved.bounty=chk.id;
+        const result=W.commitBounty(chk.id,saved,BOUNTY_COST);
+        if(result.ok)mirrorRewards(saved);
+        return result;
+    }catch(e){return {ok:false,reason:"save"};}
+}
 export function bountyClear() {
 	return saveConfigCopy(KEY_BOUNTY, "");
 }
@@ -751,7 +764,7 @@ export function installBossRecord() {
 			BOUNTY_COST: BOUNTY_COST,
 			bountyGet: bountyGet,
 			bountyCheck: bountyCheck,
-			bountySet: bountySet,
+			bountySet: bountySet, bountyBuy: bountyBuy,
 			bountyClear: bountyClear,
 		};
 		if (lib.cshBossRecord) {

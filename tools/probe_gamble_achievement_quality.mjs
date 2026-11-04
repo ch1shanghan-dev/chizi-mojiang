@@ -7,9 +7,11 @@ const source=fs.readFileSync(root+'/core/csh_achv.js','utf8');
 function engine(claimed={}){const store=new Map([['csh_career_achv',JSON.stringify(claimed)]]),ctx=vm.createContext({window:{},localStorage:{getItem:k=>store.get(k)||null,setItem:(k,v)=>store.set(k,String(v))}});vm.runInContext(source,ctx);return {A:ctx.window.CSH_ACHV,store};}
 const {A}=engine(),changed=new Set([2,3,5,8].map(n=>'gstreak2_'+n).concat([100000,500000,2000000,10000000,30000000,80000000].map(n=>'gmloss_'+n)));
 const hash=x=>crypto.createHash('sha256').update(JSON.stringify(x)).digest('hex'),met=(d,s)=>{const p=d.prog(s);return p[0]>=p[1];};
-check('all 493 old IDs, order and rewards remain exactly unchanged',A.defs.length===493&&hash(A.defs.map(d=>[d.key,d.reward]))==='0bfc3b00cae87512f5fae26cd99a3ca68500862b50eaa52b8b0678cf4d55c3cf');
+/* 2026-11-04 生涯扩容：定义总数从 493 增至 2000，但前 493 条的 ID/顺序/奖励必须原样。
+   改为校验切片前缀，保护强度不变，同时允许末尾追加。 */
+check('all 493 old IDs, order and rewards remain exactly unchanged',A.defs.length>=493&&hash(A.defs.slice(0,493).map(d=>[d.key,d.reward]))==='0bfc3b00cae87512f5fae26cd99a3ca68500862b50eaa52b8b0678cf4d55c3cf');
 const semanticIds=new Set(A.defs.filter(d=>['seg_10','seg_20','seg_30','seg_40','egg_world_tour','egg_billion_killer','egg_gamble_first'].includes(d.key)||/^(topdown|topfund|broke)_/.test(d.key)).map(d=>d.key));
-check('all other 448 definition labels, icons and descriptions remain unchanged',hash(A.defs.filter(d=>!changed.has(d.key)&&!semanticIds.has(d.key)).map(d=>[d.key,d.cat,d.ico,d.label,d.desc,d.reward]))==='14901911f3b1b7dc57d0862e4601b31abfa4d1377451b31daba5e1c98766cb42');
+check('all other 448 definition labels, icons and descriptions remain unchanged',hash(A.defs.slice(0,493).filter(d=>!changed.has(d.key)&&!semanticIds.has(d.key)).map(d=>[d.key,d.cat,d.ico,d.label,d.desc,d.reward]))==='14901911f3b1b7dc57d0862e4601b31abfa4d1377451b31daba5e1c98766cb42');
 check('no original definition is retired or hidden',Object.keys(A.RETIRED).length===0);
 for(const n of [2,3,5,8]){
  const id='gstreak2_'+n,d=A.byId(id),record=A.byId('gmstreak_'+n);

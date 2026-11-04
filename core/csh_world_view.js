@@ -4,6 +4,63 @@
  function node(tag,cls,text){var n=document.createElement(tag);if(cls)n.className=cls;if(text!=null)n.textContent=text;return n;}
  function fmt(v){return Math.max(0,Math.floor(Number(v)||0)).toLocaleString('zh-CN');}
 
+ var TALK_KEYS=['aggro','tight','bluff','math','wild','chaser','trapper','grinder','bull','maniac','reader','lucky'];
+ // 公开牌风与已保存的玩家亲历；不推测上一手、暗牌、日期或关系先后。
+ var TALK_LINES={
+  style:['我喜欢先争主动，但该收手时也得收。','等一等没什么，合适的机会值得耐心。','桌上的动作也是话，别急着句句都信。','我更在意判断有没有根据，运气留给牌来定。','我凭感觉上桌，也得认自己做的选择。','我总想看看后面那张牌，也提醒自己别追得太远。','有时候让一步，是为了等一个更合适的位置。','我不急着一把赢完，稳稳打好每一手就够。','我愿意少动几次，把真正要动的那次想清楚。','我爱热闹，不过下一步仍该自己拿主意。','我看得见你的选择，可看不见你的底牌。','我爱讨个好彩头，可不能把好运当作保证。'],
+  greet:['还没交过手？那就从一桌认识。','初次同桌，先慢慢熟悉彼此。','先打个招呼，别把我的笑当成牌好。','还没有交手的样本，评价可以晚一点。','新面孔！有机会痛快打上一桌。','还没同过桌，那就让下一次成为开头。','初见不用急，等真正落座再认识。','第一手之前，咱们都还有很多可能。','初次见面，稳稳坐下就好。','还没一块儿玩过？以后找机会热闹一桌。','现在还谈不上了解你，桌上的选择会慢慢说话。','初次见面，先送你一句好彩头。'],
+  youWon:['你赢过我，这份本事我认。','你有赢下来的记录，稳妥的选择值得尊重。','你赢过，可别从我的笑里猜下次的牌。','你确实赢过我，不过单凭胜负还说不尽判断。','你赢过我，爽快认账，下次再切磋。','你拿到过胜局，我也还愿意再找机会。','你曾把机会握住，我会更耐心地应对。','你赢下来的那份，是一手一手打出来的。','你赢过，我会认真对待下一次交手。','你赢过我，桌上的热闹还没完呢。','你赢过我，我也会留意你的下一次选择。','你赢过我，看来好彩头也会落到你那边。'],
+  youLost:['我也赢过你，下一次仍得重新打。','我有过胜局，不能因此就轻看你。','我赢过，可这句话不替下一桌下注。','我确实占过上风，旧结果不等于下一次概率。','我赢过你，不过下一桌照样有变数。','此前我有过机会，你的下一次还没写完。','我曾等到自己的机会，下次也得重新等。','我也有赢下来的时候，一点点积累罢了。','我赢过，但不会因此省掉下一次的判断。','我拿过胜局，下一桌还能继续热闹。','我曾占过上风，也只说明那些已经发生的交手。','我赢过你，可好运从来不给人打包票。'],
+  mixed:['你我都赢过，下一桌才更有意思。','有赢有输，熟悉彼此也得保持耐心。','彼此都占过上风，谁也别急着把谁看透。','胜负都有记录，我更想把下一次判断做好。','你来我往，这才像痛快的切磋。','彼此都有翻出机会的时候，还能继续。','我们都等到过自己的机会，下一桌重新找。','有来有回，牌缘是一手一手攒下来的。','你我都赢过，不必拿旧结果替新的一手作主。','都赢过！下一桌谁得意，还得打了才知道。','我们都占过上风，熟悉也不等于能看穿底牌。','好运到过两边，下一桌仍得认真打。'],
+  draw:['这些交手还没分出胜负，下一桌接着来。','既然目前都和了，不妨继续慢慢打。','和局也有意思，别把没分胜负当成没较量。','平手也有平手的道理，不用急着算谁更强。','都没分出来？那这段牌缘还留着悬念。','和局把下一次机会留给了我们。','暂时没分胜负，也不用急着抢一个结论。','和局也是共同打过的一手，照样算相识。','没有分胜负，就先把结论留着。','还没分出来，热闹可没有白凑。','几次相逢都未分胜负，我还想再看看你的选择。','好运还没偏向哪边，悬念留给下次。'],
+  unknown:['同过桌就算认识，下一次再认真较量。','先记得一起坐过，不必急着分个高下。','见过你的桌上选择，胜负的话以后慢慢聊。','有交集，不代表现在就能给彼此下结论。','一桌坐过就是缘分，下次接着玩。','相遇已经有了，后面的机会还多。','既然同过桌，之后总能再等一个机会。','相识从一手开始，慢慢积累就好。','坐过同一桌，不必马上争一句谁更强。','都凑过一桌了，下次再添点热闹。','先记住彼此的打法，胜负的事留到下次。','相识也是好彩头，后面的事留给下一桌。'],
+  revenge:['你先受过挫，也把胜局打回来了，我认这份韧劲。','你有过失利，也在后来的交手中赢回过一局。','你扳回过胜局，这个转折不是我嘴上能抹掉的。','你曾在失利后赢回来，我会认真看待下一次交手。','你赢回来过，痛快！这段切磋有来有回。','你等到过自己的转机，希望总要靠下一次选择。','你后来把机会抓住了，我会记得认真应对。','失利之后还能稳稳赢回来，这份耐心不容易。','你扳回过胜局，说明我不能拿过去轻看你。','你真的赢回来过，这才叫有后续！','你输过，也后来赢过；下一次的选择仍值得留意。','你等到了自己的好彩头，也把那一局拿住了。'],
+  familiar:['同桌多了，较量也更认真些。','已经不止几次相见了，还是按自己的节奏来。','熟面孔也别全信我的表情，牌桌上照样有变数。','交手积累得多了，我仍不会把熟悉当成确定。','都算熟人了，有机会再痛快切磋。','相识不是一两手攒成的，下次还愿意见你。','我们相逢过不少次，耐心也有了来处。','一手一手下来，这段牌缘已经有分量。','熟悉归熟悉，我对每一次交手都认真。','老面孔，一起凑过的热闹可不少。','见过不少彼此的选择，也该给新的选择留余地。','相逢多次，本身就是一份好缘分。'],
+  next:['有机会再较量，落座时再见真章。','有合适的桌，咱们慢慢打。','下次有缘落座，别提前猜我的第一步。','有机会再同桌，带入和判断都量力而行。','有机会再来一桌，痛快也别勉强。','下一次还没开场，机会不用急着追。','等一张合适的桌，再慢慢展开。','有缘再坐一桌，稳稳打完就好。','合适的时候再见，谁也不必勉强赴桌。','有合适的桌再热闹一回，眼下先由你安排。','下次若再同桌，我会看你的新选择。','有机会再见，讨个好彩头也得量力而行。'],
+  away:['眼下先歇一歇，较量不急在这一刻。','现在不便赴桌，先留一段安静的闲谈。','这会儿不上桌，也不妨坐着聊两句。','当前先不安排牌局，闲谈不需要下注。','眼下先歇会儿，热闹以后还有机会。','现在不便同桌，机会可以慢慢等。','此刻先静一静，不用为了赴桌而勉强。','眼下休息，牌缘不用靠赶这一桌维系。','现在不赴桌，也不必急着作安排。','这会儿先收住，聊两句也挺好。','当前先不坐桌，聊聊彼此的想法就好。','好彩头可以先送给你，现在不急着开桌。']
+ };
+ function conversationFor(person,p,available){
+  var index=TALK_KEYS.indexOf(person.persona);if(index<0)index=3;
+  function topic(id,label,scene){return {id:id,label:label,text:TALK_LINES[scene][index]};}
+  var scene=!p.hands?'greet':p.revenge?'mixed':p.wins&&p.losses?'mixed':p.draws===p.hands?'draw':p.wins?'youWon':p.losses?'youLost':'unknown';
+  var topics=[topic('record',p.hands?'聊聊交手':'初次见面',scene),topic('style','说说牌风','style')];
+  if(p.revenge)topics.push(topic('turn','再战转折','revenge'));
+  if(p.hands>=10)topics.push(topic('familiar','熟人再会','familiar'));
+  topics.push(topic('next',available?'下次见面':'暂别闲谈',available?'next':'away'));
+  return topics;
+ }
+ function renderConversation(W,model,ops){
+  if(!document.getElementById('csh-memory-talk-css')){
+   var style=node('style');style.id='csh-memory-talk-css';style.textContent=`
+html.csh-world-view #csh-dbg-panel[data-view="world"] .csh-memory-dialogue{display:grid!important;gap:8px!important;min-width:0!important}
+html.csh-world-view #csh-dbg-panel[data-view="world"] .csh-memory-topic{display:flex!important;align-items:center!important;gap:12px!important;font:500 var(--csh-lfs-md,13px)/1.5 "Microsoft YaHei",sans-serif!important;color:var(--csh-gray)!important}
+html.csh-world-view #csh-dbg-panel[data-view="world"] .csh-memory-topic select{position:static!important;flex:1!important;min-width:44px!important;max-width:280px!important;min-height:44px!important;background:var(--csh-fg)!important;color:var(--csh-bg)!important;border:1px solid rgba(var(--csh-bg-rgb),.25)!important;border-radius:5px!important;padding:8px!important;font:400 var(--csh-lfs-lg,14px)/1.5 "Microsoft YaHei",sans-serif!important}
+html.csh-world-view #csh-dbg-panel[data-view="world"] .csh-memory-answer{font:400 var(--csh-lfs-lg2,15px)/1.8 SimSun,serif!important;color:var(--csh-bg)!important;border-left:2px solid var(--csh-accent)!important;padding:4px 0 4px 14px!important;overflow-wrap:anywhere!important}
+html.csh-world-view #csh-dbg-panel[data-view="world"] .csh-memory-records{position:static!important;min-width:0!important;border-top:1px solid rgba(var(--csh-bg-rgb),.14)!important}
+html.csh-world-view #csh-dbg-panel[data-view="world"] .csh-memory-records>summary{position:static!important;display:flex!important;align-items:center!important;gap:8px!important;min-height:44px!important;list-style:none!important;cursor:pointer!important;color:var(--csh-gray)!important;font:500 var(--csh-lfs-md,13px)/1.5 "Microsoft YaHei",sans-serif!important}
+html.csh-world-view #csh-dbg-panel[data-view="world"] .csh-memory-records>summary:before{content:'▸'}
+html.csh-world-view #csh-dbg-panel[data-view="world"] .csh-memory-records[open]>summary:before{content:'▾'}
+html.csh-world-view #csh-dbg-panel[data-view="world"] .csh-memory-records>summary:focus-visible{outline:2px solid var(--csh-accent)!important;outline-offset:2px!important}
+html.csh-world-view #csh-dbg-panel[data-view="world"] .csh-memory-records:not([open])>:not(summary){display:none!important}
+@media(orientation:landscape) and (max-height:330px){html.csh-world-view #csh-dbg-panel[data-view="world"] .csh-memory-content{gap:10px!important}html.csh-world-view #csh-dbg-panel[data-view="world"] .csh-memory-answer{font-size:var(--csh-lfs-lg,14px)!important;line-height:1.65!important}}
+`;document.documentElement.appendChild(style);
+  }
+  var dialogue=node('section','csh-memory-dialogue'),label=node('label','csh-memory-topic','聊一聊'),select=node('select'),answer=node('p','csh-memory-answer'),note=node('p','csh-memory-note'),refresh=node('button','csh-memory-refresh','刷新回忆');
+  select.setAttribute('aria-label','选择闲谈话题');answer.setAttribute('aria-live','polite');note.setAttribute('role','status');refresh.type='button';refresh.hidden=true;
+  model.conversation.forEach(function(t){var option=node('option','',t.label);option.value=t.id;select.appendChild(option);});
+  var choice=ops.choices.get(String(model.person.id))||'record';if(!model.conversation.some(function(t){return t.id===choice;}))choice='record';
+  function paint(){select.value=choice;var t=model.conversation.find(function(t){return t.id===choice;});answer.textContent=t?'「'+t.text+'」':'';}
+  function signature(m){return JSON.stringify([m.person,m.facts]);}
+  select.addEventListener('change',function(){
+   if(!ops.current())return;
+   var fresh;try{fresh=memoryOf(W,model.person.id);}catch(e){note.textContent='回忆暂未读取，保留刚才的内容，可重新读取。';refresh.hidden=false;select.value=choice;return;}
+   if(signature(fresh)!==signature(model)){note.textContent='人物记录已更新，请刷新回忆后继续。';refresh.hidden=false;select.value=choice;select.disabled=true;return;}
+   if(!model.conversation.some(function(t){return t.id===select.value;})){select.value=choice;return;}
+   choice=select.value;ops.choices.set(String(model.person.id),choice);paint();
+  });
+  refresh.addEventListener('click',function(){if(!ops.current())return;try{memoryOf(W,model.person.id);}catch(e){note.textContent='回忆仍未读取，保留刚才的内容，稍后可重试。';return;}ops.refresh();});paint();label.appendChild(select);dialogue.appendChild(label);dialogue.appendChild(answer);dialogue.appendChild(note);dialogue.appendChild(refresh);return dialogue;
+ }
+
  function personalFacts(raw){
   raw=raw||{};var count=function(v){return Number.isSafeInteger(v)&&v>=0?v:0;},hands=count(raw.hands),wins=Math.min(hands,count(raw.wins)),losses=Math.min(hands-wins,count(raw.losses)),draws=Math.min(hands-wins-losses,count(raw.draws));
   return {hands:hands,wins:wins,losses:losses,draws:draws,unknown:hands-wins-losses-draws,revenge:!!raw.revenge&&wins>0&&losses>0};
@@ -30,7 +87,7 @@
   dated.sort(function(a,b){return b.day-a.day;});
   var fragments=dated.concat(milestones.filter(function(m){return !seen.has(m.key);}).reverse());
   var text=!p.hands?'还未同桌，牌缘留待下一手。':p.draws===p.hands?'几次相逢，胜负都留给了下一桌。':p.revenge?'有过受挫，也有过再战得胜，这段牌缘已经有了转折。':p.wins&&p.losses?'你来我往，谁也没有把胜负写成定局。':p.wins?'你曾在交手中占过上风，下一桌仍值得期待。':p.losses?'此前对方占过上风，下一次相逢仍有机会。':'同桌的经历已经记下，未分的胜负仍留着空白。';
-  return {person:{id:person.id,name:person.name,persona:P&&P.name||'牌友',description:P&&P.desc||'',available:!person.retired&&Number(person.fund)>=200},choices:choices.map(function(a){return {id:a.id,name:a.name};}),facts:p,text:text,fragments:fragments};
+  return {person:{id:person.id,name:person.name,persona:P&&P.name||'牌友',description:P&&P.desc||'',available:!person.retired&&Number(person.fund)>=200},choices:choices.map(function(a){return {id:a.id,name:a.name};}),facts:p,text:text,fragments:fragments,conversation:conversationFor(person,p,!person.retired&&Number(person.fund)>=200)};
  }
  function css(){if(document.getElementById('csh-world-board-css'))return;var s=node('style');s.id='csh-world-board-css';s.textContent=`
 html.csh-world-view #csh-dbg-panel[data-view="world"] #csh-dbg-body{padding:12px 20px 22px!important}
@@ -105,6 +162,8 @@ html.csh-world-view #csh-dbg-panel[data-view="world"] .csh-memory-seal{display:g
 html.csh-world-view #csh-dbg-panel[data-view="world"] .csh-memory-person h3{font:600 var(--csh-lfs-title,20px)/1.4 SimSun,serif!important;overflow-wrap:anywhere!important;color:var(--csh-bg)!important}
 html.csh-world-view #csh-dbg-panel[data-view="world"] .csh-memory-person p{font:400 var(--csh-lfs-sm,12px)/1.6 "Microsoft YaHei",sans-serif!important;color:var(--csh-gray)!important;overflow-wrap:anywhere!important}
 html.csh-world-view #csh-dbg-panel[data-view="world"] .csh-memory-person footer{display:grid!important;gap:8px!important}
+html.csh-world-view #csh-dbg-panel[data-view="world"] .csh-memory-actions{display:flex!important;flex-wrap:wrap!important;gap:8px!important}
+html.csh-world-view #csh-dbg-panel[data-view="world"] .csh-memory-cancel[hidden]{display:none!important}
 html.csh-world-view #csh-dbg-panel[data-view="world"] .csh-memory-person .csh-memory-invite{justify-self:start!important;border-color:var(--csh-accent)!important;color:var(--csh-bg)!important}
 html.csh-world-view #csh-dbg-panel[data-view="world"] .csh-memory-content{display:grid!important;gap:20px!important}
 html.csh-world-view #csh-dbg-panel[data-view="world"] .csh-memory-intro{font:400 var(--csh-lfs-lg2,15px)/1.75 SimSun,serif!important;color:var(--csh-bg)!important;overflow-wrap:anywhere!important}
@@ -195,6 +254,7 @@ html.csh-world-view #csh-dbg-panel[data-view="world"] .csh-memory-timeline p{fon
    if(focusId!=null){var row=[].slice.call(digest.querySelectorAll('article')).find(function(n){return n.getAttribute('data-person')===String(focusId);});if(row)row.querySelector('.csh-world-invite-actions button').focus({preventScroll:true});}
   }
 
+  var talkChoices=new Map(),recordOpen=new Map();
   var reader=null,returnTo=null,returnPerson=null,savedScroll=0,hiddenSiblings=[],scrollHost=body.closest("#csh-dbg-body")||body;
   function closeMemory(){
    if(!reader)return false;reader.remove();reader=null;body.classList.remove("csh-memory-reading");hiddenSiblings.forEach(function(item){
@@ -215,11 +275,38 @@ html.csh-world-view #csh-dbg-panel[data-view="world"] .csh-memory-timeline p{fon
    if(!model.person){reader.appendChild(node('p','csh-memory-note','还没有同桌回忆。完成一手后，再来翻翻你们的故事。'));back.focus({preventScroll:true});return;}
    var picker=node('label','csh-memory-picker','牌友回忆'),select=node('select');select.setAttribute('aria-label','选择回忆中的牌友');model.choices.forEach(function(a){var option=node('option','',a.name);option.value=String(a.id);select.appendChild(option);});select.value=String(model.person.id);select.addEventListener('change',function(){openMemory(select.value,opener);var next=reader.querySelector('select');if(next)next.focus({preventScroll:true});});picker.appendChild(select);toolbar.appendChild(picker);
    var pages=node('div','csh-memory-pages'),profile=node('section','csh-memory-person'),seal=node('span','csh-memory-seal',Array.from(model.person.name||'友')[0]);seal.setAttribute('aria-hidden','true');profile.appendChild(seal);profile.appendChild(node('h3','',model.person.name));profile.appendChild(node('p','',model.person.persona+' · '+(model.person.available?'当前在场':'暂未在场')));if(model.person.description)profile.appendChild(node('p','',model.person.description));
-   var footer=node('footer'),invite=node('button','csh-memory-invite',model.person.available?'邀下一桌':'暂未在场'),reply=node('p');invite.type='button';invite.disabled=!model.person.available;reply.setAttribute('role','status');
-   invite.addEventListener('click',function(){var r=W.inviteNext(model.person.id);if(!r.ok){reply.textContent=r.reason;return;}reply.textContent='「'+r.response+'」';renderStories(model.person.id);open('texas');});footer.appendChild(invite);footer.appendChild(reply);profile.appendChild(footer);pages.appendChild(profile);
-   var content=node('section','csh-memory-content');content.appendChild(node('p','csh-memory-intro',model.text));var totals=node('dl','csh-memory-facts');[['同桌',model.facts.hands],['你胜',model.facts.wins],['你负',model.facts.losses],['和局',model.facts.draws]].forEach(function(pair){var group=node('div');group.appendChild(node('dt','',pair[0]));group.appendChild(node('dd','',fmt(pair[1])));totals.appendChild(group);});content.appendChild(totals);
-   if(model.facts.unknown)content.appendChild(node('p','csh-memory-note','另有 '+fmt(model.facts.unknown)+' 手尚未记录胜负。'));
-   content.appendChild(node('h4','','留下的片段'));var timeline=node('ol','csh-memory-timeline');model.fragments.forEach(function(row){var li=node('li'),time=node('time','',row.date||'日期未记'),words=node('div');if(row.date)time.setAttribute('datetime',row.date);words.appendChild(node('b','',row.title));words.appendChild(node('p','',row.text));li.appendChild(time);li.appendChild(words);timeline.appendChild(li);});if(!model.fragments.length)content.appendChild(node('p','csh-memory-note','还没有留下同桌片段。'));else content.appendChild(timeline);pages.appendChild(content);reader.appendChild(pages);back.focus({preventScroll:true});
+   var footer=node('footer'),actions=node('div','csh-memory-actions'),invite=node('button','csh-memory-invite'),cancel=node('button','csh-memory-cancel','撤回邀约'),reply=node('p'),currentReader=reader;
+   invite.type=cancel.type='button';reply.setAttribute('role','status');cancel.setAttribute('aria-label','撤回对'+model.person.name+'的邀约');
+   function currentMemory(){return reader===currentReader&&currentReader.isConnected;}
+   function syncInvite(fallback){
+    var pending=fallback||null;
+    try{if(W.storylines)pending=W.storylines(6).find(function(row){return String(row.id)===String(model.person.id)&&row.invited;})||null;}catch(e){}
+    var eligibility=null;try{if(typeof W.inviteStatus==='function')eligibility=W.inviteStatus(model.person.id);}catch(e){eligibility={ok:false,reason:'邀约状态暂未读取，请稍后重试'};}
+    invite.textContent=!model.person.available?'暂未在场':pending?'去牌桌':'邀下一桌';invite.disabled=!model.person.available||!!(eligibility&&!eligibility.ok);
+    if(!pending)reply.textContent=eligibility&&!eligibility.ok?eligibility.reason||'暂时无法应邀':'';
+    cancel.hidden=!pending||typeof W.cancelInvite!=='function';
+    if(pending)reply.textContent=(pending.response?'「'+pending.response+'」 ':'')+'邀约已留，带入合适时优先同桌。';
+    return !!pending;
+   }
+   invite.addEventListener('click',function(){
+    if(!currentMemory())return;
+    var r;try{r=W.inviteNext(model.person.id);}catch(e){reply.textContent='邀约暂未确认，请稍后重试。';return;}
+    if(!r||!r.ok){reply.textContent=r&&r.reason||'这位牌友暂时无法应邀。';return;}
+    syncInvite({invited:true,response:r.response});renderStories();open('texas');
+   });
+   cancel.addEventListener('click',function(){
+    if(!currentMemory()||typeof W.cancelInvite!=='function')return;
+    var r;try{r=W.cancelInvite(model.person.id);}catch(e){reply.textContent='撤回暂未完成，请稍后重试。';return;}
+    if(!r||!r.ok){syncInvite();reply.textContent=r&&r.reason||'撤回暂未完成，请稍后重试。';if(cancel.hidden)invite.focus({preventScroll:true});return;}
+    syncInvite();reply.textContent='邀约已撤回，仍可继续阅读这段牌缘。';renderStories();invite.focus({preventScroll:true});
+   });
+   syncInvite();actions.appendChild(invite);actions.appendChild(cancel);footer.appendChild(actions);footer.appendChild(reply);profile.appendChild(footer);pages.appendChild(profile);
+   var content=node('section','csh-memory-content');content.appendChild(node('p','csh-memory-intro',model.text));
+   content.appendChild(renderConversation(W,model,{current:currentMemory,choices:talkChoices,refresh:function(){openMemory(model.person.id,opener);var target=reader.querySelector('.csh-memory-topic select');if(target)target.focus({preventScroll:true});}}));
+   var records=node('details','csh-memory-records'),recordsSummary=node('summary','','相识记录与片段');records.appendChild(recordsSummary);records.open=recordOpen.get(String(model.person.id))===true;records.addEventListener('toggle',function(){if(currentMemory())recordOpen.set(String(model.person.id),records.open);});content.appendChild(records);
+   var totals=node('dl','csh-memory-facts');[['同桌',model.facts.hands],['你胜',model.facts.wins],['你负',model.facts.losses],['和局',model.facts.draws]].forEach(function(pair){var group=node('div');group.appendChild(node('dt','',pair[0]));group.appendChild(node('dd','',fmt(pair[1])));totals.appendChild(group);});records.appendChild(totals);
+   if(model.facts.unknown)records.appendChild(node('p','csh-memory-note','另有 '+fmt(model.facts.unknown)+' 手尚未记录胜负。'));
+   records.appendChild(node('h4','','留下的片段'));var timeline=node('ol','csh-memory-timeline');model.fragments.forEach(function(row){var li=node('li'),time=node('time','',row.date||'日期未记'),words=node('div');if(row.date)time.setAttribute('datetime',row.date);words.appendChild(node('b','',row.title));words.appendChild(node('p','',row.text));li.appendChild(time);li.appendChild(words);timeline.appendChild(li);});if(!model.fragments.length)records.appendChild(node('p','csh-memory-note','还没有留下同桌片段。'));else records.appendChild(timeline);pages.appendChild(content);reader.appendChild(pages);back.focus({preventScroll:true});
   }
 
   renderStories();side.appendChild(digest);

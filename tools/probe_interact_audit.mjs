@@ -46,7 +46,7 @@ function harness() {
   vm.runInContext('var world={ai:["speaker","other","friend","me"].map(id=>({id,name:id,grudges:{}}))};'+
     'var PLAYER_GRUDGE_KEY="player";function byId(id){return world.ai.find(a=>a.id===id);}' +
     'function idInRoster(id){return !!byId(id);}function clampNum(n,a,b){return Math.max(a,Math.min(b,Number(n)||0));}' +
-    'function saveWorld(){}function pushHistory(){}'+
+    'var tableCommitTime=null;function saveWorld(){}function pushHistory(){}'+
     ['saveBlocked','idOfPlayer','grudgeValue','addGrudge','grudge'].map(n=>extract(worldSource,n)).join('\n')+
     ';lib.cshWorld={idOfPlayer,addGrudge,grudge,PLAYER_GRUDGE_KEY};globalThis.grudgeWorld=world;',ctx);
   return { api: ctx.probe, interaction: lib.cshInteract, world: ctx.grudgeWorld, get: ctx.get, lib, game, status, speaker, other, friend, me, tasks, cancelled, chats, throws, stickers, storage,

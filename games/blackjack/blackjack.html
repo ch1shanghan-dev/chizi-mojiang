@@ -327,6 +327,7 @@
   .ins-prob-bar { position: relative; height: 10px; border-radius: 999px; background: rgba(236, 229, 214, .1); border: 1px solid var(--gold-line); overflow: hidden; }
   .ins-prob-bar > i { position: absolute; inset: 0 auto 0 0; width: 30%; border-radius: 999px; background: linear-gradient(90deg, rgba(216, 180, 106, .5), var(--gold-hi)); transition: width .3s ease-out; }
   .ins-prob-v { font-size: var(--fs-md); font-weight: 900; color: var(--gold-hi); }
+  #ins-mask .btn { min-height:44px; flex-shrink:0; }
   .ins-row { display: flex; gap: clamp(8px, 1.2vh, 14px); flex-wrap: wrap; justify-content: center; }
 
   /* ---------- 结算层（骨架 .csh-result / .rs-panel，规范 §13） ----------
@@ -529,7 +530,7 @@
           <div class="fc-row fc-sub">
             <span id="hud-streak-wrap"><span class="tb-k">连胜</span><b id="hud-streak">0</b><em id="hud-mult">×1.0</em></span>
             <span id="heat-wrap"><span class="tb-k">牌靴</span><b class="tb-v num" id="heat-txt">100%</b></span>
-            <span><span class="tb-k">大牌</span><b class="tb-v plain num" id="ratio-txt">31%</b></span>
+            <span id="ratio-wrap"><span class="tb-k">未见十点</span><b class="tb-v plain num" id="ratio-txt">—</b></span>
           </div>
         </div>
         <div class="csh-center">
@@ -570,12 +571,12 @@
 </div>
 
 <!-- ==================== 保险面板 ==================== -->
-<div class="ins-mask hidden" id="ins-mask">
+<div class="ins-mask hidden" id="ins-mask" role="dialog" aria-modal="true" aria-label="保险选择">
   <div class="ins-card">
     <div class="ins-title">保险？</div>
-    <div class="ins-sub">庄家明牌为 <b>A</b>，可能构成廿一点</div>
+    <div class="ins-sub">庄家明牌为 <b>A</b> · 保险需 <span id="ins-cost">—</span>，现余 <span id="ins-chips">—</span></div>
     <div class="ins-prob">
-      <div class="ins-prob-k">牌靴中十点牌占比</div>
+      <div class="ins-prob-k">未见牌十点占比（含未翻明暗牌）</div>
       <div class="ins-prob-bar"><i id="ins-fill"></i></div>
       <div class="ins-prob-v num" id="ins-txt">—</div>
     </div>
@@ -604,7 +605,7 @@
 </div>
 
 <!-- ==================== 玩法说明 ==================== -->
-<div class="rules-mask hidden" id="rules-mask">
+<div class="rules-mask hidden" id="rules-mask" role="dialog" aria-modal="true" aria-label="廿一点玩法">
   <div class="rules-card">
     <div class="rules-title">廿一点 · 玩法</div>
     <!-- 【2026-10-03 精简】原为 9 段规则散文（约 500 字），手机上要滚三屏才读完。
@@ -1122,10 +1123,31 @@ try { CRD = (typeof window !== 'undefined' && window.CSH && window.CSH.cards) ? 
     for (var d = 0; d < decks; d++) s = s.concat(newDeck());
     state.shoe = shuffle(s);
     state.shoeSize = s.length;
+    /* 已知牌副组成减去公开所见；暗牌不读点数、不提前扣除。 */
+    state.publicShoe = { total:s.length, tens:decks*16, pendingHole:false };
   }
-  function draw() {
+  function draw(hidden) {
     if (!state.shoe.length) newShoe();
-    return state.shoe.pop();
+    var card=state.shoe.pop(),seen=state.publicShoe;
+    if(seen){
+      if(hidden===true){if(seen.pendingHole)state.publicShoe=null;else seen.pendingHole=true;}
+      else {seen.total--;var rank=cardRank(card);if(rank>=10&&rank<=13)seen.tens--;}
+    }
+    return card;
+  }
+  function publicTenRatio() {
+    var seen=state&&state.publicShoe;
+    if(!seen||!Number.isSafeInteger(seen.total)||!Number.isSafeInteger(seen.tens)||seen.total<=0||seen.tens<0||seen.tens>seen.total)return null;
+    if(seen.total!==state.shoe.length+(seen.pendingHole?1:0)||seen.pendingHole!==!!(state.holeHidden&&state.dealer&&state.dealer.length>1))return null;
+    return seen.tens/seen.total;
+  }
+  function revealDealerHole() {
+    state.holeHidden=false;
+    var seen=state.publicShoe;
+    if(seen&&seen.pendingHole){
+      var card=state.dealer[1];if(card==null){state.publicShoe=null;return;}
+      seen.pendingHole=false;seen.total--;var rank=cardRank(card);if(rank>=10&&rank<=13)seen.tens--;
+    }
   }
   function needShuffle() { return state.shoe.length < state.shoeSize * state.cut; }
   function countTen(cards) {
@@ -1182,12 +1204,13 @@ try { CRD = (typeof window !== 'undefined' && window.CSH && window.CSH.cards) ? 
        现在只留数字，挂进 topbar 的 .tb-v；low 状态改为"数字转红"，
        信息量不变，但不再白占一条横带的高度（§17：高度还给牌桌）。 */
     var wrap = $('#heat-wrap');
+    $('#ratio-wrap').classList.toggle('hidden',!heatVisible());
     if (!heatVisible()) { wrap.classList.add('hidden'); return; }
     wrap.classList.remove('hidden');
     var pct = state.shoe.length / state.shoeSize;
     $('#heat-txt').textContent = Math.round(pct * 100) + '%';
-    var tr = tenRatio(state.shoe);
-    $('#ratio-txt').textContent = Math.round(tr * 100) + '%';
+    var tr = publicTenRatio();
+    $('#ratio-txt').textContent = tr===null?'—':Math.round(tr * 100) + '%';
     wrap.classList.toggle('low', pct < 0.25);
   }
 
@@ -1536,7 +1559,7 @@ try { CRD = (typeof window !== 'undefined' && window.CSH && window.CSH.cards) ? 
     state.insDelta = 0;
     _rendered = {};
     state.hands = [{ cards: [draw(), draw()], wager: state.bet, fromSplit: false }];
-    state.dealer = [draw(), draw()];
+    state.dealer = [draw(), draw(true)];
     state.chips -= state.bet;
     renderAll();
     sfx.deal();
@@ -1553,28 +1576,46 @@ try { CRD = (typeof window !== 'undefined' && window.CSH && window.CSH.cards) ? 
     }, 460);
   }
 
+  var insuranceDecision=null;
   function showInsurance() {
-    var tr = tenRatio(state.shoe);
-    $('#ins-fill').style.width = (tr * 100).toFixed(1) + '%';
-    $('#ins-txt').textContent = Math.round(tr * 100) + '%';
-    $('#btn-ins-yes').textContent = '买保险 ' + fmt(Math.floor(state.bet / 2));
+    var scene=state,hand=state.hand,decision={scene:scene,hand:hand,cost:Math.floor(state.bet/2)};insuranceDecision=decision;
+    var tr = publicTenRatio(),cost=Math.floor(state.bet/2),affordable=Number.isFinite(state.chips)&&Number.isSafeInteger(cost)&&cost>0&&state.chips>=cost;
+    $('#ins-fill').style.width = tr===null?'0%':(tr * 100).toFixed(1) + '%';
+    $('.ins-prob-bar').classList.toggle('hidden',tr===null);
+    $('#ins-txt').textContent = tr===null?'—':Math.round(tr * 100) + '%';
+    $('#ins-cost').textContent=fmt(cost);$('#ins-chips').textContent=fmt(state.chips);
+    $('#btn-ins-yes').disabled=!affordable;
+    $('#btn-ins-yes').textContent = affordable?'买保险 '+fmt(cost):'筹码不足';
+    $('#btn-ins-yes').onclick=function(){takeInsurance(true,decision);};
+    $('#btn-ins-no').onclick=function(){takeInsurance(false,decision);};
     $('#ins-mask').classList.remove('hidden');
+    if ($('#rules-mask').classList.contains('hidden')) $('#btn-ins-no').focus({preventScroll:true});
     sfx.ins();
   }
-  function hideInsurance() { $('#ins-mask').classList.add('hidden'); }
+  function hideInsurance() { insuranceDecision=null;$('#ins-mask').classList.add('hidden'); }
 
-  function takeInsurance(yes) {
+  function takeInsurance(yes,expected) {
     if (!alive || closePending || tornDown) return;
+    var decision=expected||insuranceDecision;
+    if(!state||state.phase!=='insurance'||!decision||decision!==insuranceDecision||decision.scene!==state||decision.hand!==state.hand)return;
+    var cost=Math.floor(state.bet/2);
+    if(cost!==decision.cost){showInsurance();toast('注额已变化，请按当前金额重新选择保险');return;}
+    if(yes&&(!(cost>0)||!Number.isFinite(state.chips)||state.chips<cost)){showInsurance();toast('筹码不足，仍可选择不买保险');return;}
+    var restoreInsuranceFocus=$('#ins-mask').contains(document.activeElement);
     hideInsurance();
     if (!state) return;
     if (yes) {
-      state.insuranceBet = Math.floor(state.bet / 2);
+      state.insuranceBet = cost;
       state.chips -= state.insuranceBet;
       sfx.chip();
       renderHud();
       toast('已买保险 ' + fmt(state.insuranceBet));
     }
     afterInsurance();
+    if(restoreInsuranceFocus){
+      var next=Array.prototype.find.call(document.querySelectorAll('#view-game button:not(:disabled),#banner button:not(:disabled)'),function(n){return n.getClientRects().length;});
+      if(next)next.focus({preventScroll:true});
+    }
   }
 
   function afterInsurance() {
@@ -1591,7 +1632,7 @@ try { CRD = (typeof window !== 'undefined' && window.CSH && window.CSH.cards) ? 
 
   function resolveNow() {
     state.phase = 'settle';
-    state.holeHidden = false;
+    revealDealerHole();
     renderAll();
     sfx.flip();
     laterHand(function () { settle(); }, 420);
@@ -1707,7 +1748,7 @@ try { CRD = (typeof window !== 'undefined' && window.CSH && window.CSH.cards) ? 
   function endRound() {
     if (!alive || !state) return;
     state.phase = 'dealer';
-    state.holeHidden = false;
+    revealDealerHole();
     renderAll();
     sfx.flip();
     laterHand(function () { dealerTurn(); }, 420);
@@ -1968,8 +2009,20 @@ try { CRD = (typeof window !== 'undefined' && window.CSH && window.CSH.cards) ? 
   }
 
   /* ---------- 玩法说明 ---------- */
-  function showRules() { $('#rules-mask').classList.remove('hidden'); }
-  function hideRules() { $('#rules-mask').classList.add('hidden'); }
+function trapDialogKey(e, modal) {
+  if (e.key !== 'Tab') return;
+  var nodes = Array.prototype.filter.call(modal.querySelectorAll('button:not(:disabled),input:not(:disabled),select:not(:disabled),summary,[tabindex="0"]'), function(n){return n.getClientRects().length;});
+  if (!nodes.length) { e.preventDefault(); return; }
+  var first=nodes[0],last=nodes[nodes.length-1],active=document.activeElement;
+  if (!modal.contains(active) || (e.shiftKey && active===first) || (!e.shiftKey && active===last)) { e.preventDefault(); (e.shiftKey?last:first).focus(); }
+}
+  var rulesFocusBack=null;
+  function showRules() { rulesFocusBack=document.activeElement; $('#rules-mask').classList.remove('hidden'); $('#btn-rules-close').focus({preventScroll:true}); }
+  function hideRules() {
+    $('#rules-mask').classList.add('hidden');
+    if (!$('#ins-mask').classList.contains('hidden')) $('#btn-ins-no').focus({preventScroll:true});
+    else if(rulesFocusBack&&rulesFocusBack.isConnected) rulesFocusBack.focus({preventScroll:true});
+  }
 
   /* ============================================================
      5. 关闭链路（子页面 postMessage / 父页面按钮 / 双方各自处理 Esc）
@@ -2026,8 +2079,7 @@ try { CRD = (typeof window !== 'undefined' && window.CSH && window.CSH.cards) ? 
   $('#btn-split').addEventListener('click', actSplit);
   $('#btn-surrender').addEventListener('click', actSurrender);
 
-  $('#btn-ins-yes').addEventListener('click', function () { takeInsurance(true); });
-  $('#btn-ins-no').addEventListener('click', function () { takeInsurance(false); });
+  /* 保险按钮由每次showInsurance绑定当前手，旧处理器不能处理下一手。 */
 
   $('#bet-chips').addEventListener('click', function (e) {
     var b = e.target && e.target.closest ? e.target.closest('.chip-btn') : null;
@@ -2051,9 +2103,12 @@ try { CRD = (typeof window !== 'undefined' && window.CSH && window.CSH.cards) ? 
   /* Esc：保险 → 玩法 → 结算横幅 → 页面（三通路行为一致） */
   document.addEventListener('keydown', function (e) {
     if (!alive || closePending || tornDown) return;
+    if(e.repeat&&(e.key==='Enter'||e.key===' ')){e.preventDefault();return;}
     if (e.key === 'Escape' || e.keyCode === 27) {
-      if (!$('#ins-mask').classList.contains('hidden')) { takeInsurance(false); return; }
+      e.preventDefault();
+      if(e.repeat) return;
       if (!$('#rules-mask').classList.contains('hidden')) { hideRules(); return; }
+      if (!$('#ins-mask').classList.contains('hidden')) { takeInsurance(false); return; }
       if (!$('#banner').classList.contains('hidden')) {
         /* §27：壳内横幅打开时 Esc 不回开局页 —— 半途重开会把筹码重置成全额带入，
            等于输了免费清零亏损（德州同款处理）。独立模式无经济面，保留原行为。 */
@@ -2064,6 +2119,12 @@ try { CRD = (typeof window !== 'undefined' && window.CSH && window.CSH.cards) ? 
       closePage();
       return;
     }
+    var modal=!$('#rules-mask').classList.contains('hidden')?$('#rules-mask'):!$('#ins-mask').classList.contains('hidden')?$('#ins-mask'):null;
+    if(modal){trapDialogKey(e,modal);return;}
+    if(e.repeat||e.ctrlKey||e.altKey||e.metaKey||e.isComposing) return;
+    var target=e.target;
+    if(target&&(target.isContentEditable||/^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))) return;
+    if(target&&target.tagName==='BUTTON'&&(e.key==='Enter'||e.key===' '))return;
     if (!state || state.phase !== 'play') {
       if ((e.key === ' ' || e.key === 'Enter') && !$('#banner').classList.contains('hidden')) {
         e.preventDefault(); sfx.ui();
@@ -2116,6 +2177,7 @@ try { CRD = (typeof window !== 'undefined' && window.CSH && window.CSH.cards) ? 
     getSet: function () { return set; },
     setShoe: function (cards, size) {
       state.shoe = cards.slice();
+      state.publicShoe=null;
       state.shoeSize = size || cards.length;
       return state.shoe.length;
     },

@@ -379,6 +379,8 @@ import { lib, game } from "../../../noname.js";
 			reliefDate: clampStr(o.reliefDate, 20),
 			careerClaims: cleanAchv(o.careerClaims) || {},
             careerUnlocks:o.careerUnlocks==null?null:lib.cshWallet.validateCareerUnlocks(o.careerUnlocks),
+            tableOutbox:o.tableOutbox==null?null:lib.cshWallet.validateTableOutbox(o.tableOutbox),
+            playerMatches:o.playerMatches==null?null:lib.cshWallet.compactPlayerMatches(o.playerMatches),
 			poolClaims: cleanPoolClaims(o.poolClaims),
 			matchRewardConfig: cleanMatchRewardConfig(o.matchRewardConfig),
 			matchClaims: cleanMatchClaims(o.matchClaims),
@@ -397,7 +399,8 @@ import { lib, game } from "../../../noname.js";
 			merit: clampNum(o.merit, 0, 999999999),
 			meritToday: clampNum(o.meritToday, 0, 999999999),
 			meritDate: clampStr(o.meritDate, 20),
-			poolClaims: numMap(o.poolClaims, 8192, 0, 1000) || {},
+			/* 与 cleanPoolAchv 同口径：万条规模下 8192 会截断领奖台账。 */
+			poolClaims: numMap(o.poolClaims, 16384, 0, 1000) || {},
 			bossReceipt: cleanBossReceipt(o.bossReceipt),
             careerUnlocks:o.careerUnlocks==null?null:lib.cshWallet.validateCareerUnlocks(o.careerUnlocks),
 		};
@@ -529,6 +532,7 @@ import { lib, game } from "../../../noname.js";
 			heartbeatDay: clampNum(o.heartbeatDay, 0, 999999),
 			heartbeatMatches: clampNum(o.heartbeatMatches, 0, 999999),
 			gambles: cleanGambles(o.gambles),
+            tableReceipts:o.tableReceipts==null?[]:lib.cshWorld.validateTableReceipts(o.tableReceipts),
             careerUnlocks:o.careerUnlocks==null?null:lib.cshWallet.validateCareerUnlocks(o.careerUnlocks),
 			relations: cleanRelations(o.relations),
 			records: cleanRecords(o.records),
@@ -702,7 +706,8 @@ import { lib, game } from "../../../noname.js";
 	function cleanAchv(o) {
 		if (!o || typeof o !== "object") return null;
 		var out = {};
-		var keys = Object.keys(o).slice(0, 1000);
+		var keys = Object.keys(o);
+		if (keys.length > 16384) throw Error("生涯领奖凭据过多，备份未截断，请先检查存档");
 		for (var i = 0; i < keys.length; i++) out[clampStr(keys[i], 60)] = 1;
 		return out;
 	}
@@ -721,11 +726,16 @@ import { lib, game } from "../../../noname.js";
             var dst={totals:{},peaks:{}};['totals','peaks'].forEach(function(field){var metrics=rec[field];if(!metrics||typeof metrics!=='object'||Array.isArray(metrics))return;Object.keys(metrics).slice(0,64).forEach(function(key){var n=metrics[key];if(/^(s:csh_[a-zA-Z0-9_]+|[cdgrleqp]:[a-zA-Z0-9_.]+)$/.test(key)&&key.length<=100&&Number.isFinite(n)&&n>=0)dst[field][key]=Math.min(1000000000,Math.floor(n));});});out[id]=dst;
         });return out;
     }
+	/* 万条成就规模：池子侧容量必须与钱包侧（16384）一致。
+	   旧值 8192 在有效总量超过 8192 时会静默丢弃第 8193 条起的达成记录，
+	   这正是 2026-11-04 交接书 7.3 点名的"存档上限阻断"在池子侧的同类问题。
+	   提高上限只是放宽截断阈值，不改任何既有记录的形状。 */
+	var POOL_ACHV_CAP = 16384;
 	function cleanPoolAchv(o) {
 		if (!o || typeof o !== "object") return null;
-		var out = { v: 2, got: {}, seen: {}, results:Array.isArray(o.results)?o.results.filter(function(id){return typeof id==="string"&&/^[a-zA-Z0-9_-]{10,100}$/.test(id);}).slice(-64):[], chars: numMap(o.chars, 3000, 0, 999999) || {}, progress: numMap(o.progress, 8192, 0, 1000000000) || {}, mastery: cleanCharacterMastery(o.mastery) };
+		var out = { v: 2, got: {}, seen: {}, results:Array.isArray(o.results)?o.results.filter(function(id){return typeof id==="string"&&/^[a-zA-Z0-9_-]{10,100}$/.test(id);}).slice(-64):[], chars: numMap(o.chars, 3000, 0, 999999) || {}, progress: numMap(o.progress, POOL_ACHV_CAP, 0, 1000000000) || {}, mastery: cleanCharacterMastery(o.mastery) };
 		var src = (o.got && typeof o.got === "object") ? o.got : {};
-		var keys = Object.keys(src).slice(0, 8192);
+		var keys = Object.keys(src).slice(0, POOL_ACHV_CAP);
 		for (var i = 0; i < keys.length; i++) {
 			var id = clampStr(keys[i], 48);
 			var rec = src[keys[i]];
@@ -737,7 +747,7 @@ import { lib, game } from "../../../noname.js";
 			};
 		}
 		var seen = (o.seen && typeof o.seen === "object") ? o.seen : {};
-		var sk = Object.keys(seen).slice(0, 8192);
+		var sk = Object.keys(seen).slice(0, POOL_ACHV_CAP);
 		for (var j = 0; j < sk.length; j++) out.seen[clampStr(sk[j], 48)] = 1;
 		return out;
 	}
@@ -746,7 +756,7 @@ import { lib, game } from "../../../noname.js";
 		if (!o || typeof o !== "object") return null;
 		var out = { v: 1, paid: {} };
 		var src = (o.paid && typeof o.paid === "object") ? o.paid : {};
-		var keys = Object.keys(src).slice(0, 8192);
+		var keys = Object.keys(src).slice(0, POOL_ACHV_CAP);
 		for (var i = 0; i < keys.length; i++) {
 			var id = clampStr(keys[i], 48);
 			var rec = src[keys[i]];
@@ -1018,6 +1028,11 @@ import { lib, game } from "../../../noname.js";
 		return m;
 	}
 
+    function cleanSpiritSkins(value){
+        if(value==null)return null;
+        if(!value||value.v!==1||!value.selected||typeof value.selected!=="object"||Array.isArray(value.selected)||Object.keys(value.selected).length>200)throw Error("妖灵装扮选择格式异常");
+        var selected={};Object.keys(value.selected).forEach(function(id){var skin=value.selected[id];if(!/^csh_boss_minion_[a-z0-9_]{1,50}$/.test(id)||typeof skin!=="string"||!/^[A-Za-z0-9_-]{1,60}$/.test(skin)||["__proto__","prototype","constructor"].includes(skin))throw Error("妖灵装扮条目异常");selected[id]=skin;});return {v:1,selected:selected};
+    }
 	/* ---------- 采集 / 应用 ---------- */
 	/* 键注册表（逻辑名 → localStorage 键 + 清洗器 + 存储类型）。
 	   存储类型：0 = localStorage JSON
@@ -1047,6 +1062,7 @@ import { lib, game } from "../../../noname.js";
 		["sniperBest", K_SNIPER_BEST, cleanObj, 0],
 		["cdkLifetime", K_CDK_LIFETIME, cleanLifetime, 0],
 		["panelSkin", K_PANEL_SKIN, cleanStr, 1],
+        ["spiritSkins", "csh_spirit_skin_v1", cleanSpiritSkins, 0],
 		["bgmVolume", K_BGM_VOLUME, cleanNum, 0],
 		["bgmOn", K_BGM_ON, cleanBgmOn, 2],
 		["sfxVolume", K_SFX_VOLUME, cleanNum, 0],
@@ -1109,6 +1125,9 @@ import { lib, game } from "../../../noname.js";
         return resolveCollectedBody(body);
     }
     function resolveCollectedBody(body){
+        if(body.wallet&&body.wallet.tableOutbox!=null)lib.cshWallet.validateTableOutbox(body.wallet.tableOutbox);
+        if(body.wallet&&body.wallet.playerMatches!=null)lib.cshWallet.validatePlayerMatches(body.wallet.playerMatches);
+        if(body.world&&body.world.tableReceipts!=null)lib.cshWorld.validateTableReceipts(body.world.tableReceipts);
 		/* Paid side-domain checkpoints beat stale compatibility keys. */
         if(body.wallet&&body.wallet.dailyTaskSaved!=null)body.dailyTask=lib.cshWallet.validateTaskState(body.wallet.dailyTaskSaved);
 		if(body.wallet && body.wallet.affectionSaved != null) body.affection = lib.cshWallet.validateAffectionState(body.wallet.affectionSaved);
@@ -1578,44 +1597,20 @@ import { lib, game } from "../../../noname.js";
 		if (clean.rank) s.rank = clean.rank.rank || 0;
 		if (clean.world && clean.world.ai) s.ai = clean.world.ai.length;
 		if (clean.cdkUsed) s.cdk = clean.cdkUsed.length;
-		s.hasWinrate = !!clean.winrate;          /* ★ v3：winrate 现在真的读得到了（原来恒 false） */
-		s.matches = wrTotals(clean.winrate).games;
+		s.hasWinrate = !!clean.winrate||!!(clean.wallet&&clean.wallet.playerMatches);          /* ★ v3：winrate 现在真的读得到了（原来恒 false） */
+		s.matches = wrTotals(clean.winrate,clean.wallet&&clean.wallet.playerMatches).games;
 		s.kills = clean.bossKill && clean.bossKill.map ? Object.keys(clean.bossKill.map).length : 0;
 		s.girls = clean.affection ? Object.keys(clean.affection).length : 0;
 		return s;
 	}
-	/* 胜负统计总场次。
-	   ★ 真实形状（csh_winrate.readData）：顶层是**模式键**
-	     `{ identity:{角色:entry}, versus:{…}, doudizhu:{…}, guozhan:{…}, camps:{…}, me:{chars:{…},camps:{…}} }`
-	   ★ 口径必须与唯一的历史实现（csh_shell.buildStats）一致：它只读 `me.chars` ——
-	     因为 `me` 是"玩家亲自操控"的那一份，而模式桶是**全体（含 AI）**的汇总，
-	     两处都加会把玩家自己的对局数算两遍。故：
-	       有 me.chars → 只算它；没有（极老档）→ 退回累加四个模式桶。
-	     `camps` 是按阵营统计，与角色维度重叠，一律不计。 */
-	function wrTotals(w) {
-		var games = 0, win = 0, lose = 0;
-		if (!w || typeof w !== "object") return { games: games, win: win, lose: lose, push: 0 };
-		function absorb(bucket) {
-			if (!bucket || typeof bucket !== "object") return;
-			for (var ck in bucket) {
-				if (!Object.prototype.hasOwnProperty.call(bucket, ck)) continue;
-				var c = bucket[ck];
-				if (!c || typeof c !== "object" || typeof c.games !== "number") continue;
-				games += clampNum(c.games, 0, 9999999);
-				win += clampNum(c.win, 0, 9999999);
-				lose += clampNum(c.lose, 0, 9999999);
-			}
-		}
-		try {
-			if (w.me && typeof w.me === "object" && w.me.chars && typeof w.me.chars === "object") {
-				absorb(w.me.chars);
-			} else {
-				var MODES = ["identity", "versus", "doudizhu", "guozhan"];
-				for (var i = 0; i < MODES.length; i++) absorb(w[MODES[i]]);
-			}
-		} catch (e) {}
-		return { games: games, win: win, lose: lose, push: Math.max(0, games - win - lose) };
-	}
+    /* A player's match total cannot be reconstructed from per-character appearances.
+       Only the accepted personal checkpoint proves new observed games; old tables remain exportable. */
+    function wrTotals(w, personal) {
+        if(!personal)return {games:null,win:null,lose:null,push:null,known:false,partial:true};
+        var games=0,win=0,lose=0;
+        ["identity","versus","doudizhu","guozhan"].forEach(function(mode){var e=personal.modes[mode];if(e){games+=e.games;win+=e.win;lose+=e.lose;}});
+        return {games:games,win:win,lose:lose,push:0,known:true,partial:true,since:personal.since};
+    }
 
 	/* ---------- 家当清点（v3 · 「行囊」页的数据源） ----------
 	   返回**纯数据**（键名 + 有没有 + 数量 + 少量明细），一个中文字都没有 ——
@@ -1626,15 +1621,15 @@ import { lib, game } from "../../../noname.js";
 		body = body || collect(true);
 		var rows = [];
 		function add(key, has, n, extra) {
-			rows.push({ key: key, has: !!has, n: n || 0, extra: extra || null });
+			rows.push({ key: key, has: !!has, n: key==="winrate"&&n===null?null:n||0, extra: extra || null });
 		}
 		var w = cleanWallet(body.wallet);
 		add("wallet", !!w, w ? w.pc : 0, w ? { peak: w.pcPeak, streak: w.streak } : null);
 		var r = cleanRank(body.rank);
 		add("rank", !!r, r ? r.merit : 0, r ? { rank: r.rank } : null);
 		var wr = cleanWinrate(body.winrate);
-		var wt = wrTotals(wr);
-		add("winrate", !!wr, wt.games, { win: wt.win, lose: wt.lose, push: wt.push });
+		var wt = wrTotals(wr,w&&w.playerMatches);
+		add("winrate", !!wr||wt.known, wt.games, { win: wt.win, lose: wt.lose, push: wt.push, known:wt.known, partial:wt.partial, since:wt.since||null });
 		var wld = cleanWorld(body.world);
 		add("world", !!(wld && wld.ai && wld.ai.length), wld && wld.ai ? wld.ai.length : 0, null);
 		var bk = cleanBossKill(body.bossKill);
@@ -1684,6 +1679,7 @@ import { lib, game } from "../../../noname.js";
 		add("challengeProfile", body.challengeProfile != null, 0, null);
 		add("texasRake", body.texasRake != null, 0, null);
 		add("panelSkin", body.panelSkin != null && body.panelSkin !== "", 0, null);
+        var spiritSkins=cleanSpiritSkins(body.spiritSkins);add("spiritSkins",!!spiritSkins,spiritSkins?Object.keys(spiritSkins.selected).length:0,null);
 		add("bgmVolume", body.bgmVolume != null, 0, null);
 		add("bgmOn", !!body.bgmOn, 0, null);
 		add("sfxVolume", body.sfxVolume != null, 0, null);
@@ -1730,7 +1726,7 @@ import { lib, game } from "../../../noname.js";
         effective=resolveCollectedBody(effective);
         var cw=cleanWallet(cur.wallet)||{pc:0},cr=cleanRank(cur.rank)||{rank:0,merit:0};
         var out={pc:{from:cw.pc,to:clean.wallet?clean.wallet.pc:cw.pc},rank:{from:cr.rank,to:clean.rank?clean.rank.rank:cr.rank},merit:{from:cr.merit,to:clean.rank?clean.rank.merit:cr.merit},domains:[]};
-        if(clean.winrate!=null){var a=wrTotals(cleanWinrate(cur.winrate)),b=wrTotals(clean.winrate);if(a.games!==b.games)out.matches={from:a.games,to:b.games};}
+        if(clean.winrate!=null||clean.wallet!=null){var a=wrTotals(cleanWinrate(cur.winrate),cur.wallet&&cur.wallet.playerMatches),b=wrTotals(effective.winrate,effective.wallet&&effective.wallet.playerMatches);if(a.games!==b.games)out.matches={from:a.games,to:b.games};}
         if(clean.bossKill!=null){var a=Object.keys((cleanBossKill(cur.bossKill)||{}).map||{}).length,b=Object.keys(clean.bossKill.map||{}).length;if(a!==b)out.kills={from:a,to:b};}
         if(clean.affection!=null){var a=Object.keys(cleanAffection(cur.affection)||{}).length,b=Object.keys(clean.affection||{}).length;if(a!==b)out.girls={from:a,to:b};}
         function canonical(v){if(v==null)return null;if(Array.isArray(v))return v.map(canonical);if(typeof v==='object'){var x={};Object.keys(v).sort().forEach(function(k){x[k]=canonical(v[k]);});return x;}return v;}
@@ -1937,7 +1933,7 @@ import { lib, game } from "../../../noname.js";
 		for (var q = 0; q < inv.length; q++) invMap[inv[q].key] = inv[q];
 		ok("家当：钱包余额", invMap.wallet && invMap.wallet.has && invMap.wallet.n === 1234);
 		ok("家当：官阶功勋", invMap.rank && invMap.rank.n === 99 && invMap.rank.extra.rank === 3);
-		ok("家当：战绩场次（v3 修好后才非 0）", invMap.winrate && invMap.winrate.n === 4 && invMap.winrate.extra.win === 3);
+		ok("家当：旧武将出场不冒充本人局数", invMap.winrate && invMap.winrate.n === null && invMap.winrate.extra.known === false);
 		ok("家当：羁绊只数 + 满档数", invMap.affection && invMap.affection.n === 2 && invMap.affection.extra.full === 1);
 		ok("家当：讨伐数 + 妖灵分节", invMap.bossKill && invMap.bossKill.n === 1 && invMap.bossKill.extra.minions === 2);
 		ok("家当：持仓只数 + 成本", invMap.goldfish && invMap.goldfish.n === 1 && invMap.goldfish.extra.cost === 20);

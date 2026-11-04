@@ -1,0 +1,13 @@
+/* Cosmetic-only spirit skins. Local assets supplied by the author; no combat or wallet access. */
+(function(root){
+ 'use strict';
+ const KEY='csh_spirit_skin_v1',catalogs=new Map(),validSkin=id=>typeof id==='string'&&/^[a-zA-Z0-9_-]{1,60}$/.test(id)&&!['__proto__','constructor','prototype'].includes(id);
+ function spiritId(id){if(typeof id!=='string')return null;id=id.replace(/^csh_aux_/,'csh_boss_minion_');return /^csh_boss_minion_[a-z0-9_]{1,50}$/.test(id)?id:null;}
+ function asset(path){if(typeof path!=='string'||path.length>240||!/^image\/[A-Za-z0-9_\-/]+\.(?:webp|png|jpg|jpeg|avif|gif)$/.test(path)||path.split('/').some(p=>p==='.'||p==='..'))throw Error('装扮图片配置无效');return '../'+path;}
+ function register(id,rows){id=spiritId(id);if(!id||!Array.isArray(rows)||rows.length>1000)throw Error('妖灵装扮配置无效');const seen=new Set(),safe=rows.map(row=>{if(!row||!validSkin(row.id)||row.id==='classic'||seen.has(row.id)||typeof row.name!=='string'||!row.name.trim()||row.name.length>40)throw Error('装扮条目无效');seen.add(row.id);return {id:row.id,name:row.name.trim(),portrait:asset(row.portrait),face:row.face?asset(row.face):null,cover:row.cover?asset(row.cover):null};});catalogs.set(id,safe);return safe.length;}
+ function list(id,classic){id=spiritId(id);return [{id:'classic',name:'经典形象',portrait:classic,face:null,cover:null}].concat(id?(catalogs.get(id)||[]).map(row=>({...row})):[]);}
+ function read(storage){const raw=storage.getItem(KEY);if(raw==null)return {v:1,selected:{}};const value=JSON.parse(raw);if(!value||value.v!==1||!value.selected||typeof value.selected!=='object'||Array.isArray(value.selected)||Object.keys(value.selected).length>1000)throw Error('装扮偏好暂不可读取');const selected={};Object.keys(value.selected).forEach(id=>{if(spiritId(id)!==id||!validSkin(value.selected[id]))throw Error('装扮偏好格式异常');selected[id]=value.selected[id];});return {v:1,selected};}
+ function resolve(id,classic,storage){const normalized=spiritId(id),rows=list(id,classic),prefs=read(storage),requested=normalized&&prefs.selected[normalized]||'classic';return {skin:rows.find(row=>row.id===requested)||rows[0],requested,unavailable:!rows.some(row=>row.id===requested)};}
+ function select(id,skinId,storage){id=spiritId(id);if(!id||!validSkin(skinId)||skinId!=='classic'&&!(catalogs.get(id)||[]).some(row=>row.id===skinId))throw Error('这套装扮当前不可用');const prefs=read(storage);if(skinId==='classic')delete prefs.selected[id];else prefs.selected[id]=skinId;const raw=JSON.stringify(prefs);storage.setItem(KEY,raw);if(storage.getItem(KEY)!==raw)throw Error('装扮偏好未保存');return true;}
+ root.CSHSpiritSkins={KEY,spiritId,register,list,read,resolve,select};
+})(typeof window!=='undefined'?window:globalThis);

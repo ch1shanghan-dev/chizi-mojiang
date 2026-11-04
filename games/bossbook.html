@@ -346,12 +346,21 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--cover-deep);co
   .bcard{aspect-ratio:3/4}
   .ribbon{height:54px;right:16px}
 }
+
+/* Read failures retain the book; absent data never masquerades as zero records. */
+#book-read-status{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:12px;padding:16px;box-sizing:border-box;color:var(--ink);background:var(--paper);font:var(--fs-cap)/1.5 var(--ff-body)}
+#book-read-status[hidden],#book[hidden]{display:none!important}
+#book-read-retry,.bb-read-again{min-height:44px;min-width:72px;padding:6px 14px;border:1px solid var(--line-ink);border-radius:6px;background:var(--paper-2);color:var(--ink);font:var(--fs-cap)/1.4 var(--ff-body);cursor:pointer}
+.bb-read-banner #book{top:56px;height:calc(100% - 56px)}
+.bb-read-banner #book-read-status{inset:0 0 auto;height:56px;justify-content:flex-start;padding:4px 170px 4px 16px;border-bottom:1px solid var(--line-ink)}
+#book-read-message{max-width:38em}
 </style>
 <link rel="stylesheet" href="../core/csh_experience.css">
 <link rel="stylesheet" href="../core/csh_records.css">
 </head>
 <body class="csh-experience" data-csh-records="bossbook">
-<div id="book"></div>
+<div id="book-read-status" role="status" aria-live="polite"><span id="book-read-message">正在读取讨伐记录…</span><button id="book-read-retry" type="button" hidden>重新读取</button></div>
+<div id="book" hidden></div>
 
 <script>
 (function () {
@@ -421,6 +430,7 @@ var DWELL_MS = 600;
    数据与状态
    ============================================================ */
 var Data = { boss: null, ext: null, seen: 0, fresh: {}, hollow: false };
+var readEpoch = 0, readRetry = null, readAlive = true;
 /* v4.2：隐藏已讨伐开关（与 main/bossmode.js 同键） */
 var HIDE_KEY = "csh_boss_hide_killed";
 var cur = -1;
@@ -958,6 +968,11 @@ function renderExtSection(box) {
   head.appendChild(el("span", "vol-count", list.length ? ("已讨 " + kill + " / " + total) : ""));
   sect.appendChild(head);
 
+  if (!Data.ext) {
+    sect.appendChild(el("div", "bb-empty", "外传名册暂未读取，请重新读取。"));
+    var retry = el("button", "bb-read-again", "重新读取"); retry.type = "button";
+    retry.addEventListener("click", function () { loadBoss(); }); sect.appendChild(retry); box.appendChild(sect); return;
+  }
   if (!list.length) {
     sect.appendChild(el("div", "bb-empty", "外传虚位以待 · 未检测到异界的魔王"));
     box.appendChild(sect);
@@ -1201,7 +1216,7 @@ function fallbackBoss() {
     var L = window.parent && window.parent.lib;
     if (L && L.cshBossRecord && typeof L.cshBossRecord.summary === "function") {
       var s = L.cshBossRecord.summary();
-      if (s && s.roster && s.roster.length) return s;
+      if (validBoss(s)) return s;
     }
   } catch (e) {}
   return null;
@@ -1225,37 +1240,52 @@ function extFromParent() {
   } catch (e) {}
   return null;
 }
-function adopt(b) {
-  if (!Data.ext) Data.ext = extFromParent();     /* 桥未透传时兜底（两者都无 → 空态） */
-  if (b && b.roster && b.roster.length) {
-    Data.boss = b; Data.hollow = false;
-  } else {
-    Data.boss = b || null;
-    Data.hollow = true;        /* 数据未到 / 为空 → 优雅空态 */
-  }
-  renderAll();
+function validBoss(b) {
+  return !!(b && Array.isArray(b.roster) && b.map && typeof b.map === "object" && !Array.isArray(b.map));
 }
-function loadBoss(round) {
+function paintReadState(state) {
+  var hasRecord = validBoss(Data.boss), box = $("#book-read-status"), button = $("#book-read-retry");
+  box.hidden = state === "ready";
+  document.body.classList.toggle("bb-read-banner", hasRecord && state !== "ready");
+  $("#book").hidden = !hasRecord;
+  $("#book-read-message").textContent = state === "loading" ? (hasRecord ? "正在更新，仍显示上次读取的记录。" : "正在读取讨伐记录…") : state === "error" ? (hasRecord ? "暂未更新，仍显示上次读取的记录。" : "讨伐记录暂未读取成功，请稍后重试。") : "";
+  button.hidden = state !== "error";
+  button.disabled = state === "loading";
+}
+function adopt(b, ext) {
+  if (!validBoss(b)) { paintReadState("error"); return; }
+  Data.boss = b; Data.hollow = !b.roster.length;
+  Data.ext = ext || extFromParent();
+  renderAll(); paintReadState("ready");
+}
+function loadBoss(round, epoch) {
   round = round || 0;
-  if (Bridge.active) {
-    Bridge.call("shell-stats", null, function (ok, snap) {
-      var b = (ok && snap) ? snap.boss : null;
-      /* 外传（批次 A）：桥返回的 bossExt.roster 是数组（页面不能自己枚举） */
-      if (ok && snap && snap.bossExt) {
-        Data.ext = {
-          kill: snap.bossExt.kill || 0, total: snap.bossExt.total || 0,
-          roster: snap.bossExt.roster || [], map: (b && b.ext) || {}
-        };
-      }
-      if (b && b.roster && b.roster.length) { adopt(b); return; }
-      if (round === 0) { setTimeout(function () { loadBoss(1); }, 1500); return; }
-      var fb = fallbackBoss();
-      adopt(fb);               /* fb 为 null 时走空态 */
-    });
-  } else {
-    adopt(fallbackBoss());     /* 非桥环境（file:// 直开等）：直接兜底或空态 */
+  if (!readAlive) return;
+  if (!round) {
+    epoch = ++readEpoch;
+    if (readRetry !== null) { clearTimeout(readRetry); readRetry = null; }
+    paintReadState("loading");
   }
+  function receive(ok, snap) {
+    if (!readAlive || epoch !== readEpoch) return;
+    var b = ok && snap && snap.boss, ext = null;
+    if (ok && snap && snap.bossExt && Array.isArray(snap.bossExt.roster)) ext = {
+      kill: snap.bossExt.kill || 0, total: snap.bossExt.total || 0,
+      roster: snap.bossExt.roster, map: b && b.ext || {}
+    };
+    if (validBoss(b)) { adopt(b, ext); return; }
+    var fallback = fallbackBoss();
+    if (validBoss(fallback)) { adopt(fallback); return; }
+    if (round === 0 && Bridge.active) {
+      readRetry = setTimeout(function () { readRetry = null; loadBoss(1, epoch); }, 1500); return;
+    }
+    paintReadState("error");
+  }
+  if (Bridge.active) { try { Bridge.call("shell-stats", null, receive); } catch (readError) { receive(false, null); } }
+  else receive(false, null);
 }
+$("#book-read-retry").addEventListener("click", function () { loadBoss(); });
+window.addEventListener("pagehide", function () { readAlive = false; readEpoch++; if (readRetry !== null) clearTimeout(readRetry); });
 
 /* ---------- 启动 ---------- */
 buildAll();

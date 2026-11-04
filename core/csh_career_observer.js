@@ -15,7 +15,7 @@ import { careerSnapshot as projectBossCareer } from "./csh_bossrecord.js";
     var interactionCacheEpoch=-1,interactionCacheRevision=-1,interactionCache=null;
     var TASK_KEYS = ['task_1','task_2','task_3','task_4','task_5','task_6','task_7','task_8','task_9','task_10','task_12','task_15','egg_task_full','egg_full_house'];
     function bossRule(def) { return def.cat === "挑战"; }
-    function rankRule(def) { return def.cat === "官阶" || def.cat === "功勋" || def.key === "egg_seg_rise" || def.key === "egg_rank_master"; }
+    function rankRule(def) { return def.cat === "官阶" || def.cat === "功勋" || def.key === "egg_seg_rise" || def.key === "egg_rank_master" || /^cx_combo_merit_meritday_\d+$/.test(def.key); }
     function rankDefs() { return rankDefinitions || (rankDefinitions = engine().defs.filter(rankRule)); }
     function rankStats(value) { return {rank:value.rank,merit:value.merit,meritToday:value.meritToday,segIdx:bank().rank.segOf(value.rank).seg}; }
     /* The rank checkpoint owns exact observations, including a prior day's merit. */
@@ -43,7 +43,10 @@ import { careerSnapshot as projectBossCareer } from "./csh_bossrecord.js";
         var stamp=epoch();
         Promise.resolve().then(function(){if(stamp!==epoch()||!enabled())return;if(start())bank().flushSave();});
     }
-    function gambleRule(def) { return def.cat === "豪赌桌" || def.key === "egg_gamble_first"; }
+    /* These six generated families use only the accepted gamble checkpoint.
+       Mixed world/wallet/rank combinations must not qualify from partial stats. */
+    function gambleComboRule(def){return /^cx_combo_(gmplay_gmwin|gmplay_gmnet|gmplay_gmstreak|gmwin_gmnet|gmwin_gmstreak|gmnet_gmstreak)_\d+$/.test(def.key);}
+    function gambleRule(def) { return def.cat === "豪赌桌" || def.key === "egg_gamble_first" || /^cx_ratio_(gmret|gmwinrate)_/.test(def.key) || gambleComboRule(def); }
     function gambleDefs() { return gambleDefinitions || (gambleDefinitions = engine().defs.filter(gambleRule)); }
     function gambleStats(value) { var g=value.gambles||{};return {gamblePlays:g.plays||0,gambleWins:g.wins||0,gambleNet:g.net||0,gambleBest:g.best||0,gambleBust:g.bust||0,gambleBestStreak:g.bestStreak||0}; }
     /* The accepted gamble checkpoint owns its observations and queue receipt. */
@@ -98,8 +101,76 @@ import { careerSnapshot as projectBossCareer } from "./csh_bossrecord.js";
         var stamp=epoch();
         Promise.resolve().then(function(){if(stamp!==epoch()||!enabled())return;if(start())bank().flushSave();});
     }
-    function sourceRecord(){var record=rankRecord(),gamble=gambleRecord(),interaction=interactionRecord();return {v:1,baseline:true,entries:Object.assign({},record.entries,gamble.entries,interaction.entries)};}
-    function taskRule(def) { return TASK_KEYS.indexOf(def.key) >= 0; }
+    function playerRatioRule(def){return /^cx_ratio_(winrate|killper)_/.test(def.key);}
+    // Only these families depend entirely on the accepted personal match history.
+    function playerComboRule(def){return /^cx_combo_(wins_games|wins_kills|wins_chars|games_kills|games_chars|kills_chars)_\d+$/.test(def.key);}
+    function playerRule(def){return def.cat==="胜负"||playerRatioRule(def)||playerComboRule(def);}
+    function playerDefs(){return engine().defs.filter(playerRule);}
+    function personalStats(state, oldNames){
+        var stats={wrGames:0,wrWin:0,wrLose:0,wrKill:0,wrChars:0,wrModes:0},names=new Set(oldNames||[]);
+        if(state){["identity","versus","doudizhu","guozhan"].forEach(function(mode){var m=state.modes[mode];if(m){stats.wrGames+=m.games;stats.wrWin+=m.win;stats.wrLose+=m.lose;stats.wrKill+=m.kill;if(m.games>0)stats.wrModes++;}});state.chars.forEach(function(id){names.add(id);});}
+        stats.wrChars=names.size;return stats;
+    }
+    function historicalPersonalNames(){
+        var d=lib.config["extension_池子魔将_winrateData"],chars=d&&d.me&&d.me.chars;
+        if(!chars||typeof chars!=="object"||Array.isArray(chars))return [];
+        return Object.keys(chars).filter(function(id){return chars[id]&&Number.isSafeInteger(chars[id].games)&&chars[id].games>0;});
+    }
+    /* Only source receipts can date earlier matches. Character appearance history
+       proves a lower bound of used names, never a number of matches or its date. */
+    function playerRecord(value){
+        var W=bank(),state=value?W.validatePlayerMatches(value.playerMatches):W.playerMatches(),global=value?W.validateCareerUnlocks(value.careerUnlocks):W.wallet.careerUnlocks(),defs=playerDefs(),record={v:1,baseline:true,entries:{}},oldNames=historicalPersonalNames();
+        defs.forEach(function(def){if(global&&global.entries[def.key])record.entries[def.key]={observedAt:global.entries[def.key].observedAt};});
+        var oldStats=personalStats(null,oldNames);defs.forEach(function(def){if(!record.entries[def.key]&&met(def,oldStats))record.entries[def.key]={observedAt:0};});
+        if(!state)return record;
+        var actual=personalStats(state,oldNames),missing=defs.filter(function(def){return !record.entries[def.key]&&(playerRatioRule(def)||met(def,actual));});
+        if(!missing.length)return record;
+        var replay={modes:{},chars:[]},names=new Set(oldNames);
+        state.receipts.slice().sort(function(a,b){return a.t-b.t;}).some(function(receipt){
+            var input=JSON.parse(receipt.payload),m=replay.modes[input.mode]||(replay.modes[input.mode]={games:0,win:0,lose:0,kill:0});m.games++;m[input.win?"win":"lose"]++;m.kill+=input.kills;input.chars.forEach(function(id){names.add(id);});replay.chars=Array.from(names);
+            var stats=personalStats(replay);missing=missing.filter(function(def){if(!met(def,stats))return true;record.entries[def.key]={observedAt:input.observedAt};return false;});return !missing.length;
+        });
+        // A future compacted source can prove eligibility without retaining a first date.
+        missing.forEach(function(def){if(met(def,actual))record.entries[def.key]={observedAt:0};});
+        return W.validateCareerUnlocks(record);
+    }
+    function preparePlayerMatch(value,before,observedAt){
+        if(!enabled())throw Error("个人生涯采集当前不可用");
+        resetIfNeeded();
+        if(!Number.isSafeInteger(observedAt)||observedAt<0)throw Error("个人生涯日期无效");
+        var state=bank().validatePlayerMatches(value.playerMatches);if(!state)throw Error("个人对局来源未就绪");
+        var record=playerRecord(before),stats=personalStats(state,historicalPersonalNames()),fresh=[];
+        playerDefs().forEach(function(def){if(record.entries[def.key]||!met(def,stats))return;record.entries[def.key]={observedAt:observedAt};if(observedAt>0)fresh.push(def.key);});
+        return {record:bank().validateCareerUnlocks(record),fresh:fresh,epoch:epoch()};
+    }
+    function worldHandsRule(def){return /^(hands|cx_hands|tablefriends|oldfriend|revengefriend|balancedfriend|poorai)_\d+$/.test(def.key) || /^skilltop_(?:1|0\.(?:7|8|85|9|95|98|99))$/.test(def.key);}
+    function worldHandsDefs(){return engine().defs.filter(worldHandsRule);}
+    function worldHandsRecord(){
+        var G=lib.cshWorld;
+        if(!G||typeof G.worldCareerSaved!=="function")return {v:1,baseline:true,entries:{}};
+        var data=G.worldCareerSaved(),record=bank().validateCareerUnlocks(data.careerUnlocks)||{v:1,baseline:true,entries:{}};
+        worldHandsDefs().forEach(function(def){if(!record.entries[def.key]&&met(def,data))record.entries[def.key]={observedAt:0};});
+        return record;
+    }
+    function prepareWorldHands(value,observedAt){
+        if(!enabled())return null;
+        resetIfNeeded();
+        if(!Number.isSafeInteger(observedAt)||observedAt<0)throw Error("世界亲历日期无效");
+        var record=worldHandsRecord(),data=lib.cshWorld.worldCareerSnapshot(value),candidate=bank().validateCareerUnlocks(data.careerUnlocks),fresh=[];
+        // A table can also settle a gamble: retain both qualifications in the same source write.
+        if(candidate)Object.keys(candidate.entries).forEach(function(key){record.entries[key]=candidate.entries[key];});
+        worldHandsDefs().forEach(function(def){if(record.entries[def.key]||!met(def,data))return;record.entries[def.key]={observedAt:observedAt};if(observedAt>0)fresh.push(def.key);});
+        return {record:bank().validateCareerUnlocks(record),fresh:fresh,epoch:epoch()};
+    }
+    function worldHandsCommitted(value,prepared){
+        if(!prepared||prepared.epoch!==epoch()||!enabled())return;
+        var existing=bank().wallet.careerUnlocks();
+        prepared.fresh.filter(function(key){return !existing||!existing.entries[key];}).forEach(function(key){pending[key]={stamp:prepared.record.entries[key].observedAt,kind:"worldHands",key:key,acceptedEpoch:epoch()};});
+        var stamp=epoch();Promise.resolve().then(function(){if(stamp!==epoch()||!enabled())return;if(start())bank().flushSave();});
+    }
+    function sourceRecord(){var record=rankRecord(),gamble=gambleRecord(),interaction=interactionRecord(),player=playerRecord(),worldHands=worldHandsRecord();return {v:1,baseline:true,entries:Object.assign({},record.entries,gamble.entries,interaction.entries,player.entries,worldHands.entries)};}
+
+    function taskRule(def) { return TASK_KEYS.indexOf(def.key) >= 0 || /^cx_task_\d+$/.test(def.key); }
 
     function bank() { return lib.cshWallet; }
     function epoch() { return bank().saveEpoch(); }
@@ -124,9 +195,11 @@ import { careerSnapshot as projectBossCareer } from "./csh_bossrecord.js";
         }
         return readyEpoch === current;
     }
+    // These families use only the candidate wallet checkpoint and its chain witness.
+    function walletComboRule(def){return /^cx_combo_(rich_peak|rich_sign|peak_sign)_\d+$/.test(def.key);}
     function walletDefs() {
         if (!definitions) definitions = engine().defs.filter(function (d) {
-            return bossRule(d) || taskRule(d) || d.cat === "资产" || d.cat === "签到" ||
+            return bossRule(d) || taskRule(d) || walletComboRule(d) || d.cat === "资产" || d.cat === "签到" ||
                 ["egg_signed_first", "egg_hungry", "egg_rich_first"].indexOf(d.key) >= 0;
         });
         return definitions;
@@ -182,7 +255,7 @@ import { careerSnapshot as projectBossCareer } from "./csh_bossrecord.js";
             if (stats.careerStatsReliable !== true || epoch() !== stamp || !enabled()) return false;
             // Opening a game at night does not satisfy "open the career hall".
             stats.nightOwl = false;
-            var keys = A.evalAll(stats).filter(function (r) { return r.conditionMet; })
+            var keys = A.evalAll(stats).filter(function (r) { return r.conditionMet&&!playerRule(r)&&!worldHandsRule(r); })
                 .map(function (r) { return r.key; });
             if (!historicalTaskReliable) {
                 var recovered = snapshot(durable);
@@ -223,6 +296,7 @@ import { careerSnapshot as projectBossCareer } from "./csh_bossrecord.js";
     function witnessed(value, item) {
         if(item.kind==="boss")return item.acceptedEpoch===epoch();
         if(item.kind==="interaction"){var prop=interactionRecord().entries[item.key];return item.acceptedEpoch===epoch()&&prop&&prop.observedAt===item.stamp;}
+        if(item.kind==="worldHands"){var source=worldHandsRecord().entries[item.key];return item.acceptedEpoch===epoch()&&source&&source.observedAt===item.stamp;}
         if(item.kind==="gamble"){var source=gambleRecord().entries[item.key];return item.acceptedEpoch===epoch()&&source&&source.observedAt===item.stamp;}
         if(item.kind==="rank"){var actual=rankRecord().entries[item.key];return item.acceptedEpoch===epoch()&&actual&&actual.observedAt===item.stamp;}
         var chain = value.chain || [];
@@ -287,6 +361,6 @@ import { careerSnapshot as projectBossCareer } from "./csh_bossrecord.js";
         if (!start() || !bank().flushSave()) return false;
         return Object.keys(pending).length === 0;
     }
-    lib.cshCareerObserver = { start: start, stageWallet: stageWallet, prepareWallet: prepareWallet, prepareRank: prepareRank, rankCommitted: rankCommitted, prepareGamble:prepareGamble,gambleCommitted:gambleCommitted, prepareInteraction:prepareInteraction,interactionCommitted:interactionCommitted, committed: committed, adopted: adopted, flushForSnapshot: flushForSnapshot };
+    lib.cshCareerObserver = { start: start, stageWallet: stageWallet, prepareWallet: prepareWallet, preparePlayerMatch:preparePlayerMatch, prepareWorldHands:prepareWorldHands,worldHandsCommitted:worldHandsCommitted, prepareRank: prepareRank, rankCommitted: rankCommitted, prepareGamble:prepareGamble,gambleCommitted:gambleCommitted, prepareInteraction:prepareInteraction,interactionCommitted:interactionCommitted, committed: committed, adopted: adopted, flushForSnapshot: flushForSnapshot };
     adopted();
 })();

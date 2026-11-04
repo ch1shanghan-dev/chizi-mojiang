@@ -83,6 +83,8 @@ body{background:
 .inv{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:4px 14px}
 .iv{display:flex;align-items:baseline;gap:8px;padding:3px 0;border-bottom:1px dashed rgba(216,189,122,.10);min-width:0}
 .iv:last-child{border-bottom:0}
+.iv[data-domain="winrate"]{flex-wrap:wrap}
+.iv[data-domain="winrate"] .iv-x{flex:1 0 100%;white-space:normal;overflow:visible;text-overflow:clip}
 .iv-k{flex:0 0 74px;font-size:var(--pfs-sm);color:var(--ink-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .iv-v{flex:0 0 auto;font-family:var(--ff-num);font-variant-numeric:tabular-nums;font-size:var(--pfs-md);color:var(--ink)}
 .iv-x{flex:1 1 auto;min-width:0;font-size:var(--pfs-cap);color:var(--ink-faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -306,7 +308,7 @@ var T = {
     ledger: "账本", walletHist: "兑换台账", walletSnap: "余额快照",
     texasBest: "德州纪录", bjBest: "廿一点纪录", sniperBest: "神弩手纪录",
     auxSpirit: "妖灵乱入", challengeProfile: "挑战难度", texasRake: "德州场供",
-    names: "各处留名", panelSkin: "面板皮肤", bgmVolume: "音乐音量", bgmOn: "音乐开关",
+    names: "各处留名", panelSkin: "面板皮肤", spiritSkins: "妖灵装扮", bgmVolume: "音乐音量", bgmOn: "音乐开关",
     sfxVolume: "音效音量", texasSet: "德州设置", bjSet: "廿一点设置",
     /* ★ 「调试」二字不能出现在成品页（门禁 E28 会拦）—— 这一项是面板里存下的预设，
        对玩家只叫「面板预设」就够，不必交代它从哪来。 */
@@ -317,6 +319,7 @@ var T = {
   unitPen: "笔", unitEntry: "条", unitGame: "局", unitMatch: "场",
   wordYes: "有", wordNone: "—",
   fmtPeak: "峰值 {v}", fmtStreak: "连签 {v}",
+  fmtNewMatches: "新记录 {v} 场", matchUnknown: "历史场次未完整记录", matchPartial: "自新记录起累计，旧战绩保留", wordUnknown: "未知",
   fmtWinLose: "胜 {w} · 负 {l}", fmtMinion: "妖灵 {v}", fmtExt: "外传 {v}",
   fmtSum: "合计 {v}", fmtFull: "满档 {v}", fmtCost: "成本 {v}",
   fmtGained: "累计 {v}",
@@ -395,6 +398,7 @@ function big(n) {
   if (n >= 10000) return (n / 10000).toFixed(2) + " 万";
   return fmt(n);
 }
+var fileGeneration = 0;
 var STATE = { exportCode: null, inv: [], excluded: [], version: 0, pending: null, backups: [], ready: false,
   busy: false, recovery: false, hostBusy: false, disposed: false, loadSeq: 0, poll: null };
 function currentCode() { var ta = el("code"); return ta ? String(ta.value || "").trim() : ""; }
@@ -422,6 +426,7 @@ function syncControls() {
 function beginAction(recovering) {
   if (STATE.disposed || STATE.busy || STATE.hostBusy) return false;
   if (STATE.recovery && !recovering) { setMsg(T.msgRecoveryFirst, "warn"); return false; }
+  fileGeneration++; STATE.copySeq=(STATE.copySeq||0)+1;
   STATE.busy = true; syncControls(); return true;
 }
 function endAction() { STATE.busy = false; syncControls(); }
@@ -501,7 +506,7 @@ function valueOf(it) {
   switch (it.key) {
     case "wallet": return { v: big(n) + " " + T.uPc, d: (x.peak ? tt("fmtPeak", { v: big(x.peak) }) : "") + (x.streak ? " · " + tt("fmtStreak", { v: x.streak }) : "") };
     case "rank": return { v: big(n) + " " + T.uMerit, d: (x.rank != null ? "官阶 " + x.rank : "") };
-    case "winrate": return { v: n + " " + T.unitMatch, d: tt("fmtWinLose", { w: x.win || 0, l: x.lose || 0 }) };
+    case "winrate": return x.known===false||n==null ? {v:T.wordUnknown,d:T.matchUnknown} : { v:tt("fmtNewMatches",{v:n}), d:tt("fmtWinLose",{w:x.win,l:x.lose})+" · "+T.matchPartial };
     case "world": return { v: n + " " + T.unitN, d: "" };
     case "bossKill": return { v: n + " " + T.unitG, d: tt("fmtMinion", { v: x.minions || 0 }) + ((x.ext || 0) > 0 ? " · " + tt("fmtExt", { v: x.ext }) : "") };
     case "bossAsBoss": return { v: n + " " + T.unitGame, d: tt("fmtWinLose", { w: x.win || 0, l: x.lose || 0 }) };
@@ -525,7 +530,7 @@ function renderInv() {
   if (!box) return;
   if (!STATE.inv.length) { box.innerHTML = '<div class="iv"><span class="iv-k">' + esc(T.wordNone) + '</span></div>'; return; }
   var primary={winrate:1,bossKill:1,bossAsBoss:1,affection:1,goldfish:1,world:1,poolAchv:1,achv:1},core=[],extra=[];
-  function row(it){var lab=(T.d&&T.d[it.key])?T.d[it.key]:it.key,got=valueOf(it);return '<div class="iv" data-domain="'+esc(it.key)+'" data-has="'+(it.has?'1':'0')+'"><span class="iv-k">'+esc(lab)+'</span><span class="iv-v">'+(it.has?esc(got.v):T.wordNone)+'</span><span class="iv-x">'+(it.has?esc(got.d||''):'')+'</span></div>';}
+  function row(it){var lab=(T.d&&T.d[it.key])?T.d[it.key]:it.key,got=valueOf(it);return '<div class="iv" data-domain="'+esc(it.key)+'" data-has="'+(it.has?'1':'0')+'"><span class="iv-k">'+esc(lab)+'</span><span class="iv-v">'+(it.has||it.key==="winrate"?esc(got.v):T.wordNone)+'</span><span class="iv-x">'+(it.has||it.key==="winrate"?esc(got.d||''):'')+'</span></div>';}
   STATE.inv.forEach(function(it){(primary[it.key]?core:extra).push(row(it));});
   box.innerHTML='<div class="inv-core">'+core.join('')+'</div><details class="inv-extra"><summary>设置与历史明细 · '+extra.length+' 类（导出均包含）</summary>'+extra.join('')+'</details>';
 
@@ -554,7 +559,7 @@ function renderEdge() {
 }
 
 /* ---------- 差异渲染（只画"变了的"行；没变的不出现） ---------- */
-function renderDiff(d){var box=el('diff');if(!box)return;var rows='',map=[['pc','dkPc'],['rank','dkRank'],['merit','dkMerit'],['matches','dkMatch'],['kills','dkKill'],['girls','dkGirls']];map.forEach(function(pair){var v=d&&d[pair[0]];if(!v||v.from===v.to)return;rows+='<div class="diffrow"><span class="dk">'+esc(T[pair[1]])+'</span><span class="dv">'+esc(big(v.from))+' → '+esc(big(v.to))+'</span></div>';});
+function renderDiff(d){var box=el('diff');if(!box)return;var rows='',map=[['pc','dkPc'],['rank','dkRank'],['merit','dkMerit'],['matches','dkMatch'],['kills','dkKill'],['girls','dkGirls']];map.forEach(function(pair){var v=d&&d[pair[0]];if(!v||v.from===v.to)return;rows+='<div class="diffrow"><span class="dk">'+esc(T[pair[1]])+'</span><span class="dv">'+esc(v.from==null?T.wordUnknown:big(v.from))+' → '+esc(v.to==null?T.wordUnknown:big(v.to))+'</span></div>';});
  var domains=d&&d.domains||[],changed=domains.filter(function(x){return x.changed;}),kept=domains.filter(function(x){return x.action==='keep';});changed.forEach(function(x){var label=T.d[x.key]||x.key;rows+='<div class="diffrow"><span class="dk">'+esc(label)+'</span><span class="dv">'+(x.mayDecrease?'含回退或移除，请核对 · ':'')+(x.action==='merge'?'合并记录':'覆盖内容（数量相同也可能不同）')+'</span></div>';});
  if(kept.length)rows+='<details><summary>保留本机 · '+kept.length+' 类未包含数据</summary><p>'+kept.map(function(x){return esc(T.d[x.key]||x.key);}).join('、')+'</p></details>';box.className='diff on';box.innerHTML=rows||'<div class="note">所列数据未发现变化，仍请核对文件日期和来源。</div>';
 }
@@ -627,31 +632,22 @@ function doDownload() {
   if (url) setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
 }
 function doCopy() {
-  if (STATE.busy) return;
-  var ta = el("code");
-  if (!ta || !ta.value) { setMsg(T.msgEmpty, "warn"); return; }
-  var txt = ta.value;
-  var done = function () { if (!STATE.disposed && currentCode() === txt.trim() && !STATE.busy) setMsg(T.msgCopied, "ok"); };
-  var fail = function () { if (!STATE.disposed && currentCode() === txt.trim() && !STATE.busy) { var restore=el("journal-import");if(restore)restore.open=true;ta.focus(); ta.select(); setMsg(T.msgCopyFail, "warn"); } };
-  try {
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(txt).then(done, function () { legacyCopy(txt, done, fail); });
-      return;
-    }
-  } catch (e) {}
-  legacyCopy(txt, done, fail);
+  if(STATE.disposed||STATE.busy)return;
+  var ta=el("code");if(!ta||!ta.value){setMsg(T.msgEmpty,"warn");return;}
+  var txt=ta.value,seq=STATE.copySeq=(STATE.copySeq||0)+1,opener=document.activeElement;
+  function current(){return !STATE.disposed&&seq===STATE.copySeq&&currentCode()===txt.trim()&&!STATE.busy;}
+  function done(){if(!current())return;setMsg(T.msgCopied,"ok");if(opener&&opener.isConnected)opener.focus({preventScroll:true});}
+  function fail(){if(!current())return;var section=el("journal-import");if(section)section.open=true;ta.focus();ta.select();setMsg(T.msgCopyFail,"warn");}
+  function fallback(){if(current())legacyCopy(txt,done,fail);}
+  try{if(navigator.clipboard&&navigator.clipboard.writeText){Promise.resolve(navigator.clipboard.writeText(txt)).then(done,fallback);return;}}catch(e){}
+  fallback();
 }
-function legacyCopy(txt, done, fail) {
-  try {
-    var ta = document.createElement("textarea");
-    ta.value = txt;
-    ta.style.position = "fixed"; ta.style.left = "-9999px"; ta.style.top = "0";
-    document.body.appendChild(ta);
-    ta.focus(); ta.select();
-    var ok = document.execCommand("copy");
-    document.body.removeChild(ta);
-    ok ? done() : fail();
-  } catch (e) { fail(); }
+function legacyCopy(txt,done,fail) {
+  var ta=null,previous=document.activeElement,ok=false;
+  try{ta=document.createElement("textarea");ta.value=txt;ta.style.position="fixed";ta.style.left="-9999px";ta.style.top="0";document.body.appendChild(ta);ta.focus();ta.select();ok=document.execCommand("copy");}
+  catch(e){ok=false;}
+  finally{if(ta&&ta.parentNode)ta.parentNode.removeChild(ta);if(document.activeElement===document.body&&previous&&previous.isConnected)previous.focus({preventScroll:true});}
+  if(ok)done();else fail();
 }
 /* 验一验：只读解析 + 差异预览。hint 传值时用它替代成功文案
    （给「倒进来」那条"没验过就先验"的路径用，见 doUnpack）。 */
@@ -738,12 +734,13 @@ function loadBackups(seq) {
     if (ok && Array.isArray(list)) renderBackups(list); else setMsg(T.msgReadFail, "warn");
   });
 }
-function loadAll() {
-  var seq = ++STATE.loadSeq;
+function loadAll(onLoaded) {
+  var seq = ++STATE.loadSeq, received = false;
   call("shell-mig-inventory", null, function (ok, d) {
-    if (seq !== STATE.loadSeq) return;
+    if (seq !== STATE.loadSeq || received) return;
+    received = true;
     if (ok && d) {
-      STATE.inv = d.list || [];var result=d.results,box=el('pending-results');if(box){box.hidden=!(result&&(result.count||result.error));var note=result?(result.error?'待保存结果处理遇到问题，请检查存储后重试。':'有 '+result.count+' 项结果待保存，存储恢复后会自动补记。'):'';if(result&&result.volatile)note+=' 部分结果尚未写入本机，请保持页面打开，恢复存储后重试。';el('pending-note').textContent=note;var diagnostic=el('pending-details');diagnostic.hidden=!(result&&result.error);if(diagnostic.hidden)diagnostic.open=false;el('pending-error').textContent=result&&result.error?String(result.error):'';}
+      STATE.inv = d.list || [];var result=d.results,box=el('pending-results');if(box){box.hidden=!(result&&(result.count||result.error||result.volatile));var note=result?(result.error?'待保存结果处理遇到问题，请检查存储后重试。':(result.count?'有 '+result.count+' 项结果待保存，存储恢复后会自动补记。':'仍有结果尚未完成保存。')):'';if(result&&result.volatile)note+=' 部分结果尚未写入本机，请保持页面打开，恢复存储后重试。';el('pending-note').textContent=note;var diagnostic=el('pending-details');diagnostic.hidden=!(result&&result.error);if(diagnostic.hidden)diagnostic.open=false;el('pending-error').textContent=result&&result.error?String(result.error):'';}
       STATE.excluded = d.excluded || [];
       STATE.version = d.version || 0;
       STATE.ready = true;
@@ -761,9 +758,43 @@ function loadAll() {
       setMsg(T.msgReadFail, "warn");
     }
     syncControls();
+    if (typeof onLoaded === "function") onLoaded(!!ok && !!d, d);
   });
   call("shell-stats", null, function (ok, s) { if (seq !== STATE.loadSeq) return; if (ok && s) renderAssets(s); });
   loadBackups(seq);
+}
+
+function retryPendingResults() {
+  if (!beginAction()) return;
+  STATE.loadSeq++;
+  if (STATE.poll) { clearTimeout(STATE.poll); STATE.poll = null; }
+  setMsg("正在重试保存，请稍候…");
+  var received = false;
+  call("shell-results-retry", null, function (ok, result) {
+    if (received || STATE.disposed) return;
+    received = true;
+    if (!ok || !result) { endAction(); setMsg("暂未确认保存结果，请检查存储后重试。", "warn"); return; }
+    loadAll(function (readOK, inventory) {
+      if (STATE.disposed) return;
+      endAction();
+      var status = inventory && inventory.results;
+      if (!readOK || !status || !Number.isSafeInteger(status.count) || status.count < 0) {
+        setMsg("保存状态暂未读取成功，请重新读取后确认。", "warn"); return;
+      }
+      if (STATE.hostBusy || STATE.recovery) { setMsg(STATE.hostBusy ? T.msgHostBusy : T.msgRecoveryNeeded, "warn"); return; }
+      if (status.error || status.volatile || status.count) setMsg("仍有结果待保存，请保留当前页面，恢复存储后重试。", "warn");
+      else setMsg("待保存结果已全部保存。", "ok");
+    });
+  });
+}
+
+async function readSaveFile(file) {
+  var chosen=file.files&&file.files[0],generation=++fileGeneration;STATE.copySeq=(STATE.copySeq||0)+1;file.value='';
+  function current(){return generation===fileGeneration&&!STATE.disposed&&!STATE.busy&&!STATE.recovery&&!STATE.hostBusy;}
+  if(!chosen||!current())return;
+  if(chosen.size>5*1024*1024){setMsg('存档文件超过5MB，请确认选择正确。','warn');return;}
+  try{var text=await chosen.text();if(!current())return;if(typeof text!=="string")throw Error('format');el('code').value=text.trim();STATE.pending=null;hideDiff();syncControls();doCheck();}
+  catch(e){if(current())setMsg('文件未能读取，请重新选择。','warn');}
 }
 
 /* ---------- boot ---------- */
@@ -788,12 +819,12 @@ function loadAll() {
       n.addEventListener("click", function () { fn(); }, false);
     })(bind[i][1]);
   }
-  var file=el('save-file'),open=el('b-file'),fileGeneration=0;if(open&&file){open.addEventListener('click',function(){if(!STATE.busy&&!STATE.recovery&&!STATE.hostBusy)file.click();});file.addEventListener('change',async function(){var chosen=file.files&&file.files[0],generation=++fileGeneration;file.value='';if(!chosen)return;if(chosen.size>5*1024*1024){setMsg('存档文件超过5MB，请确认选择正确。','warn');return;}try{var text=await chosen.text();if(generation!==fileGeneration||STATE.disposed||STATE.busy||STATE.recovery||STATE.hostBusy)return;el('code').value=text.trim();STATE.pending=null;hideDiff();syncControls();doCheck();}catch(e){setMsg('文件未能读取，请重新选择。','warn');}});}
- var retry=el('pending-retry');if(retry)retry.addEventListener('click',function(){call('shell-results-retry',null,function(){loadAll();});});
+  var file=el('save-file'),open=el('b-file');if(open&&file){open.addEventListener('click',function(){if(!STATE.busy&&!STATE.recovery&&!STATE.hostBusy)file.click();});file.addEventListener('change',function(){readSaveFile(file);});}
+ var retry=el('pending-retry');if(retry)retry.addEventListener('click',retryPendingResults);
  /* 手动改框内内容 → 之前的"验过"作废（防止"看着是新的、装的是旧的"） */
   var ta = el("code");
   if (ta) ta.addEventListener("input", function () {
-    fileGeneration++;STATE.pending = null;
+    fileGeneration++;STATE.copySeq=(STATE.copySeq||0)+1;STATE.pending = null;
     hideDiff();
     syncControls();
   }, false);

@@ -1174,6 +1174,8 @@ export function snapshot() {
 			list.push({
 				id: id, name: m.name, img: m.img, face: m.face,
 				price: Math.round(price), trend: Math.round(trend), dev: Math.round(chg * 1000) / 10,
+				/* Read-only quote inputs: keep display rounding out of the trade estimate. */
+				quote: { unitPrice: (typeof s.prices[id] === "number" && s.prices[id] > 0) ? s.prices[id] : BASE_PRICE, feeRate: feeOf(id) },
 				hold: hold, cost: Math.round(cost), heat: Math.round(heatOf(id) * 1000) / 10,
 				girl: GIRLS[id] || null,
 				/* v6.3 好感度：给页面一份"她的关系正在替你赚钱"的明细 */

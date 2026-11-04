@@ -132,6 +132,155 @@ import GEN_LINES from "./csh_interact_lines_gen.js";
 	};
 	// 各触发器基础概率。整体克制：8 人局 normal 档下平均每轮约 1-2 次。
 	var BASE = { start: 0.12, damage: 0.18, recover: 0.25, allyDie: 0.2 };
+	/* 玩家批量互动：仍是原生免费道具；每个成功投掷沿用原计数和恢复收据。 */
+	var PROP_NAMES={flower:"鲜花",wine:"酒",egg:"鸡蛋",shoe:"拖鞋"};
+	var manualBatch=null,manualLast=null,manualWait=null,manualSerial=0,propPicker=null,propIntroHooked=false;
+	function manualSaveEpoch(){try{return lib.cshWallet&&typeof lib.cshWallet.saveEpoch==='function'?lib.cshWallet.saveEpoch():null;}catch(e){return NaN;}}
+	function propPublicName(to){
+		try{if(to&&typeof to.isUnseen==='function'&&to.isUnseen(2))return '这位牌友';}catch(e){return '这位牌友';}
+		return String(tr(to)||'这位牌友').replace(/<[^>]*>/g,'').slice(0,80);
+	}
+	function manualAllowed(from,to){
+		if(from&&from.storage&&from.storage.zhuSkill_shanli)return false;
+		return !!(_status.gameStarted&&!_status.over&&!_status.video&&!_status.connectMode&&!game.online&&!game.observe&&from===game.me&&usable(from)&&isAI(to)&&from.isConnected!==false&&to.isConnected!==false&&game.players&&game.players.indexOf(from)>=0&&game.players.indexOf(to)>=0);
+	}
+	function releaseManualWait(){
+		if(!manualWait)return;
+		clearTimeout(manualWait.timer);manualWait=null;_status.throwEmotionWait=false;
+		if(ui.throwEmotion)ui.throwEmotion.forEach(function(n){n.classList.remove('exclude');});
+	}
+    var manualReplyAt=0,manualReplyJob=null;
+    var PLAYER_PROP_REPLY={
+      flower:{base:['花收到了，多谢。','这份心意收下了。'],aggro:['花我收下，打牌可不让你。'],tight:['多谢，慢慢打。'],bluff:['送花也套不出我的底牌。'],math:['收到一份好意，记住了。'],wild:['好花！这桌更热闹了。']},
+      wine:{base:['谢这杯酒，先敬你。','举杯，牌局继续。'],aggro:['干了，下一手接着来！'],tight:['浅酌一口，稳着打。'],bluff:['酒可以喝，底牌得藏好。'],math:['酒收下了，判断还得清醒。'],wild:['来，隔桌碰一个！']},
+      egg:{base:['接到了，咱们牌上见。','先擦擦，牌还没打完呢。'],aggro:['这一下收到了，牌上见！'],tight:['不急，先把这一手打好。'],bluff:['动静够大，吓不走我。'],math:['蛋壳不会改变我的判断。'],wild:['好家伙，这桌真热闹！']},
+      shoe:{base:['鞋收到了，牌局继续。','先收好，别耽误出牌。'],aggro:['这一鞋记住了，继续打！'],tight:['不跟鞋计较，先看牌。'],bluff:['鞋都出手了，牌还藏着呢？'],math:['落点不错，牌局照旧。'],wild:['鞋到了，人别跑，接着玩！']}
+    };
+    function replyToManualBatch(job){
+      if(!isEnabled()||cfg(KEY.chat,true)===false||!manualAllowed(job.from,job.to)||Date.now()-manualReplyAt<6000)return;
+      var bank=PLAYER_PROP_REPLY[job.kind],lines=bank&&(bank[personaOf(job.to)]||bank.base),line=pickLine(lines);
+      if(!line)return;manualReplyAt=Date.now();manualReplyJob=job;
+      queueScene(function(){if(manualReplyJob!==job)return;manualReplyJob=null;if(job.saveEpoch===manualSaveEpoch()&&manualAllowed(job.from,job.to)){try{job.to.chat(line);}catch(e){logError('玩家互动回应',e);}}},650,job.to,job.from,true);
+    }
+	function propStatus(){var b=manualBatch||manualLast;return b?{busy:!!manualBatch,kind:b.kind,requested:b.quantity,sent:b.sent,reason:b.reason||""}:{busy:false,requested:0,sent:0};}
+	function ensurePropStyle(){
+		if(document.getElementById('csh-prop-style'))return;
+		var style=document.createElement('style');style.id='csh-prop-style';style.textContent=`
+#csh-prop-picker,#csh-prop-progress{box-sizing:border-box;font:var(--csh-lfs-lg,14px)/1.5 "Microsoft YaHei",sans-serif;color:#eee6d5}
+#csh-prop-picker *{box-sizing:border-box;position:static;left:auto;right:auto;top:auto;bottom:auto}
+#csh-prop-progress span,#csh-prop-progress button{position:static}
+#csh-prop-picker{position:fixed;inset:0;z-index:${lib.cshUI&&lib.cshUI.Z?lib.cshUI.Z.modal:2147483040};display:flex;align-items:center;justify-content:center;padding:10px;background:rgba(0,0,0,.65)}
+#csh-prop-picker .prop-card{width:min(720px,100%);max-height:100%;display:flex;flex-direction:column;gap:14px;padding:20px;background:linear-gradient(135deg,#24241e,#131b1b);border:1px solid #89744d;border-radius:12px;box-shadow:0 16px 50px #0008;overflow:hidden}
+#csh-prop-picker h3{margin:0;font-size:var(--csh-lfs-xl3,18px);line-height:1.4;color:#e3ca93;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#csh-prop-picker .prop-body{display:grid;grid-template-columns:1fr 1fr;gap:20px;min-height:0;overflow:auto}
+#csh-prop-picker .prop-types{display:grid;grid-template-columns:1fr 1fr;gap:8px;align-content:start}
+#csh-prop-picker button,#csh-prop-progress button,.csh-prop-entry{font:inherit;min-height:44px;min-width:44px;cursor:pointer;border:1px solid #776c52;border-radius:7px;background:#263230;color:#eee6d5;padding:8px 12px;touch-action:manipulation}
+#csh-prop-picker button[aria-pressed=true]{background:#4a4931;border-color:#d9bd7d;color:#fff0bd}
+#csh-prop-picker button:focus-visible,#csh-prop-progress button:focus-visible{outline:2px solid #f2d27e;outline-offset:2px}
+#csh-prop-picker button:disabled{opacity:.45;cursor:default}
+#csh-prop-picker .prop-quantity{display:flex;gap:8px}
+#csh-prop-picker .prop-quantity button{flex:1;padding:6px}
+#csh-prop-picker .prop-note{font-size:var(--csh-lfs-sm,12px);color:#c6c9bc;margin:8px 0 0}
+#csh-prop-picker .prop-reduce{display:flex;align-items:center;gap:8px;min-height:44px;font-size:var(--csh-lfs-sm,12px);cursor:pointer}
+#csh-prop-picker input{width:20px;height:20px;accent-color:#d9bd7d}
+#csh-prop-picker .prop-footer{display:flex;gap:10px;align-items:center;flex-shrink:0}
+#csh-prop-picker .prop-summary{flex:1;min-width:0;font-size:var(--csh-lfs-sm,12px);line-height:1.5}
+#csh-prop-picker .prop-confirm{background:#d3b77a;color:#211b10;border-color:#d3b77a}
+#csh-prop-picker .prop-rotate{display:none;font-size:var(--csh-lfs-lg,14px)}
+#csh-prop-progress{position:fixed;top:8px;left:50%;transform:translateX(-50%);z-index:${lib.cshUI&&lib.cshUI.Z?lib.cshUI.Z.panel:2147483000};max-width:calc(100% - 24px);display:flex;align-items:center;gap:10px;padding:0 0 0 12px;border:1px solid #89744d;border-radius:8px;background:#182321ed;pointer-events:none;box-shadow:0 4px 20px #0004}
+#csh-prop-progress span{font-size:var(--csh-lfs-sm,12px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#csh-prop-progress button{pointer-events:auto;flex-shrink:0;font-size:var(--csh-lfs-sm,12px)}
+.csh-prop-entry{display:block;width:100%;font-size:var(--csh-lfs-lg,14px);background:#263230;color:#eee6d5}
+@media(orientation:landscape) and (max-height:330px){#csh-prop-picker .prop-card{padding:12px;gap:8px}#csh-prop-picker h3{font-size:var(--csh-lfs-xl,16px)}#csh-prop-picker .prop-body{gap:12px}#csh-prop-picker .prop-note{margin-top:4px}}
+@media(orientation:portrait){#csh-prop-picker .prop-body,#csh-prop-picker .prop-summary,#csh-prop-picker .prop-confirm{display:none}#csh-prop-picker .prop-rotate{display:block}}
+`; (document.documentElement||document.body).appendChild(style);
+	}
+	function propProgress(job){
+		if(typeof document==='undefined')return;
+		var node=document.getElementById('csh-prop-progress');
+		if(!node){ensurePropStyle();node=document.createElement('div');node.id='csh-prop-progress';var text=document.createElement('span');text.setAttribute('role','status');node.appendChild(text);var stop=document.createElement('button');stop.type='button';stop.textContent='停止剩余';stop.addEventListener('click',function(e){e.stopPropagation();stopManualBatch('已停止');});node.appendChild(stop);(document.documentElement||document.body).appendChild(node);}
+		node.firstChild.textContent=PROP_NAMES[job.kind]+' · 已送出 '+job.sent+'/'+job.quantity;
+	}
+	function finishManualBatch(job,reason,quiet){
+		if(manualBatch!==job)return;
+		clearTimeout(job.timer);job.reason=reason||'';manualBatch=null;manualLast=job;
+		if(typeof document!=='undefined'){var progress=document.getElementById('csh-prop-progress');if(progress)progress.remove();}
+		var wait=manualWait;
+		if(wait){wait.timer=setTimeout(function(){if(manualWait===wait)releaseManualWait();},job.kind==='flower'||job.kind==='egg'?500:5000);}
+		if(!quiet&&!reason&&job.sent>0)replyToManualBatch(job);
+		if(!quiet){var text=(reason?reason+' · ':'')+'已向'+job.targetName+'送出'+PROP_NAMES[job.kind]+' ×'+job.sent;
+			if(job.recordPending){try{var q=lib.cshWallet&&lib.cshWallet.pending;job.recordPending=!q||!q.status||q.status().count>0;}catch(e){}}
+			if(job.recordPending)text+='，互动记录待保存，请到行囊恢复';toast(text);}
+	}
+	function stopManualBatch(reason,quiet){if(!manualBatch)return {ok:false,reason:'没有正在发送的互动'};var job=manualBatch;finishManualBatch(job,reason||'已停止',quiet);return {ok:true,sent:job.sent,requested:job.quantity};}
+	function stepManualBatch(job){
+		if(manualBatch!==job)return;
+		if(job.players!==game.players||job.epoch!==sceneEpoch||job.saveEpoch!==manualSaveEpoch()||!manualAllowed(job.from,job.to)||saveBlocked()) {finishManualBatch(job,'互动已中止');return;}
+		try{var before=playerThrowTotal();job.from.throwEmotion(job.to,job.kind);job.sent++;if(before<1000000000&&playerThrowTotal()<=before)job.recordPending=true;}
+		catch(e){logError('批量互动中止',e);finishManualBatch(job,'发送未完成');return;}
+		if(manualBatch!==job)return;
+		if(job.sent>=job.quantity){finishManualBatch(job);return;}
+		propProgress(job);
+		/* 原生动画约1.8秒；650ms间隔最多叠三枚，不额外合成声音/弹道。 */
+		job.timer=setTimeout(function(){stepManualBatch(job);},650);
+	}
+	function startManualBatch(to,kind,quantity){
+		if(!Object.prototype.hasOwnProperty.call(PROP_NAMES,kind)||[1,5,10].indexOf(quantity)<0)return {ok:false,reason:'请选择道具和数量'};
+		if(manualBatch||_status.throwEmotionWait)return {ok:false,reason:'请等当前互动结束后再送'};
+		if(!manualAllowed(game.me,to))return {ok:false,reason:'当前对象已不能互动'};
+		if(saveBlocked())return {ok:false,reason:'请先到行囊完成存档恢复'};
+		var epoch=manualSaveEpoch();if(typeof epoch==='number'&&!Number.isFinite(epoch))return {ok:false,reason:'存档状态暂未读取，请稍后重试'};
+		var job={id:++manualSerial,from:game.me,to:to,kind:kind,quantity:quantity,sent:0,players:game.players,epoch:sceneEpoch,saveEpoch:epoch,targetName:propPublicName(to),timer:null,recordPending:false};
+		manualBatch=job;manualWait={timer:null};_status.throwEmotionWait=true;
+		stepManualBatch(job);
+		return job.sent>0?{ok:true,sent:job.sent,requested:quantity}:{ok:false,reason:job.reason||'发送未完成'};
+	}
+	function closePropPicker(restore){
+		if(!propPicker)return;
+		var p=propPicker;propPicker=null;if(lib.cshUI&&lib.cshUI.achievementHold)lib.cshUI.achievementHold('player-prop-picker',false);document.removeEventListener('keydown',p.key,true);p.node.remove();
+		if(restore&&p.focus&&p.focus.isConnected&&p.focus.getClientRects().length)p.focus.focus({preventScroll:true});
+	}
+	function openPropPicker(to){
+		if(!manualAllowed(game.me,to)){toast('当前对象已不能互动');return false;}
+		if(typeof document==='undefined')return false;
+		closePropPicker(false);ensurePropStyle();
+		if(lib.cshUI&&lib.cshUI.achievementHold)lib.cshUI.achievementHold('player-prop-picker',true);
+		var layer=document.createElement('div');layer.id='csh-prop-picker';
+		layer.innerHTML='<section class="prop-card" role="dialog" aria-modal="true" aria-labelledby="csh-prop-title"><h3 id="csh-prop-title"></h3><div class="prop-rotate">请横置屏幕后选择互动</div><div class="prop-body"><div class="prop-types"></div><div><div class="prop-quantity" aria-label="发送数量"></div><label class="prop-reduce"><input type="checkbox">只送一个，减少连续动效</label><p class="prop-note">原生免费互动 · 不消耗池子币<br>逐个送出，可随时停止剩余动作。</p></div></div><footer class="prop-footer"><div class="prop-summary" role="status"></div><button type="button" class="prop-cancel">取消</button><button type="button" class="prop-confirm">送出</button></footer></section>';
+		layer.querySelector('h3').textContent='送给 '+propPublicName(to);
+		var kind='flower',quantity=1,reduce=layer.querySelector('input'),focus=document.activeElement,players=game.players,saveEpoch=manualSaveEpoch(),epoch=sceneEpoch;
+		try{reduce.checked=window.matchMedia('(prefers-reduced-motion: reduce)').matches;}catch(e){}
+		function paint(){layer.querySelectorAll('[data-kind]').forEach(function(n){n.setAttribute('aria-pressed',String(n.dataset.kind===kind));});layer.querySelectorAll('[data-quantity]').forEach(function(n){n.disabled=reduce.checked&&n.dataset.quantity!=='1';n.setAttribute('aria-pressed',String(Number(n.dataset.quantity)===quantity));});layer.querySelector('.prop-summary').textContent=PROP_NAMES[kind]+' ×'+quantity+' · 免费';}
+		Object.keys(PROP_NAMES).forEach(function(k){var b=document.createElement('button');b.type='button';b.dataset.kind=k;b.textContent=({flower:'送花',wine:'敬酒',egg:'砸蛋',shoe:'扔鞋'})[k];b.addEventListener('click',function(){kind=k;paint();});layer.querySelector('.prop-types').appendChild(b);});
+		[1,5,10].forEach(function(n){var b=document.createElement('button');b.type='button';b.dataset.quantity=n;b.textContent=n+' 个';b.addEventListener('click',function(){quantity=n;paint();});layer.querySelector('.prop-quantity').appendChild(b);});
+		reduce.addEventListener('change',function(){if(reduce.checked)quantity=1;paint();});
+		layer.querySelector('.prop-cancel').addEventListener('click',function(){closePropPicker(true);});
+		layer.addEventListener('click',function(e){e.stopPropagation();if(e.target===layer)closePropPicker(true);});
+		layer.querySelector('.prop-confirm').addEventListener('click',function(){
+			if(!propPicker||propPicker.node!==layer)return;
+			if(players!==game.players||epoch!==sceneEpoch||saveEpoch!==manualSaveEpoch()){layer.querySelector('.prop-summary').textContent='牌局或存档已变化，请重新选择';return;}
+			var result=startManualBatch(to,kind,quantity);
+			if(result.ok)closePropPicker(true);else layer.querySelector('.prop-summary').textContent=result.reason;
+		});
+		function key(e){if(!propPicker||propPicker.node!==layer)return;if(e.key==='Escape'){e.preventDefault();e.stopImmediatePropagation();if(!e.repeat)closePropPicker(true);return;}if(e.key==='Tab'){var nodes=Array.prototype.filter.call(layer.querySelectorAll('button:not(:disabled),input'),function(n){return n.getClientRects().length;});var first=nodes[0],last=nodes[nodes.length-1];if(!layer.contains(document.activeElement)||(e.shiftKey&&document.activeElement===first)||(!e.shiftKey&&document.activeElement===last)){e.preventDefault();(e.shiftKey?last:first).focus();}}}
+		propPicker={node:layer,key:key,focus:focus,from:game.me,to:to};document.addEventListener('keydown',key,true);(document.documentElement||document.body).appendChild(layer);paint();
+		var first=Array.prototype.find.call(layer.querySelectorAll('button'),function(n){return n.getClientRects().length;});if(first)first.focus({preventScroll:true});
+		return true;
+	}
+	function manualActorGone(actor){
+        if(manualReplyJob&&(manualReplyJob.from===actor||manualReplyJob.to===actor))manualReplyJob=null;
+        if(manualBatch&&(manualBatch.from===actor||manualBatch.to===actor))stopManualBatch('角色已离场');
+        if(propPicker&&(propPicker.to===actor||propPicker.from===actor))closePropPicker(false);
+    }
+    function manualInvolves(actor){return !!((manualBatch&&(manualBatch.from===actor||manualBatch.to===actor))||(propPicker&&(propPicker.from===actor||propPicker.to===actor))||(manualReplyJob&&(manualReplyJob.from===actor||manualReplyJob.to===actor)));}
+    function clearManualProps(){manualReplyAt=0;manualReplyJob=null;stopManualBatch('互动已中止',true);manualLast=null;releaseManualWait();if(typeof document!=='undefined')closePropPicker(false);}
+	function hookPropIntro(){
+		if(propIntroHooked||typeof get.nodeintro!=='function')return;
+		var original=get.nodeintro;
+		get.nodeintro=function(node){var dialog=original.apply(this,arguments);try{if(dialog&&dialog.content&&manualAllowed(game.me,node)&&!dialog.content.querySelector('.csh-prop-entry')){ensurePropStyle();var button=document.createElement('button');button.type='button';button.className='csh-prop-entry';button.textContent='批量互动 · 免费';button.addEventListener('click',function(e){e.stopPropagation();if(_status.dragged||_status.justdragged)return;if(typeof dialog._close==='function')dialog._close();openPropPicker(node);});dialog.content.appendChild(button);}}catch(e){logError('批量互动入口',e);}return dialog;};
+		propIntroHooked=true;
+	}
+
 	// 表情池，重复项即权重。只保留鲜花、酒杯、鸡蛋、拖鞋四种。
 	var POOL = {
 		ally: ["flower", "flower", "flower", "wine"],
@@ -770,6 +919,7 @@ import GEN_LINES from "./csh_interact_lines_gen.js";
 	var sceneChatEpoch = 0;
 	var sceneTimers = new Set();
 	function clearSceneTasks() {
+		clearManualProps();
 		sceneEpoch++;
 		sceneTimers.forEach(function (timer) { clearTimeout(timer); });
 		sceneTimers.clear();
@@ -1161,6 +1311,7 @@ import GEN_LINES from "./csh_interact_lines_gen.js";
 
 	// ---------- 对外接口 ----------
 	lib.cshInteract = {
+		playerBatch:{open:openPropPicker,send:startManualBatch,stop:stopManualBatch,status:propStatus,involves:manualInvolves,actorGone:manualActorGone},
 		isEnabled: isEnabled,
 		isAI: isAI,
 		relation: relation,
@@ -1479,6 +1630,15 @@ import GEN_LINES from "./csh_interact_lines_gen.js";
 			return false;
 		}
 		hookPlayerThrow();
+		hookPropIntro();
+		if(typeof window!=="undefined"&&!lib.cshInteract._propEvents){lib.cshInteract._propEvents=true;window.addEventListener("pagehide",clearManualProps);document.addEventListener("visibilitychange",function(){if(document.hidden)clearManualProps();});}
+
+        // 只取消玩家已安排的表现，不改变死亡、复活或行动；不受AI互动开关影响。
+        define('_csh_interact_manual_stop',{
+            trigger:{global:'dieAfter'},forced:true,silent:true,popup:false,charlotte:true,forceDie:true,forceOut:true,
+            filter:function(event){return lib.cshInteract.playerBatch.involves(event.player);},
+            content:function(){lib.cshInteract.playerBatch.actorGone(trigger.player);}
+        });
 
 		// 开局问候。global 触发器会对全桌每名角色各判一次，用 claimGameStart 保证只执行一轮。
 		define("_csh_interact_start", {

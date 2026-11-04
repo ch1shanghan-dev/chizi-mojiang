@@ -120,6 +120,15 @@ function ensureStyle() {
         "#" + HOST_ID + " .csh-ui-toast.paper.warn{color:#8d2f3a!important;border-color:rgba(200,90,105,.55)!important;",
         "box-shadow:inset 3px 0 0 #c85a69,0 12px 34px -14px rgba(0,0,0,.42)!important;}",
 
+        /* 官阶短颁授：沿用提示队列，不接点击、不抢焦点；新阶名称始终是主体。 */
+        "#" + HOST_ID + " .csh-ui-toast.honor{display:flex!important;align-items:center!important;gap:12px!important;padding:8px 14px!important;text-align:left!important;max-width:min(92vw,440px)!important;}",
+        "#" + HOST_ID + " .csh-ui-honor-seal{position:static!important;flex:0 0 36px!important;display:grid!important;place-items:center!important;width:36px!important;height:40px!important;border:3px double currentColor!important;border-radius:3px 3px 10px 3px!important;font:500 var(--csh-lfs-xl,16px)/1 SimSun,serif!important;letter-spacing:0!important;}",
+        "#" + HOST_ID + " .csh-ui-honor-copy{position:static!important;min-width:0!important;line-height:1.55!important;overflow-wrap:anywhere!important;}",
+        "#" + HOST_ID + " .csh-ui-toast.dark.honor{color:#efdeb0!important;border-color:#a28a57!important;background:linear-gradient(110deg,rgba(30,48,41,.98),rgba(17,27,24,.98))!important;box-shadow:inset 0 1px 0 #e3cf9620,0 8px 24px #0005!important;}",
+        "#" + HOST_ID + " .csh-ui-toast.paper.honor{color:#5f481c!important;border-color:#a48a55!important;background:linear-gradient(110deg,#faf2dd,#eee9da)!important;}",
+
+        "@media(prefers-reduced-motion:reduce){#"+HOST_ID+" .csh-ui-toast.honor,#"+HOST_ID+" .csh-ui-toast.honor.out{animation:none!important;transition:none!important;}}",
+
         /* ---------- 确认框（替代 window.confirm） ---------- */
         "#" + CF_ID + "{position:fixed!important;left:0!important;top:0!important;width:100%!important;height:100%!important;",
         "z-index:" + CSH_Z.modal + "!important;display:flex!important;align-items:center!important;justify-content:center!important;",
@@ -162,7 +171,20 @@ function ensureHost() {
     return _host;
 }
 
+function captureHonorScope() {
+    var owner=lib.cshWallet;if(!owner||typeof owner.saveEpoch!=="function")return null;
+    try{var epoch=owner.saveEpoch();return Number.isSafeInteger(epoch)?{owner:owner,epoch:epoch}:{invalid:true};}catch(e){return {invalid:true};}
+}
+function currentHonor(item) {
+    if(!item||item.kind!=="honor"||!item.scope)return true;
+    try{var owner=lib.cshWallet;return !item.scope.invalid&&owner===item.scope.owner&&owner.saveEpoch()===item.scope.epoch&&(!owner.saveGuard||typeof owner.saveGuard.blocked!=="function"||owner.saveGuard.blocked()===false);}catch(e){return false;}
+}
+function watchHonor(el){
+    if(!el.__cshItem||el.__cshItem.kind!=="honor")return;
+    el.__cshHonorGuard=setTimeout(function(){el.__cshHonorGuard=0;if(!currentHonor(el.__cshItem)){drop(el);return;}watchHonor(el);},250);
+}
 function stopTimer(el) {
+    if(el.__cshHonorGuard){clearTimeout(el.__cshHonorGuard);el.__cshHonorGuard=0;}
     if (el.__cshT1) { clearTimeout(el.__cshT1); el.__cshT1 = 0; }
     if (el.__cshT2) { clearTimeout(el.__cshT2); el.__cshT2 = 0; }
 }
@@ -184,13 +206,23 @@ function arm(el, ms) {
     el.__cshOut = false;
     try { el.classList.remove("out"); } catch (e) {}
     el.__cshT1 = setTimeout(function () { retire(el); }, ms);
+    watchHonor(el);
+}
+function paintToast(el,text) {
+    el.textContent="";
+    if(el.__cshItem&&el.__cshItem.kind==="honor"){
+        var seal=document.createElement("span");seal.className="csh-ui-honor-seal";seal.textContent="晋";seal.setAttribute("aria-hidden","true");
+        var copy=document.createElement("span");copy.className="csh-ui-honor-copy";copy.textContent=text;
+        el.appendChild(seal);el.appendChild(copy);el.setAttribute("role","status");el.setAttribute("aria-live","polite");
+    }else el.textContent=text;
 }
 function show(item) {
+    if(!currentHonor(item))return null;
     ensureHost();
     var el = document.createElement("div");
     el.className = "csh-ui-toast " + (item.theme || "dark") + (item.kind && item.kind !== "info" ? " " + item.kind : "");
-    el.textContent = item.text;
     el.__cshItem = item;
+    paintToast(el,item.text);
     _host.appendChild(el);
     _visible.push(el);
     arm(el, item.duration);
@@ -215,6 +247,7 @@ function toast(msg, opt) {
     ensureStyle();
     ensureHost();
     var kind = kindOf(text, opt);
+    _visible.slice().forEach(function(el){if(!currentHonor(el.__cshItem))drop(el);});
     var theme = opt.theme === "paper" ? "paper" : "dark";
     var key = opt.key ? String(opt.key) : "";
     var now = Date.now();
@@ -231,14 +264,14 @@ function toast(msg, opt) {
             if (el.__cshItem && el.__cshItem.key === key) {
                 el.__cshItem.count++;
                 el.__cshItem.text = text;
-                el.textContent = (opt.merge === false) ? text : (text + " ×" + el.__cshItem.count);
+                paintToast(el,(opt.merge === false) ? text : (text + " ×" + el.__cshItem.count));
                 arm(el, opt.duration || LIFE[kind] || 2400);
                 return el;
             }
         }
     }
     var item = {
-        id: ++_seq, text: text, kind: kind, theme: theme, key: key, count: 1,
+        id: ++_seq, text: text, kind: kind, theme: theme, key: key, count: 1, scope:kind==="honor"?captureHonorScope():null,
         duration: Math.max(1200, Number(opt.duration) || LIFE[kind] || 2400),
     };
     if (_visible.length >= MAX_VISIBLE) {
@@ -408,6 +441,7 @@ export function installUIKit() {
         achievement: function(items, options){try{return achievementUI().show(items,options);}catch(e){return 0;}},
         achievementHistory: function(){try{return achievementUI().review()===true;}catch(e){return false;}},
         achievementState: function(){return achievementUI().status();},
+        achievementHold: function(key,value){return achievementUI().hold(key,value);},
         achievementSkip: function(){achievementUI().skip();},
     };
     lib.cshUI = api;

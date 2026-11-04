@@ -39,7 +39,7 @@
 				started.add(ev);
 				if (run || status.over || !game.me || !mode() || mode() === "connect") return;
 				var id = newId(); if (!id) return;
-				run = {id:id, mode:mode(), active:false, ended:false}; return;
+				run = {id:id, mode:mode(), active:false, ended:false, playerEpoch:lib.cshWallet&&typeof lib.cshWallet.saveEpoch==="function"?lib.cshWallet.saveEpoch():null}; return;
 			}
 			if (!run || run.ended || status.over || mode() !== run.mode) return;
 			if (ev && ev.player && (game.players || []).concat(game.dead || []).indexOf(ev.player) >= 0) run.active = true;
@@ -88,7 +88,7 @@
 			game._cshMatchRewardOverInstalled=true;
 		}
 		if(root.addEventListener){root.addEventListener("pagehide",endSession);root.addEventListener("beforeunload",endSession);}
-		return lib.cshMatchReward={openPanel:openPanel,closePanel:closePanel,retryPending:retryPending,invalidate:invalidate,defaults:function(){return JSON.parse(JSON.stringify(DEFAULTS));},rates:rates};
+		return lib.cshMatchReward={session:function(){return run?{id:run.id,mode:run.mode,active:run.active,ended:run.ended,epoch:run.playerEpoch}:null;},openPanel:openPanel,closePanel:closePanel,retryPending:retryPending,invalidate:invalidate,defaults:function(){return JSON.parse(JSON.stringify(DEFAULTS));},rates:rates};
 	}
 	root.CSH_MATCH_REWARD={install:install};
 })(typeof window !== "undefined" ? window : globalThis);

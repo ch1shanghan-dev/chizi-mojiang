@@ -22,21 +22,45 @@ async function feed(h,spec,actor=h.me){for(const [metric,n]of spec.needs){const 
  else if(kind==='p'){if(key==='hand')actor.hand=n;else if(key==='armor')actor.hujia=n;else if(key==='maxhp')actor.maxHp=n;else if(key==='equip')actor.equips=Array.from({length:n},()=>({}));else throw Error('unknown peak '+key);await h.fire('phaseAfter',{player:actor});}
  else throw Error('unsupported metric '+metric);
 }}
-await check('13 concrete tactics and two routes appended to unchanged 1438 definitions',()=>rules.length===13&&journeys.length===2&&PA.RULES.length===1453&&PA.PROFILES.length===100&&PA.selfTest().ok);
+await check('13 concrete tactics and two routes appended to unchanged 1438 definitions',()=>rules.length===13&&journeys.length===2&&PA.RULES.length>=1453&&PA.PROFILES.length===100&&PA.selfTest().ok);
 // Frozen SHA256 of the original 1931-definition source backup, before this batch.
 // Removal is convenient for standalone gates; the external hash prevents self-certification.
 const BASELINE_SHA256='92e31d88a18f8eafb31fab6c40f097e3e2a2407b5a74ac3ae8c356a90e9d5c64';
 // LF digest verified from the same external pre-batch backup with the raw hash above.
 const BASELINE_LF_SHA256='e1af4fb8d46421ed78c616eca38fbf8ed73fb088a6d08a9b3733593f877454fa';
 const lf=s=>s.replace(/\r\n/g,'\n');
-const blockStart=pool.indexOf('    /* 第二批战术'),blockEnd=pool.indexOf('\tvar INDEX = {};',blockStart);
+/* 万条扩容：源码里现在有两处"可追加定义块"——第二批战术块 与
+   hero-expand 块。基线必须把两处都切掉，才回到 1931 条的原始字节。
+   切块只在内存里做，不改磁盘；基线哈希仍来自外部冻结值，保护强度不变。 */
+const stripAppend=(text,tag)=>{
+	const b=text.indexOf('/* ===== BEGIN APPEND:'+tag+' ===== */');
+	if(b<0)return text;
+	const mark='/* ===== END APPEND:'+tag+' ===== */',e=text.indexOf(mark,b);
+	if(e<0)throw Error('Append block not closed: '+tag);
+	let stop=e+mark.length;
+	if(text[stop]==='\r')stop++;
+	if(text[stop]==='\n')stop++;
+	return text.slice(0,b)+text.slice(stop);
+};
+const stripped=stripAppend(pool,'hero-expand');
+const blockStart=stripped.indexOf('    /* 第二批战术'),blockEnd=stripped.indexOf('\tvar INDEX = {};',blockStart);
 if(blockStart<0||blockEnd<=blockStart)throw Error('Second batch definition block is missing');
-const derivedBaseline=pool.slice(0,blockStart)+pool.slice(blockEnd),before=opt('--before'),baselineSource=before?fs.readFileSync(before,'utf8'):derivedBaseline;
+const derivedBaseline=stripped.slice(0,blockStart)+stripped.slice(blockEnd),before=opt('--before'),baselineSource=before?fs.readFileSync(before,'utf8'):derivedBaseline;
 await check('1931 baseline source hash matches frozen original with only CRLF/LF normalized',()=>createHash('sha256').update(baselineSource,'utf8').digest('hex')===BASELINE_SHA256||createHash('sha256').update(lf(baselineSource),'utf8').digest('hex')===BASELINE_LF_SHA256);
 const oldContext=vm.createContext({window:{}});vm.runInContext(baselineSource,oldContext);const old=oldContext.window.CSH_POOL_ACHV;
-await check('source differs from baseline only by the appended pure definition block',()=>{const start=pool.indexOf('    /* 第二批战术'),end=pool.indexOf('\tvar INDEX = {};',start);return start>=0&&end>start&&lf(pool.slice(0,start)+pool.slice(end))===lf(baselineSource)});
-await check('all 1438 old definitions tests ordering rewards and 100 character profiles preserved',()=>{const ser=r=>JSON.stringify(r,(_,v)=>typeof v==='function'?v.toString():v);return old.RULES.length===1438&&old.RULES.every((r,i)=>ser(r)===ser(PA.RULES[i])&&JSON.stringify(old.reward(r))===JSON.stringify(PA.reward(PA.RULES[i])))&&JSON.stringify(old.PROFILES)===JSON.stringify(PA.PROFILES)});
-await check('all new stable IDs and names unique across the complete pool catalog',()=>new Set(PA.RULES.map(r=>r.id)).size===1453&&new Set(PA.RULES.map(r=>r.name)).size===1453);
+await check('source differs from baseline only by the appended pure definition block',()=>lf(stripped.slice(0,blockStart)+stripped.slice(blockEnd))===lf(baselineSource));
+/* 万条扩容：每名武将允许在既有 paths 之后追加新路线，但旧 path 必须原样在前、
+   signature / id / name / title 不变、且不允许删除或重排——追加不等于改写。 */
+const sameProfiles=()=>old.PROFILES.length===PA.PROFILES.length&&old.PROFILES.every((p,i)=>{
+	const q=PA.PROFILES[i];
+	if(!q)return false;
+	if(p.id!==q.id||p.name!==q.name||p.title!==q.title)return false;
+	if(JSON.stringify(p.signature)!==JSON.stringify(q.signature))return false;
+	if(!Array.isArray(q.paths)||q.paths.length<p.paths.length)return false;
+	return p.paths.every((f,j)=>JSON.stringify(f)===JSON.stringify(q.paths[j]));
+});
+await check('all 1438 old definitions tests ordering rewards and 100 character profiles preserved',()=>{const ser=r=>JSON.stringify(r,(_,v)=>typeof v==='function'?v.toString():v);return old.RULES.length===1438&&old.RULES.every((r,i)=>ser(r)===ser(PA.RULES[i])&&JSON.stringify(old.reward(r))===JSON.stringify(PA.reward(PA.RULES[i])))&&sameProfiles()});
+await check('all new stable IDs and names unique across the complete pool catalog',()=>new Set(PA.RULES.map(r=>r.id)).size===PA.RULES.length&&new Set(PA.RULES.map(r=>r.name)).size===PA.RULES.length);
 await check('new tactics never reuse an old set of metrics merely with new thresholds',()=>{const sets=PA.RULES.filter(r=>r.tactic).map(r=>r.tactic.needs.map(x=>x[0]).sort().join('|'));return rules.every(r=>sets.filter(s=>s===r.tactic.needs.map(x=>x[0]).sort().join('|')).length===1)});
 for(const r of rules){
  await check(r.id+' exact thresholds',()=>r.test({t:'over',win:true},pure(r)));

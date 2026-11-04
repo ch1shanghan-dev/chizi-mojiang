@@ -590,7 +590,7 @@
      · 门票 300（门票即带入）已在收费屏扣除，宿主回传 buyIn
      · 同桌两个 AI 从「AI 角色世界」抽取（§I），各带 min(600, 资金×0.3)
      · 每局结束向宿主上报功勋（play / win / bigwin）
-     · 结算交回 {buyIn, chips}，回收 90%、净赢上限 = 两 AI 带入之和（§H.4）
+     · 结算交回 {buyIn, chips}，回收 90%、净输赢受敌方带入限制（§H.4）
    不在 shell 内（独立打开调试）时自动降级：无经济、纯娱乐。
    ============================================================ */
 var Bridge = (function () {
@@ -631,11 +631,9 @@ var Bridge = (function () {
     isReady: function () { return ready; },
     merit: function (n, reason, cb) { call('shell-merit', { n: n, reason: reason }, cb); },
     /* ★ 2026-09-29：AI 资金变动不再由本页逐笔上报，统一并入 settleSession
-       （宿主侧双向记账，玩家赢→扣 AI；玩家输→记入 AI），避免两条账本互相覆盖。 */
-    /* 结算回账（§H.4）：★ 2026-09-29 统一到 shell-settle-session ——
-       一次调用完成「玩家入账」+「AI 世界双向记账」（玩家赢 → 两 AI 按带入比例真实扣款；
-       玩家输 → 按比例真实记入两 AI 资金）。此前只做单向扣款，世界只减不增、长期枯竭。
-       aiStakeTotal = 两 AI 带入之和，即本局净赢的自然封顶（§H.4）。 */
+       （宿主侧双向记账，仅敌方与玩家发生资金转移），避免两条账本互相覆盖。 */
+    /* 结算回账：新载荷携带公开阵营；玩家只与敌方联动资金，队友只记自身战果。
+       净赢上限为敌方带入之和，宿主对照真实抽座验证。 */
     settleSession: function (payload, cb) {
       /* 走 CSHPage 的结算通道（T.settle）：**成功应答才置"已结算"**，失败自动释放认领，
          于是 closePage 里"若已结束但尚未结算就补一次"的兜底真正可达。
@@ -1361,7 +1359,8 @@ function sessionSettlementData() {
     return { id: p.id, stake: (game.aiStakes && game.aiStakes[i]) || p.stake || 0 };
   }) : [];
   return { key: 'doudizhu', buyIn: buyIn,
-    chips: complete ? Math.max(0, Math.floor(Number(game.chips) || 0)) : buyIn, seats: seats };
+    chips: complete ? Math.max(0, Math.floor(Number(game.chips) || 0)) : buyIn, seats: seats,
+    team: complete ? { landlord: game.landlord, winner: game.winner, practice: !!game.practice } : undefined };
 }
 function nextIdx(p) { return (p + 1) % 3; }
 function logLine(s) { lastLog = s; var el = $('#status-line'); if (el) el.textContent = s; }
@@ -1740,22 +1739,23 @@ function endGame(winner) {
     spring = true;
   }
 
-  /* —— 结算（§H.4）：玩家赢 = 从两 AI 带入里赢；净赢上限 = 两 AI 带入之和 —— */
+  /* —— 结算（§H.4）：玩家只与敌方发生资金联动，队友带入不计入个人可赢额度 —— */
   /* 【2026-09-30 经济修复】好牌模式（开局快照 game.practice）= 练习局：
      保底王炸 + 四个 2 的期望胜率远超 50%，原样结算就是无限刷 CBY 的印钞机。
      练习局无论输赢一律退回带入（白玩），把强化手牌的期望收益精确归零。 */
   var econ = null;
   var practice = !!game.practice;
   if (Bridge.active) {
-    var aiTotal = (game.aiStakes[0] || 0) + (game.aiStakes[1] || 0);
+    var aiTotal = 0;
+    for (var aiSeat = 1; aiSeat < 3; aiSeat++) if (isLandlord(aiSeat) !== isLandlord(0)) aiTotal += game.aiStakes[aiSeat - 1] || 0;
     var myBase = Math.max(0, Math.floor(Bridge.buyIn()));   /* 门票即带入 300 */
     var netRaw = Math.floor(myBase * game.mult);            /* 理论净赢（含倍数链） */
-    var netCap = aiTotal > 0 ? aiTotal : netRaw;            /* 天然上限 */
+    var netCap = aiTotal;            /* 天然上限 */
     var net = practice ? 0 : Math.min(netRaw, netCap);
     var capped = !practice && netRaw > netCap;
     /* 玩家赢：chips = 带入 + 净赢；玩家输：chips = 带入 − min(带入, 净亏)；练习局：原路退回 */
     if (playerWin) game.chips = myBase + net;
-    else game.chips = practice ? myBase : Math.max(0, myBase - Math.min(myBase, netRaw));
+    else game.chips = practice ? myBase : Math.max(0, myBase - Math.min(myBase, netRaw, aiTotal));
     econ = {
       aiTotal: aiTotal, net: net, netRaw: netRaw, capped: capped,
       chips: game.chips, myBase: myBase, practice: practice
@@ -1806,7 +1806,7 @@ function endGame(winner) {
 }
 
 /* 结算按钮行为（§H.3）：
-   shell 内「再来一局」= 把本局筹码交回宿主并重载（拉新带入 / 新 AI）；
+   shell 内「再来一局」= 本局确认结算后，请宿主再次确认带入并建立新收费会话；
    shell 内再额外提供「收工结算」= 交回后关闭。
    独立运行保持原行为（直接重开 / 回开局页）。 */
 function afterGameAction(kind) {
@@ -2274,7 +2274,21 @@ function leavePage(reload) {
       if (game.phase === 'bid') bidStep(); else if (game.phase === 'play') scheduleTurn(); else renderAll();
       return;
     }
-    if (reload) { window.location.reload(); return; }
+    if (reload) {
+      /* 新一场必须重新确认带入；重载 iframe 会沿用旧会话守卫，不能作为新付费局。 */
+      closePending = true;
+      var opened = false;
+      function openedFee(openOK) {
+        if (opened || tornDown) return;
+        opened = true; closePending = false; alive = true;
+        document.body.style.display = '';
+        if (openOK === false) toast('暂未打开下一局，上一局已结算。可再次点击再来一局。');
+        renderAll();
+      }
+      try { Bridge.call('shell-open', { key: 'doudizhu', buyIn: Bridge.buyIn() }, openedFee, 4000); }
+      catch (eOpen) { openedFee(false); }
+      return;
+    }
     if (window.parent && window.parent !== window) window.parent.postMessage({ __csh: 'doudizhu-close' }, '*');
     else if (typeof window.close === 'function') window.close();
     document.body.style.display = 'none';
@@ -2369,13 +2383,18 @@ function toggleCardAt(x) {
 }
 var ddzSuppressClick = false;
 $('#hand').addEventListener('pointerdown', function (e) {
+  ddzSuppressClick=false;
+  if(e.button!==0||e.isPrimary===false)return;
   if (game.phase !== 'play') return;
   if (game.auto) { toast('托管中，将自动出牌'); return; }
   if (e.pointerType === 'touch') return;   /* 触屏走 click，保住横滑手势 */
   ddzSuppressClick = true;
   toggleCardAt(e.clientX);
 });
+$('#hand').addEventListener('pointercancel',function(){ddzSuppressClick=false;});
+window.addEventListener('blur',function(){ddzSuppressClick=false;});
 $('#hand').addEventListener('click', function (e) {
+  if(e.button!==0)return;
   if (ddzSuppressClick) { ddzSuppressClick = false; return; }
   if (game.phase !== 'play') return;
   if (game.auto) { toast('托管中，将自动出牌'); return; }
@@ -2424,7 +2443,7 @@ if (Bridge.active) {
          回收率与倍数链属于背景知识，压成第二行的一句，不再各占一行。 */
       tip.innerHTML = '带入 <b>' + fmtNum(Bridge.buyIn()) + '</b> CBY · 同桌 <b>' + names +
         '</b> 共带 <b>' + fmtNum(aiSum) + '</b> CBY<br>' +
-        '倍数链各 ×2（炸弹 / 春天 / 明牌 / 抢地主） · 净赢上限 = 对手带入之和 · 收工按 90% 回收';
+        '倍数链各 ×2（炸弹 / 春天 / 明牌 / 抢地主） · 净赢上限 = 敌方带入之和 · 收工按 90% 回收';
     }
     switchView('view-start');
   }

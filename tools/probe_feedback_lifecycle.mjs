@@ -18,7 +18,7 @@ for(const mode of ['blocked','epoch'])check(mode+' outer background pause surviv
  q.accept([item('old')]);q.pause(true);if(mode==='blocked')state.blocked=true;else state.epoch++;
  closing=true;q.pause(true);state.blocked=false;q.accept([item('hidden-new')]);return q.snapshot().paused&&!q.snapshot().current&&timers.size===0;
 });
-return {scope:'actual feedback queue with original35 unchanged plus recovery/visibility/100-cycle boundaries; no wallet writes',passed:rows.filter(x=>x.passed).length,failed:rows.filter(x=>!x.passed).length,checks:rows};
+return {scope:'actual feedback queue with reading-duration/retention and recovery/visibility/100-cycle boundaries; no wallet writes',passed:rows.filter(x=>x.passed).length,failed:rows.filter(x=>!x.passed).length,checks:rows};
 `;
 const factory=new Function('createAchievementQueue','return (async()=>{'+unit+'\n'+extra+'})()');const result=await factory(createAchievementQueue);fs.writeFileSync(out+'/feedback-lifecycle.json',JSON.stringify(result,null,2));console.log(JSON.stringify({...result,checks:undefined,failures:result.checks.filter(x=>!x.passed)},null,2));if(result.failed)process.exitCode=1;
 if(process.argv.includes('--host')){
@@ -67,7 +67,7 @@ async function feedbackLifecycleHost(){
   ui.review();scope.blocked=true;ui.status();ui.status();scope.blocked=false;ui.show([sample('recovered')]);
   check('instrumented real DOM recovery closes review and resumes new display',!document.getElementById('csh-ach-review')&&!ui.status().paused&&!!document.getElementById('csh-ach-feedback'));
   document.dispatchEvent(new Event('visibilitychange'));hidden=true;document.dispatchEvent(new Event('visibilitychange'));check('background entry removes card and cancels display timer',ui.status().paused&&!document.getElementById('csh-ach-feedback')&&timers.size===0,{timers:timers.size});
-  clock+=31000;hidden=false;document.dispatchEvent(new Event('visibilitychange'));check('long background return discards expired animation without deleting history',!ui.status().paused&&!ui.status().current&&ui.status().history.length===1&&!document.getElementById('csh-ach-feedback'));
+  clock+=31000;hidden=false;document.dispatchEvent(new Event('visibilitychange'));check('long background return preserves reading without deleting history',!ui.status().paused&&ui.status().current?.id==='stress-recovered'&&ui.status().history.length===1&&!!document.getElementById('csh-ach-feedback'));
   ui.show([sample('bfcache-before')]);window.dispatchEvent(new PageTransitionEvent('pagehide',{persisted:true}));
   check('cache suspension folds animations but retains live instance',ui.status().paused&&!document.getElementById('csh-ach-feedback')&&listeners.size===4);
   window.dispatchEvent(new PageTransitionEvent('pageshow',{persisted:true}));ui.show([sample('bfcache-after')]);

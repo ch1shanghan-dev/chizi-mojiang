@@ -26,7 +26,10 @@ check('missing IDs and duplicate IDs do not produce fake rows',()=>rec([{},r('',
 check('ties use stable catalog order without reward preference',()=>keys(rec([r('first','a',1,2,{reward:1}),r('second','b',1,2,{reward:999999})]))==='first,second');
 check('policy does not mutate input order rows or pins',()=>{const input=[r('z','a',1,10),r('a','b',9,10)],pins=['z'],before=JSON.stringify([input,pins]);rec(input,pins);return JSON.stringify([input,pins])===before;});
 check('policy reads no storage and writes no save',()=>{reads=0;writes=0;rec([r('a','a',1,10)]);return reads===0&&writes===0;});
-check('real493 definitions and all-zero stats create no fake recommendation',()=>A.defs.length===493&&rec(A.evalAll({})).length===0);
+/* 2026-11-04 生涯扩容后定义数从 493 增长到 2000，第一条断言改为下界：
+   实际意图是"必须是真实定义表（不是空表/占位表）"，不是钉死某个数字。
+   第二条"零统计不得产生假推荐"保持原强度不变。 */
+check('real definitions (>=493) and all-zero stats create no fake recommendation',()=>A.defs.length>=493&&rec(A.evalAll({})).length===0);
 check('actual mixed player progress produces bounded unfinished distinct routes',()=>{const input=A.evalAll({pc:2000,pcPeak:5000,wrGames:12,wrWin:5,interactTotal:7,rank:2,merit:20,worldSkillTop:.75});const next=rec(input);return next.length===3&&next.every(x=>!x.done&&!x.claimed&&x.cur>0)&&new Set(next.map(x=>x.key.replace(/_[0-9]+(?:\.[0-9]+)?$/,''))).size===next.length;});
 check('real category/search subset remains closed under recommendation',()=>{const input=A.evalAll({pc:2000,pcPeak:5000,wrGames:12,interactTotal:7}).filter(x=>x.cat==='资产');return rec(input).every(x=>input.includes(x)&&x.cat==='资产');});
 let seed=77;const rand=()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);

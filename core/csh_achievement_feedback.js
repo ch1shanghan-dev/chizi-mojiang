@@ -3,11 +3,11 @@ export const ACHIEVEMENT_UI_KEY = 'csh_achievement_ui_v1';
 
 export function createAchievementQueue(env) {
     const now=env.now||Date.now, later=env.setTimeout||setTimeout, cancel=env.clearTimeout||clearTimeout;
-    let owner,epoch,initialized=false,queue=[],history=[],current=null,overflow=0,used=0,last=0,timer=null,paused=false,destroyed=false,generation=0,displaySeq=0,timerVersion=0;
+    let owner,epoch,initialized=false,queue=[],history=[],current=null,overflow=0,used=0,last=0,timer=null,paused=false,destroyed=false,generation=0,displaySeq=0,timerVersion=0,deadline=0,remaining=0,batchSeq=0;
     const seen=new Map();
     function tell(){if(env.changed)env.changed();}
     function clearTimer(){timerVersion++;if(timer!==null)cancel(timer);timer=null;}
-    function arm(ms){clearTimer();const version=timerVersion,g=generation,id=current&&current.displayId;timer=later(()=>{if(version===timerVersion&&g===generation&&current&&current.displayId===id)next();},ms);}
+    function arm(ms){clearTimer();remaining=ms;deadline=now()+ms;if(paused)return;const version=timerVersion,g=generation,id=current&&current.displayId;timer=later(()=>{if(version===timerVersion&&g===generation&&current&&current.displayId===id)next();},ms);}
     function reset(){generation++;clearTimer();queue=[];history=[];current=null;overflow=0;used=0;seen.clear();}
     function scope(){
         if(destroyed)return false;
@@ -21,18 +21,18 @@ export function createAchievementQueue(env) {
         if(queue.length)current=queue.shift();
         else if(overflow){current={summary:true,count:overflow,time:now()};overflow=0;}
         if(!current){tell();return;}
-        current.displayId=++displaySeq;tell();arm(current.summary?2600:current.rare===3?3200:2400);
+        current.displayId=++displaySeq;tell();arm(current.summary?8000:current.rare>=2?12000:8000);
     }
     function next(){clearTimer();if(!scope())return;current=null;pump();}
     function accept(items,options={}){
         if(!scope()||!Array.isArray(items))return 0;
-        const kind=options.kind==='claim'?'claim':'unlock',accepted=[];
+        const kind=options.kind==='claim'?'claim':'unlock',accepted=[],batch=++batchSeq;
         for(const row of items.slice(0,1000)){
             if(!row||typeof row.id!=='string'||!/^[\w:-]{1,100}$/.test(row.id)||typeof row.title!=='string'||!row.title.trim())continue;
             const source=row.source==='career'?'career':'pool',key=source+':'+kind+':'+row.id;
             if(seen.has(key))continue;
             const number=n=>Number.isSafeInteger(n)&&n>=0?n:0;
-            const item={id:row.id,source,kind,title:row.title.trim().slice(0,100),description:typeof row.description==='string'?row.description.slice(0,400):'',rare:[1,2,3].includes(row.rare)?row.rare:1,pc:number(row.pc),merit:number(row.merit),time:now()};
+            const item={id:row.id,source,kind,batch,title:row.title.trim().slice(0,100),description:typeof row.description==='string'?row.description.slice(0,400):'',rare:[1,2,3].includes(row.rare)?row.rare:1,pc:number(row.pc),merit:number(row.merit),time:now()};
             seen.set(key,true);accepted.push(item);
         }
         while(seen.size>2000)seen.delete(seen.keys().next().value);
@@ -44,13 +44,14 @@ export function createAchievementQueue(env) {
         tell();return accepted.length;
     }
     function skip(){if(!scope())return;clearTimer();queue=[];current=null;overflow=0;tell();}
-    function pause(value){if(destroyed)return;if(!scope()){paused=!!value;clearTimer();return;}paused=!!value;clearTimer();if(!paused){queue=queue.filter(x=>now()-x.time<=30000);if(now()-last>30000)overflow=0;if(current&&now()-current.time>30000)current=null;if(current)arm(1800);else pump();}tell();}
+    function pause(value){if(destroyed)return;value=!!value;if(!scope()){paused=value;clearTimer();return;}if(paused===value)return;if(value&&current)remaining=Math.max(0,deadline-now());paused=value;clearTimer();if(!paused){if(current)arm(remaining);else pump();}tell();}
     function snapshot(){scope();return {generation,current:current?{...current}:null,pending:queue.length+(overflow?1:0),overflow,history:history.map(x=>({...x})),paused};}
     return {accept,next,skip,pause,snapshot,check:scope,destroy(){reset();destroyed=true;tell();}};
 }
 
 export function createAchievementFeedback(env) {
     const doc=env.document,win=env.window,storage=env.storage;
+    const holds=new Set(),reading=new Set();
     let card=null,review=null,reviewBody=null,focusBack=null,guard=null,closed=false,preferenceError='',reviewGeneration=0,lastSoundId=0;
     function preferences(){try{const raw=storage.getItem(ACHIEVEMENT_UI_KEY);if(!raw)return {v:1,enabled:true,reduced:false,sound:false};const p=JSON.parse(raw);if(p.v!==1||['enabled','reduced','sound'].some(k=>typeof p[k]!=='boolean'))throw Error('format');return p;}catch(e){return {v:1,enabled:false,reduced:true,sound:false};}}
     function setPreferences(change){try{const p={...preferences(),...change,v:1},text=JSON.stringify(p);storage.setItem(ACHIEVEMENT_UI_KEY,text);if(storage.getItem(ACHIEVEMENT_UI_KEY)!==text)throw Error('readback');preferenceError='';if(!p.enabled)queue.skip();render();return {ok:true};}catch(e){preferenceError='显示设置未保存，请恢复本机存储后重试';return {ok:false,reason:preferenceError};}}
@@ -86,6 +87,7 @@ export function createAchievementFeedback(env) {
       #csh-ach-review .csh-ach-preferences{display:flex!important;flex-wrap:wrap!important;gap:10px 16px!important;padding:8px 0!important;flex:none!important}
       #csh-ach-review label{display:flex!important;align-items:center!important;gap:6px!important;min-height:44px!important;font-size:var(--csh-lfs-sm,12px)!important;color:#d6ded3!important}
       #csh-ach-review input{width:18px!important;height:18px!important;appearance:auto!important;accent-color:#d7bc80!important}
+      #csh-ach-review .csh-ach-preferences[hidden],#csh-ach-review .csh-ach-settings-note[hidden]{display:none!important}
       #csh-ach-review .csh-ach-review-list{display:block!important;overflow-y:auto!important;min-height:0!important;padding-right:4px!important;overscroll-behavior:contain!important}
       #csh-ach-review article{display:block!important;padding:10px 0!important;border-top:1px solid #ffffff20!important}
       #csh-ach-review h3{display:block!important;font-size:var(--csh-lfs-lg,14px)!important;margin:0 0 4px!important;color:#f0e3bf!important;overflow-wrap:anywhere!important}
@@ -103,37 +105,56 @@ export function createAchievementFeedback(env) {
       @media(prefers-reduced-motion:reduce){#csh-ach-feedback{animation:none!important}}
     `;(doc.head||doc.documentElement).appendChild(s);}
     const queue=createAchievementQueue({now:env.now,scope:env.scope,enabled:()=>preferences().enabled,setTimeout:env.setTimeout,clearTimeout:env.clearTimeout,changed:()=>render()});
-    function removeCard(){if(card){card.remove();card=null;}}
+    function removeCard(){reading.clear();if(card){card.remove();card=null;}}
     function words(item){return item.kind==='claim'?'本次到账 +'+item.pc+' CBY'+(item.merit?' / +'+item.merit+' 功勋':''):'奖励待领取 · '+item.pc+' CBY'+(item.merit?' / '+item.merit+' 功勋':'');}
     function render(){
         if(closed)return;
         const state=queue.snapshot();
         if(review&&reviewGeneration!==state.generation){closeReview();return;}
         if(doc.getElementById("csh-ui-confirm")){removeCard();guarding();return;}
-        if(review||state.paused||doc.hidden||!state.current||!preferences().enabled){removeCard();guarding();return;}
+        if(review||holds.size>0||(state.paused&&!reading.size)||doc.hidden||!state.current||!preferences().enabled){removeCard();guarding();return;}
         if(card&&card.__displayId===state.current.displayId){card.dataset.reduced=String(reduced());card.dataset.compact=String([...doc.querySelectorAll('#csh-dbg-panel,#csh-shell-overlay')].some(n=>n.getClientRects().length>0));guarding();return;}
         removeCard();style();const item=state.current;card=el('section');card.id='csh-ach-feedback';card.__displayId=item.displayId;card.__item=item.id;card.__summaryCount=item.count;card.setAttribute('role','status');card.setAttribute('aria-live','polite');card.dataset.rare=String(item.rare||1);card.dataset.reduced=String(reduced());card.dataset.compact=String([...doc.querySelectorAll('#csh-dbg-panel,#csh-shell-overlay')].some(n=>n.getClientRects().length>0));card.appendChild(badge(item.rare||1));
         card.appendChild(el('span','csh-ach-kicker',item.summary?'反馈已收纳':(item.kind==='claim'?'成就领奖':'成就解锁')+' · '+(item.source==='pool'?['','普通','稀有','史诗'][item.rare]:'生涯')));
         card.appendChild(el('h3','',item.summary?'另有 '+item.count+' 项反馈':item.title));card.appendChild(el('p','',item.summary?'进度与奖励不受动画影响，可查看本次记录。':words(item)));
-        const actions=el('div','csh-ach-actions');actions.appendChild(button('详情',()=>openReview(item.summary?null:item)));const next=button('跳过',()=>queue.next());next.classList.add('csh-ach-next');actions.appendChild(next);actions.appendChild(button('收纳',()=>queue.skip(),'收纳全部成就动画，保留记录'));card.appendChild(actions);doc.documentElement.appendChild(card);
+        const actions=el('div','csh-ach-actions');actions.appendChild(button('详情',()=>openReview(item.summary?null:item)));const next=button('跳过',()=>queue.next());next.classList.add('csh-ach-next');actions.appendChild(next);actions.appendChild(button('收纳',()=>queue.skip(),'收纳全部成就动画，保留记录'));card.appendChild(actions);
+        const read=(key,value)=>{if(value)reading.add(key);else reading.delete(key);syncPause();};
+        card.addEventListener('pointerenter',e=>{if(e.pointerType!=='touch')read('hover',true);});card.addEventListener('pointerleave',()=>read('hover',false));
+        card.addEventListener('focusin',()=>read('focus',true));card.addEventListener('focusout',e=>{if(card&&!card.contains(e.relatedTarget))read('focus',false);});
+        card.addEventListener('pointerdown',e=>{if(e.pointerType==='touch')read('touch',true);});doc.documentElement.appendChild(card);
         if(!item.summary&&item.displayId!==lastSoundId&&preferences().sound&&env.sound){lastSoundId=item.displayId;try{env.sound();}catch(e){}}
         guarding();
     }
     function guarding(){if(guard!==null){win.clearTimeout(guard);guard=null;}if(!closed&&!doc.hidden&&(review||queue.snapshot().current))guard=win.setTimeout(()=>{queue.check();render();},350);}
-    function closeReview(){if(!review)return;review.remove();review=null;reviewBody=null;queue.pause(false);if(focusBack&&focusBack.isConnected)focusBack.focus({preventScroll:true});else if(card&&card.querySelector("button"))card.querySelector("button").focus({preventScroll:true});focusBack=null;}
+    function syncPause(){const paused=doc.hidden||!!review||holds.size>0||reading.size>0;if(queue.snapshot().paused!==paused)queue.pause(paused);}
+    function hold(key,value){if(closed||typeof key!=="string"||!key||key.length>80)return false;if(value)holds.add(key);else holds.delete(key);syncPause();render();return true;}
+    function closeReview(){if(!review)return;review.remove();review=null;reviewBody=null;syncPause();if(focusBack&&focusBack.isConnected)focusBack.focus({preventScroll:true});else if(card&&card.querySelector("button"))card.querySelector("button").focus({preventScroll:true});focusBack=null;}
     function openReview(item){
         if(!queue.check())return false;style();if(review)closeReview();focusBack=doc.activeElement;queue.pause(true);reviewGeneration=queue.snapshot().generation;review=el('div');review.id='csh-ach-review';const box=el('section','csh-ach-review-card');box.setAttribute('role','dialog');box.setAttribute('aria-modal','true');box.setAttribute('aria-label',item?'成就详情':'最近成就反馈');
-        const head=el('div','csh-ach-review-head');head.appendChild(el('h2','',item?'成就详情':'最近成就反馈 · 本次运行最多保留200项'));const back=button('返回',closeReview);head.appendChild(back);box.appendChild(head);
-        const prefs=el('div','csh-ach-preferences'),note=el('p','csh-ach-settings-note',preferenceError);note.setAttribute('role','status');
+        const head=el('div','csh-ach-review-head');head.appendChild(el('h2','',item?'成就详情':'最近成就反馈 · 本次运行最多保留200项'));const back=button('返回',closeReview),settings=button('显示设置',()=>{prefs.hidden=!prefs.hidden;note.hidden=prefs.hidden&&!preferenceError;settings.setAttribute('aria-expanded',String(!prefs.hidden));});settings.setAttribute('aria-expanded','false');head.appendChild(settings);head.appendChild(back);box.appendChild(head);
+        const prefs=el('div','csh-ach-preferences'),note=el('p','csh-ach-settings-note',preferenceError);note.setAttribute('role','status');prefs.hidden=true;note.hidden=!preferenceError;
         for(const[k,label]of [['enabled','显示解锁与领奖反馈'],['reduced','减少动效'],['sound','成就音效']]){const l=el('label'),input=el('input');input.type='checkbox';input.checked=preferences()[k];input.setAttribute('aria-label',label);input.addEventListener('change',()=>{const old=preferences()[k],r=setPreferences({[k]:input.checked});if(!r.ok)input.checked=old;note.textContent=r.ok?'已保存，仅影响本机显示':r.reason;});l.appendChild(input);l.appendChild(doc.createTextNode(label));prefs.appendChild(l);}box.appendChild(prefs);box.appendChild(note);
-        reviewBody=el('div','csh-ach-review-list');const rows=item?[item]:queue.snapshot().history;if(!rows.length)reviewBody.appendChild(el('p','','暂无反馈记录；成就的永久进度与领奖状态仍保存在原成就页。'));
-        rows.forEach(row=>{const a=el('article');a.appendChild(el('h3','',(row.kind==='claim'?'已领取 · ':'已解锁 · ')+row.title));a.appendChild(el('p','',row.description));a.appendChild(el('p','',words(row)+' · '+new Date(row.time).toLocaleTimeString()));reviewBody.appendChild(a);});box.appendChild(reviewBody);review.appendChild(box);review.addEventListener('click',e=>{if(e.target===review)closeReview();});doc.documentElement.appendChild(review);back.focus({preventScroll:true});guarding();return true;
+        reviewBody=el('div','csh-ach-review-list');
+        const history=queue.snapshot().history,batchRows=item?history.filter(row=>row.batch===item.batch).reverse():history;
+        let selected=item?Math.max(0,batchRows.findIndex(row=>row.id===item.id&&row.kind===item.kind&&row.source===item.source)):-1;
+        if(item&&!batchRows.length)batchRows.push(item);
+        const nav=el('div','csh-ach-preferences'),previous=button('上一项',()=>move(-1)),position=el('span'),nextItem=button('下一项',()=>move(1)),list=button('查看列表',()=>{selected=-1;paintReview();});
+        position.setAttribute('role','status');nav.append(previous,position,nextItem,list);box.appendChild(nav);
+        function article(row){const a=el('article');a.appendChild(el('h3','',(row.kind==='claim'?'已领取 · ':'已解锁 · ')+row.title));a.appendChild(el('p','',row.description));a.appendChild(el('p','',words(row)+' · '+new Date(row.time).toLocaleTimeString()));return a;}
+        function move(delta){const index=selected+delta;if(index<0||index>=batchRows.length)return;selected=index;paintReview();}
+        function paintReview(){
+            reviewBody.replaceChildren();const single=selected>=0;previous.hidden=nextItem.hidden=list.hidden=!single;previous.disabled=selected<=0;nextItem.disabled=selected>=batchRows.length-1;
+            position.textContent=single?'第 '+(selected+1)+' / '+batchRows.length+' 项':(item?'本批 ':'本次 ')+batchRows.length+' 项';
+            if(single){reviewBody.appendChild(article(batchRows[selected]));}else{if(!batchRows.length)reviewBody.appendChild(el('p','','暂无反馈记录；成就的永久进度与领奖状态仍保存在原成就页。'));batchRows.forEach((row,index)=>{const a=article(row);a.appendChild(button('查看详情',()=>{selected=index;paintReview();previous.focus({preventScroll:true});if(previous.disabled)nextItem.focus({preventScroll:true});if(nextItem.disabled)list.focus({preventScroll:true});}));reviewBody.appendChild(a);});}
+            reviewBody.scrollTop=0;
+        }
+        paintReview();box.appendChild(reviewBody);review.appendChild(box);review.addEventListener('click',e=>{if(e.target===review)closeReview();});doc.documentElement.appendChild(review);back.focus({preventScroll:true});guarding();return true;
     }
-    function onKey(e){if(!review||doc.getElementById('csh-ui-confirm'))return;if(e.key==='Escape'){e.preventDefault();e.stopImmediatePropagation();closeReview();}else if(e.key==='Tab'){const stops=[...review.querySelectorAll('button,input')].filter(n=>!n.disabled&&n.getClientRects().length);const first=stops[0],last=stops[stops.length-1];if(!review.contains(doc.activeElement)||(e.shiftKey&&doc.activeElement===first)||(!e.shiftKey&&doc.activeElement===last)){e.preventDefault();(e.shiftKey?last:first).focus();}}}
-    function visibility(){queue.pause(doc.hidden||!!review);}
+    function onKey(e){if(!review||holds.size||doc.getElementById('csh-ui-confirm'))return;if(e.key==='Escape'){e.preventDefault();e.stopImmediatePropagation();closeReview();}else if(e.key==='Tab'){const stops=[...review.querySelectorAll('button,input')].filter(n=>!n.disabled&&n.getClientRects().length);const first=stops[0],last=stops[stops.length-1];if(!review.contains(doc.activeElement)||(e.shiftKey&&doc.activeElement===first)||(!e.shiftKey&&doc.activeElement===last)){e.preventDefault();(e.shiftKey?last:first).focus();}}}
+    function visibility(){syncPause();}
     function pageHide(e){if(e&&e.persisted){closeReview();queue.skip();queue.pause(true);}else destroy();}
-    function pageShow(e){if(e&&e.persisted)queue.pause(doc.hidden||!!review);}
+    function pageShow(e){if(e&&e.persisted)syncPause();}
     function destroy(){if(closed)return;closed=true;if(guard!==null)win.clearTimeout(guard);guard=null;removeCard();if(review)review.remove();review=null;queue.destroy();doc.removeEventListener('keydown',onKey,true);doc.removeEventListener('visibilitychange',visibility);win.removeEventListener('pagehide',pageHide);win.removeEventListener('pageshow',pageShow);}
     doc.addEventListener('keydown',onKey,true);doc.addEventListener('visibilitychange',visibility);win.addEventListener('pagehide',pageHide);win.addEventListener('pageshow',pageShow);visibility();
-    return {show:queue.accept,review:()=>openReview(null),skip:queue.skip,preferences,setPreferences,status:queue.snapshot,destroy};
+    return {show:queue.accept,hold,review:()=>openReview(null),skip:queue.skip,preferences,setPreferences,status:queue.snapshot,destroy};
 }

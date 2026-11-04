@@ -1,0 +1,38 @@
+// Source transaction coverage for the 22 expanded ratio achievements. VM stores only.
+import fs from 'node:fs';import path from 'node:path';import vm from 'node:vm';import {webcrypto} from 'node:crypto';import * as roster from '../core/csh_bossdata.js';import {root,parse,walk} from './lib/skill_audit.mjs';
+const at=process.argv.indexOf('--out');if(at<0)throw Error('--out required');const out=path.resolve(process.argv[at+1]);fs.mkdirSync(out,{recursive:true});
+function fixture(file){let src=fs.readFileSync(root+'/tools/'+file,'utf8').split('const checks=')[0].replace(/^import .*?;\r?\n/gm,'');src=src.replace(/const out='[^']*';fs.mkdirSync\(out,\{recursive:true\}\);/,'const out="unused";');const ctx=vm.createContext({fs,path,vm,webcrypto,root,parse,walk,console,...roster,roster,TextEncoder,TextDecoder,btoa,atob,process});vm.runInContext(src+'\nthis.makeFixture=make;',ctx);return ctx.makeFixture;}
+const player=fixture('probe_career_player_unlocks_20261104.mjs'),gamble=fixture('probe_career_gamble_unlocks.mjs');
+const checks=[],check=(name,value)=>checks.push({name,passed:!!value}),tick=async()=>{for(let i=0;i<16;i++)await Promise.resolve()},entry=(h,k)=>h.W.careerUnlocks()?.entries[k],pd=h=>h.ctx.window.CSH_ACHV.defs.filter(d=>/^cx_ratio_(winrate|killper)_/.test(d.key)),gd=h=>h.ctx.window.CSH_ACHV.defs.filter(d=>/^cx_ratio_(gmret|gmwinrate)_/.test(d.key));
+const match=(i,win=true,kills=2)=>({id:'ratio-personal-source-'+String(i).padStart(6,'0'),mode:'identity',win,kills,chars:['hero'],observedAt:1700000000000+i});
+{
+ const h=player(),pc=h.W.pc();for(let i=1;i<=49;i++)h.bank.commitPlayerMatch(match(i),h.bank.saveEpoch());await tick();check('49 personal matches do not bypass minimum sample',pd(h).every(d=>!entry(h,d.key)));
+ const offset=h.writes.length;h.bank.commitPlayerMatch(match(50),h.bank.saveEpoch());const saved=JSON.parse(h.writes.slice(offset).find(x=>x.k==='csh_wallet').v);await tick();check('all 12 personal ratios share 50th accepted source checkpoint and exact time',pd(h).length===12&&pd(h).every(d=>saved.careerUnlocks.entries[d.key]?.observedAt===match(50).observedAt));check('qualification pays no automatic reward',h.W.pc()===pc);
+ for(let i=51;i<=151;i++)h.bank.commitPlayerMatch(match(i,false,0),h.bank.saveEpoch());await tick();check('falling ratios retain first eligibility and do not repeat feedback',pd(h).every(d=>entry(h,d.key)?.observedAt===match(50).observedAt)&&h.feedback.flatMap(x=>x.rows).filter(r=>r.id==='cx_ratio_winrate_35').length===1);
+ const reboot=player({data:h.data});await tick();check('whole module restart keeps fallen ratios and original date',pd(reboot).every(d=>entry(reboot,d.key)?.observedAt===match(50).observedAt)&&reboot.feedback.length===0);
+ const key='cx_ratio_winrate_60',reward=h.ctx.window.CSH_ACHV.byId(key).reward;const a=h.W.claimCareer(key,reward,'manual ratio'),b=h.W.claimCareer(key,reward,'repeat ratio');check('retained eligibility can be claimed exactly once',a.ok&&b.already&&h.W.pc()===pc+reward);
+ const decimalKeys=['cx_ratio_killper_1.2','cx_ratio_killper_1.5'];for(const k of decimalKeys){const r=h.ctx.window.CSH_ACHV.byId(k).reward;const first=h.W.claimCareer(k,r,'decimal ratio'),again=h.W.claimCareer(k,r,'repeat decimal ratio');check('existing decimal ID claims once '+k,first.ok&&again.already);}
+ const data=await h.M.export(),ex=await h.M.inspect(data);check('decimal qualifications and paid receipts survive portable export',ex.ok&&decimalKeys.every(k=>ex.data.wallet.careerClaims[k]===1&&ex.data.wallet.careerUnlocks.entries[k]?.observedAt===match(50).observedAt));
+ const imported=player(),res=await imported.M.import(data);await tick();check('imported decimal IDs remain paid without replay',res.ok&&decimalKeys.every(k=>entry(imported,k)?.observedAt===match(50).observedAt&&imported.W.claimCareer(k,imported.ctx.window.CSH_ACHV.byId(k).reward,'after import').already));
+ for(const bad of ['other.key','cx_ratio_killper_1.3','__proto__']){let refused=false;try{h.bank.validateCareerUnlocks({v:1,baseline:true,entries:JSON.parse('{"'+bad+'":{"observedAt":1}}')})}catch{refused=true}check('invalid qualification key still rejected '+bad,refused);}
+
+}
+{
+ const h=player({start:false});delete h.lib.cshCareerObserver;for(let i=1;i<=551;i++)h.bank.commitPlayerMatch(match(i,i<=50,i<=50?2:0),h.bank.saveEpoch());
+ const reboot=player({data:h.data});await tick();check('late observer replays lossless compacted receipts even when ratio has since fallen',pd(reboot).every(d=>entry(reboot,d.key)?.observedAt===match(50).observedAt)&&reboot.feedback.length===0);
+}
+{
+ const h=player();for(let i=1;i<=49;i++)h.bank.commitPlayerMatch(match(i),h.bank.saveEpoch());await tick();h.fault.key='csh_wallet';let refused=false;try{h.bank.commitPlayerMatch(match(50),h.bank.saveEpoch())}catch{refused=true}await tick();check('failed source commit publishes no personal ratio qualification',refused&&pd(h).every(d=>!entry(h,d.key)));h.fault.key=null;h.bank.commitPlayerMatch(match(50),h.bank.saveEpoch());await tick();check('retry preserves original source date',pd(h).every(d=>entry(h,d.key)?.observedAt===match(50).observedAt));
+}
+{
+ const h=gamble(),pc=h.W.pc();for(let i=0;i<99;i++)h.G.noteGamble(100000);await tick();check('99 gamble results do not bypass 100-result sample',gd(h).every(d=>!entry(h,d.key)));h.G.noteGamble(100000);await tick();const source=JSON.parse(h.data.get('csh_world')),stamp=source.careerUnlocks.entries.cx_ratio_gmret_80000?.observedAt;check('all 10 gamble ratios persist in accepted source and aggregate',gd(h).length===10&&stamp>0&&gd(h).every(d=>source.careerUnlocks.entries[d.key]?.observedAt===stamp&&entry(h,d.key)?.observedAt===stamp));
+ for(let i=0;i<101;i++)h.G.noteGamble(-100000);await tick();const reboot=gamble({data:h.data});await tick();check('declining gamble return and win rate keep first date across reload',gd(reboot).every(d=>entry(reboot,d.key)?.observedAt===stamp)&&reboot.feedback.length===0);check('gamble qualifications do not pay automatically',h.W.pc()===pc);
+ const ex=await h.M.inspect(await h.M.export());check('export retains both source and permanent ratio records',ex.ok&&gd(h).every(d=>ex.data.world.careerUnlocks.entries[d.key]?.observedAt===stamp&&ex.data.wallet.careerUnlocks.entries[d.key]?.observedAt===stamp));
+}
+{
+ const h=gamble();for(let i=0;i<99;i++)h.G.noteGamble(100000);await tick();h.fault.key='csh_world';let refused=false;try{refused=!h.G.noteGamble(100000)}catch{refused=true}await tick();check('rejected gamble source publishes no ratio eligibility',refused&&gd(h).every(d=>!entry(h,d.key)));h.fault.key=null;h.G.noteGamble(100000);await tick();check('gamble source retry records qualification',gd(h).every(d=>entry(h,d.key)?.observedAt>0));
+}
+{
+ const h=gamble();for(let i=0;i<99;i++)h.G.noteGamble(100000);await tick();h.fault.key='csh_wallet';h.G.noteGamble(100000);await tick();const source=JSON.parse(h.data.get('csh_world')),stamp=source.careerUnlocks.entries.cx_ratio_gmret_80000?.observedAt;check('aggregate failure retains source proof without premature feedback',stamp>0&&!entry(h,'cx_ratio_gmret_80000'));const reboot=gamble({data:h.data});await tick();check('source-only checkpoint recovers exact ratio date quietly',gd(reboot).every(d=>entry(reboot,d.key)?.observedAt===stamp)&&reboot.feedback.length===0);
+}
+const failures=checks.filter(x=>!x.passed),result={scope:'Real modules in disposable VM, controlled accepted source results; not natural long-term human play.',passed:checks.length-failures.length,failed:failures.length,checks};fs.writeFileSync(out+'/results.json',JSON.stringify(result,null,2));console.log(JSON.stringify({...result,checks:failures}));process.exitCode=failures.length?1:0;

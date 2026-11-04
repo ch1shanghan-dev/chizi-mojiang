@@ -25,6 +25,7 @@ async function achievementFeedbackHost(){
  check('review exposes all 100 records without replaying animations',await page.evaluate('document.querySelectorAll("#csh-ach-review article").length===100&&!document.getElementById("csh-ach-feedback")'));
 
  await page.evaluate('window.__feedbackSetItem=Storage.prototype.setItem;Storage.prototype.setItem=function(k,v){if(k==="csh_achievement_ui_v1")throw Error("isolated preference quota");return __feedbackSetItem.call(this,k,v)}');
+ await clickElement('[...document.querySelectorAll("#csh-ach-review button")].find(n=>n.textContent==="显示设置")');
  await clickElement('document.querySelector("#csh-ach-review input[aria-label=减少动效]")');
  check('failed preference write reports failure and restores the checkbox',await page.evaluate('!document.querySelector("#csh-ach-review input[aria-label=减少动效]").checked&&document.getElementById("csh-ach-review").textContent.includes("未保存")'));
  await page.evaluate('Storage.prototype.setItem=__feedbackSetItem');

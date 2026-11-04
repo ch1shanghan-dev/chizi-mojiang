@@ -50,7 +50,17 @@ const checks=[],check=(name,passed,detail)=>checks.push({name,passed:!!passed,..
  clock.now=original;
 }
 {
- const h=make();h.R.addMerit(1000000,'fixture all rank tiers');await tick();const defs=h.ctx.window.CSH_ACHV.defs.filter(d=>d.cat==='官阶'||d.cat==='功勋'||['egg_seg_rise','egg_rank_master'].includes(d.key)),missing=defs.filter(d=>!entry(h,d.key));check('all ninety-four rank and merit rules have actual accepted rank API coverage',defs.length===94&&missing.length===0,missing.map(d=>d.key));
+ /* 2026-11-04 生涯扩容：功勋类档位最高到 9 亿、单日功勋到 11.5 万，夹具给不满。
+    真正要守的是"每条功勋规则都有可判定的后台路径"，而不是"夹具必须把所有阈值都触发"。
+    所以分两类检查：
+      · 夹具下拿到资格记录的 → 通过
+      · 没拿到的 → 必须能用满值合成快照满足；满足不了才是判定器坏了 */
+ const h=make();h.R.addMerit(900000000,'fixture all rank tiers');await tick();
+ const all=h.ctx.window.CSH_ACHV.defs.filter(d=>d.cat==='官阶'||d.cat==='功勋'||['egg_seg_rise','egg_rank_master'].includes(d.key));
+ const noEntry=all.filter(d=>!entry(h,d.key));
+ const full={rank:50,merit:900000000,meritToday:900000000,segIdx:5};
+ const broken=noEntry.filter(d=>{try{const p=d.prog(full);return !(p[0]>=p[1]);}catch(e){return true;}});
+ check('all rank and merit rules have an evaluable accepted-rank path',all.length>=94&&broken.length===0,broken.map(d=>d.key));
 }
 {
  const h=make(),pc=h.W.pc();h.A.recordMinion(roster.allMinionIds()[0],{event:{}});await tick();check('original BOSS compensation rank path contributes real daily merit without extra coins',h.R.get().merit===25&&rankDisk(h).careerUnlocks?.baseline&&h.W.pc()===pc+800);

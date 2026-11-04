@@ -263,11 +263,11 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 	}
 	function lsPut(k, o) { try { lsSet(k, JSON.stringify(o)); } catch (e) {} }
 
-	function toast(msg) {
+	function toast(msg,options) {
 		msg = String(msg == null ? "" : msg);
 		try {
 			/* 统一走界面基座（documentElement 挂载 · 不随 body 缩放 · 合并/排队/描金） */
-			if (lib.cshUI && typeof lib.cshUI.toast === "function") { lib.cshUI.toast(msg); return; }
+			if (lib.cshUI && typeof lib.cshUI.toast === "function") { lib.cshUI.toast(msg,options); return; }
 		} catch (e0) {}
 		try {
 			if (typeof ui !== "undefined" && ui && ui.create && typeof ui.create.toast === "function") {
@@ -426,7 +426,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 		if (_saveTimer) { clearTimeout(_saveTimer); _saveTimer = 0; }
 		/* 迁移只可在尚无恢复凭据时刷新旧钱包；busy 标志不能令它自锁。 */
 		var saved = syncSave(!!(options && options.migration));
-		if(saved && !(options && options.migration))flushCheckpoints();
+		if(saved && !(options && options.migration)){flushCheckpoints();flushTableResults();}
 		return saved;
 	}
 	function syncSave(forMigration) {
@@ -519,16 +519,17 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 	}
 	/* 讨伐配置保全：同名ZIP更新会删除extension_*配置，钱包不受该清理影响。
 	   保全副本是已接受写入的真值；宿主config只作兼容镜像。无经济入账。 */
-	function bossSaved() {
-		if (wallet.bossSaved == null) return null;
-		if (typeof wallet.bossSaved !== "object" || Array.isArray(wallet.bossSaved)) throw new Error("讨伐保全副本格式异常");
-		["bossKill", "bossAsBoss", "bounty"].forEach(function (key) {
-			if (!Object.prototype.hasOwnProperty.call(wallet.bossSaved, key)) return;
-			var value = wallet.bossSaved[key];
-			if (key === "bounty" ? typeof value !== "string" : !value || typeof value !== "object" || Array.isArray(value)) throw new Error("讨伐保全字段异常：" + key);
-		});
-		return JSON.parse(JSON.stringify(wallet.bossSaved));
-	}
+	function validateBossSaved(savedValue) {
+        if(savedValue==null)return null;
+        if(typeof savedValue!=="object"||Array.isArray(savedValue))throw Error("讨伐保全副本格式异常");
+        ["bossKill","bossAsBoss","bounty"].forEach(function(key){
+            if(!Object.prototype.hasOwnProperty.call(savedValue,key))return;
+            var value=savedValue[key];
+            if(key==="bounty"?typeof value!=="string":!value||typeof value!=="object"||Array.isArray(value))throw Error("讨伐保全字段异常："+key);
+        });
+        return JSON.parse(JSON.stringify(savedValue));
+    }
+	function bossSaved() { return validateBossSaved(wallet.bossSaved); }
 	function preserveBoss(patch) {
 		if (saveBlocked()) return false;
 		var before = wallet;
@@ -702,6 +703,63 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 	}
 	function affectionSaved(){return validateAffectionState(wallet.affectionSaved);}
 	function cheerState(){return validateCheerState(wallet.cheerState);}
+    /* Personal native-match facts are independent of all-seat character appearances.
+       Keep every accepted receipt: capacity refusal is safer than replaying an evicted result. */
+    var PLAYER_MATCH_MODES=["identity","versus","doudizhu","guozhan"];
+    function playerMatchInput(value){
+        if(!value||typeof value!=="object"||Array.isArray(value)||typeof value.id!=="string"||!/^[A-Za-z0-9_-]{10,100}$/.test(value.id)||PLAYER_MATCH_MODES.indexOf(value.mode)<0||typeof value.win!=="boolean"||!Number.isSafeInteger(value.kills)||value.kills<0||value.kills>100000||!Number.isSafeInteger(value.observedAt)||value.observedAt<0||!Array.isArray(value.chars)||!value.chars.length||value.chars.length>4)throw Error("个人对局记录无效");
+        var chars=value.chars.slice();if(chars.some(function(id){return typeof id!=="string"||!id||id.length>120||/[\x00-\x1f]/.test(id);})||new Set(chars).size!==chars.length)throw Error("个人武将记录无效");chars.sort();
+        return {id:value.id,mode:value.mode,win:value.win,kills:value.kills,chars:chars,observedAt:value.observedAt};
+    }
+    function validatePlayerMatches(value){
+        if(value==null)return null;
+        var x=JSON.parse(JSON.stringify(value));
+        if(x.v===2){
+            if(!Number.isSafeInteger(x.since)||x.since<0||!Array.isArray(x.chars)||!Array.isArray(x.receipts))throw Error("个人对局紧凑记录异常");
+            x.receipts=x.receipts.map(function(r){
+                if(!Array.isArray(r)||r.length!==6||!Number.isInteger(r[1])||r[1]<0||r[1]>=PLAYER_MATCH_MODES.length||![0,1].includes(r[2])||!Array.isArray(r[4])||!Number.isSafeInteger(r[5])||r[5]<0||!Number.isSafeInteger(x.since+r[5])||r[4].some(function(i){return !Number.isInteger(i)||i<0||i>=x.chars.length;}))throw Error("个人对局紧凑条目异常");
+                var input=playerMatchInput({id:r[0],mode:PLAYER_MATCH_MODES[r[1]],win:r[2]===1,kills:r[3],chars:r[4].map(function(i){return x.chars[i];}),observedAt:x.since+r[5]});
+                return {id:input.id,payload:JSON.stringify(input),t:input.observedAt};
+            });x.v=1;
+        }
+        if(x.v!==1||!Number.isSafeInteger(x.since)||x.since<0||!x.modes||typeof x.modes!=="object"||Array.isArray(x.modes)||!Array.isArray(x.chars)||x.chars.length>20000||!Array.isArray(x.receipts))throw Error("个人对局存档格式异常");
+        var games=0;Object.keys(x.modes).forEach(function(mode){var m=x.modes[mode];if(PLAYER_MATCH_MODES.indexOf(mode)<0||!m||["games","win","lose","kill"].some(function(k){return !Number.isSafeInteger(m[k])||m[k]<0;})||m.win+m.lose!==m.games)throw Error("个人对局模式累计异常");games+=m.games;});
+        if(!Number.isSafeInteger(games)||games!==x.receipts.length)throw Error("个人对局凭据数量不符");
+        if(x.chars.some(function(id){return typeof id!=="string"||!id||id.length>120||/[\x00-\x1f]/.test(id);})||new Set(x.chars).size!==x.chars.length)throw Error("个人武将集合异常");
+        var seen=new Set(),verified={},knownChars=new Set(),first=null;x.receipts.forEach(function(r){if(!r||typeof r.id!=="string"||!/^[A-Za-z0-9_-]{10,100}$/.test(r.id)||seen.has(r.id)||typeof r.payload!=="string"||r.payload.length>2000||!Number.isSafeInteger(r.t)||r.t<x.since)throw Error("个人对局凭据异常");seen.add(r.id);var d=playerMatchInput(JSON.parse(r.payload));if(d.id!==r.id||d.observedAt!==r.t||JSON.stringify(d)!==r.payload)throw Error("个人对局凭据内容异常");var totals=verified[d.mode]||(verified[d.mode]={games:0,win:0,lose:0,kill:0});totals.games++;totals[d.win?"win":"lose"]++;totals.kill+=d.kills;d.chars.forEach(function(id){knownChars.add(id);});first=first===null?r.t:Math.min(first,r.t);});
+        if(JSON.stringify(Object.keys(x.modes).sort())!==JSON.stringify(Object.keys(verified).sort())||Object.keys(verified).some(function(mode){return ["games","win","lose","kill"].some(function(k){return x.modes[mode][k]!==verified[mode][k];});})||knownChars.size!==x.chars.length||x.chars.some(function(id){return !knownChars.has(id);})||first!==null&&first!==x.since)throw Error("个人对局累计与凭据不一致");
+        return x;
+    }
+    /* A lossless tuple format removes repeated field names and character strings.
+       Public readers still receive v1 facts; no receipt is evicted to make room. */
+    function compactPlayerMatches(value){
+        var state=validatePlayerMatches(value);if(!state||state.receipts.length<=512)return state;
+        var indices=new Map(state.chars.map(function(id,i){return [id,i];}));
+        return {v:2,since:state.since,modes:state.modes,chars:state.chars,receipts:state.receipts.map(function(r){var d=JSON.parse(r.payload);return [d.id,PLAYER_MATCH_MODES.indexOf(d.mode),d.win?1:0,d.kills,d.chars.map(function(id){return indices.get(id);}),d.observedAt-state.since];})};
+    }
+    function playerMatches(){return validatePlayerMatches(wallet.playerMatches);}
+    function commitPlayerMatch(value,epoch){
+        if(epoch!==adoptedSaveEpoch||saveBlocked())throw Error("个人对局记录已过期或存档正在恢复");
+        var input=playerMatchInput(value),payload=JSON.stringify(input),state=playerMatches();
+        if(state){var old=state.receipts.find(function(r){return r.id===input.id;});if(old){if(old.payload!==payload)throw Error("个人对局凭据与原记录不符");return {ok:true,durable:true,repeated:true};}}
+        else state={v:1,since:input.observedAt,modes:{},chars:[],receipts:[]};
+        state.since=Math.min(state.since,input.observedAt);
+        var m=state.modes[input.mode]||{games:0,win:0,lose:0,kill:0};m.games++;m[input.win?"win":"lose"]++;m.kill+=input.kills;state.modes[input.mode]=m;
+        state.chars=Array.from(new Set(state.chars.concat(input.chars))).sort();state.receipts.push({id:input.id,payload:payload,t:input.observedAt});
+        state=validatePlayerMatches(state);
+        var before=wallet,next=JSON.parse(JSON.stringify(wallet));next.playerMatches=state;
+        var observer=lib.cshCareerObserver,prepared=null;
+        if(observer&&typeof observer.preparePlayerMatch==="function"){
+            prepared=observer.preparePlayerMatch(next,before,input.observedAt);
+            if(prepared){var previous=validateCareerUnlocks(next.careerUnlocks)||{v:1,baseline:true,entries:{}};var additions=validateCareerUnlocks(prepared.record);next.careerUnlocks={v:1,baseline:true,entries:Object.assign({},additions.entries,previous.entries)};}
+        }
+        if(state.receipts.length>512)next.playerMatches=compactPlayerMatches(state);
+        next._sig=sigOf(next);
+        if(epoch!==adoptedSaveEpoch||saveBlocked())throw Error("个人对局记录已过期或存档正在恢复");
+        persistWallet(next);wallet=next;
+        if(prepared&&observer&&typeof observer.committed==="function")try{observer.committed(next,prepared);}catch(error){logError("个人生涯达成反馈待恢复",error);}
+        return {ok:true,durable:true,repeated:false};
+    }
 	function validateCheckpointLedger(value) {
 		if(value==null)return [];
 		if(!Array.isArray(value)||value.length>100)throw Error("付费操作流水检查点异常");
@@ -729,7 +787,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 		if(!Number.isSafeInteger(charge)||typeof reason!=="string"||!reason.trim()||reason.length>120||charge>PC_CAP||charge< -SINGLE_ADD_CAP)return {ok:false,reason:"付费操作参数无效"};
 		if(charge>0&&wallet.pc<charge)return {ok:false,reason:"poor",balance:wallet.pc};
 		if(charge<0&&wallet.pc-charge>PC_CAP)return {ok:false,reason:"余额空间不足",balance:wallet.pc};
-		var safe;try{safe=field==="affectionSaved"?validateAffectionState(state):field==="cheerState"?validateCheerState(state):field==="dailyTaskSaved"?validateTaskState(state):null;if(!safe)throw Error("empty");}catch(e){return {ok:false,reason:"付费操作状态无效"};}
+		var safe;try{safe=field==="affectionSaved"?validateAffectionState(state):field==="cheerState"?validateCheerState(state):field==="dailyTaskSaved"?validateTaskState(state):field==="bossSaved"?validateBossSaved(state):null;if(!safe)throw Error("empty");}catch(e){return {ok:false,reason:"付费操作状态无效"};}
 		try{validateCheckpointLedger(wallet.checkpointPending);if(taskHistory!==undefined){if(field!=="dailyTaskSaved")throw Error("field");taskHistory=validateTaskLifetime(taskHistory);}}catch(e){return {ok:false,reason:"付费操作流水或日课累计记录异常"};}
 		flushCheckpointLedger();
 		if(charge&&Array.isArray(wallet.checkpointPending)&&wallet.checkpointPending.length>=100)return {ok:false,reason:"历史流水正在恢复，请稍后重试"};
@@ -741,6 +799,14 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 		}catch(e){wallet=before;return {ok:false,reason:"存档写入失败，本次操作未完成",balance:wallet.pc};}
 		flushCheckpoints();return {ok:true,balance:wallet.pc,charged:charge,ledgerPending:!!(wallet.checkpointPending&&wallet.checkpointPending.length)};
 	}
+	function commitBounty(id,state,cost) {
+        if(saveBlocked())return saveRefused();
+        if(typeof id!=="string"||!/^csh_boss_minion_[a-z0-9_]{1,40}$/.test(id)||!state||state.bounty!==id||!Number.isSafeInteger(cost)||cost<=0)return {ok:false,reason:"invalid"};
+        try { if((bossSaved()||{}).bounty===id)return {ok:true,replayed:true,cost:0,pc:wallet.pc,id:id}; }
+        catch(e){return {ok:false,reason:"save"};}
+        var result=commitCheckpoint("bossSaved",state,cost,"悬赏:"+id);
+        return result.ok?{ok:true,id:id,cost:cost,pc:result.balance,ledgerPending:result.ledgerPending}:{ok:false,reason:result.reason==="poor"?"poor":"save"};
+    }
 	function commitAffection(state,cost,reason){return commitCheckpoint("affectionSaved",state,cost,reason);}
 	function commitCheerState(state,charge,reason){if(!Number.isSafeInteger(charge)||charge<0||charge>1000000)return {ok:false,reason:"应援金额无效"};return commitCheckpoint("cheerState",state,charge,reason);}
 
@@ -769,12 +835,14 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 	}
 
     /* First observed career completion is separate from reward receipts. No money moves here. */
+    // Preserve shipped decimal achievement IDs without accepting arbitrary dotted keys.
+    function validCareerKey(key){return typeof key==="string"&&(/^[a-zA-Z0-9_]{1,60}$/.test(key)||/^cx_ratio_killper_(1\.2|1\.5)$/.test(key)||/^skilltop_0\.(7|8|85|9|95|98|99)$/.test(key));}
     function validateCareerUnlocks(value) {
         if(value==null)return null;
         if(typeof value!=="object"||Array.isArray(value)||value.v!==1||value.baseline!==true||!value.entries||typeof value.entries!=="object"||Array.isArray(value.entries))throw Error("生涯达成记录格式异常");
         var keys=Object.keys(value.entries);if(keys.length>16384)throw Error("生涯达成记录过多");
         var out={v:1,baseline:true,entries:{}};
-        keys.forEach(function(key){var item=value.entries[key];if(!/^[a-zA-Z0-9_]{1,60}$/.test(key)||["__proto__","prototype","constructor"].includes(key)||!item||typeof item!=="object"||Array.isArray(item)||!Number.isSafeInteger(item.observedAt)||item.observedAt<0||item.observedAt>8640000000000000)throw Error("生涯达成条目格式异常");out.entries[key]={observedAt:item.observedAt};});
+        keys.forEach(function(key){var item=value.entries[key];if(!validCareerKey(key)||["__proto__","prototype","constructor"].includes(key)||!item||typeof item!=="object"||Array.isArray(item)||!Number.isSafeInteger(item.observedAt)||item.observedAt<0||item.observedAt>8640000000000000)throw Error("生涯达成条目格式异常");out.entries[key]={observedAt:item.observedAt};});
         return out;
     }
     function careerUnlocks(){return validateCareerUnlocks(wallet.careerUnlocks);}
@@ -782,9 +850,9 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
         if(saveBlocked())return saveRefused();
         var before=wallet;
         try {
-            if(!Array.isArray(keys)||keys.length>16384||keys.some(function(k){return typeof k!=="string"||!/^[a-zA-Z0-9_]{1,60}$/.test(k)||["__proto__","prototype","constructor"].includes(k);}))throw Error("生涯达成候选无效");
+            if(!Array.isArray(keys)||keys.length>16384||keys.some(function(k){return typeof k!=="string"||!validCareerKey(k)||["__proto__","prototype","constructor"].includes(k);}))throw Error("生涯达成候选无效");
             var historical=options&&options.historicalKeys||[];
-            if(!Array.isArray(historical)||historical.length>16384||historical.some(function(k){return typeof k!=="string"||!/^[a-zA-Z0-9_]{1,60}$/.test(k)||["__proto__","prototype","constructor"].includes(k);}))throw Error("历史生涯候选无效");
+            if(!Array.isArray(historical)||historical.length>16384||historical.some(function(k){return typeof k!=="string"||!validCareerKey(k)||["__proto__","prototype","constructor"].includes(k);}))throw Error("历史生涯候选无效");
             var source=options&&options.sourceRecord?validateCareerUnlocks(options.sourceRecord):null;
             var history=Object.create(null);historical.forEach(function(k){history[k]=true;});
             var record=careerUnlocks(),initial=!record;record=record||{v:1,baseline:true,entries:{}};
@@ -792,7 +860,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
             if(!legacy||typeof legacy!=="object"||Array.isArray(legacy))throw Error("旧生涯领奖记录无法读取");
             var claims=wallet.careerClaims||{};if(typeof claims!=="object"||Array.isArray(claims))throw Error("生涯领奖凭据格式异常");
             var paid=Object.create(null),fresh=[],changed=initial,stamp=Date.now();[legacy,claims].forEach(function(source){Object.keys(source).forEach(function(k){if(source[k])paid[k]=1;});});
-            Object.keys(paid).forEach(function(k){if(!paid[k])return;if(!/^[a-zA-Z0-9_]{1,60}$/.test(k)||["__proto__","prototype","constructor"].includes(k))throw Error("旧生涯领奖条目无效");if(!Object.prototype.hasOwnProperty.call(record.entries,k)){record.entries[k]={observedAt:0};changed=true;}});
+            Object.keys(paid).forEach(function(k){if(!paid[k])return;if(!validCareerKey(k)||["__proto__","prototype","constructor"].includes(k))throw Error("旧生涯领奖条目无效");if(!Object.prototype.hasOwnProperty.call(record.entries,k)){record.entries[k]={observedAt:0};changed=true;}});
             keys.forEach(function(k){if(!Object.prototype.hasOwnProperty.call(record.entries,k)){record.entries[k]={observedAt:source&&source.entries[k]?source.entries[k].observedAt:initial||history[k]?0:stamp};if(record.entries[k].observedAt>0)fresh.push(k);changed=true;}});
             record=validateCareerUnlocks(record);
             if(!changed)return {ok:true,record:record,fresh:[],baseline:false};
@@ -804,7 +872,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 
 	function claimCareer(key, amount, label) {
 		if (saveBlocked()) return saveRefused();
-		if (typeof key !== "string" || !/^[a-zA-Z0-9_]{1,60}$/.test(key) ||
+		if (typeof key !== "string" || !validCareerKey(key) ||
 			!Number.isSafeInteger(amount) || amount <= 0 || amount > SINGLE_ADD_CAP ||
 			typeof label !== "string" || !label.trim()) return { ok: false, reason: "成就奖励无效" };
 		var claims = wallet.careerClaims;
@@ -922,18 +990,28 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
         if(s.v!==1||!Number.isSafeInteger(s.wins)||s.wins<0||!Number.isSafeInteger(s.losses)||s.losses<0||!Array.isArray(s.receipts)||s.receipts.length>64||s.receipts.some(function(id){return typeof id!=="string"||!/^[a-zA-Z0-9_-]{10,100}$/.test(id);}))throw Error("辅助战绩损坏，请先备份恢复");
         return JSON.parse(JSON.stringify(s));
     }
-    function settleAssisted(id,win) {
+    function settleAssisted(id,win,amount,observedAt) {
         if(saveBlocked())return saveRefused();
         if(typeof id!=="string"||!/^[a-zA-Z0-9_-]{10,100}$/.test(id)||typeof win!=="boolean")return {ok:false,reason:"辅助战绩无效"};
-        try{
-            var s=assistedStats();if(s.receipts.indexOf(id)>=0)return {ok:true,already:true};
-            var field=win?"wins":"losses";if(s[field]>=Number.MAX_SAFE_INTEGER)return {ok:false,reason:"战绩已达上限"};
+        var before=wallet,gained=0;
+        try {
+            var s=assistedStats();
+            if(s.receipts.indexOf(id)>=0){flushMatchLedger();return {ok:true,already:true,gained:0,balance:wallet.pc};}
+            var claims=matchClaims(),prior=claims.find(function(r){return r.id===id;});
+            if(prior){if(prior.mode!=="assisted_identity"||prior.win!==win)return {ok:false,reason:"辅助结算凭据冲突"};flushMatchLedger();return {ok:true,already:true,gained:0,balance:wallet.pc};}
+            if(amount===undefined){var rates=matchRewardConfig().identity;if(!rates)throw Error("identity reward missing");amount=rates[win?"win":"lose"];}
+            if(!Number.isSafeInteger(amount)||amount<0||amount>1000||observedAt!=null&&(!Number.isSafeInteger(observedAt)||observedAt<0))throw Error("invalid auxiliary reward");
+            if(!flushMatchLedger())return {ok:false,reason:"上笔奖励流水尚未恢复，请稍后重试"};
+            before=wallet;var field=win?"wins":"losses";if(s[field]>=Number.MAX_SAFE_INTEGER)throw Error("auxiliary count overflow");
             s[field]++;s.receipts=s.receipts.slice(-63).concat(id);
-            var next=JSON.parse(JSON.stringify(wallet));next.assistedStats=s;next._sig=sigOf(next);
-            if(saveBlocked())return saveRefused();persistWallet(next);wallet=next;
-            return {ok:true,stats:assistedStats(),gained:0};
-        }catch(e){return {ok:false,reason:"辅助战绩保存失败"};}
+            wallet=JSON.parse(JSON.stringify(before));wallet.assistedStats=s;gained=Math.min(amount,PC_CAP-wallet.pc);wallet.pc+=gained;wallet.pcPeak=Math.max(wallet.pcPeak,wallet.pc);if(gained)appendChain(gained);
+            var stamp=observedAt==null?Date.now():observedAt,reason="妖灵助战:"+(win?"胜利":"失败");
+            wallet.matchClaims=(wallet.matchClaims||[]).slice(-63);wallet.matchClaims.push({id:id,mode:"assisted_identity",win:win,pc:gained,t:stamp,entry:gained?{t:stamp,d:gained,r:reason,c:"对局奖励",b:wallet.pc,matchTx:id}:null});wallet._sig=sigOf(wallet);
+            if(saveBlocked())throw Error("save blocked");persistWallet(wallet);
+        }catch(error){wallet=before;logError("辅助奖励保存失败",error);return {ok:false,reason:"辅助奖励保存失败，请重试"};}
+        flushMatchLedger();snapshot();return {ok:true,stats:assistedStats(),gained:gained,balance:wallet.pc};
     }
+
 	function settleMatch(id, mode, win, amount) {
 		if (saveBlocked()) return saveRefused();
 		if (typeof id !== "string" || !/^[a-zA-Z0-9_-]{10,100}$/.test(id) || typeof mode !== "string" || !/^[a-zA-Z0-9_-]{1,40}$/.test(mode) || typeof win !== "boolean" || !Number.isSafeInteger(amount) || amount < 0 || amount > 1000) return { ok:false, reason:"对局奖励无效" };
@@ -1070,22 +1148,94 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 	   算 payout → 写回钱包 → 返回含 credited 的完整结果。
 	   钱只在这里动 —— csh_shell 退化为纯展示层（文案 / 提示音 / 事件），
 	   不再自己 addPC，也就不可能再出现「同一局两条路径入账金额不同」。 */
+    /* Wallet-owned world intents travel in the same durable balance write. */
+    var tableResultBusy=false,tableResultError="";
+    function validateTableOutbox(value){
+        if(value==null)return [];
+        if(!Array.isArray(value)||value.length>64)throw Error("牌桌待保存记录异常");
+        var seen={};return value.map(function(e){
+            if(!e||typeof e!=="object"||Array.isArray(e)||typeof e.id!=="string"||!/^[a-zA-Z0-9_-]{10,100}$/.test(e.id)||seen[e.id]||!Number.isSafeInteger(e.t)||e.t<0||!Array.isArray(e.ops)||(e.ops.length<1&&e.gambleProfit===undefined)||e.ops.length>5)throw Error("牌桌结果凭据异常");seen[e.id]=true;
+            var people={};var ops=e.ops.map(function(o){
+                if(!o||typeof o.id!=="string"||!/^[a-zA-Z0-9_-]{1,100}$/.test(o.id)||people[o.id]||["win","lose","result","team","play"].indexOf(o.kind)<0)throw Error("牌桌人物结果异常");people[o.id]=true;
+                var out={id:o.id,kind:o.kind};
+                if(o.kind==="win"||o.kind==="lose"){if(!Number.isSafeInteger(o.amount)||o.amount<0||o.amount>100000000000)throw Error("牌桌资金结果异常");out.amount=o.amount;}
+                else if(o.kind!=="play") {if(o.kind==="team"?typeof o.won!=="boolean":o.won!==true&&o.won!==false&&o.won!==null)throw Error("牌桌胜负结果异常");out.won=o.won;}
+                return out;
+            });var entry={id:e.id,t:e.t,ops:ops};if(e.gambleProfit!==undefined){if(!Number.isSafeInteger(e.gambleProfit)||Math.abs(e.gambleProfit)>100000000000)throw Error("豪赌结果金额异常");entry.gambleProfit=e.gambleProfit;}return entry;
+        });
+    }
+    /* Non-cash table results use the same durable outbox, without adding money. */
+    function queueTableResult(value){
+        if(saveBlocked())return {ok:false,reason:SAVE_BLOCK_REASON};
+        var before=wallet,entry;
+        try{
+            var api=lib.cshWorld;
+            if(!api||typeof api.validateTableResult!=="function"||typeof api.commitTableResult!=="function")throw Error("牌友记录尚未就绪");
+            entry=api.validateTableResult(value);
+            var jobs=validateTableOutbox(wallet.tableOutbox),same=jobs.find(function(e){return e.id===entry.id;});
+            if(same&&JSON.stringify(same)!==JSON.stringify(entry))throw Error("牌友记录内容冲突");
+            var receipts=api.raw&&api.raw().tableReceipts||[],saved=receipts.find(function(e){return e.id===entry.id;});
+            if(saved){if(saved.payload!==JSON.stringify(entry))throw Error("牌友记录内容冲突");return {ok:true,already:true,worldPending:false,results:JSON.parse(JSON.stringify(saved.results))};}
+            if(!same){if(jobs.length>=64)throw Error("请先恢复待保存的牌友记录");wallet=JSON.parse(JSON.stringify(wallet));wallet.tableOutbox=validateTableOutbox(jobs.concat(entry));wallet._sig=sigOf(wallet);persistWallet(wallet);}
+        }catch(error){wallet=before;logError("牌友记录未能写入",error);return {ok:false,reason:"牌友记录尚未写入本机，请保留牌桌后重试"};}
+        var flushed=flushTableResults();
+        return {ok:true,durable:true,worldPending:validateTableOutbox(wallet.tableOutbox).some(function(e){return e.id===entry.id;}),results:flushed.byId[entry.id]||[]};
+    }
+    function tableResultStatus(){
+        try{var jobs=validateTableOutbox(wallet.tableOutbox);return {count:jobs.length,error:jobs.length?tableResultError:"",items:jobs.map(function(e){return {id:e.id,kind:"table",t:e.t};})};}
+        catch(error){return {count:Array.isArray(wallet.tableOutbox)?wallet.tableOutbox.length:0,error:String(error.message||error),items:[]};}
+    }
+    function flushTableResults(){
+        var byId={},results=[];
+        if(tableResultBusy||saveBlocked())return {ok:false,pending:tableResultStatus().count>0,results:results,byId:byId};
+        tableResultBusy=true;
+        try{
+            var jobs=validateTableOutbox(wallet.tableOutbox),W=lib.cshWorld;
+            if(jobs.length&&(!W||typeof W.commitTableResult!=="function"))throw Error("牌桌世界记录尚未就绪");
+            while(jobs.length){
+                var job=jobs[0],answer=W.commitTableResult(job);
+                if(!answer||answer.ok!==true)throw Error(answer&&answer.reason||"牌桌世界记录尚未保存");
+                byId[job.id]=answer.results;results=results.concat(answer.results||[]);
+                var before=wallet;
+                try{wallet=JSON.parse(JSON.stringify(wallet));wallet.tableOutbox=jobs.slice(1);wallet._sig=sigOf(wallet);persistWallet(wallet);}
+                catch(error){wallet=before;throw error;}
+                jobs=validateTableOutbox(wallet.tableOutbox);
+            }
+            tableResultError="";
+        }catch(error){tableResultError=String(error.message||error);logError("牌桌世界记录待保存",error);}
+        finally{tableResultBusy=false;}
+        var state=tableResultStatus();if(state.count||state.error)resultSchedule();return {ok:!state.count&&!state.error,pending:state.count>0,results:results,byId:byId};
+    }
 	function settleRun(gameKey, opts) {
 		if (saveBlocked()) return Object.assign(saveRefused(), { credited: 0, balance: wallet.pc });
 		opts = opts || {};
 		var r = settle(gameKey, opts.buyIn, opts.netWin, opts.aiStakeTotal, opts.players);
 		/* A successful ACK requires durable balance, even when the ledger mirror is temporarily unavailable. */
-        var credited=0,before=wallet;
+        var credited=0,before=wallet,worldEntry=null;
         try {
+            if(typeof opts.prepareWorldResult==="function"&&validateTableOutbox(wallet.tableOutbox).length){
+                flushTableResults();if(validateTableOutbox(wallet.tableOutbox).length)throw Error("请先恢复上一场牌桌记录");before=wallet;
+            }
             validateCheckpointLedger(wallet.checkpointPending);flushCheckpointLedger();
             if(Array.isArray(wallet.checkpointPending)&&wallet.checkpointPending.length>=100)throw Error('ledger pending');
             wallet=JSON.parse(JSON.stringify(wallet));
             credited=r.payout>SINGLE_ADD_CAP?0:Math.max(0,Math.min(r.payout,PC_CAP-wallet.pc));
             wallet.pc+=credited;wallet.pcPeak=Math.max(wallet.pcPeak,wallet.pc);
             if(credited){appendChain(credited);wallet.checkpointSeq=(Number.isSafeInteger(wallet.checkpointSeq)?wallet.checkpointSeq:0)+1;if(!Array.isArray(wallet.checkpointPending))wallet.checkpointPending=[];wallet.checkpointPending.push({t:Date.now(),d:credited,r:'结算/'+gameKey,c:catOf('结算/'+gameKey),b:wallet.pc,checkpointTx:'cp-'+Date.now().toString(36)+'-'+wallet.checkpointSeq+'-'+Math.random().toString(36).slice(2,10)});}
+            if(typeof opts.prepareWorldResult==="function"){
+                var worldApi=lib.cshWorld;
+                if(!worldApi||typeof worldApi.validateTableResult!=="function"||typeof worldApi.commitTableResult!=="function")throw Error("牌桌世界记录尚未就绪");
+                var draft=opts.prepareWorldResult({profit:opts.netWin,credited:credited,rate:r.rate});
+                worldEntry=worldApi.validateTableResult(draft);
+                var outbox=validateTableOutbox(wallet.tableOutbox);
+                if(outbox.length>=64||outbox.some(function(e){return e.id===worldEntry.id;}))throw Error("牌桌待保存记录已满或重复");
+                if(worldApi.raw&&Array.isArray(worldApi.raw().tableReceipts)&&worldApi.raw().tableReceipts.some(function(e){return e.id===worldEntry.id;}))throw Error("牌桌结果已经保存");
+                wallet.tableOutbox=validateTableOutbox(outbox.concat(worldEntry));
+            }
             wallet._sig=sigOf(wallet);if(saveBlocked())throw Error('save blocked');persistWallet(wallet);
         }catch(e){wallet=before;return {ok:false,credited:0,balance:wallet.pc,reason:'结算尚未保存，请保留页面后重试'};}
         flushCheckpoints();snapshot();r.ok=true;
+        if(worldEntry){var worldFlush=flushTableResults();r.worldJournaled=true;r.worldResults=worldFlush.byId[worldEntry.id]||[];r.worldPending=validateTableOutbox(wallet.tableOutbox).some(function(e){return e.id===worldEntry.id;});}
 		r.credited = credited;
 		/* ★ 2026-10-18（第二十二批审计）：原来 `r.clamped` 只被赋值、全项目无人读（死字段）。
 		   它不是和 discarded 重复 —— discarded 是"算法按封顶丢掉"，clamped 是"钱包层按
@@ -1319,11 +1469,11 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 		if (leveled) {
 			var info = rankInfo(rankData.rank);
 			if (crossedSeg) {
-				toast("已晋入 · " + segOfRank(rankData.rank).name + "：" + info.name);
+				toast("已晋入 · " + segOfRank(rankData.rank).name + "：" + info.name,{kind:"honor",key:"rank-honor",merge:false,duration:2600});
 				/* §G.3：跨段升阶播「鼓 + 号角」组合音（段内升阶只播普通升阶音） */
 				sfx("rank.seg");
 			} else {
-				toast("晋升：" + info.name + "（第 " + rankData.rank + " 阶）");
+				toast("晋升：" + info.name + "（第 " + rankData.rank + " 阶）",{kind:"honor",key:"rank-honor",merge:false,duration:2600});
 				sfx("rank.up");
 			}
 			logInfo("升阶 → " + info.name + "（第 " + rankData.rank + " 阶）");
@@ -1991,12 +2141,14 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 		var supplied = snapshot && typeof snapshot === "object";
 		var memoryOnly = supplied && options && options.memoryOnly;
 		var raw = supplied ? snapshot.wallet : lsJSON(K_WALLET, null);
+        if(raw&&raw.tableOutbox!=null)validateTableOutbox(raw.tableOutbox);
+        if(raw&&raw.playerMatches!=null)validatePlayerMatches(raw.playerMatches);
         if(raw&&raw.careerUnlocks!=null)validateCareerUnlocks(raw.careerUnlocks);
         if(raw&&raw.taskLifetime!=null)validateTaskLifetime(raw.taskLifetime);
         var rd = supplied ? snapshot.rank : lsJSON(K_RANK, null);
         if(rd&&rd.careerUnlocks!=null)validateCareerUnlocks(rd.careerUnlocks);
 		try { if (lib.cshMatchReward && typeof lib.cshMatchReward.invalidate === "function") lib.cshMatchReward.invalidate(); } catch (e) { logError("对局奖励会话重置异常",e); }
-		adoptedSaveEpoch++; resultInvalidate();
+		adoptedSaveEpoch++; resultInvalidate();tableResultError="";
 		bossEventCache = new WeakMap();
 
 		if (_saveTimer) { clearTimeout(_saveTimer); _saveTimer = 0; }
@@ -2089,13 +2241,13 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
     function resultRead() {
         var raw=localStorage.getItem(K_RESULTS);if(raw==null)return [];
         var data=JSON.parse(raw);if(!data||data.v!==1||!Array.isArray(data.entries)||data.entries.length>64)throw Error("待保存记录格式异常，请先备份恢复");
-        var seen={};data.entries.forEach(function(e){if(!e||!["match","assisted","pool","task","gamble","interaction"].includes(e.kind)||typeof e.id!=="string"||!/^[a-zA-Z0-9_-]{10,100}$/.test(e.id)||seen[e.id]||!e.data||typeof e.data!=="object"||Array.isArray(e.data)||!Number.isSafeInteger(e.t)||e.t<0)throw Error("待保存记录损坏");seen[e.id]=1;});return data.entries;
+        var seen={};data.entries.forEach(function(e){if(!e||!["match","assisted","pool","task","gamble","interaction","player-match"].includes(e.kind)||typeof e.id!=="string"||!/^[a-zA-Z0-9_-]{10,100}$/.test(e.id)||seen[e.id]||!e.data||typeof e.data!=="object"||Array.isArray(e.data)||!Number.isSafeInteger(e.t)||e.t<0)throw Error("待保存记录损坏");seen[e.id]=1;});return data.entries;
     }
     function resultWrite(entries) { var value=JSON.stringify({v:1,entries:entries});if(value.length>524288)throw Error("待保存内容过多，请先恢复存储");if(entries.length)localStorage.setItem(K_RESULTS,value);else localStorage.removeItem(K_RESULTS); }
     function resultSchedule() {if(resultTimer!==null||typeof setTimeout!=="function")return;resultTimer=setTimeout(function(){resultTimer=null;resultRetry();},2000);}
-    function resultStatus() {try{var a=resultRead(),ids=a.map(function(e){return e.id;});return {count:a.length+volatileResults.filter(function(e){return ids.indexOf(e.id)<0;}).length,volatile:volatileResults.length,error:resultError,items:a.map(function(e){return {id:e.id,kind:e.kind,t:e.t};})};}catch(e){return {count:volatileResults.length,volatile:volatileResults.length,error:String(e.message||e),items:[]};}}
+    function resultStatus() {try{var a=resultRead(),ids=a.map(function(e){return e.id;}),table=tableResultStatus();return {count:a.length+volatileResults.filter(function(e){return ids.indexOf(e.id)<0;}).length+table.count,volatile:volatileResults.length,error:table.error||resultError,items:a.map(function(e){return {id:e.id,kind:e.kind,t:e.t};}).concat(table.items)};}catch(e){return {count:volatileResults.length,volatile:volatileResults.length,error:String(e.message||e),items:[]};}}
     function resultRetry() {
-        if(resultBusy||saveBlocked())return resultStatus();resultBusy=true;
+        if(resultBusy||saveBlocked())return resultStatus();flushTableResults();resultBusy=true;
         try {
             var entries=resultRead();volatileResults.forEach(function(e){if(!entries.some(function(x){return x.id===e.id;}))entries.push(e);});
             if(entries.length>64)throw Error("待保存记录已满，请先恢复存储");
@@ -2111,7 +2263,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
     }
     function resultPut(kind,id,data) {
         if(saveBlocked())return {ok:false,durable:false,reason:SAVE_BLOCK_REASON};
-        if(!["match","assisted","pool","task","gamble","interaction"].includes(kind)||typeof id!=="string"||!/^[a-zA-Z0-9_-]{10,100}$/.test(id))return {ok:false,durable:false,reason:"结果标识无效"};
+        if(!["match","assisted","pool","task","gamble","interaction","player-match"].includes(kind)||typeof id!=="string"||!/^[a-zA-Z0-9_-]{10,100}$/.test(id))return {ok:false,durable:false,reason:"结果标识无效"};
         var job={kind:kind,id:id,data:JSON.parse(JSON.stringify(data)),t:Date.now()};
         try{var entries=resultRead();if(!entries.some(function(e){return e.id===id;}))entries.push(job);if(entries.length>64)throw Error("待保存记录已满");resultWrite(entries);volatileResults=volatileResults.filter(function(e){return e.id!==id;});}
         catch(e){if(!volatileResults.some(function(e){return e.id===id;})&&volatileResults.length<64)volatileResults.push(job);resultError=String(e.message||e);resultSchedule();return {ok:false,durable:false,reason:"结果未能写入本机，请保持页面打开并恢复存储"};}
@@ -2123,8 +2275,9 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
     function resultInvalidate(){volatileResults=[];resultError="";if(resultTimer!==null){clearTimeout(resultTimer);resultTimer=null;}}
     var pendingResults={KEY:K_RESULTS,put:resultPut,retry:resultRetry,status:resultStatus,register:resultRegister};
     resultRegister("match",function(d,id){return settleMatch(id,d.mode,d.win,d.amount);});
-    resultRegister("assisted",function(d,id){return settleAssisted(id,d.win);});
+    resultRegister("assisted",function(d,id){return settleAssisted(id,d.win,d.amount===undefined?0:d.amount,d.observedAt);});
     resultRegister("task",commitTaskResult);
+    resultRegister("player-match",function(d,id){if(!d||d.id!==id)throw Error("个人对局凭据不符");return commitPlayerMatch(d,adoptedSaveEpoch);});
 
 
 	var CSH = {
@@ -2133,6 +2286,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 		version: "1.1.0",
 		validateBossRewards: validateBossRewards,
         validateCareerUnlocks: validateCareerUnlocks,
+        validatePlayerMatches:validatePlayerMatches,compactPlayerMatches:compactPlayerMatches,playerMatches:playerMatches,commitPlayerMatch:commitPlayerMatch,
 		saveEpoch: function () { return adoptedSaveEpoch; },
 		saveGuard: { blocked: function () { return saveBlocked(); }, reason: SAVE_BLOCK_REASON },
 		/* 存储键名唯一真值（§5.5.3）。csh_migrate 的导入导出由此取键名，
@@ -2166,12 +2320,14 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 			pc: function () { return wallet.pc; },
 			peak: function () { return wallet.pcPeak; },
 			add: addPC, spend: spendPC, SINGLE_ADD_CAP: SINGLE_ADD_CAP,
+			flushTableResults:flushTableResults,tableResultStatus:tableResultStatus,queueTableResult:queueTableResult,
 			claimCareer: claimCareer,
             careerUnlocks: careerUnlocks, syncCareerUnlocks: syncCareerUnlocks,
+            playerMatches:playerMatches,commitPlayerMatch:commitPlayerMatch,
 			claimPool: claimPool, poolClaimed: poolClaimed, poolPending: function(id) { return !!(wallet.poolClaims && wallet.poolClaims[id] && !poolClaimed(id)); },
 			affectionSaved: affectionSaved, commitAffection: commitAffection, cheerState: cheerState, commitCheerState: commitCheerState, flushCheckpoints: flushCheckpoints,
 			commitMarket: commitMarket, marketPending: marketPending, marketSaved: marketSaved, completeMarket: completeMarket,
-			bossSaved: bossSaved, preserveBoss: preserveBoss, commitBossEvent: commitBossEvent, bossRewardState: bossRewardState, flushBossRewards: flushBossRewards,
+			bossSaved: bossSaved, preserveBoss: preserveBoss, commitBounty: commitBounty, commitBossEvent: commitBossEvent, bossRewardState: bossRewardState, flushBossRewards: flushBossRewards,
 			assistedStats: assistedStats, settleAssisted: settleAssisted,
 			matchRewardConfig: matchRewardConfig, setMatchRewardConfig: setMatchRewardConfig, settleMatch: settleMatch,
 			/* v6.2 账本（来源与去处） */
@@ -2218,7 +2374,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 			pubkeys: function () { return CSH_PUBKEYS.slice(); },
 			setPubkeys: function (arr) { CSH_PUBKEYS = Array.isArray(arr) ? arr : []; },
 		},
-	pending: pendingResults, validateTaskState: validateTaskState, validateTaskLifetime: validateTaskLifetime, sign, flushSave, reloadSave, validateAffectionState: validateAffectionState, validateCheerState: validateCheerState, validateCheckpointLedger: validateCheckpointLedger,
+	pending: pendingResults, playerMatches:playerMatches,commitPlayerMatch:commitPlayerMatch,validatePlayerMatches:validatePlayerMatches,compactPlayerMatches:compactPlayerMatches, flushTableResults:flushTableResults,tableResultStatus:tableResultStatus,queueTableResult:queueTableResult,validateTableOutbox:validateTableOutbox,validateTaskState: validateTaskState, validateTaskLifetime: validateTaskLifetime, sign, flushSave, reloadSave, validateAffectionState: validateAffectionState, validateCheerState: validateCheerState, validateCheckpointLedger: validateCheckpointLedger,
 	integrity: { check: integrityCheck, crossCheck: crossCheck },
 		migrate: { legacy: legacyMigrate },
 	_sig: { sign: sigOf, verify: verifySig, fnv1a: fnv1a, verifyRSA: verifyPKCS1v15, sha256: _sha256 },

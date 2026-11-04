@@ -46,6 +46,7 @@ import { MINIONS } from "./csh_bossdata.js";
 	if (lib.cshWorld) return;
 
 	var K_WORLD = "csh_world";
+    var heartbeatDraft=null,heartbeatPending=null,heartbeatActive=false;
     var gambleRevision=0,gambleSerial=0;
 	var AI_MIN_STAKE = 200;          // 最低带入（§I.2 退隐线）
 	var AI_FUND_CAP = 500000000;     // AI 资金上限 5 亿（2026-09-29：由 1 亿上调，容纳豪赌席）
@@ -382,9 +383,10 @@ import { MINIONS } from "./csh_bossdata.js";
 	   且不引入 DST 误差（用日历差而非毫秒差）。
 	   兼容性：旧档的 lastTick / retireDay 是 UTC 口径，切换后最多相差 1 天，
 	   只会让某一次离线结算少算/多算一天，不会产生越界值。 */
+	var tableCommitTime = null;
 	function dayIndex() {
 		try {
-			var d = new Date();
+			var d = new Date(tableCommitTime === null ? Date.now() : tableCommitTime);
 			return Math.floor((Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) - Date.UTC(2026, 0, 1)) / 86400000);
 		} catch (e) { return 0; }
 	}
@@ -412,6 +414,7 @@ import { MINIONS } from "./csh_bossdata.js";
 		try { console.log("[池子魔将·世界] " + msg); } catch (e2) {}
 	}
 	function logInfo(msg) {
+        if(heartbeatDraft){heartbeatDraft.push(msg);return;}
 		try { if (lib.cshDebug && typeof lib.cshDebug.info === "function") lib.cshDebug.info("world: " + msg); } catch (e) {}
 	}
 	function logError(msg, err) {
@@ -479,13 +482,22 @@ import { MINIONS } from "./csh_bossdata.js";
 	}
 
 	/* 入口先暂停，不能仅在 saveWorld 拒绝时留下已经变化的内存。 */
-	function saveBlocked() {
+	function saveBlocked(allowTable) {
 		try {
 			var W = lib.cshWallet;
-			if (W && W.saveGuard) return W.saveGuard.blocked();
-			if (localStorage.getItem("csh_migrate_recovery") !== null) return true;
-			var M = lib.cshMigrate, state = M && M.recoveryState && M.recoveryState();
-			return !!(state && (state.pending || state.busy));
+			if (W && W.saveGuard) { if (W.saveGuard.blocked()) return true; }
+			else {
+				if (localStorage.getItem("csh_migrate_recovery") !== null) return true;
+				var M = lib.cshMigrate, state = M && M.recoveryState && M.recoveryState();
+				if (state && (state.pending || state.busy)) return true;
+			}
+			/* Retained transfers must settle before later world activity can consume their funds. */
+			if (allowTable !== true && tableCommitTime === null && W && typeof W.tableResultStatus === "function") {
+				var table = W.tableResultStatus();
+				if (table && (table.count || table.error)) return true;
+			}
+            if(heartbeatPending&&!heartbeatActive&&tableCommitTime===null)return reconcileHeartbeatBeforeWrite();
+			return false;
 		} catch (e) { return true; }
 	}
 	var world = lsJSON(K_WORLD, null);
@@ -645,6 +657,7 @@ import { MINIONS } from "./csh_bossdata.js";
 	/* 迁移/重置后采用磁盘真值，不能让旧内存把已删除的世界重新写回。
 	   只规整内存；恢复流程自己负责持久化，不能在这里推进心跳或补写存档。 */
 	function reloadSave(snapshot) {
+        heartbeatPending=null;
         invitedId=null; invitedReply="";
 		var stored, next = null;
 		if (arguments.length) {
@@ -735,8 +748,127 @@ import { MINIONS } from "./csh_bossdata.js";
 
 	function saveWorld() {
 		if (saveBlocked()) return false;
+		if (tableCommitTime !== null || heartbeatDraft) return true;
 		try { lsSet(K_WORLD, JSON.stringify(world)); }
 		catch (e) { logError("saveWorld 失败", e); }
+	}
+    /* Career hands use accepted player history, never AI-only totals or a failed soft save. */
+    function worldCareerSnapshot(value){
+        if(value==null)return {worldHands:0,playerFundMin:0,playerFundWitness:0,worldSkillTop:0,playerOpponents:0,playerFamiliar:0,playerRevenge:0,playerBalanced:0,careerUnlocks:null};
+        if(!value||typeof value!=="object"||Array.isArray(value)||!Array.isArray(value.ai))throw Error("世界亲历来源格式异常");
+        var total=0,fundMin=Infinity,fundWitness=0,skillTop=0,opponents=0,familiar=0,revenge=0,balanced=0,seen=Object.create(null);
+        value.ai.forEach(function(a){
+            if(!a||typeof a.id!=="string"||!Object.prototype.hasOwnProperty.call(ROSTER_IDS,a.id)||seen[a.id])throw Error("世界亲历角色异常");seen[a.id]=true;
+            var p=a.withPlayer;
+            if(p==null)return;
+            if(typeof p!=="object"||Array.isArray(p)||!Number.isSafeInteger(p.hands)||p.hands<0||p.hands>9999999)throw Error("世界亲历人次异常");
+            var wins=p.wins==null?0:p.wins,losses=p.losses==null?0:p.losses;
+            if(!Number.isSafeInteger(wins)||wins<0||!Number.isSafeInteger(losses)||losses<0||wins+losses>p.hands||p.revenge!=null&&typeof p.revenge!=="boolean"||p.revenge===true&&(!wins||!losses))throw Error("世界亲历胜负异常");
+            total+=p.hands;if(!Number.isSafeInteger(total))throw Error("世界亲历人次过多");
+            var witnessedSkill=p.skillTop==null?0:p.skillTop;
+            if(typeof witnessedSkill!=="number"||!Number.isFinite(witnessedSkill)||witnessedSkill<0||witnessedSkill>1)throw Error("世界亲历牌技异常");
+            if(p.hands>0){opponents++;skillTop=Math.max(skillTop,witnessedSkill);}
+            familiar=Math.max(familiar,p.hands);balanced=Math.max(balanced,Math.min(wins,losses));
+            // Counts alone cannot establish loss-before-win order; retain the source flag.
+            if(p.revenge===true)revenge++;
+            if(p.lowestFund!=null){
+                if(!Number.isSafeInteger(p.lowestFund)||p.lowestFund<0||p.lowestFund>AI_FUND_CAP||wins<1)throw Error("世界亲历资金见证异常");
+                fundMin=Math.min(fundMin,p.lowestFund);fundWitness++;
+            }
+        });
+        return {worldHands:total,playerFundMin:fundWitness?fundMin:0,playerFundWitness:fundWitness,worldSkillTop:skillTop,playerOpponents:opponents,playerFamiliar:familiar,playerRevenge:revenge,playerBalanced:balanced,careerUnlocks:lib.cshWallet.validateCareerUnlocks(value.careerUnlocks)};
+    }
+    function worldCareerSaved(){var raw=localStorage.getItem(K_WORLD);return worldCareerSnapshot(raw==null?null:JSON.parse(raw));}
+	/* Wallet-owned table intents are applied as one strict world write, with their receipt. */
+	function validateTableResult(value) {
+		if (!value || typeof value !== "object" || Array.isArray(value) || typeof value.id !== "string" ||
+			!/^[a-zA-Z0-9_-]{10,100}$/.test(value.id) || !Number.isSafeInteger(value.t) || value.t < 0 ||
+			!Array.isArray(value.ops) || (value.ops.length < 1 && value.gambleProfit === undefined) || value.ops.length > 5) throw Error("牌桌世界结果格式异常");
+		var ids = Object.create(null);
+		var ops = value.ops.map(function (op) {
+			if (!op || typeof op !== "object" || Array.isArray(op) || typeof op.id !== "string" || !Object.prototype.hasOwnProperty.call(ROSTER_IDS, op.id) || ids[op.id] ||
+				["win", "lose", "result", "team", "play"].indexOf(op.kind) < 0) throw Error("牌桌世界席位异常");
+			ids[op.id] = true;
+			if (op.kind === "win" || op.kind === "lose") {
+				if (!Number.isSafeInteger(op.amount) || op.amount < 0 || op.amount > 100000000000) throw Error("牌桌世界金额异常");
+				return { id: op.id, kind: op.kind, amount: op.amount };
+			}
+			if (op.kind === "play") return { id: op.id, kind: "play" };
+			if (op.won !== true && op.won !== false && !(op.kind === "result" && op.won === null)) throw Error("牌桌世界战果异常");
+			return { id: op.id, kind: op.kind, won: op.won };
+		});
+		var entry = { id: value.id, t: value.t, ops: ops };
+		if (value.gambleProfit !== undefined) {
+			if (!Number.isSafeInteger(value.gambleProfit) || Math.abs(value.gambleProfit) > 100000000000) throw Error("豪赌金额结果异常");
+			entry.gambleProfit = value.gambleProfit;
+		}
+		return entry;
+	}
+	function tableResultShape(op) {
+		var won = op.kind === "win" ? true : op.kind === "lose" ? false : op.won;
+		var r = { id: op.id, delta: 0, asked: op.kind === "win" ? op.amount : op.kind === "lose" ? -op.amount : 0,
+			outcome: op.kind === "play" ? "unresolved" : won === true ? "win" : won === false ? "loss" : "draw" };
+		if (op.kind === "team") r.partner = true;
+		return r;
+	}
+	function validateTableReceipts(value) {
+		if (value == null) return [];
+		if (!Array.isArray(value) || value.length > 64) throw Error("牌桌世界凭据格式异常");
+		var ids = Object.create(null);
+		return value.map(function (receipt) {
+			if (!receipt || typeof receipt !== "object" || typeof receipt.payload !== "string" || receipt.payload.length > 4096 ||
+				!Array.isArray(receipt.results)) throw Error("牌桌世界凭据损坏");
+			var entry = validateTableResult(JSON.parse(receipt.payload));
+			if (receipt.id !== entry.id || ids[entry.id] || receipt.payload !== JSON.stringify(entry) || receipt.results.length !== entry.ops.length) throw Error("牌桌世界凭据不一致");
+			ids[entry.id] = true;
+			var results = receipt.results.map(function (result, i) {
+				var expected = tableResultShape(entry.ops[i]);
+				if (!result || result.id !== expected.id || result.asked !== expected.asked || result.outcome !== expected.outcome ||
+					result.partner !== expected.partner || !Number.isSafeInteger(result.delta) || Math.abs(result.delta) > 100000000000 ||
+					(entry.ops[i].kind === "win" ? result.delta < 0 || result.delta > expected.asked : entry.ops[i].kind === "lose" ? result.delta > 0 || result.delta < expected.asked : result.delta !== 0)) throw Error("牌桌世界回执金额异常");
+				expected.delta = result.delta;
+				return expected;
+			});
+			return { id: entry.id, payload: receipt.payload, results: results };
+		});
+	}
+	function commitTableResult(value) {
+		if (saveBlocked(true) || tableCommitTime !== null) return { ok: false, reason: "存档暂不可写" };
+		var before = world;
+		try {
+			var entry = validateTableResult(value), payload = JSON.stringify(entry), receipts = validateTableReceipts(world.tableReceipts);
+			var old = receipts.find(function (receipt) { return receipt.id === entry.id; });
+			if (old) {
+				if (old.payload !== payload) throw Error("牌桌世界凭据内容冲突");
+				return { ok: true, already: true, results: JSON.parse(JSON.stringify(old.results)) };
+			}
+			if (entry.ops.some(function (op) { return !byId(op.id); })) throw Error("牌桌世界角色暂不可用");
+			world = JSON.parse(JSON.stringify(before));
+			tableCommitTime = entry.t;
+			var results = entry.ops.map(function (op) {
+				var result = op.kind === "win" ? settleWin(op.id, op.amount) : op.kind === "lose" ? settleLose(op.id, op.amount) :
+					op.kind === "team" ? settleTeamResult(op.id, op.won) : op.kind === "play" ? settlePlay(op.id, false) : settleResult(op.id, op.won);
+				if (!result || (op.kind === "win" || op.kind === "lose") && !Number.isSafeInteger(result._delta)) throw Error("牌桌世界结果未能应用");
+				var actual = tableResultShape(op); actual.delta = result._delta || 0;
+				return actual;
+			});
+			var gamblePrepared = entry.gambleProfit === undefined ? null : prepareGambleMutation({profit:entry.gambleProfit,t:entry.t},entry.id,before);
+            var observer=lib.cshCareerObserver,worldPrepared=observer&&observer.prepareWorldHands?observer.prepareWorldHands(world,entry.t):null;
+            if(worldPrepared)world.careerUnlocks=worldPrepared.record;
+			world.tableReceipts = validateTableReceipts(receipts.concat({ id: entry.id, payload: payload, results: results }).slice(-64));
+			if (saveBlocked(true)) throw Error("存档已更新");
+			localStorage.setItem(K_WORLD, JSON.stringify(world));
+            try{if(observer&&observer.worldHandsCommitted)observer.worldHandsCommitted(world,worldPrepared);}catch(notifyError){logError("世界同桌生涯记录待同步",notifyError);}
+			if (entry.gambleProfit !== undefined) {
+				gambleRevision++;
+				try { if (lib.cshCareerObserver && lib.cshCareerObserver.gambleCommitted) lib.cshCareerObserver.gambleCommitted(world,gamblePrepared); } catch (notifyError) { logError("豪赌生涯记录待同步",notifyError); }
+			}
+			return { ok: true, results: JSON.parse(JSON.stringify(results)) };
+		} catch (error) {
+			world = before;
+			logError("牌桌世界结果待保存", error);
+			return { ok: false, reason: "牌友记录尚未保存，请恢复存储后重试" };
+		} finally { tableCommitTime = null; }
 	}
 	/* 玩家亲历与全世界自动演化分开；不从旧的AI总手数推断玩家历史。 */
 	function playerTable(raw) {
@@ -831,7 +963,7 @@ import { MINIONS } from "./csh_bossdata.js";
 		a.streak += 1;
 		if (a.streak > a.bestStreak) a.bestStreak = a.streak;
 		if (netWin > a.biggestPot) a.biggestPot = netWin;
-		a.last = Date.now();
+		a.last = tableCommitTime === null ? Date.now() : tableCommitTime;
 		refreshSkill(a);
 		noteTierShift(a, before);
 		checkRetire(a);
@@ -851,10 +983,10 @@ import { MINIONS } from "./csh_bossdata.js";
 		if (netLoss > 0) notePlayerTable(a, true);
 		var before = a.fund;
 		a.fund = clampNum(a.fund - netLoss, 0, AI_FUND_CAP);
-		if (netLoss > 0) a.withPlayer.lowestFund = a.withPlayer.lowestFund == null ? a.fund : Math.min(a.withPlayer.lowestFund, a.fund);
+		if (a.fund < before) a.withPlayer.lowestFund = a.withPlayer.lowestFund == null ? a.fund : Math.min(a.withPlayer.lowestFund, a.fund);
 		a.hands += 1;
 		a.streak = 0;
-		a.last = Date.now();
+		a.last = tableCommitTime === null ? Date.now() : tableCommitTime;
 		refreshSkill(a);
 		noteTierShift(a, before);
 		checkRetire(a);
@@ -867,13 +999,26 @@ import { MINIONS } from "./csh_bossdata.js";
 	   UNO 这类不与世界对赌资金的游戏，同桌 AI 的手数 / 胜负 / 心态也应随对局演化，
 	   否则同一个"张飞"在德州里会破产、在 UNO 桌上却是木头人（同一世界两套人格）。
 	   won: true 胜 / false 负 / null 和局（三分支都走 advanceState）。 */
+	/* 队友自身阵营战果，与玩家只记同桌：不凭共同胜负伪造对抗或复仇。 */
+	function settleTeamResult(id, won) {
+		if (saveBlocked() || (won !== true && won !== false)) return null;
+		var a = byId(id);
+		if (!a) return null;
+		notePlayerTable(a, undefined);
+		advanceState(a, won, 0);
+		a.last = tableCommitTime === null ? Date.now() : tableCommitTime;
+		saveWorld();
+		var out = publicOf(a);
+		out._delta = 0;
+		return out;
+	}
 	function settleResult(id, won) {
 		if (saveBlocked()) return null;
 		var a = byId(id);
 		if (!a) return null;
 		notePlayerTable(a, won === true ? false : won === false ? true : null);
 		advanceState(a, (won === true) ? true : (won === false ? false : null), 0);
-		a.last = Date.now();
+		a.last = tableCommitTime === null ? Date.now() : tableCommitTime;
 		saveWorld();
 		return publicOf(a);
 	}
@@ -891,7 +1036,7 @@ import { MINIONS } from "./csh_bossdata.js";
 		} else {
 			a.hands += 1;
 		}
-		a.last = Date.now();
+		a.last = tableCommitTime === null ? Date.now() : tableCommitTime;
 		saveWorld();
 		return publicOf(a);
 	}
@@ -925,7 +1070,75 @@ import { MINIONS } from "./csh_bossdata.js";
 	   ★ 2026-09-29：胜负概率改为**受 skill 影响**（越聪明赢面越大），
 	     使"钱往聪明人手里集中"成为世界的自然规律 —— 这也是豪赌席能长期存在的机制解释。
 	   ============================================================ */
-	function tick() {
+    function heartbeatScope(){
+        var owner=lib.cshWallet;
+        return {owner:owner,epoch:owner&&typeof owner.saveEpoch==='function'?owner.saveEpoch():null};
+    }
+    function heartbeatScopeMatches(scope){
+        try{var now=heartbeatScope();return now.owner===scope.owner&&now.epoch===scope.epoch&&!saveBlocked();}catch(e){return false;}
+    }
+    function heartbeatRefused(extra){return Object.assign({ok:false,days:0,rounds:0,changed:false,pending:!!heartbeatPending,reason:'牌友记录尚未保存，请稍后重新进入重试'},extra||{});}
+    function acceptHeartbeat(candidate,stored){
+        if(!heartbeatScopeMatches(candidate.scope)||JSON.stringify(world)!==candidate.base||batchMaxPot!==candidate.basePot){heartbeatPending=null;return heartbeatRefused({stale:true});}
+        try{
+            if(stored!==candidate.next)localStorage.setItem(K_WORLD,candidate.next);
+            if(localStorage.getItem(K_WORLD)!==candidate.next)throw Error('世界记录尚未读回确认');
+            if(!heartbeatScopeMatches(candidate.scope)||JSON.stringify(world)!==candidate.base||batchMaxPot!==candidate.basePot){heartbeatPending=null;return heartbeatRefused({stale:true});}
+            world=JSON.parse(candidate.next);batchMaxPot=candidate.nextPot;heartbeatPending=null;
+            candidate.logs.forEach(function(msg){logInfo(msg);});
+            return Object.assign({ok:true},candidate.result);
+        }catch(error){
+            if(!heartbeatScopeMatches(candidate.scope)||JSON.stringify(world)!==candidate.base)heartbeatPending=null;
+            logError('牌友心跳记录待保存',error);return heartbeatRefused();
+        }
+    }
+    function reconcileHeartbeatBeforeWrite(){
+        var pending=heartbeatPending;
+        try{
+            var scope=heartbeatScope(),stored=localStorage.getItem(K_WORLD);
+            if(scope.owner!==pending.scope.owner||scope.epoch!==pending.scope.epoch||JSON.stringify(world)!==pending.base||batchMaxPot!==pending.basePot){heartbeatPending=null;return false;}
+            if(stored===pending.next){
+                heartbeatActive=true;
+                try{return !acceptHeartbeat(pending,stored).ok;}finally{heartbeatActive=false;}
+            }
+            // Keep the coordination barrier until an external replacement is valid.
+            // Otherwise a second write could overwrite the unreadable replacement.
+            if(stored===pending.disk){heartbeatPending=null;return false;}
+            var adopted=stored===null?null:JSON.parse(stored);
+            if(adopted!==null&&(!adopted||!Array.isArray(adopted.ai)))return true;
+            return !reloadSave(adopted);
+        }catch(error){return true;}
+    }
+    function tick(){
+        if(heartbeatActive)return heartbeatRefused({blocked:true});
+        heartbeatActive=true;try{return heartbeatTick();}finally{heartbeatActive=false;}
+    }
+    function heartbeatTick(){
+        if(saveBlocked())return heartbeatRefused({blocked:true});
+        var stored,scope;
+        try{stored=localStorage.getItem(K_WORLD);scope=heartbeatScope();}catch(error){return heartbeatRefused();}
+        if(heartbeatPending){
+            var pending=heartbeatPending;
+            var samePending=heartbeatScopeMatches(pending.scope)&&JSON.stringify(world)===pending.base&&batchMaxPot===pending.basePot;
+            if(samePending&&(stored===pending.disk||stored===pending.next))return acceptHeartbeat(pending,stored);
+            if(!samePending)heartbeatPending=null;
+        }
+        /* An external accepted write/import wins over an old in-memory candidate. Never overwrite it. */
+        if(stored!==JSON.stringify(world)){
+            try{var adopted=stored===null?null:JSON.parse(stored);if(adopted!==null&&(!adopted||!Array.isArray(adopted.ai))||!reloadSave(adopted))return heartbeatRefused({stale:true});}
+            catch(error){return heartbeatRefused({stale:true});}
+        }
+        var before=world,beforePot=batchMaxPot,base=JSON.stringify(before),logs=[],candidate;
+        try{
+            world=JSON.parse(base);heartbeatDraft=logs;
+            var result=draftHeartbeat(),next=JSON.stringify(world);
+            candidate={scope:scope,base:base,basePot:beforePot,disk:stored,next:next,nextPot:batchMaxPot,result:result,logs:logs};
+        }catch(error){logError('牌友心跳暂未推进',error);return heartbeatRefused();}
+        finally{world=before;batchMaxPot=beforePot;heartbeatDraft=null;}
+        if(candidate.next===base)return Object.assign({ok:true},candidate.result);
+        heartbeatPending=candidate;return acceptHeartbeat(candidate,stored);
+    }
+	function draftHeartbeat() {
 		if (saveBlocked()) return { days: 0, rounds: 0, changed: false, blocked: true };
 		var today = dayIndex();
 		var days = today - world.lastTick;
@@ -1446,11 +1659,16 @@ import { MINIONS } from "./csh_bossdata.js";
         else if (p.losses > 0) greeting = '前面我占了上风，这回也别客气。';
         return (p.hands >= 10 && greeting.indexOf('老牌友') !== 0 ? '老牌友，' : '') + greeting + lines[stableHash(String(a.id) + '|' + p.hands) % lines.length];
     }
-    function inviteNext(id) {
+    function inviteStatus(id) {
         var blocked = invitationBlocked(); if (blocked) return { ok: false, reason: blocked };
         var a = activeList().find(function (p) { return String(p.id) === String(id); });
         if (!a) return { ok: false, reason: '这位牌友暂未在场' };
         if (normalStake(a, AI_MIN_STAKE) < AI_MIN_STAKE) return { ok: false, reason: a.name + '暂时凑不齐带入，稍后再邀或换位牌友吧' };
+        return {ok:true,id:a.id,name:a.name};
+    }
+    function inviteNext(id) {
+        var eligibility=inviteStatus(id);if(!eligibility.ok)return eligibility;
+        var a=byId(eligibility.id);
         var repeated = String(invitedId) === String(a.id);
         if (!repeated) { invitedId = a.id; invitedReply = invitationReply(a); }
         return { ok: true, id: a.id, name: a.name, response: invitedReply, repeated: repeated };
@@ -1476,7 +1694,7 @@ import { MINIONS } from "./csh_bossdata.js";
             if (p.hands === 0) { title = '初次相识'; text = a.name + ' · ' + P.name + '，尚未与你同桌。可以从一场小桌认识这位牌友。'; }
             else if (p.draws === p.hands) { title = '平局未了'; text = '你与' + a.name + '已同桌' + p.hands + '手，' + p.draws + '次和局，胜负留给下一桌。'; }
             else if (p.wins && p.losses) { title = p.revenge ? '你来我往' : '胜负未定'; text = '你与' + a.name + '已同桌' + p.hands + '手，你' + p.wins + '胜、' + p.losses + '负' + (p.draws ? '、' + p.draws + '和' : '') + '；下一桌仍有故事可续。'; }
-            else { title = '熟人再会'; text = a.name + '与你已有' + p.hands + '手交集，' + (p.wins ? '此前是你占了上风' : '此前是对方占了上风') + '。邀约下一桌，再续这段牌缘。'; }
+            else { title = '熟人再会'; text = a.name + '与你已有' + p.hands + '手交集，' + (p.wins ? '此前是你占了上风' : p.losses ? '此前是对方占了上风' : '相识经历已记下') + '。邀约下一桌，再续这段牌缘。'; }
             var invited = String(invitedId) === String(a.id);
             return { id: a.id, name: a.name, title: title, text: text, persona: P.name, fund: a.fund, invited: invited, response: invited ? invitedReply : '', hands: p.hands };
         });
@@ -1589,16 +1807,12 @@ import { MINIONS } from "./csh_bossdata.js";
         if(!Array.isArray(ids)||ids.length>64||ids.some(function(id,i){return typeof id!=="string"||!/^[a-zA-Z0-9_-]{10,100}$/.test(id)||ids.indexOf(id)!==i;}))throw Error("豪赌结算凭据异常");
         return ids.slice();
     }
-    function commitGambleResult(data,id) {
-        if(saveBlocked())return {ok:false,reason:"存档暂不可写"};
-        if(!data||!Number.isSafeInteger(data.profit)||Math.abs(data.profit)>100000000000||!Number.isSafeInteger(data.t)||data.t<0||typeof id!=="string"||!/^[a-zA-Z0-9_-]{10,100}$/.test(id))return {ok:false,reason:"豪赌结果无效"};
-        var before=world,prepared=null;
-        try {
-            validateGambleStats(before.gambles);
-            var receipts=gambleReceipts(before.gambles);
-            if(receipts.indexOf(id)>=0)return {ok:true,already:true};
+    function prepareGambleMutation(data,id,before) {
+        var prepared=null;
+            validateGambleStats(world.gambles);
+            var receipts=gambleReceipts(world.gambles);
+            if(receipts.indexOf(id)>=0)throw Error("豪赌凭据已经存在");
             if(before.careerUnlocks!=null)lib.cshWallet.validateCareerUnlocks(before.careerUnlocks);
-            world=JSON.parse(JSON.stringify(before));
             if(!world.gambles)world.gambles=freshGambles();
             var g=world.gambles=Object.assign(freshGambles(),world.gambles),profit=data.profit;
             g.plays+=1;g.net+=profit;
@@ -1611,6 +1825,17 @@ import { MINIONS } from "./csh_bossdata.js";
             var observer=lib.cshCareerObserver;
             if(observer&&observer.prepareGamble)prepared=observer.prepareGamble(world,before,data.t);
             if(prepared)world.careerUnlocks=prepared.record;
+        return prepared;
+    }
+    function commitGambleResult(data,id) {
+        if(saveBlocked())return {ok:false,reason:"存档暂不可写"};
+        if(!data||!Number.isSafeInteger(data.profit)||Math.abs(data.profit)>100000000000||!Number.isSafeInteger(data.t)||data.t<0||typeof id!=="string"||!/^[a-zA-Z0-9_-]{10,100}$/.test(id))return {ok:false,reason:"豪赌结果无效"};
+        var before=world,prepared=null;
+        try {
+            validateGambleStats(before.gambles);
+            if(gambleReceipts(before.gambles).indexOf(id)>=0)return {ok:true,already:true};
+            world=JSON.parse(JSON.stringify(before));
+            prepared=prepareGambleMutation(data,id,before);
             localStorage.setItem(K_WORLD,JSON.stringify(world));gambleRevision++;
         }catch(error){world=before;logError("豪赌战绩待保存",error);return {ok:false,reason:"豪赌战绩尚未保存，请恢复存储后重试"};}
         try{if(lib.cshCareerObserver&&lib.cshCareerObserver.gambleCommitted)lib.cshCareerObserver.gambleCommitted(world,prepared);}catch(error){logError("豪赌生涯记录待同步",error);}
@@ -1802,7 +2027,8 @@ import { MINIONS } from "./csh_bossdata.js";
 		gamblePoolSize: function () { return gamblePool().length; },
 		settleWin: settleWin, settleLose: settleLose, settlePlay: settlePlay,
 		/* 只记战果不动钱：名次制牌桌（UNO）让同桌 AI 也长战绩与心态（2026-10-03） */
-		settleResult: settleResult,
+		settleResult: settleResult, settleTeamResult: settleTeamResult,
+        validateTableResult:validateTableResult, validateTableReceipts:validateTableReceipts, commitTableResult:commitTableResult,
 		gambleStats: gambleStats, noteGamble: noteGamble,
         gambleSaved:gambleSaved,gambleRevision:function(){return gambleRevision;},
 		stats: stats,
@@ -1810,6 +2036,7 @@ import { MINIONS } from "./csh_bossdata.js";
 		leaderboard: leaderboard,
 		addGrudge: addGrudge, grudge: grudge, idOfPlayer: idOfPlayer,
 		avatar: avatar,
+		worldCareerSnapshot:worldCareerSnapshot,worldCareerSaved:worldCareerSaved,
 		raw: function () { return JSON.parse(JSON.stringify(world)); },
 		reloadSave: reloadSave,
 		importRaw: function (obj) {
@@ -1836,7 +2063,7 @@ import { MINIONS } from "./csh_bossdata.js";
 		   effectiveSkill / mentalFactor —— 供游戏页展示"真实发挥水平"。 */
 		worldStory: worldStory,
 		/* 世界动态（流言）：最近 n 条值得说的事，人物化措辞，只读派生（2026-10-03 新增） */
-		news: news, storylines:storylines, inviteNext:inviteNext, cancelInvite:cancelInvite,
+		news: news, storylines:storylines, inviteNext:inviteNext, inviteStatus:inviteStatus, cancelInvite:cancelInvite,
 		effectiveSkill: effectiveSkill,
 		mentalFactor: mentalFactor,
 		advanceState: advanceState,
@@ -1863,4 +2090,9 @@ import { MINIONS } from "./csh_bossdata.js";
 	logInfo("AI 世界已加载：" + st.chars + " 名角色，在场 " + activeList().length +
 		" 名；资金 " + st.fundMin + " ~ " + st.fundMax + "；牌技上限 " + st.skillTop.toFixed(3));
     if(lib.cshWallet&&lib.cshWallet.pending)lib.cshWallet.pending.register("gamble",commitGambleResult);
+    if (typeof setTimeout === "function") setTimeout(function () {
+        if (saveBlocked(true)) return;
+        try { if (lib.cshWallet && typeof lib.cshWallet.flushTableResults === "function") lib.cshWallet.flushTableResults(); }
+        catch (tableFlushError) { logError("牌桌世界结果待恢复", tableFlushError); }
+    }, 0);
 })();

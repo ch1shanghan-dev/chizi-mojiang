@@ -19,7 +19,7 @@
     var pressure = call / Math.max(o.bb, o.contestablePot);
     var edge = style.edge + (o.board.length ? .025 : .045) + Math.min(.09, pressure * .05);
     var tendency = o.aggressorStats;
-    if (tendency && tendency.hands >= 12 && call > 0) {
+    if (tendency && (tendency.samples==null?tendency.hands>=12:tendency.samples>=12&&tendency.hands>=6) && call > 0) {
       if (tendency.vpip / tendency.hands < .25 && tendency.raises / tendency.hands < .2) edge += .035;
       if (tendency.vpip / tendency.hands > .7) edge -= .025;
     }
@@ -30,7 +30,10 @@
     var cheap = call <= Math.max(o.bb, o.chips * .08);
     var canBluff = o.canRaise && o.opponents <= 2 && o.chips > Math.max(o.bb * 4, call * 3) && pressure < .35;
     var opportunity = (o.latePosition || o.hasDraw || o.scaryBoard) && (!pre || o.strength > .32);
-    var bluffChance = style.bluff * (.65 + skill * .35);
+    /* Unknown players are neutral. At most +/-60% of a small base bluff rate;
+       a short run never overrides value, pot odds or legal raising rights. */
+    var fieldFactor=typeof o.fieldFoldRate==='number'&&isFinite(o.fieldFoldRate)?clamp(1+(o.fieldFoldRate-.4)*1.6,.55,1.6):1;
+    var bluffChance = style.bluff * (.65 + skill * .35) * fieldFactor;
     if (call === 0) {
       if (o.canRaise && (value || (pre && o.latePosition && o.strength > style.open + .08 && random() < .40))) { act = 'raise'; reason = '价值下注'; }
       else if (canBluff && opportunity && random() < bluffChance) { act = 'raise'; reason = o.hasDraw ? '听牌半诈唬' : '位置施压'; bluff = true; }

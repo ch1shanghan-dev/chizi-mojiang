@@ -262,6 +262,8 @@ body{background:
 .affbtn.soft{border-color:rgba(147,166,187,.45);background:linear-gradient(180deg,rgba(147,166,187,.16),rgba(147,166,187,.05));color:#d8e4f0}
 .affhint{position:relative;z-index:2;margin-top:6px;font-size:var(--pfs-cap2);color:#f7c9d9;min-height:15px}
 .affhint.good{color:var(--up)} .affhint.bad{color:var(--ink-dim)}
+#portrait-fallback{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:16px;text-align:center;background:radial-gradient(ellipse at 50% 45%,#352b20 0,#191612 72%);color:var(--gold);font-family:var(--ff-title);pointer-events:none}
+#portrait-fallback[hidden]{display:none}#portrait-name{font-size:var(--pfs-2xl);letter-spacing:.12em;overflow-wrap:anywhere;max-width:100%}#portrait-fallback small{font:var(--pfs-sm) var(--ff-body);color:var(--ink-dim);line-height:1.5}
 </style>
 <link rel="stylesheet" href="../core/csh_experience.css">
 <style id="market-layout-repair">
@@ -331,7 +333,7 @@ body[data-market-ready="true"] #storageStatus,body[data-market-ready="true"] #re
 <div id="panel" role="dialog" aria-modal="true" aria-labelledby="pname">
   <div class="pwrap">
     <button class="pclose" id="pclose" type="button" aria-label="关闭人物行情">✕</button>
-    <div class="pstage"><img id="pimg" alt=""></div>
+    <div class="pstage"><img id="pimg" alt=""><div id="portrait-fallback" hidden role="status"><span id="portrait-name"></span><small>人物立绘暂未载入</small></div></div>
     <div class="pinfo">
       <div class="pcontent">
       <div>
@@ -379,10 +381,11 @@ function $(s) { return document.querySelector(s); }
 function el(t, c, x) { var e = document.createElement(t); if (c) e.className = c; if (x != null) e.textContent = x; return e; }
 function fmt(n) { return String(Math.round(Number(n) || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, ","); }
 
-var Data = { snap: null, cur: null, qty: 10, unavailable: true };
+var Data = { snap: null, cur: null, qty: 10, unavailable: true, reading: false, disposed: false, viewEpoch: 0, readEpoch: 0, qtyAll: false };
 function updateTradeAvailability() {
-  $("#bBuy").disabled = Data.unavailable || !!Data.tradeBusy;
-  $("#bSell").disabled = Data.unavailable || !!Data.tradeBusy;
+  $("#bBuy").disabled = Data.unavailable || Data.reading || !!Data.tradeBusy;
+  $("#bSell").disabled = Data.unavailable || Data.reading || !!Data.tradeBusy;
+  if (Data.cur) updateQtyHint();
 }
 
 /* ---------- 数据获取（桥 → 父窗兜底） ---------- */
@@ -395,41 +398,51 @@ function parentMarket() {
   return null;
 }
 function loadSnap(cb) {
-  var receive = cb;
-  cb = function (snap) {
+  var epoch = ++Data.readEpoch, finished = false;
+  Data.reading = true; updateTradeAvailability();
+  $("#retryMarket").disabled = true;
+  $("#storageStatus").textContent = Data.snap ? "正在更新持仓，暂显示上次行情…" : "正在读取存档…";
+  function receive(snap) {
+    if (finished || Data.disposed || epoch !== Data.readEpoch) return;
+    finished = true; Data.reading = false;
+    $("#retryMarket").disabled = false;
+    var valid = snap && snap.ready !== false && snap.ok !== false && Array.isArray(snap.list);
     $("#startNewMarket").hidden = !(snap && snap.missingState);
-    if (!snap || snap.ready === false || snap.ok === false) {
+    if (!valid) {
       document.body.dataset.marketReady = "false";
-      $("#storageStatus").textContent = (snap && snap.saveError) || "暂未读到市场存档，请重试。读取失败不会新建或清空持仓。";
-      Data.unavailable = true; updateTradeAvailability();
-      receive(Data.snap || null); return;
+      $("#storageStatus").textContent = Data.snap ? "持仓更新失败，暂显示上次行情；请重新读取后再交易。" : "暂未读到市场存档，请重试。读取失败不会新建或清空持仓。";
+      Data.unavailable = true;
+    } else {
+      Data.unavailable = !!snap.saveError;
+      document.body.dataset.marketReady = String(!Data.unavailable);
+      $("#storageStatus").textContent = snap.saveError ? "存档尚未就绪，请重新读取后再交易。" : "存档已就绪";
+      Data.snap = snap;
     }
-    Data.unavailable = false; updateTradeAvailability();
-    document.body.dataset.marketReady = String(!snap.saveError);
-    $("#storageStatus").textContent = snap.saveError || "存档已就绪";
-    if (snap.saveError) toast(snap.saveError);
-    receive(snap);
-  };
-  function fallback() {
-    var M = parentMarket();
-    if (!M) { cb(null); return; }
-    Promise.resolve(M.ready ? M.ready() : true).then(function (ok) {
-      if (ok && M.ensureDay) M.ensureDay();
-      cb(M.snapshot ? M.snapshot() : null);
-    }, function () { cb(null); });
+    updateTradeAvailability(); cb(Data.snap || null, valid && !Data.unavailable);
   }
-  if (Bridge.active) {
-    Bridge.call("shell-goldfish", null, function (ok, snap) {
-      if (ok && snap && snap.list && snap.list.length) { cb(snap); return; }
-      if (snap && snap.saveError) { cb(snap); return; }
+  function fallback() {
+    if (Data.disposed || epoch !== Data.readEpoch || finished) return;
+    var M = parentMarket();
+    if (!M) { receive(null); return; }
+    Promise.resolve().then(function () { return M.ready ? M.ready() : true; }).then(function (ok) {
+      if (Data.disposed || epoch !== Data.readEpoch || finished) return;
+      if (!ok) { receive(null); return; }
+      if (M.ensureDay) M.ensureDay();
+      receive(M.snapshot ? M.snapshot() : null);
+    }).catch(function () { receive(null); });
+  }
+  try {
+    if (Bridge.active) Bridge.call("shell-goldfish", null, function (ok, snap) {
+      if (Data.disposed || epoch !== Data.readEpoch || finished) return;
+      if (ok && snap && Array.isArray(snap.list)) { receive(snap); return; }
+      if (snap && snap.saveError) { receive(snap); return; }
       fallback();
     });
-  } else {
-    fallback();
-  }
+    else fallback();
+  } catch (e) { fallback(); }
 }
 function doTrade(id, n, side, cb) {
-  if (Data.unavailable) { cb({ ok: false, msg: "市场存档尚未就绪，请先重试读取" }); return; }
+  if (Data.unavailable || Data.reading || Data.disposed) { cb({ ok: false, msg: "市场存档尚未就绪，请先重试读取" }); return; }
   /* ★ 2026-10-14 审计修复（真 BUG）：桥模式下**不做本地重放兜底**。
      原因：Bridge.call 超时也会回调 (false, null)（见 core/csh_page.js:114-125 的超时分支），
      而宿主可能只是"慢"——它那边的交易已经落账。此时再走父窗 M.trade() 就会**买/卖两次**
@@ -506,9 +519,9 @@ function renderGrid() {
   if (!list.length) {
     var box = el("div", "gf-empty");
     box.style.cssText = "grid-column:1/-1;text-align:center;padding:48px 12px;color:var(--ink-dim)";
-    var t1 = el("div", "", "市场数据尚未读取");
+    var t1 = el("div", "", Data.snap && !Data.unavailable ? "当前暂无挂牌" : "市场数据尚未读取");
     t1.style.cssText = "font-size:var(--pfs-md);color:var(--gold)";
-    var t2 = el("div", "", "可点「重新读取」。若更新后持仓缺失，请在行囊查看旧备份；这里不会将读取失败当成零持仓。" );
+    var t2 = el("div", "", Data.snap && !Data.unavailable ? "稍后可重新读取行情。" : "可点「重新读取」。若更新后持仓缺失，请在行囊查看旧备份；这里不会将读取失败当成零持仓。" );
     t2.style.cssText = "margin-top:10px;font-size:var(--pfs-sm);letter-spacing:.06em";
     box.appendChild(t1); box.appendChild(t2);
     g.appendChild(box);
@@ -707,17 +720,24 @@ function pickLine(girl, it) {
 /* ---------- galgame 角色面板 ---------- */
 var detailReturnId = null;
 function openGirl(id) {
-  detailReturnId = id;
+  detailReturnId = id; Data.viewEpoch++;
   var s = Data.snap || { list: [] };
   var it = (s.list || []).filter(function (x) { return x.id === id; })[0];
   if (!it) return;
-  Data.cur = it; Data.qty = 10;
+  Data.cur = it; Data.qty = 10; Data.qtyAll = false;
   $("#pname").textContent = it.name;
   $("#ptag").textContent = (it.girl && it.girl.tag) || "金鳞市挂牌";
   $("#pbio").textContent = (it.girl && it.girl.bio) || "";
-  var img = $("#pimg");
-  img.src = "../image/" + String(it.img || "").split("/").pop();
+  var img = $("#pimg"), epoch = Data.viewEpoch;
+  var replacement = img.cloneNode(false); img.replaceWith(replacement); img = replacement;
+  $("#portrait-name").textContent = it.name;
+  $("#portrait-fallback").hidden = false;
+  img.style.visibility = "hidden";
   img.alt = it.name;
+  function currentPortrait() { return !Data.disposed && epoch === Data.viewEpoch && Data.cur && Data.cur.id === id && img === $("#pimg"); }
+  img.onload = function () { if (currentPortrait()) { img.style.visibility = "visible"; $("#portrait-fallback").hidden = true; } };
+  img.onerror = function () { if (currentPortrait()) { img.style.visibility = "hidden"; $("#portrait-fallback").hidden = false; } };
+  img.src = "../image/" + String(it.img || "").split("/").pop();
   sayLine();
   renderFacts();
   renderQty();
@@ -735,6 +755,7 @@ function sayLine(force) {
   say.style.animation = "none"; void say.offsetWidth; say.style.animation = "";
 }
 function closeGirl() {
+  Data.viewEpoch++;
   var panel = $("#panel"), wasOpen = panel.classList.contains("on"); panel.classList.remove("on");
   if (wasOpen && detailReturnId) { var cards = $("#grid").querySelectorAll(".card"); for (var i=0;i<cards.length;i++) if(cards[i].getAttribute("data-id")===detailReturnId){cards[i].focus({preventScroll:true});break;} }
 }
@@ -755,20 +776,25 @@ function renderFacts() {
   updateQtyHint();
 }
 function renderQty() {
+  if (Data.qtyAll) { Data.qty = Math.max(0, Number(Data.cur && Data.cur.hold) || 0); if (!Data.qty) { Data.qtyAll = false; Data.qty = 1; } }
   var box = $("#qty");
   box.innerHTML = "";
   [1, 5, 10, 25, 50].forEach(function (n) {
-    var b = el("button", "qbtn" + (Data.qty === n ? " on" : ""), String(n));
+    var b = el("button", "qbtn" + (!Data.qtyAll && Data.qty === n ? " on" : ""), String(n));
     b.type = "button";
-    b.addEventListener("click", function () { Data.qty = n; renderQty(); }, false);
+    b.setAttribute("aria-pressed", String(!Data.qtyAll && Data.qty === n));
+    b.setAttribute("aria-label", "选择 " + n + " 股");
+    b.addEventListener("click", function () { Data.qtyAll = false; Data.qty = n; renderQty(); box.querySelector('[data-qty="' + n + '"]').focus({preventScroll:true}); }, false);
+    b.setAttribute("data-qty", String(n));
     box.appendChild(b);
   });
   var it = Data.cur;
   if (it && it.hold > 0) {
-    var all = el("button", "qbtn", "全卖");
+    var all = el("button", "qbtn" + (Data.qtyAll ? " on" : ""), "全卖");
+    all.setAttribute("data-qty", "all"); all.setAttribute("aria-pressed", String(Data.qtyAll)); all.setAttribute("aria-label", "选择全部持仓 " + it.hold + " 股");
     all.type = "button";
     all.addEventListener("click", function () {
-      Data.qty = it.hold; renderQty();
+      Data.qtyAll = true; Data.qty = it.hold; renderQty(); box.querySelector('[data-qty="all"]').focus({preventScroll:true});
     }, false);
     box.appendChild(all);
   }
@@ -776,42 +802,53 @@ function renderQty() {
 }
 function updateQtyHint() {
   var it = Data.cur; if (!it) return;
-  var n = Data.qty | 0;
-  var need = Math.round(it.price * n * 1.02);
-  var got = Math.round(it.price * n * 0.98);
-  $("#qHint").textContent = "买 " + n + " 股需 " + fmt(need) + " CBY（含 2% 手续费） · 卖可得 " + fmt(got);
+  if (Data.reading) { $("#qHint").textContent = "正在核对持仓，确认后可继续交易。"; return; }
+  if (Data.unavailable) { $("#qHint").textContent = "行情未更新，请关闭详情后点「重新读取」。"; return; }
+  var n = Data.qty | 0, q = it.quote;
+  if (!q || typeof q.unitPrice !== "number" || !isFinite(q.unitPrice) || q.unitPrice <= 0 || typeof q.feeRate !== "number" || !isFinite(q.feeRate) || q.feeRate < 0 || q.feeRate >= 1) {
+    $("#qHint").textContent = "已选 " + n + " 股 · 暂无报价明细，成交金额以实际结算为准。"; return;
+  }
+  var need = Math.round(q.unitPrice * n * (1 + q.feeRate));
+  var got = Math.round(q.unitPrice * n * (1 - q.feeRate));
+  var rate = Math.round(q.feeRate * 10000) / 100;
+  $("#qHint").textContent = "买 " + n + " 股约 " + fmt(need) + " · 卖约 " + fmt(got) + " CBY（含 " + rate + "% 费用）";
 }
 
 /* ---------- 买卖 ---------- */
 function tradeAct(side) {
-  if (Data.unavailable) { toast("市场存档尚未就绪，请先重试读取"); return; }
+  if (Data.unavailable || Data.reading || Data.disposed) { toast("市场存档尚未就绪，请先重试读取"); return; }
   if (Data.tradeBusy) return;
   var it = Data.cur; if (!it) return;
   var n = Data.qty | 0;
   if (n <= 0) { toast("请选择股数"); return; }
-  Data.tradeBusy = true;
-  $("#bBuy").disabled = true; $("#bSell").disabled = true;
-  doTrade(it.id, n, side, function (res) {
-    Data.tradeBusy = false;
-    updateTradeAvailability();
-    if (!res || !res.ok) { toast((res && res.msg) || "交易失败"); return; }
-    toast(res.msg + " @ " + fmt(res.price));
-    loadSnap(function (snap) {
+  var view = Data.viewEpoch, targetId = it.id;
+  Data.tradeBusy = true; updateTradeAvailability();
+  var received = false;
+  function complete(res) {
+    if (received || Data.disposed) return;
+    received = true;
+    toast(res && res.ok ? res.msg + " @ " + fmt(res.price) : ((res && res.msg) || "暂未确认交易结果，请先核对持仓"));
+    loadSnap(function (snap, fresh) {
+      Data.tradeBusy = false;
       Data.snap = snap;
-      renderStats(); renderGrid(); refreshView();
-      /* galgame 反馈：买/卖后她说一句 */
-      if (side === "buy") sayLine("……好。那就一起走一段吧。");
-      else sayLine("……成交。下次再来。");
+      renderStats(); renderGrid(); refreshView(); updateTradeAvailability();
+      if (res && res.ok && fresh && Data.viewEpoch === view && Data.cur && Data.cur.id === targetId && $("#panel").classList.contains("on")) {
+        if (side === "buy") sayLine("……好。那就一起走一段吧。");
+        else sayLine("……成交。下次再来。");
+      }
     });
-  });
+  }
+  try { doTrade(targetId, n, side, complete); }
+  catch (e) { complete(null); }
 }
 function refreshView() {
   var it = Data.cur; if (!it) return;
   var s = Data.snap || { list: [] };
   var fresh = (s.list || []).filter(function (x) { return x.id === it.id; })[0];
+  if (!fresh) { closeGirl(); Data.cur = null; return; }
   if (fresh) {
     Data.cur = fresh;
-    renderFacts(); renderQty();
+    renderQty(); renderFacts();
   }
 }
 
@@ -853,6 +890,7 @@ $("#retryMarket").addEventListener("click", function () {
   button.disabled = true;
   loadSnap(function (snap) { button.disabled = false; Data.snap = snap; renderStats(); renderGrid(); refreshView(); });
 });
+window.addEventListener("pagehide", function () { Data.disposed = true; Data.readEpoch++; Data.viewEpoch++; clearTimeout(toastTimer); });
 updateTradeAvailability();
 renderStats();
 loadSnap(function (snap) {

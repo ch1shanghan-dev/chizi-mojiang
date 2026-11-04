@@ -61,9 +61,9 @@ export const cshConfig = {
             "csh_interact_panel":{"name":artConfigLabel("局内互动","interaction-strategy.png"),"intro":"设置局内互动：总开关、互动频率、附带台词。联机不可用。","clear":true,"onclick":function(){ if(!lib.cshInteract||typeof lib.cshInteract.openPanel!=="function"){ notice("局内互动没能打开，请重启游戏后再试"); return false; } lib.cshInteract.openPanel(); return false; }},
             "csh_texas_rake":{"name":"德州场供","intro":"每手每人先交大盲10%作前注入池，不另扣钱包。此项只调翻牌后场供，默认0.5%、无上限；返还免收，收工不再扣费。","init":"50","item":{"0":"关闭","50":"0.5% · 无上限","100":"1% · 无上限","200":"2% · 无上限"}},
             "csh_challenge_profile":{"name":"池子挑战难度","intro":"仅池子魔王。爽快档减血减压，挑战者起手6张与1护甲；困难档保留原参数。下局生效，奖励不加倍。","init":"normal","item":{"normal":"爽快 · 推荐","hard":"原味困难"}},
-            "csh_aux_spirit":{"name":"妖灵乱入（实验）","intro":"下局生效。单机标准身份2–8人，内奸不召唤。准备阶段加入守护友军；阵亡不补召，战绩独立，无普通奖励。","init":false},
+            "csh_aux_spirit":{"name":"妖灵乱入（实验）","intro":"下局生效。单机标准身份2–8人，内奸不召唤。准备阶段加入守护友军；阵亡不补召，战绩独立；完局奖励同身份场。","init":false},
             "csh_aux_state":{"name":"本局妖灵状态","clear":true,"onclick":function(){notice(lib.cshAuxSpirit?lib.cshAuxSpirit.describe():"妖灵状态未就绪");return false;}},
-            "csh_aux_stats":{"name":"妖灵辅助战绩","clear":true,"onclick":function(){try{const s=lib.cshWallet.wallet.assistedStats();notice("辅助身份场："+s.wins+"胜 "+s.losses+"负；不计普通身份战绩，无常规奖励");}catch(e){notice("辅助战绩不可读取，请先备份并恢复存档");}return false;}},
+            "csh_aux_stats":{"name":"妖灵辅助战绩","clear":true,"onclick":function(){try{const s=lib.cshWallet.wallet.assistedStats();notice("辅助身份场："+s.wins+"胜 "+s.losses+"负；不计普通身份战绩，完局按身份场标准发放奖励");}catch(e){notice("辅助战绩不可读取，请先备份并恢复存档");}return false;}},
             /* ===== 功能开关 ===== */
             "csh_effect_announce":{"name":"伤害/击杀/回复播报","intro":"开启后播放伤害、连杀、回复的播报与音效。与其他特效扩展冲突时关掉。","init":false},
             /* 【2026-10-05】默认关闭化：调试悬浮球默认不再开启（老玩家已保存的选择不受影响）。 */
@@ -95,6 +95,11 @@ export const cshConfig = {
                     return false;
                 }
                 notice("检查更新没能打开，请重启游戏后再试"); return false;
+            }},
+            "csh_update_backups":{"name":artConfigLabel("更新备份","transfer-chest.png"),"intro":"离线查看本机更新副本与空间，按需清理可识别的旧资料。不会删除行囊存档。","clear":true,"onclick":function(){
+                if(lib.cshDebug&&typeof lib.cshDebug.openUpdateBackups==="function"){lib.cshDebug.openUpdateBackups();return false;}
+                if(typeof lib.__cshLoadDebug==="function"){lib.__cshLoadDebug().then(function(){try{lib.cshDebug.openUpdateBackups();}catch(e){console.error(e);notice("更新备份暂未打开，请重启后再试");}}).catch(function(e){console.error(e);notice("更新备份暂未打开，请重启后再试");});return false;}
+                notice("更新备份暂未打开，请重启后再试");return false;
             }},
             "csh_extstore":{"name":artConfigLabel("其他扩展","transfer-chest.png"),"intro":"安装精选的其他扩展（武将包 / 功能扩展）。","clear":true,"onclick":function(){
                 if(lib.cshDebug && typeof lib.cshDebug.openExtStore==="function"){ lib.cshDebug.openExtStore(); return false; }
