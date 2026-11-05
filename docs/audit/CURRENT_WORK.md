@@ -37,6 +37,7 @@
 ## 已完成证据与历史
 
 2026-11-05 已核查其余探针中的 `493` 引用：仅 `probe_goal_recommendations_host.mjs` 两处属「当前生涯定义数」断言，已同步为 2000；本副本缺 `ext/app/index.html`，该宿主专项未实跑。其余探针的 `1438/1946/782` 等数字为历史基线或迁移兼容引用，保留。
+**行囊跨版本已建立证据与纪律（B3）**：当前格式 v3，`v>VERSION` 拒绝、旧版走清洗补缺，正常导入对缺失键保留本地值；4.0.15→4.0.16 未改 `VERSION`/`KEY_DEFS`/存档结构，在线更新后旧档可直读。新增 `tools/probe_migrate_compat_20261105.mjs` **10/0**（v1/v2 可导入、新键不被清空、v4 明确拒绝、篡改拒绝、未知键忽略、导入旧包后再导出不丢新键）。以后新键必须可缺失、不得改旧键结构、升 `VERSION` 前必跑该专项。详见[B3报告](WORKBUDDY_B3_MIGRATE_COMPAT_20261105.md)。老版本（4.0.14 及更早）行囊按作者要求不再加兼容分支。
 2026-11-05 修复 `tools/probe_first_batch.mjs`：从 `csh_winrate.js` 按函数名抽取代码时漏了新增的 `capturePersonal`，导致 HARNESS_ERROR；补入抽取列表后 **56/0** 通过，恢复该回归证据。另实测 `tools/probe_interact_audit.mjs` 为 **114/9**（不在门禁内，失败集中在互动桥恩怨写入路径），原因未查明，**记录为已知工具缺口，未冒充通过**，需单独一轮排查。
 [B1成就通知常驻未读与归档](WORKBUDDY_B1_FEEDBACK_ARCHIVE_20261105.md)、[U0—U4 面向提交的差异说明](WORKBUDDY_U0_U4_DELTA_20261105.md)、[U4失败暂存与容量](WORKBUDDY_U4_STAGING_CAPACITY_20261105.md)、[U3启动恢复](WORKBUDDY_U3_STARTUP_RECOVERY_20261105.md)、[U2镜像缓存完整性](WORKBUDDY_U2_MIRROR_CACHE_INTEGRITY_20261105.md)、[U1更新器任务生命周期](WORKBUDDY_U1_UPDATE_TASK_LIFECYCLE_20261105.md)、[U0发布字节修正](WORKBUDDY_U0_RELEASE_BYTES_20261105.md)、[退隐可达性](RETIRED_REACHABILITY_20261105.md)、[世界资金与路由复核](VERSION_BACKLOG_REVIEW_20261105.md)、[安卓更新事故](ANDROID_UPDATE_REPAIR_20261105.md)、[此前GitHub集成](GITHUB_DEV_SYNC_20261105.md)。更多按交接第8节定位，不全文重读所有历史。
 
