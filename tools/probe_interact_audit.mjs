@@ -46,7 +46,7 @@ function harness() {
   vm.runInContext('var world={ai:["speaker","other","friend","me"].map(id=>({id,name:id,grudges:{}}))};'+
     'var PLAYER_GRUDGE_KEY="player";function byId(id){return world.ai.find(a=>a.id===id);}' +
     'function idInRoster(id){return !!byId(id);}function clampNum(n,a,b){return Math.max(a,Math.min(b,Number(n)||0));}' +
-    'var tableCommitTime=null;function saveWorld(){}function pushHistory(){}'+
+    'var tableCommitTime=null,heartbeatPending=false,heartbeatActive=true;function saveWorld(){}function pushHistory(){}'+
     ['saveBlocked','idOfPlayer','grudgeValue','addGrudge','grudge'].map(n=>extract(worldSource,n)).join('\n')+
     ';lib.cshWorld={idOfPlayer,addGrudge,grudge,PLAYER_GRUDGE_KEY};globalThis.grudgeWorld=world;',ctx);
   return { api: ctx.probe, interaction: lib.cshInteract, world: ctx.grudgeWorld, get: ctx.get, lib, game, status, speaker, other, friend, me, tasks, cancelled, chats, throws, stickers, storage,
@@ -101,6 +101,13 @@ for (const [prior, category] of [[null, 'hitBack'], ['hit','memHitBack'], ['hitB
   const cold = harness(); cold.api.riposte(cold.speaker, 'egg', cold.other); cold.flush();
   h.flush(); check('memory ' + (prior || 'cold') + ' -> ' + category, wanted ? h.chats[0]?.text !== cold.chats[0]?.text : h.chats[0]?.text === cold.chats[0]?.text, h.chats[0]);
   check('memory writes current event ' + (prior || 'cold'), h.api.lastEvent.get('speaker|other') === 'hitBack');
+}
+{
+  const h = harness();
+  const before = h.lib.cshWorld.grudge('speaker','other');
+  const wrote = h.lib.cshWorld.addGrudge('speaker',2,'other');
+  const after = h.lib.cshWorld.grudge('speaker','other');
+  check('world grudge adapter writes through', before===0&&wrote===2&&after===2, {before,wrote,after,idSpeaker:h.lib.cshWorld.idOfPlayer(h.speaker),idOther:h.lib.cshWorld.idOfPlayer(h.other),key:h.lib.cshWorld.PLAYER_GRUDGE_KEY});
 }
 {
   const h = harness(); scenarios.riposte(h); h.interaction.onGameOver(true, 1);
