@@ -7769,10 +7769,24 @@ function onlineLocalFetch(url,options){return window.CSHOnline.local(url,options
                 /* 局中 prepare 后由这里接手：本局结束、结算留出时间后再提交并重启。
                    轮询独立于任务锁，关闭弹窗不会取消已下载内容。 */
                 function scheduleDeferredInstall(){
+                    /* 结算完成判定：局已结束 + 钱包无待保存结果 + 迁移无未决；连续两次稳定才装，
+                       避免结算动画/战绩写入刚开始就替换文件。 */
+                    function settledNow(){
+                        try{
+                            if(_status.gameStarted&&!_status.over)return false;
+                            var q=lib.cshWallet&&lib.cshWallet.pending;
+                            if(q&&typeof q.status==='function'){var s=q.status();if(s&&(s.count||s.error))return false;}
+                            var M=lib.cshMigrate,st=M&&M.recoveryState?M.recoveryState():null;
+                            if(st&&(st.pending||st.busy))return false;
+                        }catch(e){return false;}
+                        return true;
+                    }
+                    var stable=0;
                     var tick=function(){
                         var pending=window.CSHUpdate&&window.CSHUpdate.__cshPendingInstall;
                         if(!pending)return;
-                        if(_status.gameStarted&&!_status.over){setTimeout(tick,1500);return;}
+                        if(!settledNow()){stable=0;setTimeout(tick,1500);return;}
+                        if(++stable<2){setTimeout(tick,1500);return;}
                         setTimeout(function(){
                             var again=window.CSHUpdate&&window.CSHUpdate.__cshPendingInstall;
                             if(!again||again!==pending)return;
