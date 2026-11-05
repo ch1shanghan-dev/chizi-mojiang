@@ -17,7 +17,7 @@ async function independentCareerHost(){
  async function state(index){await clickElement(d+'.getElementById("ach-state")',true);await key('Home','Home',36);for(let i=0;i<index;i++)await key('ArrowDown','ArrowDown',40);await key('Enter','Enter',13);await delay(200);}
  async function search(text){await clickElement(d+'.getElementById("ach-search")',true);await key('a','KeyA',65,2);if(text)await page.send('Input.insertText',{text});else await key('Backspace','Backspace',8);await delay(200);}
  const actual=await page.evaluate('(()=>{const t='+test+',G='+w+'.CSHGoals,rows=t.rows();return {count:rows.length,reliable:t.reliable(),expected:G.recommend(rows,[],t.reliable()).map(x=>x.key),shown:[...'+d+'.querySelectorAll(".ach-recommendation")].map(x=>x.closest(".ach").dataset.key)};})()');
- check('real host partial progress produces max3 honest next goals',actual.count===493&&actual.reliable&&actual.expected.length>0&&actual.expected.length<=3&&actual.shown.join(',')===actual.expected.join(','),actual);
+ check('real host partial progress produces max3 honest next goals',actual.count===2000&&actual.reliable&&actual.expected.length>0&&actual.expected.length<=3&&actual.shown.join(',')===actual.expected.join(','),actual);
  await state(3);
  const subset=await page.evaluate('(()=>{const d='+d+';return {state:d.getElementById("ach-state").value,keys:[...d.querySelectorAll("#ach-grid .ach")].map(n=>n.dataset.key),claims:d.querySelectorAll("#ach-grid .aclaim").length,more:d.getElementById("ach-more").hidden};})()');
  check('native recent target filter shows the bounded unfinished subset',subset.state==='near'&&subset.keys.join(',')===actual.expected.join(',')&&subset.claims===0&&subset.more,subset);
@@ -45,7 +45,7 @@ async function independentCareerHost(){
  await page.evaluate('window.__goalStats=lib.cshWorld.stats;lib.cshWorld.stats=function(){throw Error("isolated world read failure")};'+test+'.refresh();');await delay(500);
  check('failed host statistics suppress suggestions and show unavailable state',await page.evaluate('!'+test+'.reliable()&&'+d+'.getElementById("ach-grid").children.length===0&&'+d+'.getElementById("ach-empty").textContent.includes("尚未完整读取")'));
  await page.evaluate('lib.cshWorld.stats=__goalStats;delete window.__goalStats;'+test+'.refresh();');await delay(500);
- check('recovered actual stats restore candidates without touching definitions',await page.evaluate(test+'.reliable()&&'+d+'.querySelectorAll("#ach-grid .ach").length>0&&'+test+'.rows().length===493'));
+ check('recovered actual stats restore candidates without touching definitions',await page.evaluate(test+'.reliable()&&'+d+'.querySelectorAll("#ach-grid .ach").length>0&&'+test+'.rows().length===2000'));
  const prefsBefore=await page.evaluate('localStorage.getItem("csh_goal_pins_v1")');await state(0);
  await clickElement(d+'.getElementById("ach-filters-toggle")',true);await clickElement(d+'.getElementById("ach-reset")',true);await delay(200);
  check('reset restores normal view and does not clear tracking preferences',await page.evaluate(d+'.getElementById("ach-state").value==="all"&&'+d+'.querySelectorAll("#ach-grid .ach").length===60')&&prefsBefore===await page.evaluate('localStorage.getItem("csh_goal_pins_v1")'));

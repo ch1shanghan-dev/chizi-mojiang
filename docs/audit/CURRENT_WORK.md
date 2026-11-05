@@ -36,6 +36,7 @@
 
 ## 已完成证据与历史
 
+2026-11-05 已核查其余探针中的 `493` 引用：仅 `probe_goal_recommendations_host.mjs` 两处属「当前生涯定义数」断言，已同步为 2000；本副本缺 `ext/app/index.html`，该宿主专项未实跑。其余探针的 `1438/1946/782` 等数字为历史基线或迁移兼容引用，保留。
 [B1成就通知常驻未读与归档](WORKBUDDY_B1_FEEDBACK_ARCHIVE_20261105.md)、[U0—U4 面向提交的差异说明](WORKBUDDY_U0_U4_DELTA_20261105.md)、[U4失败暂存与容量](WORKBUDDY_U4_STAGING_CAPACITY_20261105.md)、[U3启动恢复](WORKBUDDY_U3_STARTUP_RECOVERY_20261105.md)、[U2镜像缓存完整性](WORKBUDDY_U2_MIRROR_CACHE_INTEGRITY_20261105.md)、[U1更新器任务生命周期](WORKBUDDY_U1_UPDATE_TASK_LIFECYCLE_20261105.md)、[U0发布字节修正](WORKBUDDY_U0_RELEASE_BYTES_20261105.md)、[退隐可达性](RETIRED_REACHABILITY_20261105.md)、[世界资金与路由复核](VERSION_BACKLOG_REVIEW_20261105.md)、[安卓更新事故](ANDROID_UPDATE_REPAIR_20261105.md)、[此前GitHub集成](GITHUB_DEV_SYNC_20261105.md)。更多按交接第8节定位，不全文重读所有历史。
 
 ## 执行边界
