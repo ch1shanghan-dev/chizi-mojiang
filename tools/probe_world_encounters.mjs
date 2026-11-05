@@ -21,7 +21,8 @@ function harness(data=new Map()){
   return {ctx,data,store,W,AC,M:ctx.lib.cshMigrate,id:W.list()[0].id,other:W.list()[1].id,stats:()=>ctx.buildStats()};
 }
 const results=[];async function check(name,fn){try{const v=await fn();results.push({name,passed:v===true,detail:v===true?undefined:v});}catch(e){results.push({name,passed:false,detail:e.message});}}
-await check('actual 149-person roster used',()=>harness().W.list().length===149);
+// 2026-11-06 B9：名册 149→150，改为运行时动态名单（list 与 raw.ai 互证，且不低于原 149），避免下次扩容再次失效。
+await check('actual runtime roster used (dynamic, not less than original 149)',()=>{const h=harness(),W=h.W;return W.list().length===W.raw().ai.length&&W.list().length>=149&&W.list().length>0;});
 await check('fresh world is not player table experience',()=>{const h=harness(),s=h.stats();return s.worldHands===0&&s.worldSkillTop===0&&s.playerOpponents===0;});
 await check('fresh global high skill cannot unlock met-opponent awards',()=>{const h=harness();return !h.AC.evalAll(h.stats()).filter(r=>r.key.startsWith('skilltop_')).some(r=>r.done);});
 await check('offline world games cannot create player experience',()=>{const h=harness();h.W.playRounds(8);const s=h.stats();return h.W.stats().hands>0&&s.worldHands===0&&s.worldSkillTop===0&&s.playerOpponents===0;});
@@ -42,9 +43,11 @@ await check('balanced rivalry uses wins and losses against same opponent',()=>{c
 await check('read-only stats/news/list do not grow player records',()=>{const h=harness();h.W.settlePlay(h.id);const before=JSON.stringify(h.W.raw());h.stats();h.W.news();h.W.list();h.W.worldStory();return before===JSON.stringify(h.W.raw());});
 await check('encounters survive module restart',()=>{const h=harness();h.W.settleWin(h.id,10);h.W.settleLose(h.id,10);const restarted=harness(h.data);return restarted.stats().worldHands===2&&restarted.stats().playerRevenge===1;});
 await check('migration export/import preserves player encounters and chronology',async()=>{const h=harness();h.W.settleWin(h.id,10);h.W.settleLose(h.id,10);const code=await h.M.export(),ins=await h.M.inspect(code),target=harness();await target.M.import(code);return ins.ok&&target.stats().worldHands===2&&target.stats().playerRevenge===1;});
-await check('old world total hands are not backfilled as player history',()=>{const h=harness(),raw=h.W.raw();raw.ai.forEach(a=>{a.hands=1000;delete a.withPlayer;});h.W.importRaw(raw);return h.W.stats().hands===149000&&h.stats().worldHands===0;});
+// 2026-11-06 B9：旧写死 149000=149×1000 改为运行时名单数 ×1000，完整保留「不回填为玩家历史」语义。
+await check('old world total hands are not backfilled as player history',()=>{const h=harness(),n=h.W.list().length,raw=h.W.raw();raw.ai.forEach(a=>{a.hands=1000;delete a.withPlayer;});h.W.importRaw(raw);return h.W.stats().hands===n*1000&&h.stats().worldHands===0;});
 await check('malformed encounter counters are safely normalized',()=>{const h=harness(),raw=h.W.raw();raw.ai[0].withPlayer={hands:-1,wins:20,losses:20,draws:20,skillTop:Infinity,revenge:true};h.W.importRaw(raw);const p=h.W.byId(h.id).withPlayer;return p.hands===0&&p.wins===0&&p.losses===0&&p.draws===0&&p.skillTop===0&&!p.revenge;});
-await check('all 465 old keys retained and 28 meaningful definitions added',()=>{const h=harness(),old=JSON.parse(read('tools/fixtures/career_v4_0_9_ids.json'));return old.length===465&&h.AC.defs.length===493&&old.every(key=>h.AC.byKey(key))&&h.AC.selfTest().ok;});
+// 2026-11-06 B9：旧写死 493 改为引擎动态定义数；保留「465 旧键全留存 / 至少新增 28 条 / 引擎自检通过」三条原语义。
+await check('all 465 old keys retained and at least 28 definitions added (dynamic runtime count)',()=>{const h=harness(),old=JSON.parse(read('tools/fixtures/career_v4_0_9_ids.json')),A=h.AC,dynamic=A.stats().total;return old.length===465&&A.defs.length===dynamic&&A.defs.length>=493&&A.defs.length-old.length>=28&&A.selfTest().count===dynamic&&old.every(key=>A.byKey(key))&&A.selfTest().ok;});
 for(const field of ['playerOpponents','playerFamiliar','playerRevenge','playerBalanced']){
   await check(field+' new family requires real threshold and preserves all tiers',()=>{const h=harness(),prefix={playerOpponents:'tablefriends_',playerFamiliar:'oldfriend_',playerRevenge:'revengefriend_',playerBalanced:'balancedfriend_'}[field],defs=h.AC.defs.filter(d=>d.key.startsWith(prefix));return defs.length>0&&defs.every(d=>{const goal=d.prog({})[1];return !h.AC.test(d,{[field]:goal-1})&&h.AC.test(d,{[field]:goal});});});
 }

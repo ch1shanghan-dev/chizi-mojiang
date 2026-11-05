@@ -3257,6 +3257,9 @@ async function runBossChecks() {
       if(facts69.failed!==0||facts69.passed<35)fail('执行级 E69：成就事件事实边界未通过');else ok('执行级 E69：装备前后事实/有效判定/去重/保存隔离（'+facts69.passed+'/0）');
       const career58=runProbeJson('probe_career_unlocks.mjs',['--out',path.join(tmp57,'career.json')],{timeout:20000});
       if(career58.failed!==0||career58.passed<40)fail('执行级 E58：生涯首次达成与永久资格未通过');else ok('执行级 E58：生涯首次达成/旧档/失败/迁移/资格（'+career58.passed+'/0）');
+      /* B6：退隐/世界首次采集与跨来源组合的真实源码反例，防止「没有证据」被当成兼容。 */
+      const firstCaptureB6=runProbeJson('probe_career_world_first_capture_20261105.mjs',['--out',path.join(tmp57,'first-capture')],{timeout:20000});
+      if(firstCaptureB6.failed!==0||firstCaptureB6.passed<24)fail('执行级 E58G：退隐/世界首次采集与跨来源组合反例未通过');else ok('执行级 E58G：首次采集/跨来源组合/真实谓词分区（'+firstCaptureB6.passed+'/0）');
       const taskLife58=runProbeJson('probe_task_lifetime.mjs',['--out',path.join(tmp57,'task-lifetime.json')],{timeout:20000});
       if(taskLife58.failed!==0)fail('执行级 E58B：累计日课事实与新档拒绝未通过');else ok('执行级 E58B：累计日课同写/跨日/旧档/失败/采用预检（'+taskLife58.passed+'/0）');
       const bossCareer58=runProbeJson('probe_career_boss_unlocks.mjs',['--out',path.join(tmp57,'boss-career.json')],{timeout:20000});
@@ -3334,6 +3337,47 @@ log("项目根：" + ROOT);
 log("");
 
 if (!ONLY_VERSIONS) { runSyntax(); runFreeVars(); runImports(); runConsistency(); }
+/* E95：把「修好但长期没人跑」的专项真正接进门禁。
+   前三轮反复出现同一种事故：探针坏了几个月没人发现，因为没有任何入口引用它
+   （probe_first_batch HARNESS_ERROR、career_achievements 固化 493、career_source 指向旧安装）。
+   这里统一注册，全部走 runProbeJson 的失败重试一次；min passed 取两轮实测稳定值。 */
+function sweep95(dir, budget){
+  let left = budget == null ? 80 : budget;
+  try {
+    for (const it of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (left-- <= 0) return;
+      const p = path.join(dir, it.name);
+      if (it.isDirectory()) { sweep95(p, left); try { fs.rmdirSync(p); } catch (_e) {} }
+      else { try { fs.unlinkSync(p); } catch (_e) {} }
+    }
+  } catch (_e) {}
+}
+if (spawnOk && execFileSync && !ONLY_SYNTAX && !ONLY_VERSIONS) {
+  let tmp95 = null;
+  try {
+    tmp95 = fs.mkdtempSync(path.join(auditTempRoot(), 'csh-registry-'));
+    const reg95 = [
+      ['E95A','probe_career_source_20261104.mjs',['--out',path.join(tmp95,'career-source')],12,'生涯来源探针（运行时2000条动态基线）',20000],
+      ['E95B','probe_retired_reachability_20261105.mjs',['--out',path.join(tmp95,'retired')],28,'退隐可达性探针（自洽基线28条）',20000],
+      ['E95C','probe_update_bundle_cleanup_20261105.mjs',['--out',path.join(tmp95,'bundle')],10,'失败更新资料整组清理安全判定',20000],
+      ['E95D','probe_migrate_compat_20261105.mjs',['--out',path.join(tmp95,'compat')],10,'行囊跨版本兼容与旧档不清空',20000],
+      ['E95E','probe_migration_failures.mjs',[],57,'迁移失败/配额/回滚屏障',20000],
+      ['E95F','probe_world_lifecycle.mjs',[],67,'世界生命周期回归',20000],
+      ['E95G','probe_career_rewards.mjs',[],29,'生涯奖励探针（动态定义数）',20000],
+      ['E95H','probe_world_encounters.mjs',[],35,'世界名册/旧键留存（动态定义数）',20000],
+    ];
+    for (const [tag95, script95, args95, min95, label95, timeout95] of reg95) {
+      const r95 = runProbeJson(script95, args95, { timeout: timeout95 });
+      if (r95.failed !== 0 || r95.passed < min95) fail('执行级 ' + tag95 + '：' + label95 + '未通过');
+      else ok('执行级 ' + tag95 + '：' + label95 + '（' + r95.passed + '/0）');
+    }
+  } catch (error95) {
+    fail('执行级 E95：回归注册区失败（' + String(error95 && error95.message).slice(0, 160) + '）');
+  } finally {
+    if (tmp95) { sweep95(tmp95); try { fs.rmdirSync(tmp95); } catch (_e) {} }
+  }
+}
+
 if (!ONLY_SYNTAX && !ONLY_VERSIONS) await runBossChecks();
 if (!ONLY_SYNTAX) runVersions();
 

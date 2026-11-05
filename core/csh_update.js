@@ -48,12 +48,31 @@
   }
   async function protect(state,keep){
    const managed=state.rows.filter(r=>r.trusted);let latest=null;
-   for(const row of managed){if(!['staging','prepared'].includes(row.state)&&!(row.meta.cleaning&&row.meta.cleaning.kind==='bundle')&&await recoverable(row)){latest=row.id;break;}}
-   for(let i=0;i<managed.length;i++){const row=managed[i];row.recovering=!!state.blocked||row.id===state.journalId;row.protected=!!state.blocked||['staging','prepared'].includes(row.state)||row.id===latest||i<keep||!latest&&row.beforeBytes>0;row.reason=state.blocked||(['staging','prepared'].includes(row.state)?'更新未完成：原文件副本保留，下载副本可单独清理':'')||(row.id===latest?'最近可校验的回退资料，保留不清理':i<keep?'按保留组数保留':!latest&&row.beforeBytes>0?'没有其他可校验回退资料，保留不清理':'');}
+   /* U4 残余：无 journal 的失败组此前被永久保护，before/ 一直占空间。
+      只在「确有另一个可校验回退」时开放整组清理：
+        · aborted / rolledback 是明确失败，随时可清；
+        · staging / prepared 但无 journal 是进程被杀留下的孤儿，给 24h 冷静期，
+          避免刚中断就删掉玩家可能还想手动恢复的资料；
+        · 整组清理中断（cleaning.kind==='bundle'）的组保留原重试入口，不在这里处理。
+      latest 必须排除这些失败组，否则失败组自己会变成「必须保留的回退」，永远清不掉；
+      排除后若没有任何可校验回退，!latest && beforeBytes>0 会把所有含原文件的组全部保住。 */
+   const orphanAge=24*3600*1000;
+   for(const row of managed){const st2=row.state;
+    const orphan=Number.isFinite(row.created)&&row.created>0&&Date.now()-row.created>orphanAge;
+    /* cleaning.kind==='bundle' 表示上次整组清理中断、部分文件已删：
+       它必须能重试收尾，否则半清理状态会永久卡住。 */
+    row.failedBundle=!!(!state.blocked&&row.id!==state.journalId&&
+     (['aborted','rolledback'].includes(st2)||(['staging','prepared'].includes(st2)&&orphan)));}
+   for(const row of managed){if(!row.failedBundle&&!['staging','prepared'].includes(row.state)&&!(row.meta.cleaning&&row.meta.cleaning.kind==='bundle')&&await recoverable(row)){latest=row.id;break;}}
+   for(let i=0;i<managed.length;i++){const row=managed[i];row.recovering=!!state.blocked||row.id===state.journalId;
+    row.protected=!!state.blocked||(['staging','prepared'].includes(row.state)&&!row.failedBundle)||row.id===latest||(i<keep&&!row.failedBundle)||!latest&&row.beforeBytes>0;
+    row.reason=state.blocked||(['staging','prepared'].includes(row.state)&&!row.failedBundle?'更新未完成：原文件副本保留，下载副本可单独清理':'')||
+     (row.id===latest?'最近可校验的回退资料，保留不清理':(i<keep&&!row.failedBundle)?'按保留组数保留':!latest&&row.beforeBytes>0?'没有其他可校验回退资料，保留不清理':'');
+    if(row.failedBundle&&!row.protected&&!row.recovering&&!row.reason)row.reason='已确认失败的更新资料，可在保留可校验回退的前提下整组清理';}
    return latest;
   }
   function policy(options={}){return {keep:[1,2,3].includes(options.keep)?options.keep:2,budgetBytes:[256,512,1024].includes(options.budgetMB)?options.budgetMB*1024*1024:512*1024*1024};}
-  function publicRow(row){return {id:row.id,bytes:row.bytes,beforeBytes:row.beforeBytes,nextBytes:row.nextBytes,created:row.created,fromVersion:row.fromVersion||'',toVersion:row.toVersion||'',state:row.state,trusted:row.trusted,protected:row.protected,reason:row.reason,interrupted:!!(row.meta&&row.meta.cleaning),downloadsCleanable:row.trusted&&!row.recovering&&!(row.meta&&row.meta.nextRemoved)&&(row.nextBytes>0||!!(row.meta&&row.meta.cleaning&&row.meta.cleaning.kind==='next'))};}
+  function publicRow(row){return {id:row.id,bytes:row.bytes,beforeBytes:row.beforeBytes,nextBytes:row.nextBytes,created:row.created,fromVersion:row.fromVersion||'',toVersion:row.toVersion||'',state:row.state,trusted:row.trusted,protected:row.protected,reason:row.reason,interrupted:!!(row.meta&&row.meta.cleaning),downloadsCleanable:row.trusted&&!row.recovering&&!(row.meta&&row.meta.nextRemoved)&&(row.nextBytes>0||!!(row.meta&&row.meta.cleaning&&row.meta.cleaning.kind==='next')),bundleCleanable:!!(row.failedBundle&&!row.protected&&!row.recovering)};}
   async function inventory(options){return locked(async()=>{const s=await scan(),p=policy(options);const retained=await protect(s,p.keep);return {ok:true,blocked:s.blocked,totalBytes:s.totalBytes,rows:s.rows.map(publicRow),keep:p.keep,budgetBytes:p.budgetBytes,retained};});}
   async function fingerprint(state){return digest(encode(JSON.stringify({blocked:state.blocked,rows:state.rows.map(r=>[r.id,r.metaHash||null,r.tree.files.map(f=>[f.path,f.size])])})));}
   async function verifyTargets(row,kind){
@@ -64,7 +83,9 @@
    const state=await scan(),p=policy(options);if(state.blocked)throw Error(state.blocked);const retained=await protect(state,p.keep),kind=options.kind==='next'?'next':'bundle';let selected;
    if(options.ids!=null){if(!Array.isArray(options.ids)||!options.ids.length||options.ids.length>1000||options.ids.some(id=>typeof id!=='string'||!state.rows.some(r=>r.id===id)))throw Error('请选择当前可识别的备份');selected=state.rows.filter(r=>options.ids.includes(r.id));}
    else {selected=[];let total=state.totalBytes,count=state.rows.filter(r=>r.trusted).length;for(const row of state.rows.slice().reverse())if(row.trusted&&!row.protected&&(total>p.budgetBytes||count>p.keep)){selected.push(row);total-=row.bytes;count--;}}
-   const jobs=[];for(const row of selected){if(!row.trusted)throw Error(row.reason||'这组资料无法核对，不能清理');if(kind==='bundle'&&(row.protected||row.recovering||['staging','prepared','aborted','rolledback'].includes(row.state)))throw Error(row.reason||'这组资料受保护，不能清理');if(kind==='next'){const retryMeta=row.meta.cleaning&&row.meta.cleaning.kind==='next';if(row.recovering||row.meta.nextRemoved||(!(row.nextBytes>0)&&!retryMeta))throw Error('这组资料没有可清理的下载副本或正在恢复');}const files=await verifyTargets(row,kind);if(!files.length&&!(row.meta.cleaning&&row.meta.cleaning.kind===kind))continue;jobs.push({id:row.id,meta:JSON.parse(JSON.stringify(row.meta)),metaHash:row.metaHash,files,dirs:row.tree.dirs});}
+   const jobs=[];for(const row of selected){if(!row.trusted)throw Error(row.reason||'这组资料无法核对，不能清理');if(kind==='bundle'&&(row.protected||row.recovering))throw Error(row.reason||'这组资料受保护，不能清理');
+   if(kind==='bundle'&&!row.failedBundle&&['staging','prepared','aborted','rolledback'].includes(row.state))throw Error('这组更新尚未确认失败或仍在冷静期，不能整组清理；可只清理下载副本');
+   if(kind==='bundle'&&row.id===retained)throw Error('最近可校验的回退资料不能清理');if(kind==='next'){const retryMeta=row.meta.cleaning&&row.meta.cleaning.kind==='next';if(row.recovering||row.meta.nextRemoved||(!(row.nextBytes>0)&&!retryMeta))throw Error('这组资料没有可清理的下载副本或正在恢复');}const files=await verifyTargets(row,kind);if(!files.length&&!(row.meta.cleaning&&row.meta.cleaning.kind===kind))continue;jobs.push({id:row.id,meta:JSON.parse(JSON.stringify(row.meta)),metaHash:row.metaHash,files,dirs:row.tree.dirs});}
    const bytes=jobs.reduce((n,j)=>n+j.files.reduce((m,f)=>m+f.size,0)+(kind==='bundle'?state.rows.find(r=>r.id===j.id).tree.files.find(f=>f.path===AREA+'/'+j.id+'/'+META).size:0),0),id='cleanup-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2);issued.clear();issued.set(id,{kind,jobs,fingerprint:await fingerprint(state),policy:p,retained});return {ok:true,id,kind,groups:jobs.length,bytes,files:jobs.reduce((n,j)=>n+j.files.length,0),retained,empty:!jobs.length};
   });}
   async function cleanup(id){return locked(async()=>{

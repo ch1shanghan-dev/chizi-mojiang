@@ -1,0 +1,322 @@
+{
+  "scope": "Actual pool page/load/progress with controlled bridge/current-round/guard fixtures; real browser mouse and three landscapes; no player data or natural match claim.",
+  "passed": 63,
+  "failed": 0,
+  "checks": [
+    {
+      "case": "1365x768",
+      "name": "first failed read never fabricates zero unlocks or zero-progress rows",
+      "passed": true
+    },
+    {
+      "case": "1365x768",
+      "name": "first failure is retryable and does not expose parser diagnostics",
+      "passed": true
+    },
+    {
+      "case": "1365x768",
+      "name": "valid source restores exact known unlock and manual reward controls",
+      "passed": true
+    },
+    {
+      "case": "1365x768",
+      "name": "successful retry does not strand focus on a hidden retry button",
+      "passed": true
+    },
+    {
+      "case": "1365x768",
+      "name": "collapsed signature does not query parent live context eagerly",
+      "passed": true
+    },
+    {
+      "case": "1365x768",
+      "name": "opening current signature reads actual compatible steps on demand",
+      "passed": true
+    },
+    {
+      "case": "1365x768",
+      "name": "explicit refresh adopts newer current-round state",
+      "passed": true
+    },
+    {
+      "case": "1365x768",
+      "name": "refresh retains original native button focus after queued toggle",
+      "passed": true
+    },
+    {
+      "case": "1365x768",
+      "name": "invalid live data is retryable and never means satisfied",
+      "passed": true
+    },
+    {
+      "case": "1365x768",
+      "name": "historical achieved signature never borrows another live round",
+      "passed": true
+    },
+    {
+      "case": "1365x768",
+      "name": "read failure retains all previously accepted unlocks rather than resetting history",
+      "passed": true
+    },
+    {
+      "case": "1365x768",
+      "name": "cached read is never authority for claiming money",
+      "passed": true
+    },
+    {
+      "case": "1365x768",
+      "name": "direct old handlers cannot claim while unread",
+      "passed": true
+    },
+    {
+      "case": "1365x768",
+      "name": "structurally invalid snapshot cannot replace known history",
+      "passed": true
+    },
+    {
+      "case": "1365x768",
+      "name": "corrected source re-enables authoritative claim controls",
+      "passed": true
+    },
+    {
+      "case": "1365x768",
+      "name": "save guard cannot merge a newly adopted save into old page history",
+      "passed": true
+    },
+    {
+      "case": "1365x768",
+      "name": "single claim rechecks source before sending despite a previously enabled button",
+      "passed": true
+    },
+    {
+      "case": "1365x768",
+      "name": "healthy bulk path still sends exactly one original request",
+      "passed": true
+    },
+    {
+      "case": "1365x768",
+      "name": "read failure stops batch continuation but retains accepted totals",
+      "passed": true
+    },
+    {
+      "case": "1365x768",
+      "name": "closed page ignores new storage events and obsolete retry actions",
+      "passed": true
+    },
+    {
+      "case": "1365x768",
+      "name": "actual HTML remains exception free",
+      "passed": true
+    },
+    {
+      "case": "915x412",
+      "name": "first failed read never fabricates zero unlocks or zero-progress rows",
+      "passed": true
+    },
+    {
+      "case": "915x412",
+      "name": "first failure is retryable and does not expose parser diagnostics",
+      "passed": true
+    },
+    {
+      "case": "915x412",
+      "name": "valid source restores exact known unlock and manual reward controls",
+      "passed": true
+    },
+    {
+      "case": "915x412",
+      "name": "successful retry does not strand focus on a hidden retry button",
+      "passed": true
+    },
+    {
+      "case": "915x412",
+      "name": "collapsed signature does not query parent live context eagerly",
+      "passed": true
+    },
+    {
+      "case": "915x412",
+      "name": "opening current signature reads actual compatible steps on demand",
+      "passed": true
+    },
+    {
+      "case": "915x412",
+      "name": "explicit refresh adopts newer current-round state",
+      "passed": true
+    },
+    {
+      "case": "915x412",
+      "name": "refresh retains original native button focus after queued toggle",
+      "passed": true
+    },
+    {
+      "case": "915x412",
+      "name": "invalid live data is retryable and never means satisfied",
+      "passed": true
+    },
+    {
+      "case": "915x412",
+      "name": "historical achieved signature never borrows another live round",
+      "passed": true
+    },
+    {
+      "case": "915x412",
+      "name": "read failure retains all previously accepted unlocks rather than resetting history",
+      "passed": true
+    },
+    {
+      "case": "915x412",
+      "name": "cached read is never authority for claiming money",
+      "passed": true
+    },
+    {
+      "case": "915x412",
+      "name": "direct old handlers cannot claim while unread",
+      "passed": true
+    },
+    {
+      "case": "915x412",
+      "name": "structurally invalid snapshot cannot replace known history",
+      "passed": true
+    },
+    {
+      "case": "915x412",
+      "name": "corrected source re-enables authoritative claim controls",
+      "passed": true
+    },
+    {
+      "case": "915x412",
+      "name": "save guard cannot merge a newly adopted save into old page history",
+      "passed": true
+    },
+    {
+      "case": "915x412",
+      "name": "single claim rechecks source before sending despite a previously enabled button",
+      "passed": true
+    },
+    {
+      "case": "915x412",
+      "name": "healthy bulk path still sends exactly one original request",
+      "passed": true
+    },
+    {
+      "case": "915x412",
+      "name": "read failure stops batch continuation but retains accepted totals",
+      "passed": true
+    },
+    {
+      "case": "915x412",
+      "name": "closed page ignores new storage events and obsolete retry actions",
+      "passed": true
+    },
+    {
+      "case": "915x412",
+      "name": "actual HTML remains exception free",
+      "passed": true
+    },
+    {
+      "case": "640x286",
+      "name": "first failed read never fabricates zero unlocks or zero-progress rows",
+      "passed": true
+    },
+    {
+      "case": "640x286",
+      "name": "first failure is retryable and does not expose parser diagnostics",
+      "passed": true
+    },
+    {
+      "case": "640x286",
+      "name": "valid source restores exact known unlock and manual reward controls",
+      "passed": true
+    },
+    {
+      "case": "640x286",
+      "name": "successful retry does not strand focus on a hidden retry button",
+      "passed": true
+    },
+    {
+      "case": "640x286",
+      "name": "collapsed signature does not query parent live context eagerly",
+      "passed": true
+    },
+    {
+      "case": "640x286",
+      "name": "opening current signature reads actual compatible steps on demand",
+      "passed": true
+    },
+    {
+      "case": "640x286",
+      "name": "explicit refresh adopts newer current-round state",
+      "passed": true
+    },
+    {
+      "case": "640x286",
+      "name": "refresh retains original native button focus after queued toggle",
+      "passed": true
+    },
+    {
+      "case": "640x286",
+      "name": "invalid live data is retryable and never means satisfied",
+      "passed": true
+    },
+    {
+      "case": "640x286",
+      "name": "historical achieved signature never borrows another live round",
+      "passed": true
+    },
+    {
+      "case": "640x286",
+      "name": "read failure retains all previously accepted unlocks rather than resetting history",
+      "passed": true
+    },
+    {
+      "case": "640x286",
+      "name": "cached read is never authority for claiming money",
+      "passed": true
+    },
+    {
+      "case": "640x286",
+      "name": "direct old handlers cannot claim while unread",
+      "passed": true
+    },
+    {
+      "case": "640x286",
+      "name": "structurally invalid snapshot cannot replace known history",
+      "passed": true
+    },
+    {
+      "case": "640x286",
+      "name": "corrected source re-enables authoritative claim controls",
+      "passed": true
+    },
+    {
+      "case": "640x286",
+      "name": "save guard cannot merge a newly adopted save into old page history",
+      "passed": true
+    },
+    {
+      "case": "640x286",
+      "name": "single claim rechecks source before sending despite a previously enabled button",
+      "passed": true
+    },
+    {
+      "case": "640x286",
+      "name": "healthy bulk path still sends exactly one original request",
+      "passed": true
+    },
+    {
+      "case": "640x286",
+      "name": "read failure stops batch continuation but retains accepted totals",
+      "passed": true
+    },
+    {
+      "case": "640x286",
+      "name": "closed page ignores new storage events and obsolete retry actions",
+      "passed": true
+    },
+    {
+      "case": "640x286",
+      "name": "actual HTML remains exception free",
+      "passed": true
+    }
+  ]
+}

@@ -60,5 +60,7 @@ await check('imported rank and task data replace old memory',async()=>{const h=h
 await check('rollback adopts backed-up balance and claim receipts',async()=>{const h=harness();h.claim();const code=await h.M.export(),target=harness(),before=target.W.pc();const a=await target.M.import(code);const b=await target.M.rollback(a.backup);return b.ok&&target.W.pc()===before&&!target.AC.claimed('rank_1');});
 await check('full reset and restart removes receipts with wallet',async()=>{const h=harness();h.claim();const r=await h.M.reset();const restart=harness(h.store);return r.ok&&restart.W.pc()===2000&&!restart.AC.claimed('rank_1');});
 await check('wallet transaction preserves existing pending market checkpoint',()=>{const h=harness();h.W.commitMarket({hold:{sample:1}},-10,'金鳞市买入:fixture');h.claim();return h.disk().marketPending?.state.hold.sample===1&&h.disk().careerClaims?.rank_1===1;});
-await check('achievement engine expanded definitions and empty retired set preserved',()=>{const h=harness();return h.AC.defs.length===493&&Object.keys(h.AC.RETIRED).length===0&&h.AC.selfTest().ok;});
+// 2026-11-06 B9：旧写死 493（扩容前）改为走引擎公开统计 API 的动态定义数。
+// 保留原三条语义「已扩容(>=493)/空退役集/selfTest 通过」，并新增 stats/selfTest/defs 三路计数互证。
+await check('achievement engine expanded definitions and empty retired set preserved',()=>{const h=harness(),A=h.AC,dynamic=A.stats().total;return A.defs.length===dynamic&&A.defs.length>=493&&A.selfTest().count===dynamic&&Object.keys(A.RETIRED).length===0&&A.selfTest().ok;});
 const failures=results.filter(r=>!r.passed);console.log(JSON.stringify({passed:results.length-failures.length,failed:failures.length,failures},null,2));process.exitCode=failures.length?1:0;

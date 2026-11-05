@@ -68,6 +68,7 @@ const probes = [
 	'probe_update_mirror_fallback_20261105.mjs',
 	'probe_update_startup_recovery_20261105.mjs',
 	'probe_update_backup_capacity_20261105.mjs',
+	'probe_update_bundle_cleanup_20261105.mjs',
 	'probe_backup_lifecycle_20261104.mjs',
 	'probe_online_offline.mjs',
 ];
