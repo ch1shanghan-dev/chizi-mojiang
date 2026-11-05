@@ -7741,6 +7741,32 @@ function onlineLocalFetch(url,options){return window.CSHOnline.local(url,options
                再官方 raw，最后各镜像。同一个文件在这里面从头试到尾才算失败。 */
             /* U2：优先本次更新目录实际来自的那个基址，避免「目录从 A、文件从 B」的构建混用。
                版本探测写入的 _cshUpdBase 退居其次，官方与各镜像仍是回退。 */
+            /* 取消待安装：玩家局中预下载后可能改主意（或空间不够、想先看别的版本）。
+               实现挂在 window.CSHUpdate 上，而不是本闭包里的局部函数 ——
+               tools/probe_update_transaction.mjs 会把 startUpdate 单独抽出来在 vm 里跑，
+               那里没有外层闭包；挂在 window 上两边都能取到。
+               先看事务阶段：提交/恢复中拒绝取消（那时文件已经在换，取消只会让状态更糟）；
+               确认可取消后立刻清掉待安装凭据，局后自动安装的轮询读到空就停，
+               再去清暂存；清理失败不影响「已取消」这个事实，下次启动的恢复会收尾。 */
+            if (!window.CSHUpdate.__cshCancelPending) window.CSHUpdate.__cshCancelPending = function () {
+                var st2 = window.CSHUpdate, pending2 = st2.__cshPendingInstall;
+                if (!pending2) return Promise.resolve({ empty: true });
+                if (st2.__cshCancelInFlight) return Promise.resolve({ busy: true });
+                st2.__cshCancelInFlight = true;
+                var tx2 = null;
+                try { tx2 = st2.create(st2.hostIO({ lib: lib, game: game })); }
+                catch (eC0) { st2.__cshCancelInFlight = false; return Promise.resolve({ cancelled: false, error: eC0 }); }
+                /* 只有 abortPrepared 真的成功才清掉待安装凭据。
+                   失败（例如已经进入提交阶段）时保持原样：本局结束后照常安装，
+                   并如实告诉玩家「没取消失败了」——绝不出现「界面说取消了、文件却仍在换」。 */
+                return tx2.abortPrepared().then(function () {
+                    st2.__cshPendingInstall = null; st2.__cshCancelInFlight = false;
+                    return { cancelled: true };
+                }, function (eC2) {
+                    st2.__cshCancelInFlight = false;
+                    return { cancelled: false, refused: (eC2 && eC2.message) || '取消未完成，请重新检查更新' };
+                });
+            };
             function updateBases() {
                 var list = [];
                 if (st.candidateBase) list.push(st.candidateBase);
@@ -7785,11 +7811,13 @@ function onlineLocalFetch(url,options){return window.CSHOnline.local(url,options
                     var tick=function(){
                         var pending=window.CSHUpdate&&window.CSHUpdate.__cshPendingInstall;
                         if(!pending)return;
+                        if(window.CSHUpdate.__cshCancelInFlight){setTimeout(tick,1500);return;}   /* 正在取消：推迟自动安装，不抢 */
                         if(!settledNow()){stable=0;setTimeout(tick,1500);return;}
                         if(++stable<2){setTimeout(tick,1500);return;}
                         setTimeout(function(){
                             var again=window.CSHUpdate&&window.CSHUpdate.__cshPendingInstall;
                             if(!again||again!==pending)return;
+                            if(window.CSHUpdate.__cshCancelInFlight)return;
                             var engine=window.CSHUpdate, tx=task.tx;   /* commit 是事务实例方法，不是模块导出 */
                             tx.commit(pending.prepared).then(function(){
                                 window.CSHUpdate.__cshPendingInstall=null;
@@ -7872,7 +7900,30 @@ function onlineLocalFetch(url,options){return window.CSHOnline.local(url,options
                             }
                         });
                         window.CSHUpdate.__cshPendingInstall={prepared:prepared,remoteVer:remoteVer,build:info.build||'',at:Date.now()};
-                        if (current()) { status.textContent='更新已下载并核验，本局结束后自动安装；当前文件未改动。'; goBtn.disabled=true; closeBtn.disabled=false; closeBtn.textContent='关闭'; setState('idle','关闭'); }
+                        if (current()) { status.textContent='更新已下载并核验，本局结束后自动安装；当前文件未改动。'; goBtn.disabled=true; closeBtn.disabled=false; closeBtn.textContent='关闭'; setState('idle','关闭');
+                            /* 单抽 startUpdate 的 vm 探针（probe_update_transaction）里没有 document：
+                               取消失败入口在这里降级掉，绝不能因为建不出按钮就让「已就绪」变成异常。 */
+                            var cancelNow=null;
+                            try{
+                            cancelNow=document.createElement('button'); cancelNow.type='button'; cancelNow.className='csh-ext-btn ghost'; cancelNow.textContent='取消待安装';
+                            cancelNow.addEventListener('click',function(){
+                                if(!current())return;
+                                cancelNow.disabled=true;
+                                window.CSHUpdate.__cshCancelPending().then(function(rC){
+                                    if(!current())return;
+                                    if(rC&&rC.refused){cancelNow.disabled=false;status.textContent=rC.refused;return;}
+                                    try{cancelNow.remove();}catch(eRm){}
+                                    goBtn.disabled=false; goBtn.textContent='立即更新';
+                                    status.textContent=(rC&&rC.cleanupError)?'已取消待安装；暂存内容会在下次启动时清理。':'已取消待安装，已下载内容已清理。';
+                                },function(eCx){
+                                    if(!current())return;
+                                    cancelNow.disabled=false;
+                                    status.textContent='取消失败：'+((window.CSHUpdate.errorText&&window.CSHUpdate.errorText(eCx))||'请重新检查更新');
+                                });
+                            },false);
+                            try{ goBtn.parentNode.insertBefore(cancelNow, goBtn); }catch(eIns){}
+                            }catch(eNoDom){}
+                        }
                         scheduleDeferredInstall();
                         return;
                     }
@@ -7983,6 +8034,35 @@ function onlineLocalFetch(url,options){return window.CSHOnline.local(url,options
                 }, false);
                 if (st.task && !st.task.settled) goBtn.disabled=true;
                 row.insertBefore(goBtn, row.firstChild);
+                /* 已经有「下好了、等本局结束就装」的更新：这里说清楚，并给一个取消入口。
+                   否则玩家只看到按钮变灰，不知道什么时候会动他的文件。 */
+                var pendingNow = window.CSHUpdate && window.CSHUpdate.__cshPendingInstall;
+                if (pendingNow) {
+                    status.textContent = '已下载并核验 ' + pendingNow.remoteVer + '，本局结束后自动安装；当前文件未改动。';
+                    goBtn.disabled = true;
+                    var cancelBtn = document.createElement("button");
+                    cancelBtn.type = "button";
+                    cancelBtn.className = "csh-ext-btn ghost";
+                    cancelBtn.textContent = "取消待安装";
+                    cancelBtn.addEventListener("click", function () {
+                        if (!current()) return;
+                        cancelBtn.disabled = true;
+                        window.CSHUpdate.__cshCancelPending().then(function (rC) {
+                            if (!current()) return;
+                            if (rC && rC.refused) { cancelBtn.disabled = false; status.textContent = rC.refused; return; }
+                            try { cancelBtn.remove(); } catch (eRm) {}
+                            goBtn.disabled = false;
+                            status.textContent = (rC && rC.cleanupError)
+                                ? '已取消待安装；暂存内容会在下次启动时清理。'
+                                : '已取消待安装，已下载内容已清理。';
+                        }, function (eCx) {
+                            if (!current()) return;
+                            cancelBtn.disabled = false;
+                            status.textContent = '取消失败：' + ((window.CSHUpdate.errorText && window.CSHUpdate.errorText(eCx)) || '请重新检查更新');
+                        });
+                    }, false);
+                    row.insertBefore(cancelBtn, row.firstChild);
+                }
             }
 
             /* 两阶段取目录：小包比版本 → 真有新版才拉 35KB catalog。

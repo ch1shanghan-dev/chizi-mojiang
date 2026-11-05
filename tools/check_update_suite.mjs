@@ -61,6 +61,7 @@ if (rev) run('catalog-rev', ['tools/catalog_git_bytes.mjs', '--rev', rev, '--out
 const probes = [
 	'probe_update_transaction.mjs',
 	'probe_update_deferred_20261105.mjs',
+	'probe_update_cancel_pending_20261105.mjs',
 	'probe_update_mobile_io_20261105.mjs',
 	'probe_update_ui_20261105.mjs',
 	'probe_update_lifecycle_20261105.mjs',

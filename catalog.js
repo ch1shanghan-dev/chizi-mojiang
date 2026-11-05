@@ -1,10 +1,10 @@
-/* 自动生成于 2026-11-05T12:16:32.222Z by tools/release.js —— hashes 对应 Git 发布字节，发版后 git push 即生效，勿手改 files */
+/* 自动生成于 2026-11-05T13:03:59.119Z by tools/release.js —— hashes 对应 Git 发布字节，发版后 git push 即生效，勿手改 files */
 window.extension = {
 	"池子魔将": {
-		"build": "0753d31b95ea62a3572ddc73485427698285d24187b2ea2a2ee0754df20f87ef",
+		"build": "a896fc3cc64369af2c57470121442350678ac372ade216eb5125fa19b35ca85b",
 		"hashes": {
 			"LICENSE": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
-			"README.md": "c27f13f138b33a2481567858593f8e0f2a5476446e1bcf0768dcbedc05983841",
+			"README.md": "41102b34ebc984b6b84b361baa0e78aa9defe5633a4a270cde6ed0ff7bc9ae4d",
 			"audio/card/csh_fangyuan_niliuhushenyin_female.mp3": "0210771697ae9c20c97f3a9336a2e5ae35ae570529e11f48cb914c7a6fe4dc36",
 			"audio/card/csh_fangyuan_niliuhushenyin_male.mp3": "0210771697ae9c20c97f3a9336a2e5ae35ae570529e11f48cb914c7a6fe4dc36",
 			"audio/card/csh_pifeng_male.mp3": "cf3f36b3c0f2c47ee6c9bcdd056d6dcca91f61a04dbf9795005543d646e3dfa1",
@@ -321,7 +321,7 @@ window.extension = {
 			"core/csh_challenge.js": "c3af4da3b81a7f965e29f3dd09a0bc151b7ab80afe026a5254d5773efeed027a",
 			"core/csh_cheer.js": "045d407326d29d2b052b4c26609094c23e6d9a6c76f0b2311003b3163ed54340",
 			"core/csh_collection.css": "9baae759dc666643f95862ea2094594e7c5da8ed341ef598c4365746eb653072",
-			"core/csh_debug.js": "bbad3f60dff568a526110dc99331f57d231b8abce311b35c7a77a6963b856efa",
+			"core/csh_debug.js": "e9655f955608765714d0c4ece52fcc1c5d62417537a4948ee9caa9a64ae4f9a6",
 			"core/csh_duel_tables.css": "0bcfdeea45955a0904f32eb7afdf675306afe977633382f999ac69ae1a915e1c",
 			"core/csh_experience.css": "ecc4910b39a34a29b5072ec99ac3041c0ffd7d8502ee422139c5f6595630b621",
 			"core/csh_games.js": "87a474c3953d21f761f9f6ed36843e55151075b80d2bfae1d4c339f415217636",
