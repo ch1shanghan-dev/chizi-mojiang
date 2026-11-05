@@ -1,3 +1,5 @@
+> **2026-11-05 WorkBuddy接手第七轮（B2 · backlog「生涯2000条规模交互完整检查」，已验）**：运行时生涯定义确为2000条（`tools/achv_scale` 扩容已接），但既有 `tools/probe_career_achievements.mjs` 仍断言493且「继续查看」循环上限10（只走660/2000），实跑126/16 FAIL。新增 `tools/probe_career_scale_20261105.mjs`（真实 career.html + 真实2000条，19/0：33批全部可达、无丢失重复、筛选/排序/焦点/三横屏、单次最大重绘278ms）；既有专项断言改为2000与动态类别计数（142/0），内联详情复用夹具129/0。**刻意不改产品代码**：278ms 峰值可接受，增量渲染要动公共渲染路径，风险大于收益；真机性能归作者U5。详见 `docs/audit/WORKBUDDY_B2_CAREER_SCALE_20261105.md`。以下为前六轮与交接记录。
+>
 > **2026-11-05 WorkBuddy接手第六轮（B1 · backlog「成就通知常驻未读与跨重启归档」，已修）**：`core/csh_achievement_feedback.js` 新增本机键 `csh_achievement_archive_v1`（有界200条、去重、逐条/全部标记已读、每页20条分页回顾、换档清空、写失败提示），右下角常驻「成就回顾 · 新 N」入口，重启后立即恢复；不改钱包/成就条件/奖励，原「本次运行回顾」保持原样。新键按项目约定登记进 `core/csh_migrate.js` 的 EXCLUDED（本机展示记录，不随存档导入）。新增 `tools/probe_feedback_archive_20261105.mjs`（18/0）；既有反馈专项 39/0、47/0、39/0；**真实宿主专项本副本起不来：缺 `ext/app/index.html`，与本轮改动无关，不算通过**。已重跑 `tools/release.js`（修前2不符、修后0）。详细见 `docs/audit/WORKBUDDY_B1_FEEDBACK_ARCHIVE_20261105.md`。以下为前五轮与交接记录。
 >
 > **2026-11-05 WorkBuddy接手第五轮（U4失败暂存与容量，已修）**：旧 `protect()` 把 staging/prepared 组无条件保护，`plan()` 与 `downloadsCleanable` 同样排除 → 无 journal 的失败组长期不可清理。现 `csh_update.js` 用 `recovering` 标记把「整组保护」与「只清下载副本」解耦：bundle 仍拒失败组、journal 引用时全保护，无 journal 且确有副本时允许 `plan({kind:'next'})` 只删 `next/`，保留 `before/` 与说明，并保留 metadata 写失败重试入口。新增 `tools/lib/update_limits.mjs`（512KiB 文本 / 16MiB 文件，真源 `core/csh_online.js`）；`tools/release.js` 生成前逐文件预检、超限拒绝并给「分块 / 完整安装包 / 同步提高上限」三条出路，catalog 新增 `limits` 字段；`csh_debug.js` 下载前按 `info.limits.maxFileBytes` 拒绝、备份面板明确「预算非设备可用空间、设备剩余空间无法可靠读取」；`check.js` E53 把上限声明与三处数字防漂移列为必检。新增 `tools/probe_update_backup_capacity_20261105.mjs`（10/0），既有备份专项两条旧断言按新规则改成更强检查（40/0），其余专项与完整门禁全通过，catalog 1035 文件 0 不符（预检实测最大 3,141,016 字节）。**明确未做**：失败组整组清理（保守保留 before/）、分块下载实现、设备空间读取能力；U5 安卓真机未动，无提交/推送/合并/安装。详见 `docs/audit/WORKBUDDY_U4_STAGING_CAPACITY_20261105.md`。以下为前四轮与交接记录。
@@ -236,6 +238,8 @@
 > 五轮改动清单、归属与残余限制见 `docs/audit/WORKBUDDY_U0_U4_DELTA_20261105.md`；
 > `git diff` 里大部分是交接前 Codex 的 4.0.15 成果，不要误当可丢弃的脏改动。
 > 作者已明确**U5 安卓真机链路验收由本人届时测试，WorkBuddy 不执行**；不要拿隔离探针冒充真机证据。
+>
+> **2026-11-05 起本地提交候选**：作者授权一次性提交全部 4.0.15 改动（首个 `7e00900`，50 文件，含交接前 Codex 成果与六轮改动，不拆分），之后每轮收口继续本地提交，**当前候选以分支 HEAD 为准**。每次提交后跑 `node tools/catalog_git_bytes.mjs --rev HEAD` **0 错、build 一致**，`release.js --check` / `--worktree` 亦 0 错。**仅本地提交，未推送、未合并 main、未发版**；玩家在线更新源仍指 main 4.0.14。后续任何新改动都要重新跑 `--rev`。作者已把后续工作决策交 WorkBuddy，但推送/合并/发版仍需单独授权。
 
 按改动风险选择验证。文档只核对内容/引用/diff；小型UI做目标交互与必要横屏检查，不一律跑全套。共享基础层、高风险或稳定集成候选批次，在扩展根目录集中运行完整门禁；世界模拟按世界耦合与候选批次需要选择：
 

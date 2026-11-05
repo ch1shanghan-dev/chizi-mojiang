@@ -53,14 +53,14 @@ for(const [name,width,height,scale] of cases){
         check('world page distinguishes actual player encounters',$('#bd-most').textContent.includes('结识 3 位牌友')&&$('#bd-most').textContent.includes('同桌 10 人次'));
         check('world page shows chronological revenge summary',$('#bd-most').textContent.includes('赢回来的对手有 1 位'));
         document.querySelector('[data-p="ach"]').click();
-        check('all 493 existing and new definitions retained',CSH_ACHV.defs.length===493&&auditCareer.rows().length===493);
+        check('all 2000 career definitions retained after expansion',CSH_ACHV.defs.length===2000&&auditCareer.rows().length===2000);
         check('initial render limited to 60 cards',keys().length===60);
         check('default recommends claimable before other states',auditCareer.rows().find(r=>r.key===keys()[0])?.done&&!auditCareer.rows().find(r=>r.key===keys()[0])?.claimed);
         check('show more visible while undisplayed targets remain',$('#ach-more')&&!$('#ach-more').hidden);
         $('#ach-more')?.click();check('next batch appended without duplicate keys',keys().length===120&&new Set(keys()).size===120);
         check('show more moves keyboard focus to first new target',document.activeElement===$('#ach-grid').children[60]?.querySelector('.adetail'));
-        let guard=0;while($('#ach-more')&&!$('#ach-more').hidden&&guard++<10)$('#ach-more').click();
-        check('every definition remains reachable through batches',keys().length===493&&new Set(keys()).size===493);
+        let guard=0;while($('#ach-more')&&!$('#ach-more').hidden&&guard++<40)$('#ach-more').click();
+        check('every definition remains reachable through batches',keys().length===2000&&new Set(keys()).size===2000);
         check('show more hidden when exhausted',$('#ach-more')?.hidden&&getComputedStyle($('#ach-more')).display==='none');
         reset();const requests=auditHost.calls.filter(c=>['shell-stats','shell-career-sync'].includes(c.cmd)).length;
         set('ach-search','向 AI 扔出道具','input');
@@ -73,7 +73,8 @@ for(const [name,width,height,scale] of cases){
         set('ach-search','不存在的目标xyz','input');check('empty search explains recovery',keys().length===0&&!$('#ach-empty')?.hidden&&!$('#ach-more')?.offsetHeight);
         reset();check('reset restores inputs and default batch',$('#ach-search')?.value===''&&$('#ach-state')?.value==='all'&&keys().length===60);
         const cat=[...document.querySelectorAll('#ach-cats button')].find(b=>b.textContent==='互动');cat?.click();
-        check('category uses native pressed button and real subset',cat?.getAttribute('aria-pressed')==='true'&&keys().length===20);
+        const catCount=auditCareer.rows().filter(r=>r.cat==='互动').length;
+        check('category uses native pressed button and real subset',cat?.getAttribute('aria-pressed')==='true'&&catCount>0&&keys().length===Math.min(60,catCount)&&keys().every(k=>auditCareer.rows().find(r=>r.key===k).cat==='互动'),{catCount,shown:keys().length});
         reset();set('ach-search','牌技上限','input');
         check('fractional progress remains legible',[...document.querySelectorAll('.alab')].some(n=>/0\\.75/.test(n.textContent)));
         reset();set('ach-sort','catalog');check('catalog order matches complete engine order',keys().every((k,i)=>k===auditCareer.rows()[i].key));
