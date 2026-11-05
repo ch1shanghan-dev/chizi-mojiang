@@ -1,10 +1,10 @@
-/* 自动生成于 2026-11-05T10:30:51.980Z by tools/release.js —— hashes 对应 Git 发布字节，发版后 git push 即生效，勿手改 files */
+/* 自动生成于 2026-11-05T11:51:51.636Z by tools/release.js —— hashes 对应 Git 发布字节，发版后 git push 即生效，勿手改 files */
 window.extension = {
 	"池子魔将": {
-		"build": "41628ba41f90e338828de5aadde29164d24af9637a0d0784cbba5fb831e248f9",
+		"build": "373a668bc0c1fb062f4e452bdda93179df471016e622d694750f6ae2c2b39dd9",
 		"hashes": {
 			"LICENSE": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
-			"README.md": "5c6dd7a33fc76175bb59a9e3911c1476e26a0c8db3418ba3bad7b88c69a9f266",
+			"README.md": "c27f13f138b33a2481567858593f8e0f2a5476446e1bcf0768dcbedc05983841",
 			"audio/card/csh_fangyuan_niliuhushenyin_female.mp3": "0210771697ae9c20c97f3a9336a2e5ae35ae570529e11f48cb914c7a6fe4dc36",
 			"audio/card/csh_fangyuan_niliuhushenyin_male.mp3": "0210771697ae9c20c97f3a9336a2e5ae35ae570529e11f48cb914c7a6fe4dc36",
 			"audio/card/csh_pifeng_male.mp3": "cf3f36b3c0f2c47ee6c9bcdd056d6dcca91f61a04dbf9795005543d646e3dfa1",
@@ -321,7 +321,7 @@ window.extension = {
 			"core/csh_challenge.js": "c3af4da3b81a7f965e29f3dd09a0bc151b7ab80afe026a5254d5773efeed027a",
 			"core/csh_cheer.js": "045d407326d29d2b052b4c26609094c23e6d9a6c76f0b2311003b3163ed54340",
 			"core/csh_collection.css": "9baae759dc666643f95862ea2094594e7c5da8ed341ef598c4365746eb653072",
-			"core/csh_debug.js": "d27082304a2ce2730290a92d331593b7ed3e112a2c18e052725f0edd65a3a34c",
+			"core/csh_debug.js": "7a4c0728c960d7a45b674e89242f1f545c7c5cc3b9afbee3eb5671f8ae9770fe",
 			"core/csh_duel_tables.css": "0bcfdeea45955a0904f32eb7afdf675306afe977633382f999ac69ae1a915e1c",
 			"core/csh_experience.css": "ecc4910b39a34a29b5072ec99ac3041c0ffd7d8502ee422139c5f6595630b621",
 			"core/csh_games.js": "87a474c3953d21f761f9f6ed36843e55151075b80d2bfae1d4c339f415217636",
@@ -355,7 +355,7 @@ window.extension = {
 			"core/csh_titles_style.js": "dd1eee695e92eeb219906c593b6d0cbf025122753499d154ed9b27b7846b72ea",
 			"core/csh_trick_tables.css": "2d5716939b60ed24578e96a070d4ab6797880532d11cc4a47ca65b5409344715",
 			"core/csh_uikit.js": "6be863f80ba7542cd4fe25931303f85421439be771f562d0137a03d4892009a9",
-			"core/csh_update.js": "07362847ec2d0c1e0e83c9b52c85d02efd35da38956871deff7d7e924a391833",
+			"core/csh_update.js": "719f5cdedfe48edc770b8e3f579621bf032ce534303ad355cde2e37c99d03710",
 			"core/csh_voice.js": "4c6616186f89d559578a4fa63032daebc5c4d9223f0ecc39b68bd6831aa323c6",
 			"core/csh_wallet.js": "ceeff50a26c101a72352f04861a3519e8ac9c0b623563d9e3dcc2b7ab7a0f509",
 			"core/csh_winrate.js": "8dbd3146f396fbea2551691b42295329ce2ba89e3569d8c4e6ea63ee95b0190b",

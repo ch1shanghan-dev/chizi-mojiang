@@ -116,27 +116,65 @@
    await journal(null);return {ok:true,recovered:true};
   }
   async function recover(progress){if(busy)throw Error('更新任务正在进行');const release=acquire(io);busy=true;try{const raw=await io.read(JOURNAL);if(!raw)return {ok:true,empty:true};return await restore(validate(JSON.parse(decode(raw))),progress);}finally{if(!uncertain){busy=false;phase='idle';release();}}}
-  async function apply(files,download,{hashes={},signal,progress,fromVersion='',toVersion=''}={}){
-   if(busy)throw Error('更新任务正在进行');const release=acquire(io);busy=true;let state=null,committing=false,meta=null;
+async function prepare(files,download,{hashes={},signal,progress,fromVersion='',toVersion=''}={}){
+   if(busy)throw Error('更新任务正在进行');const release=acquire(io);busy=true;let state=null,meta=null;
    const cancelled=()=>{if(signal&&signal.aborted)throw Error('下载已取消，原安装未改动');};
    try{
     const existing=await io.read(JOURNAL);if(existing)await restore(validate(JSON.parse(decode(existing))),progress);
     const list=Array.from(new Set(files.map(safe)));if(!list.length||list.length>5000)throw Error('更新清单数量无效');
     const id='update-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2),staged=new Map();let index=0,done=0;
-    if(await io.read(AREA+'/'+id+'/'+META))throw Error('更新备份目录已存在，请重新尝试');meta={v:1,id,created:Date.now(),state:'staging',fromVersion:String(fromVersion).slice(0,40),toVersion:String(toVersion).slice(0,40),files:list.map(rel=>({rel,existed:null,beforeHash:null,beforeSize:null,nextHash:/^[a-f0-9]{64}$/.test(hashes[rel]||'')?hashes[rel]:null,nextSize:null}))};await put(AREA+'/'+id+'/'+META,encode(JSON.stringify(meta)));
+    if(await io.read(AREA+'/'+id+'/'+META))throw Error('更新备份目录已存在，请重新尝试');
+    meta={v:1,id,created:Date.now(),state:'staging',fromVersion:String(fromVersion).slice(0,40),toVersion:String(toVersion).slice(0,40),files:list.map(rel=>({rel,existed:null,beforeHash:null,beforeSize:null,nextHash:/^[a-f0-9]{64}$/.test(hashes[rel]||'')?hashes[rel]:null,nextSize:null}))};
+    await put(AREA+'/'+id+'/'+META,encode(JSON.stringify(meta)));
     let downloadError=null;const worker=async()=>{while(index<list.length&&!downloadError){cancelled();const rel=list[index++];try{const data=bytes(await download(rel,signal));cancelled();if(!data.length)throw Error('文件为空：'+rel);const hash=await digest(data);if(hashes[rel]&&hash!==hashes[rel])throw Error('文件摘要不符：'+rel);cancelled();await put(AREA+'/'+id+'/next/'+rel,data);staged.set(rel,{hash,size:data.byteLength});note(progress,'downloading',++done,list.length);}catch(e){downloadError=Object.assign(Error("文件 "+rel+"："+errorText(e)),{file:rel,cause:e});throw downloadError;}}};
-    const results=await Promise.allSettled(Array.from({length:Math.min(3,list.length)},worker));const failed=results.filter(r=>r.status==='rejected');if(failed.length)throw Object.assign(Error(failed.map(r=>r.reason.message).join('；')),{files:failed.map(r=>r.reason.file).filter(Boolean)});cancelled();
+    const results=await Promise.allSettled(Array.from({length:Math.min(3,list.length)},worker));const failed=results.filter(r=>r.status==='rejected');
+    if(failed.length)throw Object.assign(Error(failed.map(r=>r.reason.message).join('；')),{files:failed.map(r=>r.reason.file).filter(Boolean)});
+    cancelled();
     const records=[];for(const rel of list){cancelled();const data=await io.read(TARGET+rel),record={rel,existed:data!==null,hash:data?await digest(data):null,size:data?data.byteLength:null};if(data)await put(AREA+'/'+id+'/before/'+rel,data);records.push(record);note(progress,'backing-up',records.length,list.length);}
     meta.files=records.map(f=>({rel:f.rel,existed:f.existed,beforeHash:f.hash,beforeSize:f.size,nextHash:staged.get(f.rel).hash,nextSize:staged.get(f.rel).size}));meta.state='prepared';await put(AREA+'/'+id+'/'+META,encode(JSON.stringify(meta)));
-    state={v:1,id,phase:'prepared',files:records};await journal(state);cancelled();state.phase='committing';await journal(state);committing=true;
+    state={v:1,id,phase:'prepared',files:records};await journal(state);
+    /* 到 prepared 为止：目标目录一个字节都没改。局中可以先下载，等本局结束再 commit。 */
+    return {ok:true,id,files:records,hashes,toVersion,nextHashes:Object.fromEntries([...staged].map(([rel,v])=>[rel,v.hash]))};
+   }catch(error){
+    if(uncertain)throw Object.assign(Error('文件接口结果未知，已保留更新凭据，请重启后恢复：'+error.message),{recovery:true,uncertain:true,cause:error});
+    if(state){await journal(null);}
+    throw error;
+   }finally{if(!uncertain){busy=false;phase='idle';release();}}
+  }
+  async function commit(prepared,{progress}={}){
+   if(!prepared||typeof prepared.id!=='string'||!Array.isArray(prepared.files))throw Error('待安装内容无效，请重新检查更新');
+   if(busy)throw Error('更新任务正在进行');const release=acquire(io);busy=true;let state=null,committing=false;
+   try{
+    const raw=await io.read(JOURNAL);if(!raw)throw Error('待安装的更新凭据已不存在，请重新检查更新');
+    const saved=validate(JSON.parse(decode(raw)));
+    /* 先核对再赋值：token 不匹配时保留有效暂存，不能顺手把 prepared 凭据清掉。 */
+    if(saved.id!==prepared.id||saved.phase!=='prepared')throw Error('待安装内容与更新凭据不一致，请重新检查更新');
+    state=saved;const records=state.files;
+    state.phase='committing';await journal(state);committing=true;
     /* New modules first, entry metadata last. The persistent backups remain available throughout commit. */
     const ordered=records.slice().sort((a,b)=>Number(a.existed)-Number(b.existed)||Number(/^(extension\.js|info\.json|package\.js)$/.test(a.rel))-Number(/^(extension\.js|info\.json|package\.js)$/.test(b.rel)));
-    for(let i=0;i<ordered.length;i++){const f=ordered[i],data=await io.read(AREA+'/'+id+'/next/'+f.rel);if(!data||await digest(data)!==staged.get(f.rel).hash)throw Error('暂存文件校验失败：'+f.rel);await put(TARGET+f.rel,data);note(progress,'committing',i+1,ordered.length);}
-    state.phase='committed';await journal(state);await journal(null);meta.state='committed';let backupNotice='';try{await put(AREA+'/'+id+'/'+META,encode(JSON.stringify(meta)));}catch(e){backupNotice='更新完成，备份说明暂未更新；原文件副本仍保留';}return {ok:true,count:list.length,backup:AREA+'/'+id+'/before',backupNotice};
-   }catch(error){if(uncertain)throw Object.assign(Error('文件接口结果未知，已保留更新凭据，请重启后恢复：'+error.message),{recovery:true,uncertain:true,cause:error});if(state&&state.phase==='committed')throw Object.assign(Error('文件已全部提交，更新凭据清理待恢复：'+error.message),{recovery:true,cause:error});if(state&&committing){try{await restore(state,progress);}catch(rollback){throw Object.assign(Error('更新未完成，原文件恢复尚未完成：'+rollback.message),{recovery:true,cause:error});}}else if(state){await journal(null);}throw error;}
+    for(let i=0;i<ordered.length;i++){const f=ordered[i],data=await io.read(AREA+'/'+state.id+'/next/'+f.rel);const want=prepared.nextHashes&&prepared.nextHashes[f.rel];if(!data||!want||await digest(data)!==want)throw Error('暂存文件校验失败：'+f.rel);await put(TARGET+f.rel,data);note(progress,'committing',i+1,ordered.length);}
+    state.phase='committed';await journal(state);await journal(null);
+    let backupNotice='';try{const metaText=await io.read(AREA+'/'+state.id+'/'+META);if(metaText){const meta=JSON.parse(decode(metaText));meta.state='committed';await put(AREA+'/'+state.id+'/'+META,encode(JSON.stringify(meta)));}}catch(e){backupNotice='更新完成，备份说明暂未更新；原文件副本仍保留';}
+    return {ok:true,count:records.length,backup:AREA+'/'+state.id+'/before',backupNotice};
+   }catch(error){
+    if(uncertain)throw Object.assign(Error('文件接口结果未知，已保留更新凭据，请重启后恢复：'+error.message),{recovery:true,uncertain:true,cause:error});
+    if(state&&state.phase==='committed')throw Object.assign(Error('文件已全部提交，更新凭据清理待恢复：'+error.message),{recovery:true,cause:error});
+    if(state&&committing){try{await restore(state,progress);}catch(rollback){throw Object.assign(Error('更新未完成，原文件恢复尚未完成：'+rollback.message),{recovery:true,cause:error});}}
+    else if(state){await journal(null);}
+    throw error;
+   }finally{if(!uncertain){busy=false;phase='idle';release();}}
+  }
+  async function abortPrepared(){
+   if(busy)throw Error('更新任务正在进行');const release=acquire(io);busy=true;
+   try{const raw=await io.read(JOURNAL);if(raw){const state=validate(JSON.parse(decode(raw)));if(state.phase!=='prepared')throw Error('更新已在提交阶段，不能取消');await journal(null);}return {ok:true};}
    finally{if(!uncertain){busy=false;phase='idle';release();}}
   }
-  return {apply,recover,status:()=>({busy,phase}),journal:JOURNAL};
+  async function apply(files,download,opts={}){
+   const prepared=await prepare(files,download,opts);
+   return await commit(prepared,{progress:opts.progress});
+  }
+  return {apply,prepare,commit,abortPrepared,recover,status:()=>({busy,phase}),journal:JOURNAL};
  }
  function fileError(value){let e=value,seen=new Set();while(e&&typeof e==='object'&&!seen.has(e)){seen.add(e);let next=e.error||(e.target&&e.target.error);if(!next)break;e=next;}return e;}
  function errorText(value){
