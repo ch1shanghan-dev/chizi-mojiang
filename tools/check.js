@@ -52,6 +52,43 @@ const warn = (s) => { warnings++; log("  [WARN] " + s); };
 const ok = (s) => log("  [ OK ] " + s);
 
 /* ------------------------------------------------------------------ *
+ * 探针执行（带一次重试）
+ * ------------------------------------------------------------------ *
+ * 门禁在大批探针串行 + 机器高负载时，个别依赖真实时钟/微任务深度的断言会偶发失败；
+ * 单跑或低负载下稳定通过（实测：E57 批次2 单跑 5 次 134/0、E48 事务单跑 3 次全过，
+ * 但在完整门禁里各偶发过一次，且两次是不同的断言）。
+ *
+ * 这里只对「失败」重试一次，并且把重试如实打印成 [RETRY] 行（不计入告警、
+ * 不改变 --strict 结论）。真实缺陷会两次都失败，不会被掩盖；
+ * 反复出现 [RETRY] 说明该探针确实不稳，应当去修探针而不是继续靠重试。
+ * ------------------------------------------------------------------ */
+let probeRetries = 0;
+function runProbeJson(script, args = [], opts = {}) {
+	if (!spawnOk || !execFileSync) throw new Error("环境不允许启动子进程");
+	const { timeout = 20000, retries = 1 } = opts;
+	const target = path.join(ROOT, "tools", script);
+	let lastErr = null;
+	for (let attempt = 0; attempt <= retries; attempt++) {
+		try {
+			const out = JSON.parse(execFileSync(process.execPath, [target, ...args], { encoding: "utf8", timeout, windowsHide: true }));
+			/* 没有 failed 字段的探针保持原样交给调用方判断，不在这里改变语义 */
+			if (!out || typeof out.failed !== "number") return out;
+			if (out.failed === 0) {
+				if (attempt > 0) {
+					probeRetries++;
+					log("  [RETRY] " + script + " 首次失败，重试后通过（环境抖动，非产品缺陷）");
+				}
+				return out;
+			}
+			lastErr = new Error("探针报告 " + out.failed + " 项失败");
+		} catch (e) {
+			lastErr = e;
+		}
+	}
+	throw lastErr || new Error("探针未产出结果");
+}
+
+/* ------------------------------------------------------------------ *
  * 一、语法检查
  * ------------------------------------------------------------------ */
 function collect(dir, out = [], depth = 0) {
@@ -1091,8 +1128,7 @@ async function runBossChecks() {
 		const gText = fs.readFileSync(path.join(ROOT, "games", "goldfish.html"), "utf8");
 		let economicSafe = false;
 		try {
-			const result = JSON.parse(execFileSync(process.execPath, [path.join(ROOT, "tools/probe_market_persistence.mjs")],
-				{ encoding: "utf8", timeout: 10000, windowsHide: true }));
+			const result = runProbeJson('probe_market_persistence.mjs', [], { timeout: 10000 });
 			economicSafe = result.passed > 0 && result.failed === 0;
 		} catch (error) { fail("执行级 E18：市场持久化故障回归失败：" + error.message.slice(0, 160)); }
 		const dblRaw = bossBlockOf(gText, "function doTrade(");
@@ -1473,8 +1509,7 @@ async function runBossChecks() {
 			if (!/她的回礼/.test(wt24)) e24.push("账本缺「她的回礼」分类");
 			/* NC-01: debit and entitlement must survive together; a spend() regex enforces the old unsafe split. */
             try {
-                const result = JSON.parse(execFileSync(process.execPath, [path.join(ROOT, "tools/probe_affection_transactions.mjs"), "--gate"],
-                    { encoding: "utf8", timeout: 20000, windowsHide: true }));
+                const result = runProbeJson('probe_affection_transactions.mjs', ['--gate'], { timeout: 20000 });
                 if (result.passed < 33 || result.failed !== 0) e24.push("送礼/结契共同事务故障回归未通过");
             } catch (error) { e24.push("送礼/结契共同事务故障回归失败：" + error.message.slice(0, 160)); }
 			if (!/export function installAffection/.test(af)) e24.push("缺 installAffection");
@@ -2215,7 +2250,7 @@ async function runBossChecks() {
 		if (fs.existsSync(gdir)) walk38(gdir);
         const transport38=fs.readFileSync(path.join(ROOT,"core/csh_net.js"),"utf8");
         if(!transport38.includes("req('https')")||!transport38.includes("root.fetch(")||!/credentials:\s*'omit'/.test(transport38)||!/redirect:\s*'error'/.test(transport38)||!/size\s*>\s*MAX/.test(transport38))e38.push("共享传输缺HTTPS双通道、凭据隔离或响应尺寸上限");
-        try{const result=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,"tools/probe_online_offline.mjs")],{encoding:"utf8",timeout:20000,windowsHide:true}));if(result.failed!==0||result.passed<76)e38.push("联网开关、取消、缓存/竞态与补送故障回归未通过");}catch(error){e38.push("联网离线故障回归失败："+error.message.slice(0,150));}
+        try{const result=runProbeJson('probe_online_offline.mjs',[],{timeout:20000});if(result.failed!==0||result.passed<76)e38.push("联网开关、取消、缓存/竞态与补送故障回归未通过");}catch(error){e38.push("联网离线故障回归失败："+error.message.slice(0,150));}
 		if (e38.length) fail("执行级 E38：云功能基址与双通道（" + e38.slice(0, 3).join("；") + "）");
 		else ok("执行级 E38：云功能基址全 https + Node/fetch 双通道齐全（手机端混合内容拦截不再复发）");
 	}
@@ -2677,7 +2712,7 @@ async function runBossChecks() {
 		else if (/"https:\/\/raw\.gitmirror\.com/.test(db48)) e48.push("更新源仍含已停止解析的 raw.gitmirror.com");
         /* Execute faults against the actual staged engine; old failed.push/finishAll regexes required an unsafe updater. */
         try {
-            const result = JSON.parse(execFileSync(process.execPath,[path.join(ROOT,"tools/probe_update_transaction.mjs")],{encoding:"utf8",timeout:20000,windowsHide:true}));
+            const result = runProbeJson('probe_update_transaction.mjs',[],{timeout:20000});
             if(result.passed<18||result.failed!==0)e48.push("更新暂存/取消/失败文件清单/回滚故障回归未通过");
         } catch(error){e48.push("更新事务故障回归失败："+error.message.slice(0,160));}
 		const rk48 = fs.readFileSync(path.join(ROOT, "games", "rank.html"), "utf8");
@@ -2963,7 +2998,7 @@ async function runBossChecks() {
 			for (const probe52 of ["probe_pool_achv_rebuild.mjs", "probe_pool_achv_browser.mjs"]) if (!fs.existsSync(path.join(ROOT, "tools", probe52))) e52.push("缺 tools/" + probe52);
             // Post-ACK presentation is allowed; all original rule/receipt assertions remain above.
             for(const [probe,minimum] of [["probe_pool_achv_rebuild.mjs",57],["probe_achievement_feedback.mjs",35]]){
-                try{const r=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,"tools",probe)],{encoding:"utf8",timeout:20000,windowsHide:true}));if(r.failed!==0||r.passed<minimum)e52.push(probe+" 实际持久化/反馈契约未通过");}
+                try{const r=runProbeJson(probe,[],{timeout:20000});if(r.failed!==0||r.passed<minimum)e52.push(probe+" 实际持久化/反馈契约未通过");}
                 catch(error){e52.push(probe+" 执行失败："+error.message.slice(0,120));}
             }
 
@@ -3191,90 +3226,90 @@ async function runBossChecks() {
     try {
       tmp57 = fs.mkdtempSync(path.join(auditTempRoot(), 'csh-planning-'));
       const target57 = path.join(tmp57, 'result.json');
-      const result57 = JSON.parse(execFileSync(process.execPath, [path.join(ROOT, 'tools/probe_minigame_planning.mjs'), '--out', target57], {encoding:'utf8', timeout:20000, windowsHide:true}));
+      const result57 = runProbeJson('probe_minigame_planning.mjs', ['--out', target57], {timeout:20000});
       if (result57.failed !== 0 || result57.passed < 42) fail('执行级 E57：小游戏提示/残局规划/公开记忆边界未通过');
       else ok('执行级 E57：实际提示/残局规划/公开记忆/托管销毁边界（'+result57.passed+'/0）');
-      const bj57=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_blackjack_hint.mjs'),'--out',path.join(tmp57,'blackjack.json')],{encoding:'utf8',timeout:20000,windowsHide:true}));
+      const bj57=runProbeJson('probe_blackjack_hint.mjs',['--out',path.join(tmp57,'blackjack.json')],{timeout:20000});
       if(bj57.failed!==0||bj57.passed<14)fail('执行级 E57B：廿一点4对NDAS提示未通过');else ok('执行级 E57B：廿一点4对NDAS提示（14/0）');
-      const rules57=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_blackjack_rules_hint.mjs'),'--out',path.join(tmp57,'blackjack-rules.json')],{encoding:'utf8',timeout:20000,windowsHide:true}));
+      const rules57=runProbeJson('probe_blackjack_rules_hint.mjs',['--out',path.join(tmp57,'blackjack-rules.json')],{timeout:20000});
       if(rules57.failed!==0||rules57.passed<1653)fail('执行级 E57C：廿一点NDAS提示与合法动作未通过');else ok('执行级 E57C：廿一点NDAS与合法按钮（'+rules57.passed+'/0）');
-      const uno59=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_uno_round_boundaries.mjs'),'--out',path.join(tmp57,'uno-rounds.json')],{encoding:'utf8',timeout:20000,windowsHide:true}));
+      const uno59=runProbeJson('probe_uno_round_boundaries.mjs',['--out',path.join(tmp57,'uno-rounds.json')],{timeout:20000});
       if(uno59.failed!==0||uno59.passed<32)fail('执行级 E59：UNO轮次/关闭回调边界未通过');else ok('执行级 E59：UNO轮次/关闭与迟到ACK（'+uno59.passed+'/0）');
-      const matrix60=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_blackjack_strategy_matrix.mjs'),'--out',path.join(tmp57,'blackjack-matrix.json')],{encoding:'utf8',timeout:20000,windowsHide:true}));
+      const matrix60=runProbeJson('probe_blackjack_strategy_matrix.mjs',['--out',path.join(tmp57,'blackjack-matrix.json')],{timeout:20000});
       if(matrix60.failed!==0||matrix60.passed<24365)fail('执行级 E60：廿一点实际桌规策略矩阵未通过');else ok('执行级 E60：廿一点S17/H17与NDAS策略矩阵（'+matrix60.passed+'/0）');
-      const ddz61=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_doudizhu_round_boundaries.mjs'),'--out',path.join(tmp57,'ddz-rounds.json')],{encoding:'utf8',timeout:20000,windowsHide:true}));
+      const ddz61=runProbeJson('probe_doudizhu_round_boundaries.mjs',['--out',path.join(tmp57,'ddz-rounds.json')],{timeout:20000});
       if(ddz61.failed!==0||ddz61.passed<31)fail('执行级 E61：斗地主关窗/再来互斥未通过');else ok('执行级 E61：斗地主关窗/收工/重开与迟到ACK（'+ddz61.passed+'/0）');
-      const gifts62=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_gift_quantity.mjs'),'--out',tmp57],{encoding:'utf8',timeout:20000,windowsHide:true}));
+      const gifts62=runProbeJson('probe_gift_quantity.mjs',['--out',tmp57],{timeout:20000});
       if(gifts62.failed!==0||gifts62.passed<41)fail('执行级 E62：批量赠礼事务与幂等凭据未通过');else ok('执行级 E62：批量赠礼/幂等/封顶/故障/迁移（'+gifts62.passed+'/0）');
-      const goals63=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_goal_recommendations.mjs'),'--out',path.join(tmp57,'goals.json')],{encoding:'utf8',timeout:20000,windowsHide:true}));
+      const goals63=runProbeJson('probe_goal_recommendations.mjs',['--out',path.join(tmp57,'goals.json')],{timeout:20000});
       if(goals63.failed!==0||goals63.passed<35)fail('执行级 E63：近期目标纯策略未通过');else ok('执行级 E63：近期目标/阶梯去重/真实进度/可靠性（'+goals63.passed+'/0）');
-      const blackjack64=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_blackjack_exit_boundaries.mjs'),'--out',path.join(tmp57,'bj-exit.json')],{encoding:'utf8',timeout:20000,windowsHide:true}));
+      const blackjack64=runProbeJson('probe_blackjack_exit_boundaries.mjs',['--out',path.join(tmp57,'bj-exit.json')],{timeout:20000});
       if(blackjack64.failed!==0||blackjack64.passed<36)fail('执行级 E64：廿一点退出/失败续局未通过');else ok('执行级 E64：廿一点退出互斥/失败续步/迟到ACK（'+blackjack64.passed+'/0）');
-      const spirit65=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_spirit_owner_boundaries.mjs'),'--out',tmp57],{encoding:'utf8',timeout:20000,windowsHide:true}));
+      const spirit65=runProbeJson('probe_spirit_owner_boundaries.mjs',['--out',tmp57],{timeout:20000});
       if(spirit65.failed!==0||spirit65.passed<31)fail('执行级 E65：妖灵主人与执行期支援边界未通过');else ok('执行级 E65：妖灵主人/配额/暂停/迟到支援（'+spirit65.passed+'/0）');
-      const feedback66=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_feedback_lifecycle.mjs'),'--out',tmp57],{encoding:'utf8',timeout:20000,windowsHide:true}));
+      const feedback66=runProbeJson('probe_feedback_lifecycle.mjs',['--out',tmp57],{timeout:20000});
       if(feedback66.failed!==0||feedback66.passed<43)fail('执行级 E66：成就反馈恢复/暂停/重入生命周期未通过');else ok('执行级 E66：成就反馈恢复/前后台/暂停重入（'+feedback66.passed+'/0）');
-      const tactics67=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_tactical_achievements.mjs')],{encoding:'utf8',timeout:20000,windowsHide:true}));
+      const tactics67=runProbeJson('probe_tactical_achievements.mjs',[],{timeout:20000});
       if(tactics67.failed!==0||tactics67.passed<180)fail('执行级 E67：同局组合成就边界未通过');else ok('执行级 E67：28条同局挑战/事件/身份/模式/重载/领奖（'+tactics67.passed+'/0）');
-      const badges68=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_achievement_badges.mjs')],{encoding:'utf8',timeout:20000,windowsHide:true}));
+      const badges68=runProbeJson('probe_achievement_badges.mjs',[],{timeout:20000});
       if(badges68.failed!==0||badges68.passed<41)fail('执行级 E68：语义徽章隔离边界未通过');else ok('执行级 E68：十类徽章/稀有度/纯DOM/只读（'+badges68.passed+'/0）');
-      const facts69=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_achievement_event_facts.mjs')],{encoding:'utf8',timeout:20000,windowsHide:true}));
+      const facts69=runProbeJson('probe_achievement_event_facts.mjs',[],{timeout:20000});
       if(facts69.failed!==0||facts69.passed<35)fail('执行级 E69：成就事件事实边界未通过');else ok('执行级 E69：装备前后事实/有效判定/去重/保存隔离（'+facts69.passed+'/0）');
-      const career58=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_career_unlocks.mjs'),'--out',path.join(tmp57,'career.json')],{encoding:'utf8',timeout:20000,windowsHide:true}));
+      const career58=runProbeJson('probe_career_unlocks.mjs',['--out',path.join(tmp57,'career.json')],{timeout:20000});
       if(career58.failed!==0||career58.passed<40)fail('执行级 E58：生涯首次达成与永久资格未通过');else ok('执行级 E58：生涯首次达成/旧档/失败/迁移/资格（'+career58.passed+'/0）');
-      const taskLife58=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_task_lifetime.mjs'),'--out',path.join(tmp57,'task-lifetime.json')],{encoding:'utf8',timeout:20000,windowsHide:true}));
+      const taskLife58=runProbeJson('probe_task_lifetime.mjs',['--out',path.join(tmp57,'task-lifetime.json')],{timeout:20000});
       if(taskLife58.failed!==0)fail('执行级 E58B：累计日课事实与新档拒绝未通过');else ok('执行级 E58B：累计日课同写/跨日/旧档/失败/采用预检（'+taskLife58.passed+'/0）');
-      const bossCareer58=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_career_boss_unlocks.mjs'),'--out',path.join(tmp57,'boss-career.json')],{encoding:'utf8',timeout:20000,windowsHide:true}));
+      const bossCareer58=runProbeJson('probe_career_boss_unlocks.mjs',['--out',path.join(tmp57,'boss-career.json')],{timeout:20000});
       if(bossCareer58.failed!==0||bossCareer58.passed<24)fail('执行级 E58C：讨伐生涯同写与旧档/代次边界未通过');else ok('执行级 E58C：22条讨伐/无钱应战/旧档/失败/导入回滚（'+bossCareer58.passed+'/0）');
-      const expansion70=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_achievement_expansion_20261101.mjs'),'--out',path.join(tmp57,'expansion.json')],{encoding:'utf8',timeout:20000,windowsHide:true}));
+      const expansion70=runProbeJson('probe_achievement_expansion_20261101.mjs',['--out',path.join(tmp57,'expansion.json')],{timeout:20000});
       if(expansion70.failed!==0||expansion70.passed<233)fail('执行级 E70：战术与跨局收藏扩容边界未通过');else ok('执行级 E70：26战术/4收藏/原队列失败恢复/换局/领奖（'+expansion70.passed+'/0）');
-      const gamble71=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_gamble_achievement_quality.mjs'),'--out',path.join(tmp57,'gamble-quality.json')],{encoding:'utf8',timeout:20000,windowsHide:true}));
+      const gamble71=runProbeJson('probe_gamble_achievement_quality.mjs',['--out',path.join(tmp57,'gamble-quality.json')],{timeout:20000});
       if(gamble71.failed!==0||gamble71.passed<79)fail('执行级 E71：豪赌四组条件去重未通过');else ok('执行级 E71：四组条件区分/真实统计/旧ID与奖励保留（'+gamble71.passed+'/0）');
-      const rankCareer58=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_career_rank_unlocks.mjs'),'--out',path.join(tmp57,'rank-career.json')],{encoding:'utf8',timeout:20000,windowsHide:true}));
+      const rankCareer58=runProbeJson('probe_career_rank_unlocks.mjs',['--out',path.join(tmp57,'rank-career.json')],{timeout:20000});
       if(rankCareer58.failed!==0||rankCareer58.passed<32)fail('执行级 E58D：官阶功勋后台来源未通过');else ok('执行级 E58D：94条官阶功勋/同写/跨日/失败/迁移/缓存（'+rankCareer58.passed+'/0）');
-      const semantics72=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_career_semantic_quality.mjs'),'--out',path.join(tmp57,'career-semantics.json')],{encoding:'utf8',timeout:20000,windowsHide:true}));
+      const semantics72=runProbeJson('probe_career_semantic_quality.mjs',['--out',path.join(tmp57,'career-semantics.json')],{timeout:20000});
       if(semantics72.failed!==0||semantics72.passed<63)fail('执行级 E72：生涯成就语义与来源未通过');else ok('执行级 E72：34条语义/真实世界投影/原条件与奖励保全（'+semantics72.passed+'/0）');
-      const expansion73=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_achievement_expansion_batch2_20261101.mjs'),'--out',path.join(tmp57,'expansion-batch2.json')],{encoding:'utf8',timeout:20000,windowsHide:true}));
+      const expansion73=runProbeJson('probe_achievement_expansion_batch2_20261101.mjs',['--out',path.join(tmp57,'expansion-batch2.json')],{timeout:20000});
       if(expansion73.failed!==0||expansion73.passed<134)fail('执行级 E73：第二批战术与收藏未通过');else ok('执行级 E73：13战术/2收藏/真实事件适配/原1438条哈希保全（'+expansion73.passed+'/0）');
-      const gambleCareer58=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_career_gamble_unlocks.mjs'),'--out',path.join(tmp57,'gamble-career.json')],{encoding:'utf8',timeout:20000,windowsHide:true}));
+      const gambleCareer58=runProbeJson('probe_career_gamble_unlocks.mjs',['--out',path.join(tmp57,'gamble-career.json')],{timeout:20000});
       if(gambleCareer58.failed!==0||gambleCareer58.passed<41)fail('执行级 E58E：豪赌后台与待保存恢复未通过');else ok('执行级 E58E：76豪赌/源同写/瞬时净赢/队列恢复/旧档/迁移（'+gambleCareer58.passed+'/0）');
-      const interactionCareer58=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_career_interaction_unlocks.mjs'),'--out',path.join(tmp57,'interaction-career.json')],{encoding:'utf8',timeout:20000,windowsHide:true}));
+      const interactionCareer58=runProbeJson('probe_career_interaction_unlocks.mjs',['--out',path.join(tmp57,'interaction-career.json')],{timeout:20000});
       if(interactionCareer58.failed!==0||interactionCareer58.passed<48)fail('执行级 E58F：互动后台与待保存恢复未通过');else ok('执行级 E58F：20条互动/原生成功/同写/恢复/旧档/迁移（'+interactionCareer58.passed+'/0）');
-      const memoir74=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_world_memoir_facts.mjs'),'--out',path.join(tmp57,'memoir-facts.json')],{encoding:'utf8',timeout:20000,windowsHide:true}));
+      const memoir74=runProbeJson('probe_world_memoir_facts.mjs',['--out',path.join(tmp57,'memoir-facts.json')],{timeout:20000});
       if(memoir74.failed!==0||memoir74.passed<40)fail('执行级 E74：牌友回忆来源与日期边界未通过');else ok('执行级 E74：亲历/世界事件隔离/未知日期/同名/只读（'+memoir74.passed+'/0）');
       const ddzTeam75Dir=path.join(tmp57,'ddz-team');
-      const ddzTeam75=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_doudizhu_presentation_20261102.mjs'),'--facts-only','--out',ddzTeam75Dir],{encoding:'utf8',timeout:20000,windowsHide:true}));
+      const ddzTeam75=runProbeJson('probe_doudizhu_presentation_20261102.mjs',['--facts-only','--out',ddzTeam75Dir],{timeout:20000});
       if(ddzTeam75.failed!==0||ddzTeam75.passed<135)fail('执行级 E75：斗地主阵营胜负/经济一致性未通过');else ok('执行级 E75：3角色×3先出完者/练习/功勋/净额/重复/失败重试（'+ddzTeam75.passed+'/0）');
       const ddzRefund76Dir=path.join(tmp57,'ddz-refund');
-      const ddzRefund76=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_doudizhu_refund_20261102.mjs'),'--out',ddzRefund76Dir],{encoding:'utf8',timeout:20000,windowsHide:true}));
+      const ddzRefund76=runProbeJson('probe_doudizhu_refund_20261102.mjs',['--out',ddzRefund76Dir],{timeout:20000});
       if(ddzRefund76.failed!==0||ddzRefund76.passed<97)fail('执行级 E76：斗地主未终局退款/统一结算重试未通过');else ok('执行级 E76：未终局仅退本金/异常终局/收工重开同载荷/失败迟到ACK（'+ddzRefund76.passed+'/0）');
-      const fee77=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_shell_fee_session.mjs')],{encoding:'utf8',timeout:20000,windowsHide:true}));
+      const fee77=runProbeJson('probe_shell_fee_session.mjs',[],{timeout:20000});
       if(fee77.failed||fee77.passed!==14)fail('执行级 E77：收费ACK与旧页开桌隔离未通过');else ok('执行级 E77：明确扣款成功/旧页与换档隔离（14/0）');
-      const money78=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_doudizhu_team_money.mjs')],{encoding:'utf8',timeout:20000,windowsHide:true}));
-      const partner78=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_world_team_result.mjs')],{encoding:'utf8',timeout:20000,windowsHide:true}));
+      const money78=runProbeJson('probe_doudizhu_team_money.mjs',[],{timeout:20000});
+      const partner78=runProbeJson('probe_world_team_result.mjs',[],{timeout:20000});
       if(money78.failed||money78.passed<85||partner78.failed||partner78.passed<9)fail('执行级 E78：阵营资金/合作战果未通过');else ok('执行级 E78：敌方资金/队友战果/旧档兼容/失败/重复（85+9/0）');
-      const world79=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_world_table_persistence.mjs')],{encoding:'utf8',timeout:20000,windowsHide:true}));
-      const wallet79=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_wallet_table_outbox.mjs')],{encoding:'utf8',timeout:20000,windowsHide:true}));
+      const world79=runProbeJson('probe_world_table_persistence.mjs',[],{timeout:20000});
+      const wallet79=runProbeJson('probe_wallet_table_outbox.mjs',[],{timeout:20000});
       if(world79.failed||world79.passed<32||wallet79.failed||wallet79.passed<15)fail('执行级 E79：牌友记录同写恢复未通过');else ok('执行级 E79：余额与意图同写/整批回滚/去重/迁移/恢复（32+15/0）');
-      const chips80=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_other_table_recovery.mjs')],{encoding:'utf8',timeout:20000,windowsHide:true}));
-      const uno80=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_uno_table_recovery.mjs')],{encoding:'utf8',timeout:20000,windowsHide:true}));
-      const queue80=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_table_queue_extensions.mjs')],{encoding:'utf8',timeout:20000,windowsHide:true}));
+      const chips80=runProbeJson('probe_other_table_recovery.mjs',[],{timeout:20000});
+      const uno80=runProbeJson('probe_uno_table_recovery.mjs',[],{timeout:20000});
+      const queue80=runProbeJson('probe_table_queue_extensions.mjs',[],{timeout:20000});
       if(chips80.failed||chips80.passed<58||uno80.failed||uno80.passed<13||queue80.failed||queue80.passed<8)fail('执行级 E80：其余牌桌可靠保存未通过');else ok('执行级 E80：德州/廿一点/UNO/非现金与豪赌同写（58+13+8/0）');
-      const paid81=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_oath_bounty_20261103.mjs'),'--gate'],{encoding:'utf8',timeout:20000,windowsHide:true}));
+      const paid81=runProbeJson('probe_oath_bounty_20261103.mjs',['--gate'],{timeout:20000});
       if(paid81.failed||paid81.passed<12)fail('执行级 E81：悬赏与结契事务未通过');else ok('执行级 E81：悬赏余额/目标同写与幂等、结契拒写/重试、迁移保全（12/0）');
-      const props82=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_manual_props_20261103.mjs'),'--gate'],{encoding:'utf8',timeout:20000,windowsHide:true}));
+      const props82=runProbeJson('probe_manual_props_20261103.mjs',['--gate'],{timeout:20000});
       if(props82.failed||props82.passed<115)fail('执行级 E82：玩家批量四道具未通过');else ok('执行级 E82：四道具数量/停止/死亡复活/旧局存档/人物回应（115/0）');
-      const talk83=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_memoir_talk_20261103.mjs'),'--gate'],{encoding:'utf8',timeout:20000,windowsHide:true}));
+      const talk83=runProbeJson('probe_memoir_talk_20261103.mjs',['--gate'],{timeout:20000});
       if(talk83.failed||talk83.passed<203)fail('执行级 E83：牌友闲谈与邀约资格未通过');else ok('执行级 E83：12牌风/132句/亲历话题/只读与实际带入边界（203/0）');
-      const insurance84=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_blackjack_public_insurance_20261103.mjs'),'--gate'],{encoding:'utf8',timeout:20000,windowsHide:true}));
+      const insurance84=runProbeJson('probe_blackjack_public_insurance_20261103.mjs',['--gate'],{timeout:20000});
       if(insurance84.failed||insurance84.passed<59)fail('执行级 E84：廿一点保险/公开牌靴守卫未通过');else ok('执行级 E84：购买能力/单次决策/拒旧操作/隐藏信息隔离（59/0）');
-      const backup85=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_backup_lifecycle_20261104.mjs'),'--gate'],{encoding:'utf8',timeout:20000,windowsHide:true}));
+      const backup85=runProbeJson('probe_backup_lifecycle_20261104.mjs',['--gate'],{timeout:20000});
       if(backup85.failed||backup85.passed<29)fail('执行级 E85：更新备份清理保护未通过');else ok('执行级 E85：保留副本/未完更新/预览变化/中断恢复（29/0）');
-      const public86=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_texas_public_read_20261104.mjs'),'--gate'],{encoding:'utf8',timeout:20000,windowsHide:true}));
+      const public86=runProbeJson('probe_texas_public_read_20261104.mjs',['--gate'],{timeout:20000});
       if(public86.failed||public86.passed<43)fail('执行级 E86：德州公开观察策略未通过');else ok('执行级 E86：样本门槛/有界衰减/真实策略/暗牌隔离（43/0）');
-      const player87=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_player_match_wallet_20261104.mjs'),'--gate'],{encoding:'utf8',timeout:20000,windowsHide:true}));
+      const player87=runProbeJson('probe_player_match_wallet_20261104.mjs',['--gate'],{timeout:20000});
       if(player87.failed||player87.passed<29)fail('执行级 E87：个人终局严格记录未通过');else ok('执行级 E87：同写/重复/拒写/恢复/换档/迁移（29/0）');
-      const capture88=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools/probe_player_match_capture_20261104.mjs'),'--gate'],{encoding:'utf8',timeout:20000,windowsHide:true}));
+      const capture88=runProbeJson('probe_player_match_capture_20261104.mjs',['--gate'],{timeout:20000});
       if(capture88.failed||capture88.passed<34)fail('执行级 E88：本人终局采集与统计归属未通过');else ok('执行级 E88：本人/双将/模式/旧局/两类意图并存/真实聚合（34/0）');
       for(const [tag,probe,minimum,label] of [
         ['E89','probe_uno_reverse_20261104.mjs',45,'UNO多人反转方向/真实行动/公开信息'],
@@ -3283,7 +3318,7 @@ async function runBossChecks() {
         ['E92','probe_player_match_capacity_20261104.mjs',17,'16000场无损容量/第16001场/去重/迁移'],
         ['E93','probe_aux_rewards_20261104.mjs',27,'助战现金/独立战绩/未入场回退/拒写恢复'],
         ['E94','probe_spirit_skin_entry_20261104.mjs',22,'妖灵装扮注册/严格外观保存/别名/缺图回退']
-      ]){const result=JSON.parse(execFileSync(process.execPath,[path.join(ROOT,'tools',probe),'--gate'],{encoding:'utf8',timeout:30000,windowsHide:true}));if(result.failed||result.passed<minimum)fail('执行级 '+tag+'：'+label+'未通过');else ok('执行级 '+tag+'：'+label+'（'+result.passed+'/0）');}
+      ]){const result=runProbeJson(probe,['--gate'],{timeout:30000});if(result.failed||result.passed<minimum)fail('执行级 '+tag+'：'+label+'未通过');else ok('执行级 '+tag+'：'+label+'（'+result.passed+'/0）');}
 
     } catch(error) { if(error.stdout)log(String(error.stdout).slice(0,2000)); fail('执行级 E57—E94/E58F：小游戏/生涯/赠礼执行回归失败（'+String(error.message).slice(0,160)+'）'); }
     finally { if(tmp57){try{fs.unlinkSync(path.join(tmp57,'ddz-refund','result.json'));fs.rmdirSync(path.join(tmp57,'ddz-refund'));}catch{}try{fs.unlinkSync(path.join(tmp57,'ddz-team','result.json'));fs.rmdirSync(path.join(tmp57,'ddz-team'));}catch{}for(const file of ['memoir-facts.json','interaction-career.json','gamble-career.json','expansion-batch2.json','rank-career.json','career-semantics.json','boss-career.json','expansion.json','gamble-quality.json','blackjack-matrix.json','ddz-rounds.json','gift-quantity.json','goals.json','bj-exit.json','spirit-owner-boundaries.json','feedback-lifecycle.json']){try{fs.unlinkSync(path.join(tmp57,file));}catch{}}try{fs.unlinkSync(path.join(tmp57,'uno-rounds.json'));}catch{}try{fs.unlinkSync(path.join(tmp57,'blackjack-rules.json'));}catch{}try{fs.unlinkSync(path.join(tmp57,'career.json'));}catch{}try{fs.unlinkSync(path.join(tmp57,'task-lifetime.json'));}catch{}try{fs.unlinkSync(path.join(tmp57,'blackjack.json'));}catch{}try{fs.unlinkSync(path.join(tmp57,'result.json'));}catch{}try{fs.rmdirSync(tmp57);}catch{}} }

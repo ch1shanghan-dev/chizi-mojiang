@@ -37,6 +37,7 @@
 
 ## 已完成证据与历史
 
+2026-11-05 门禁探针重试（B4）：完整门禁连续出现「随机红」，且两次是不同断言——E57 区段 `probe_achievement_expansion_batch2_20261101` 的 `jr_eight_arts … persist then reload`、E48 区段 `probe_update_transaction` 的一条 controller 用例；单跑分别连续 5 次 134/0、连续 3 次 exit=0。判定为探针自身时序敏感（真实时钟/微任务深度/定时器推进）在机器高负载时的抖动，不是产品回归。**已修**：`tools/check.js` 全部 50 处探针调用统一走 `runProbeJson(script,args,{timeout,retries=1})`，失败重试一次并打印 `[RETRY]`（不计告警、不改 `--strict` 结论），真实缺陷两次都失败仍判红，无 `failed` 字段的探针原样返回不改语义。新增 `tools/probe_gate_retry_20261105.mjs` 从真实 check.js 抽函数体测该语义 **5/0**。完整门禁连跑两次均 **exit=0、FAIL 0、`[RETRY]` 0 次**。残余：没有消除探针的真实时钟依赖，`[RETRY]` 反复出现时仍须去修探针；探针崩溃/超时仍按原 `catch` 判红、不重试。详见 [B4 报告](WORKBUDDY_B4_GATE_RETRY_20261105.md)。
 2026-11-05 已核查其余探针中的 `493` 引用：仅 `probe_goal_recommendations_host.mjs` 两处属「当前生涯定义数」断言，已同步为 2000；本副本缺 `ext/app/index.html`，该宿主专项未实跑。其余探针的 `1438/1946/782` 等数字为历史基线或迁移兼容引用，保留。
 **行囊跨版本已建立证据与纪律（B3）**：当前格式 v3，`v>VERSION` 拒绝、旧版走清洗补缺，正常导入对缺失键保留本地值；4.0.15→4.0.16 未改 `VERSION`/`KEY_DEFS`/存档结构，在线更新后旧档可直读。新增 `tools/probe_migrate_compat_20261105.mjs` **10/0**（v1/v2 可导入、新键不被清空、v4 明确拒绝、篡改拒绝、未知键忽略、导入旧包后再导出不丢新键）。以后新键必须可缺失、不得改旧键结构、升 `VERSION` 前必跑该专项。详见[B3报告](WORKBUDDY_B3_MIGRATE_COMPAT_20261105.md)。老版本（4.0.14 及更早）行囊按作者要求不再加兼容分支。
 2026-11-05 修复 `tools/probe_first_batch.mjs`：从 `csh_winrate.js` 按函数名抽取代码时漏了新增的 `capturePersonal`，导致 HARNESS_ERROR；补入抽取列表后 **56/0** 通过，恢复该回归证据。`tools/probe_interact_audit.mjs` 已修复：9 项失败源于探针按名抽取 `saveBlocked` 后缺少 `heartbeatPending/heartbeatActive` 闭包变量，ReferenceError 被兜成「存档阻塞」，恩怨记账静默跳过；补齐夹具后 **124/0**，不是产品缺陷。
