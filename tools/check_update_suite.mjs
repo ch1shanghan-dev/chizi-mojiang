@@ -60,6 +60,7 @@ if (rev) run('catalog-rev', ['tools/catalog_git_bytes.mjs', '--rev', rev, '--out
 /* ---------- 9 个更新/备份专项 ---------- */
 const probes = [
 	'probe_update_transaction.mjs',
+	'probe_update_deferred_20261105.mjs',
 	'probe_update_mobile_io_20261105.mjs',
 	'probe_update_ui_20261105.mjs',
 	'probe_update_lifecycle_20261105.mjs',
