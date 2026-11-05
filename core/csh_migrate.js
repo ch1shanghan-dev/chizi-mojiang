@@ -63,6 +63,7 @@ import { lib, game } from "../../../noname.js";
         ["csh_ui_panel_window_world", "本机池子世界窗口位置与显示偏好（随屏幕变化，不随行囊迁移）"],
         ["csh_ui_panel_window_developer", "本机调试窗口位置与显示偏好（不属于玩家进度，不随行囊迁移）"],
         ["csh_achievement_ui_v1", "本机成就反馈开关、动效和声音偏好（不是成就进度，不随他人存档导入）"],
+		["csh_achievement_archive_v1", "本机成就通知归档与未读状态（只是展示记录，成就进度/领奖真值在成就页；换档即清空，不随他人存档导入）"],
         ["csh_online_policy_v1", "本机联网与发布偏好（默认离线，导入他人存档不会代为开启）"],
         ["csh_online_backoff_v1", "本机网络退避记录（不影响本地游戏，不跨设备补发）"],
         ["csh_rank_cache_v2", "按服务、类别与身份分槽的社区榜缓存（非玩家资产，不随行囊迁移）"],

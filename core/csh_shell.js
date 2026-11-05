@@ -983,11 +983,12 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 				var wst = (lib.cshWorld && lib.cshWorld.stats) ? lib.cshWorld.stats() : null;
 				if (wst) {
 					var acceptedWorld=lib.cshWorld.worldCareerSaved?lib.cshWorld.worldCareerSaved():null;
-                    s.worldHands = acceptedWorld ? acceptedWorld.worldHands : (wst.playerHands || 0); s.worldSkillTop = acceptedWorld ? acceptedWorld.worldSkillTop : (wst.playerSkillTop || 0);
+                    s.worldHands = acceptedWorld ? acceptedWorld.worldHands : (wst.playerHands || 0);
+                    if(acceptedWorld){s.worldFundMax=acceptedWorld.worldFundMax;s.worldTopFund=acceptedWorld.worldTopFund;} s.worldSkillTop = acceptedWorld ? acceptedWorld.worldSkillTop : (wst.playerSkillTop || 0);
 					s.playerOpponents = acceptedWorld ? acceptedWorld.playerOpponents : (wst.playerOpponents || 0); s.playerFamiliar = acceptedWorld ? acceptedWorld.playerFamiliar : (wst.playerFamiliar || 0);
 					s.playerRevenge = acceptedWorld ? acceptedWorld.playerRevenge : (wst.playerRevenge || 0); s.playerBalanced = acceptedWorld ? acceptedWorld.playerBalanced : (wst.playerBalanced || 0);
 					s.playerFundMin = acceptedWorld ? acceptedWorld.playerFundMin : (wst.playerFundMin || 0); s.playerFundWitness = acceptedWorld ? acceptedWorld.playerFundWitness : (wst.playerFundWitness || 0);
-					s.billionaires = wst.tier3 || 0; s.billionaireBroke = wst.billionaireBroke || 0;
+					s.billionaires = acceptedWorld ? acceptedWorld.billionaires : (wst.tier3 || 0); s.billionaireBroke = acceptedWorld ? acceptedWorld.billionaireBroke : (wst.billionaireBroke || 0);
 					/* 世界动态的累计计数（2026-10-03）：成就引擎直接读这几个字段 */
 					s.recordsSeen = wst.recordsSeen || 0; s.tierDown = wst.tierDown || 0;
 					s.comebacks = wst.comebacks || 0; s.rivals = wst.rivals || 0; s.grudge8 = wst.grudge8 || 0;

@@ -7302,6 +7302,8 @@ function onlineLocalFetch(url,options){return window.CSHOnline.local(url,options
                 "#csh-update .csh-src-stat{flex:1 1 auto!important;opacity:.72!important;font-variant-numeric:tabular-nums!important;}",
                 "#csh-update .csh-src-row:not(.dead){cursor:pointer!important;}",
             ].join("");
+            st.textContent += "#csh-update{display:flex!important;flex-direction:column!important;gap:6px!important;width:calc(100vw - 24px)!important;max-width:720px!important;max-height:calc(100vh - 24px)!important;max-height:calc(100dvh - 24px)!important;min-height:0!important;overflow:hidden!important;padding:12px!important;text-shadow:none!important}#csh-update .csh-ext-title,#csh-update .csh-ext-sub{flex:none!important;margin:0!important}#csh-update .csh-ext-sub{line-height:1.4!important;word-break:normal!important}#csh-update .csh-update-sources{display:block!important;flex:0 1 auto!important;min-height:44px!important;overflow:auto!important;margin:0!important}#csh-update .csh-update-sources summary{display:flex!important;align-items:center!important;min-height:44px!important;cursor:pointer!important;font-size:var(--csh-lfs-sm,12px)!important}#csh-update .csh-src-box{margin:0!important}#csh-update .csh-src-row{min-height:44px!important}#csh-update .csh-ext-loading{flex:0 1 auto!important;min-height:44px!important;overflow:auto!important;padding:4px 0!important;line-height:1.4!important;overflow-wrap:anywhere!important}#csh-update .csh-ext-row{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;flex:none!important;gap:6px!important;margin:0!important}#csh-update .csh-ext-btn{display:block!important;width:100%!important;min-width:0!important;height:auto!important;min-height:44px!important;padding:6px!important;line-height:1.2!important;font-family:inherit!important;font-size:var(--csh-lfs-sm,12px)!important;text-shadow:none!important;background-image:none!important;border-image:none!important;box-shadow:none!important;filter:none!important;appearance:none!important;-webkit-appearance:none!important}#csh-update .csh-ext-btn:before,#csh-update .csh-ext-btn:after{display:none!important;content:none!important}@media(max-width:580px){#csh-update .csh-ext-row{grid-template-columns:repeat(2,minmax(0,1fr))!important}}";
+            st.textContent += "#csh-update{gap:4px!important}#csh-update .csh-update-error{display:block!important;flex:0 1 auto!important;min-height:44px!important;overflow:auto!important}#csh-update .csh-update-error[hidden]{display:none!important}#csh-update .csh-update-error summary{display:flex!important;align-items:center!important;min-height:44px!important;cursor:pointer!important;font-size:var(--csh-lfs-sm,12px)!important}#csh-update .csh-update-error-body{display:block!important;font-size:var(--csh-lfs-sm,12px)!important;line-height:1.4!important;white-space:pre-wrap!important;overflow-wrap:anywhere!important;padding:4px!important}";
             (document.head || document.documentElement).appendChild(st);
         }
         /* ---------- 更新源容灾（2026-10-18 · 作者：网络原因检查更新很鸡肋） ----------
@@ -7382,8 +7384,12 @@ function onlineLocalFetch(url,options){return window.CSHOnline.local(url,options
                         cache: "no-store",
                         referrerPolicy: "no-referrer",
                         signal: ctrl ? ctrl.signal : undefined,
+                        redirect: "error",
                     }).then(function (r) {
                         if (!r.ok) throw new Error("HTTP " + r.status);
+                        if (r.redirected) throw new Error("更新源发生跳转");
+                        var _ct = r.headers && typeof r.headers.get === "function" ? String(r.headers.get("content-type") || "") : "";
+                        if (/text\/html/i.test(_ct)) throw new Error("更新源返回网页（可能是错误页或代理拦截）");
                         return r.text();
                     }).then(function (t) { fin(true, t); })
                       .catch(function (e) { fin(false, e); });
@@ -7519,7 +7525,7 @@ function onlineLocalFetch(url,options){return window.CSHOnline.local(url,options
             function kill(){if(busy==='cleaning'){toast('正在清理已确认的副本，请稍候');return false;}alive=false;seq++;document.removeEventListener('keydown',key,true);layer.remove();if(lib.cshUI&&lib.cshUI.achievementHold)lib.cshUI.achievementHold('update-backups',false);if(focusBack&&focusBack.isConnected&&focusBack.getClientRects().length)focusBack.focus({preventScroll:true});return true;}
             function key(e){if(!alive||document.getElementById('csh-ui-confirm'))return;if(e.key==='Escape'){e.preventDefault();e.stopImmediatePropagation();if(!e.repeat)kill();return;}if(e.key==='Tab'){var nodes=Array.prototype.filter.call(layer.querySelectorAll('button:not(:disabled),select:not(:disabled)'),function(n){return n.getClientRects().length;});var first=nodes[0],last=nodes[nodes.length-1];if(first&&(!layer.contains(document.activeElement)||(e.shiftKey&&document.activeElement===first)||(!e.shiftKey&&document.activeElement===last))){e.preventDefault();(e.shiftKey?last:first).focus();}}}
             function paint(){body.textContent='';if(!model.rows.length){body.appendChild(element('p','bk-note','还没有本机更新副本。没有资料需要清理。'));return;}model.rows.forEach(function(row){var article=element('article'),text=element('div'),title=row.fromVersion&&row.toVersion?row.fromVersion+' → '+row.toVersion+' 的更新资料':'本机更新资料',time=row.created?new Date(row.created).toLocaleString():'日期未记';text.appendChild(element('h4','',title));text.appendChild(element('p','',time+' · '+size(row.bytes)));text.appendChild(element('p','','更新前副本 '+size(row.beforeBytes)+' · 下载副本 '+size(row.nextBytes)));if(row.reason)text.appendChild(element('p','',row.reason));if(row.interrupted)text.appendChild(element('p','','上次清理未完成，可重新核对后继续。'));article.appendChild(text);var actions=element('div','bk-actions');if(row.downloadsCleanable){var next=element('button','','清理下载副本');next.type='button';next.addEventListener('click',function(){prepare({kind:'next',ids:[row.id]});});actions.appendChild(next);}if(row.trusted&&!row.protected){var all=element('button','','清理此组');all.type='button';all.addEventListener('click',function(){prepare({ids:[row.id]});});actions.appendChild(all);}article.appendChild(actions);body.appendChild(article);});}
-            async function load(){if(!alive||busy)return;busy='reading';var token=++seq;controls();status.textContent='正在读取并核对本机资料…';try{if(!manager)manager=window.CSHUpdate.backups(window.CSHUpdate.hostIO({lib:lib,game:game}));var next=await manager.inventory(options());if(!live(token))return;model=next;summary.textContent=next.rows.length+' 组本机资料 · 合计 '+size(next.totalBytes);status.textContent=next.blocked||'预算只生成清理建议，最近可校验回退资料始终保留。';paint();}catch(e){if(live(token)){status.textContent='本机备份暂未读取，未进行清理，可稍后重试。';summary.textContent=model?'保留上次读取结果':'尚未完整读取本机资料';}try{console.warn('[池子魔将] 更新备份读取',e);}catch(_e){}}finally{if(live(token)){busy='';controls();}}}
+            async function load(){if(!alive||busy)return;busy='reading';var token=++seq;controls();status.textContent='正在读取并核对本机资料…';try{if(!manager)manager=window.CSHUpdate.backups(window.CSHUpdate.hostIO({lib:lib,game:game}));var next=await manager.inventory(options());if(!live(token))return;model=next;summary.textContent=next.rows.length+' 组本机资料 · 合计 '+size(next.totalBytes);status.textContent=next.blocked||'预算是你设定的占用上限，不是设备可用空间；设备剩余空间无法可靠读取，不据此判断充足。预算只生成清理建议，最近可校验回退资料始终保留。';paint();}catch(e){if(live(token)){status.textContent='本机备份暂未读取，未进行清理，可稍后重试。';summary.textContent=model?'保留上次读取结果':'尚未完整读取本机资料';}try{console.warn('[池子魔将] 更新备份读取',e);}catch(_e){}}finally{if(live(token)){busy='';controls();}}}
             async function prepare(extra){if(!alive||busy||!manager)return;busy='planning';var token=++seq;controls();status.textContent='正在核对可清理内容与保留资料…';try{var plan=await manager.plan(Object.assign(options(),extra||{}));if(!live(token))return;if(plan.empty){status.textContent='当前没有符合条件的清理项，受保护资料仍保留。';return;}if(!lib.cshUI||typeof lib.cshUI.confirm!=='function'){status.textContent='当前环境无法确认清理，请重启后再试。';return;}busy='confirming';lib.cshUI.confirm({title:'清理更新副本',danger:true,message:'本次将清理 '+plan.groups+' 组中的'+(plan.kind==='next'?'下载副本':'旧更新资料')+'，约 '+size(plan.bytes)+'。最近可校验的回退资料保留。此操作不会删除行囊存档，已清理的文件不能撤销。',ok:'确认清理',cancel:'保留'},async function(accepted){if(!live(token))return;if(!accepted){busy='';status.textContent='已保留，未清理任何资料。';controls();return;}busy='cleaning';controls();status.textContent='正在清理已确认的副本…';try{var result=await manager.cleanup(plan.id);if(live(token)){busy='';await load();if(live())status.textContent='已清理 '+size(result.freedBytes)+'。'+(model&&model.blocked?model.blocked:'受保护资料仍保留。');}}catch(e){if(live(token)){busy='';status.textContent=(e.freedBytes?'已清理 '+size(e.freedBytes)+'，':'')+'其余尚未完成，请重新读取后继续。';controls();}try{console.warn('[池子魔将] 更新备份清理',e);}catch(_e){}}});}catch(e){if(live(token)&&busy!=='cleaning'){busy='';status.textContent='清理预览暂未完成，资料可能已变化，请重新读取。';controls();}try{console.warn('[池子魔将] 更新备份预览',e);}catch(_e){}}finally{if(live(token)&&busy==='planning'){busy='';controls();}}}
             close.addEventListener('click',kill);layer.addEventListener('click',function(e){if(e.target===layer)kill();});refresh.addEventListener('click',load);suggest.addEventListener('click',function(){prepare();});keep.addEventListener('change',load);budget.addEventListener('change',load);layer.__close=kill;document.addEventListener('keydown',key,true);host.appendChild(layer);if(lib.cshUI&&lib.cshUI.achievementHold)lib.cshUI.achievementHold('update-backups',true);close.focus({preventScroll:true});load();return true;
         };
@@ -7527,6 +7533,15 @@ function onlineLocalFetch(url,options){return window.CSHOnline.local(url,options
         lib.cshDebug.checkUpdate = function () {
             if(!window.CSHOnline.enabled()){toast("当前为离线模式，可在联网设置中开启后检查更新");return false;}
             try { ensureUpdateStyle(); } catch (eSt) {}
+            /* U1 2026-11-05：跨弹窗唯一任务状态。挂在 CSHUpdate 上，完整弹窗与
+               被单独抽取执行的 startUpdate 都取同一个对象；不新增模块级变量。 */
+            var st = window.CSHUpdate.__cshUpdateState || (window.CSHUpdate.__cshUpdateState = {task:null,panelSeq:0,taskSeq:0,refresh:null,setControls:null,esc:null,candidateBase:null});
+            var activeTask = st.task;
+            if (activeTask && !activeTask.settled && (activeTask.kind === 'recover' || ['committing','recovering','restoring'].indexOf(activeTask.phase) >= 0) && document.getElementById("csh-update") && document.getElementById("csh-update").parentNode) {
+                toast("正在提交或恢复文件，请稍候，未取消任何写入");
+                return true;   /* 提交/恢复期间不替换正在写文件的弹窗 */
+            }
+            if (st.esc) { try { document.removeEventListener("keydown", st.esc, true); } catch (eOld) {} st.esc = null; }
             var staleBg = document.getElementById("csh-update-bg");
             if (staleBg && staleBg.parentNode) staleBg.parentNode.removeChild(staleBg);
             var staleBox = document.getElementById("csh-update");
@@ -7539,12 +7554,25 @@ function onlineLocalFetch(url,options){return window.CSHOnline.local(url,options
             bg.id = "csh-update-bg";
             var box = document.createElement("div");
             box.id = "csh-update";
-            var updateController=null,updateTx=null;
+            var panelId = ++st.panelSeq;
+            var alive = true;
+            function current(){ return alive && panelId === st.panelSeq; }
+            var updateController=null,updateTx=null; /* 兼容旧引用；生命周期统一由 st.task 管理 */
             function kill() {
-                if(_cshUpdating&&updateTx&&updateTx.status().phase==='committing'){toast("正在提交并核验文件，请稍候");return;}if(updateController)updateController.abort();
+                var t = st.task;
+                if (t && !t.settled) {
+                    if (t.panelId !== panelId) { /* 旧弹窗的任务：本弹窗关闭不影响它，绝不 abort */ }
+                    else if (t.kind === 'recover' || ['committing','recovering','restoring'].indexOf(t.phase) >= 0) {
+                        toast("正在提交或恢复文件，请稍候，未取消任何写入"); return false;
+                    }
+                    else if (t.controller) { try { t.controller.abort(); } catch (eA) {} }
+                }
+                alive = false;
                 try { document.removeEventListener("keydown", box.__esc, true); } catch (eE) {}
+                if (st.esc === box.__esc) st.esc = null;
                 if (box.parentNode) box.parentNode.removeChild(box);
                 if (bg.parentNode) bg.parentNode.removeChild(bg);
+                return true;
             }
             box.__esc = function (e) {
                 if (e.key !== "Escape" && e.keyCode !== 27) return;
@@ -7552,6 +7580,7 @@ function onlineLocalFetch(url,options){return window.CSHOnline.local(url,options
                 kill();
             };
             document.addEventListener("keydown", box.__esc, true);
+            st.esc = box.__esc;
             bg.addEventListener("click", kill, false);
             host.appendChild(bg);
             host.appendChild(box);
@@ -7562,16 +7591,18 @@ function onlineLocalFetch(url,options){return window.CSHOnline.local(url,options
             box.appendChild(t);
             var sub = document.createElement("div");
             sub.className = "csh-ext-sub";
-            sub.textContent = "更新源已内置（无需手动填写地址）：共 " + CSH_UPDATE_SOURCES.length +
-                " 个，并发探测后默认取最快可用的一个，可手动切换。";
+            sub.textContent = "自动选择可用线路，需要时可展开切换。";
             box.appendChild(sub);
             var srcBox = document.createElement("div");
             srcBox.className = "csh-src-box";
-            box.appendChild(srcBox);
+            var sourceDetails=document.createElement('details');sourceDetails.className='csh-update-sources';
+            var sourceSummary=document.createElement('summary');sourceSummary.textContent='更新线路 · 自动选择';sourceDetails.appendChild(sourceSummary);sourceDetails.appendChild(srcBox);box.appendChild(sourceDetails);
             var status = document.createElement("div");
-            status.className = "csh-ext-loading";
+            status.className = "csh-ext-loading";status.setAttribute("role","status");
             status.textContent = "正在检查…";
             box.appendChild(status);
+            var errorDetails=document.createElement('details');errorDetails.className='csh-update-error';errorDetails.hidden=true;
+            var errorSummary=document.createElement('summary');errorSummary.textContent='查看失败原因';var errorBody=document.createElement('div');errorBody.className='csh-update-error-body';errorDetails.appendChild(errorSummary);errorDetails.appendChild(errorBody);box.appendChild(errorDetails);
             var row = document.createElement("div");
             row.className = "csh-ext-row";
             box.appendChild(row);
@@ -7610,6 +7641,7 @@ function onlineLocalFetch(url,options){return window.CSHOnline.local(url,options
             /* ---------- 源列表渲染：并发探测的结果一次性摆出来 ---------- */
             var _srcProbed = null;
             function renderSources(list) {
+                if (!current()) return;    /* 旧弹窗的探测回包不改写新弹窗，也不覆盖玩家选的线路 */
                 _srcProbed = list;
                 srcBox.innerHTML = "";
                 var firstOk = null;
@@ -7647,7 +7679,7 @@ function onlineLocalFetch(url,options){return window.CSHOnline.local(url,options
                     srcBox.appendChild(line);
                 }
             }
-            cshProbeAll(4000).then(renderSources);
+            cshProbeAll(4000).then(function(list){ if (current()) renderSources(list); });
 
             /* ---------- 逐文件下载器（2026-10-18 · 取代引擎的批量下载原语） ----------
                为什么不能用引擎那两件原语（三条都是实测/源码确认过的硬伤）：
@@ -7707,36 +7739,137 @@ function onlineLocalFetch(url,options){return window.CSHOnline.local(url,options
             }
             /* 基址候选：**先用本次 info.json 验证通过的那个**（它一定有本扩展的文件），
                再官方 raw，最后各镜像。同一个文件在这里面从头试到尾才算失败。 */
+            /* U2：优先本次更新目录实际来自的那个基址，避免「目录从 A、文件从 B」的构建混用。
+               版本探测写入的 _cshUpdBase 退居其次，官方与各镜像仍是回退。 */
             function updateBases() {
                 var list = [];
+                if (st.candidateBase) list.push(st.candidateBase);
                 var first = _cshUpdBase || CSH_UPDATE_SRC;
-                list.push(first);
-                if (first !== CSH_UPDATE_SRC) list.push(CSH_UPDATE_SRC);
+                if (list.indexOf(first) < 0) list.push(first);
+                if (list.indexOf(CSH_UPDATE_SRC) < 0) list.push(CSH_UPDATE_SRC);
                 for (var i = 0; i < CSH_UPDATE_MIRRORS.length; i++) {
                     if (list.indexOf(CSH_UPDATE_MIRRORS[i]) < 0) list.push(CSH_UPDATE_MIRRORS[i]);
                 }
                 return list;
             }
             async function startUpdate(info,remoteVer,goBtn,closeBtn){
-                if(_cshUpdating){status.textContent='更新任务正在进行，请稍候';goBtn.disabled=false;return;}
-                if(_status.gameStarted&&!_status.over){status.textContent='请在本局结束后再安装更新，当前文件未改动。';goBtn.disabled=false;closeBtn.disabled=false;return;}
-                _cshUpdating=true;updateController=new AbortController();closeBtn.disabled=false;closeBtn.textContent='取消下载';
-                try{
-                    var engine=window.CSHUpdate,io=engine.hostIO({lib:lib,game:game});updateTx=engine.create(io);await updateTx.recover();
-                    var files=Array.from(new Set((info.files||[]).concat(['extension.js']))),hashes=info.hashes||{},needed=[];if(!files.every(function(rel){return /^[a-f0-9]{64}$/.test(hashes[rel]||'');}))throw Error('更新目录缺少文件摘要，请使用完整安装包');status.textContent='正在核对本机文件…';
-                    for(var i=0;i<files.length;i++){if(updateController.signal.aborted)throw Error('下载已取消，原安装未改动');var rel=engine.safe(String(files[i])),local=await io.read('extension/池子魔将/'+rel);if(!local||(hashes[rel]?await engine.digest(local)!==hashes[rel]:cshIsCode(rel)))needed.push(rel);}
+                /* 单独抽取执行（tools/probe_update_transaction.mjs）时没有外层闭包，
+                   因此这里只依赖参数、window.CSHUpdate 与自带的局部函数。 */
+                var st = window.CSHUpdate.__cshUpdateState || (window.CSHUpdate.__cshUpdateState = {task:null,panelSeq:0,taskSeq:0,refresh:null,setControls:null,esc:null,candidateBase:null});
+                var selfPanel = st.panelSeq;
+                var controls = st.setControls;              /* 捕获本弹窗控制器，旧任务不碰新弹窗 */
+                function current(){ if (typeof alive === 'undefined') return true; return alive && selfPanel === st.panelSeq; }
+                function setState(mode,label){ if (controls) try { controls(mode,label); } catch (eC) {} }
+                if (st.task && !st.task.settled) { if (current()) status.textContent='已有更新或恢复任务正在进行，请稍候'; goBtn.disabled=false; closeBtn.disabled=false; return; }
+                if (_status.gameStarted && !_status.over) { if (current()) status.textContent='请在本局结束后再安装更新，当前文件未改动。'; goBtn.disabled=false; closeBtn.disabled=false; return; }
+                var task = {id:++st.taskSeq,kind:'update',phase:'checking',controller:new AbortController(),tx:null,panelId:selfPanel,settled:false};
+                st.task = task; _cshUpdating = true;
+                var ctrl = task.controller;
+                closeBtn.disabled=false; closeBtn.textContent='取消下载'; setState('cancellable','取消下载');
+                if (typeof errorDetails!=='undefined' && errorDetails) { errorDetails.hidden=true; errorDetails.open=false; }
+                try {
+                    var engine=window.CSHUpdate,io=engine.hostIO({lib:lib,game:game});
+                    task.tx=engine.create(io); await task.tx.recover();
+                    var files=Array.from(new Set((info.files||[]).concat(['extension.js']))),hashes=info.hashes||{},needed=[];
+                    if (!files.every(function(rel){return /^[a-f0-9]{64}$/.test(hashes[rel]||'');})) throw Error('更新目录缺少文件摘要，请使用完整安装包');
+                    if (current()) status.textContent='正在核对本机文件（0 / '+files.length+'）…';
+                    for (var i=0;i<files.length;i++) {
+                        if (ctrl.signal.aborted) throw Error('下载已取消，原安装未改动');
+                        if (i%20===0 && current()) status.textContent='正在核对本机文件（'+i+' / '+files.length+'）…';
+                        var rel=engine.safe(String(files[i])),local=await io.read('extension/池子魔将/'+rel);
+                        if (!local || (hashes[rel] ? await engine.digest(local)!==hashes[rel] : cshIsCode(rel))) needed.push(rel);
+                    }
                     var bases=updateBases();
-                    async function fetchFile(rel,signal){var last;for(var i=0;i<bases.length;i++){if(signal.aborted)throw Error('下载已取消');var ctrl=new AbortController(),timer=setTimeout(function(){ctrl.abort();},12000),abort=function(){ctrl.abort();};signal.addEventListener('abort',abort,{once:true});try{var response=await onlineFetch(bases[i]+encodeURI(rel),{cache:'no-store',referrerPolicy:'no-referrer',redirect:'error',signal:ctrl.signal});if(!response.ok)throw Error('HTTP '+response.status);return new Uint8Array(await response.arrayBuffer());}catch(e){last=e;if(signal.aborted)throw e;}finally{clearTimeout(timer);signal.removeEventListener('abort',abort);}}throw last||Error('文件下载失败');}
-                    if(needed.length)await updateTx.apply(needed,fetchFile,{hashes:hashes,fromVersion:typeof localVer==='string'?localVer:'',toVersion:remoteVer,signal:updateController.signal,progress:function(p){var names={'downloading':'下载并核验','backing-up':'备份原文件','committing':'提交并核验','recovering':'恢复原文件'};if(p.phase==='backing-up'&&_status.gameStarted&&!_status.over)throw Error('检测到新对局，安装已取消，原文件未改动');status.textContent=(names[p.phase]||p.phase)+' '+p.done+' / '+p.total;closeBtn.disabled=p.phase==='committing'||p.phase==='recovering';}});
-                    if(info.build)game.saveConfig('extension_池子魔将_build',info.build);game.saveConfig('extension_池子魔将_version',remoteVer);status.textContent='文件已核验并更新完成，正在重启…';
-                    setTimeout(function restart(){if(_status.gameStarted&&!_status.over){status.textContent='更新已完成，本局结束后自动重启。';setTimeout(restart,1000);return;}try{game.reload();}catch(e){location.reload();}},1200);
-                }catch(e){status.textContent=String(e.message||e)+(e.recovery?'。请点击“恢复未完成更新”。':'。已提交文件如发生失败会恢复原文件，可重试。');goBtn.disabled=false;}
-                finally{_cshUpdating=false;updateController=null;closeBtn.disabled=false;closeBtn.textContent='关闭';}
+                    /* U2 2026-11-05：首个 HTTP 200 不再等于「文件可用」。
+                       每个源都要按本次目录的同一个预期 SHA-256 核验；旧缓存、HTML 错误页、
+                       空/截断、404/5xx、跳转全部拒绝并继续尝试下一个可信源。
+                       事务层 csh_update.js:apply 仍会再校验一次，绝不降级取消哈希。 */
+                    async function fetchFile(rel,signal){
+                        var expected = /^[a-f0-9]{64}$/.test(hashes[rel]||'') ? hashes[rel] : null;
+                        var attempts = [];
+                        for (var i=0;i<bases.length;i++) {
+                            if (signal.aborted) throw Error('下载已取消，原安装未改动');
+                            var c2=new AbortController(),timer=setTimeout(function(){c2.abort();},12000),abort=function(){c2.abort();};
+                            signal.addEventListener('abort',abort,{once:true});
+                            try {
+                                var response=await onlineFetch(bases[i]+encodeURI(rel),{cache:'no-store',referrerPolicy:'no-referrer',redirect:'error',signal:c2.signal});
+                                if (!response.ok) throw Error('HTTP '+response.status);
+                                if (response.redirected) throw Error('更新源发生跳转');
+                                var hdr=response.headers&&typeof response.headers.get==='function'?response.headers:null;
+                                var ct=hdr?String(hdr.get('content-type')||''):'';
+                                if (/text\/html/i.test(ct)) throw Error('返回网页（可能是错误页或代理拦截）');
+                                var declared=hdr?hdr.get('content-length'):null;
+                                var buf=await response.arrayBuffer();
+                                var data=new Uint8Array(buf);
+                                if (!data.length) throw Error('返回空文件');
+                                if (declared!=null&&Number.isFinite(Number(declared))&&Number(declared)>=0&&Number(declared)!==data.byteLength) throw Error('长度不符（可能被截断）');
+                                if (!expected) throw Error('更新目录缺少该文件摘要，不能核验');
+                                if (await engine.digest(data)!==expected) throw Error('摘要不符（可能是旧缓存或不同构建）');
+                                return data;
+                            } catch(e) {
+                                if (signal.aborted) throw e;   /* 取消不继续请求其他源 */
+                                attempts.push('源'+(i+1)+'：'+(engine.errorText?engine.errorText(e):(e&&e.message||'未知原因')));
+                            } finally { clearTimeout(timer); signal.removeEventListener('abort',abort); }
+                        }
+                        throw Error('文件 '+rel+' 下载未能完成（已按目录摘要核对全部 '+bases.length+' 个更新源）：'+attempts.join('；'));
+                    }
+                    if (needed.length) await task.tx.apply(needed,fetchFile,{
+                        hashes:hashes,
+                        fromVersion:typeof localVer==='string'?localVer:'',
+                        toVersion:remoteVer,
+                        signal:ctrl.signal,
+                        progress:function(p){
+                            task.phase=p.phase;
+                            if (p.phase==='backing-up' && _status.gameStarted && !_status.over) throw Error('检测到新对局，安装已取消，原文件未改动');
+                            var locked=p.phase==='committing'||p.phase==='recovering';
+                            setState(locked?'busy':'cancellable',locked?'正在提交并核验…':'取消下载');
+                            if (!current()) return;   /* 旧任务的进度回包不写新弹窗 */
+                            var names={'downloading':'下载并核验','backing-up':'备份原文件','committing':'提交并核验','recovering':'恢复原文件'};
+                            status.textContent=(names[p.phase]||p.phase)+' '+p.done+' / '+p.total;
+                            closeBtn.disabled=locked;
+                            closeBtn.textContent=locked?'正在提交并核验…':'取消下载';
+                        }
+                    });
+                    if (info.build) game.saveConfig('extension_池子魔将_build',info.build);
+                    game.saveConfig('extension_池子魔将_version',remoteVer);
+                    if (current()) status.textContent='文件已核验并更新完成，正在重启…';
+                    setTimeout(function restart(){
+                        if (_status.gameStarted && !_status.over) { if (current()) status.textContent='更新已完成，本局结束后自动重启。'; setTimeout(restart,1000); return; }
+                        try { game.reload(); } catch(e) { location.reload(); }
+                    },1200);
+                } catch(e) {
+                    var committed=task.phase==='committing'||task.phase==='recovering'||task.phase==='restoring';
+                    var failureText=(window.CSHUpdate&&window.CSHUpdate.errorText?window.CSHUpdate.errorText(e):(e&&e.message||'更新暂未完成，请稍后重试'));
+                    if (committed && ctrl.signal.aborted) failureText='更新在提交或恢复阶段被中断，文件状态需要核对，请点击“恢复未完成更新”。';
+                    if (!current()) return;   /* 旧弹窗回包不写新弹窗 */
+                    if (typeof errorDetails!=='undefined' && errorDetails) {
+                        errorBody.textContent=failureText; errorDetails.hidden=false; errorDetails.open=false;
+                        status.textContent=e.recovery?'更新恢复尚未完成，请点击“恢复未完成更新”。':committed?'更新在写入阶段未完成，请点击“恢复未完成更新”核对文件。':'更新未完成，原安装已保留。可重试或切换线路，原因可展开查看。';
+                    } else status.textContent=failureText+(e.recovery?'。请点击“恢复未完成更新”。':'。已提交文件如发生失败会恢复原文件，可重试。');
+                    goBtn.disabled=false;
+                } finally {
+                    task.settled=true;
+                    if (st.task===task) { st.task=null; _cshUpdating=false; }   /* 旧 finally 绝不解除新任务锁 */
+                    if (current()) { goBtn.disabled=false; closeBtn.disabled=false; closeBtn.textContent='关闭'; setState('idle','关闭'); }
+                    if (selfPanel!==st.panelSeq && st.refresh) try { st.refresh(); } catch (eR) {}   /* 只让等待中的新弹窗刷新 */
+                }
             }
 
             /* 目录解析 + 结果呈现：在线 / 缓存共用一套，避免两份版本比较逻辑漂移。
                cached 时只回答"上次已知版本 + 缓存时间"，不给「立即更新」按钮（网络不可用，点了也白点）。 */
-            function applyCatalog(txt, cached, ageText) {
+            function applyCatalog(txt, cached, ageText, fromBase) {
+                if (!current()) return;
+                if (!cached && fromBase) st.candidateBase = fromBase;   /* 目录与文件同源起步 */
+                /* U3：本次会话处于受保护恢复状态时，不继续普通更新检查；
+                   手动恢复按钮仍在，恢复后需重启才重新启用业务内容。 */
+                var recovery = window.CSHUpdate && window.CSHUpdate.__cshStartupRecovery;
+                var pending = window.CSHUpdate && typeof window.CSHUpdate.isRecoveryPending === 'function' && window.CSHUpdate.isRecoveryPending();
+                if (recovery || pending) {
+                    status.textContent = recovery && recovery.ok
+                        ? '更新文件已恢复或核验完成，请重启游戏后再检查更新；本机存档与素材未改动。'
+                        : '更新恢复尚未完成，请重启后重试或使用「恢复未完成更新」。';
+                    return;
+                }
                 /* catalog.js = `window.extension = {...};`（JSON.stringify 产物）→ 截出 JSON 解析，
                    不用 eval（避免把远端脚本当代码执行）。 */
                 var body = txt.slice(txt.indexOf("{"), txt.lastIndexOf("}") + 1);
@@ -7748,6 +7881,13 @@ function onlineLocalFetch(url,options){return window.CSHOnline.local(url,options
                 }
                 var info = j && j["池子魔将"];
                 if (!info || !info.version) { status.textContent = "更新目录缺少版本信息。"; return; }
+                /* U4：发布侧已把读取上限写进目录。含超出本机 arrayBuffer 上限的文件时
+                   当场拒绝，不把已知不支持留到玩家下载途中。数值与 csh_online.js 一致，
+                   tools/check.js 会校验两处不漂移。 */
+                if (info.limits && Number(info.limits.maxFileBytes) > 16 * 1024 * 1024) {
+                    status.textContent = "本次更新含超出在线读取能力的文件，请使用作者提供的完整安装包；没有下载或改动本机文件。";
+                    return;
+                }
                 var remoteVer = String(info.version);
                 if (!cached) cshCacheWrite(txt, _cshUpdBase);
                 var head = cached
@@ -7767,15 +7907,18 @@ function onlineLocalFetch(url,options){return window.CSHOnline.local(url,options
                 }
                 if(!Array.isArray(info.files)||!info.files.length||!info.hashes||!info.files.concat(['extension.js']).every(function(rel){return /^[a-f0-9]{64}$/.test(info.hashes[rel]||'');})){status.textContent='远端目录未提供完整文件摘要，无法安全逐文件更新。请使用作者提供的完整安装包。';return;}
                 status.textContent = cshVerCmp(remoteVer,localVer)===0?'版本同为 '+localVer+'，可以校验并修复本版本文件；完成后自动重启。':'发现新版本 '+remoteVer+'（当前 '+localVer+'）。更新完成后自动重启。';
+                if (st.task && !st.task.settled) { status.textContent='已有更新或恢复任务正在进行，请稍候…'; }
                 var goBtn = document.createElement("button");
                 goBtn.type = "button";
                 goBtn.className = "csh-ext-btn";
                 goBtn.textContent = cshVerCmp(remoteVer,localVer)===0?"校验并修复":"立即更新";
                 goBtn.addEventListener("click", function () {
+                    if (st.task && !st.task.settled) { status.textContent='已有更新或恢复任务正在进行，请稍候'; return; }
                     goBtn.disabled = true;
                     closeBtn.disabled = true;
                     startUpdate(info, remoteVer, goBtn, closeBtn);
                 }, false);
+                if (st.task && !st.task.settled) goBtn.disabled=true;
                 row.insertBefore(goBtn, row.firstChild);
             }
 
@@ -7787,8 +7930,9 @@ function onlineLocalFetch(url,options){return window.CSHOnline.local(url,options
                 if (_triedCatalog) return Promise.reject(new Error("已尝试过"));
                 _triedCatalog = true;
                 return cshFetchManifest().then(function (m) {
+                    if (!current()) return;
                     _cshUpdBase = m.base || _cshUpdBase;
-                    applyCatalog(m.txt, false, "");
+                    applyCatalog(m.txt, false, "", m.base);
                 });
             }
             function runCheck() {
@@ -7798,6 +7942,7 @@ function onlineLocalFetch(url,options){return window.CSHOnline.local(url,options
                 var oldGo = row.querySelector(".csh-ext-btn:not(.ghost)");
                 if (oldGo && oldGo.parentNode) oldGo.parentNode.removeChild(oldGo);
                 cshFetchVer().then(function (v) {
+                    if (!current()) return;
                     _cshUpdBase = v.base || _cshUpdBase;
                     cshVerCacheWrite(v.ver, _cshUpdBase);
                     if (localVer && cshVerCmp(v.ver, localVer) < 0) {
@@ -7811,6 +7956,7 @@ function onlineLocalFetch(url,options){return window.CSHOnline.local(url,options
                     /* ① info.json 阶段全挂（老仓库没这个文件 / 全源不通）→ 退回 catalog 直拉，行为与旧版一致 */
                     return loadCatalogOnce().catch(function () {
                         /* ② 在线全挂 → 缓存兜底：优先整份目录（能给出按钮），其次只用版本小包如实回答 */
+                        if (!current()) return;
                         var c = cshCacheRead();
                         if (c) {
                             _cshUpdBase = c.base || _cshUpdBase;
@@ -7830,8 +7976,35 @@ function onlineLocalFetch(url,options){return window.CSHOnline.local(url,options
                     });
                 });
             }
-            var recoverBtn=document.createElement('button');recoverBtn.type='button';recoverBtn.className='csh-ext-btn ghost';recoverBtn.textContent='恢复未完成更新';recoverBtn.addEventListener('click',async function(){if(_cshUpdating)return;recoverBtn.disabled=true;try{var tx=window.CSHUpdate.create(window.CSHUpdate.hostIO({lib:lib,game:game}));var result=await tx.recover();status.textContent=result.empty?'没有待恢复的更新。':'原文件已恢复或完整提交凭据已核验，可以重新检查。';}catch(e){status.textContent='更新恢复尚未完成：'+String(e.message||e);}finally{recoverBtn.disabled=false;}});row.appendChild(recoverBtn);
-            var backupBtn=document.createElement('button');backupBtn.type='button';backupBtn.className='csh-ext-btn ghost';backupBtn.textContent='更新备份';backupBtn.addEventListener('click',function(){lib.cshDebug.openUpdateBackups();});row.appendChild(backupBtn);
+            var recoverBtn=document.createElement('button');recoverBtn.type='button';recoverBtn.className='csh-ext-btn ghost';recoverBtn.textContent='恢复未完成更新';
+            recoverBtn.addEventListener('click',async function(){
+                if (st.task && !st.task.settled) { if (current()) status.textContent='已有更新或恢复任务正在进行，请稍候'; return; }
+                if (!current()) return;
+                var task={id:++st.taskSeq,kind:'recover',phase:'restoring',controller:null,tx:null,panelId:panelId,settled:false};
+                st.task=task; _cshUpdating=true; setControls('busy','正在恢复文件…');
+                try {
+                    var tx=window.CSHUpdate.create(window.CSHUpdate.hostIO({lib:lib,game:game})); task.tx=tx;
+                    var result=await tx.recover();
+                    if (current()) status.textContent=result.empty?'没有待恢复的更新。':'原文件已恢复或完整提交凭据已核验，可以重新检查。';
+                } catch(e) {
+                    if (current()) status.textContent='更新恢复尚未完成：'+(window.CSHUpdate.errorText?window.CSHUpdate.errorText(e):(e&&e.message||'请检查存储权限后重试'));
+                } finally {
+                    task.settled=true;
+                    if (st.task===task) { st.task=null; _cshUpdating=false; }
+                    if (current()) setControls('idle','关闭');
+                    if (panelId!==st.panelSeq && st.refresh) try { st.refresh(); } catch (eR2) {}
+                }
+            });row.appendChild(recoverBtn);
+            var backupBtn=document.createElement('button');backupBtn.type='button';backupBtn.className='csh-ext-btn ghost';backupBtn.textContent='更新备份';
+            backupBtn.addEventListener('click',function(){ if (st.task && !st.task.settled) { toast('更新或恢复任务正在进行，请稍候'); return; } lib.cshDebug.openUpdateBackups(); });row.appendChild(backupBtn);
+            function setControls(mode,label){
+                if (!current()) return;
+                Array.prototype.forEach.call(row.querySelectorAll('button'),function(b){ b.disabled = mode==='busy'; });
+                if (mode==='cancellable') closeBtn.disabled=false;
+                closeBtn.textContent=label||(mode==='busy'?'请稍候…':'关闭');
+            }
+            st.setControls=function(mode,label){ if (current()) setControls(mode,label); };
+            st.refresh=function(){ if (current()) runCheck(); };
             runCheck();
             return true;
         };

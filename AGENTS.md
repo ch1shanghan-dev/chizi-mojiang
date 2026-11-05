@@ -1,3 +1,23 @@
+> **2026-11-05 WorkBuddy接手第六轮（B1 · backlog「成就通知常驻未读与跨重启归档」，已修）**：`core/csh_achievement_feedback.js` 新增本机键 `csh_achievement_archive_v1`（有界200条、去重、逐条/全部标记已读、每页20条分页回顾、换档清空、写失败提示），右下角常驻「成就回顾 · 新 N」入口，重启后立即恢复；不改钱包/成就条件/奖励，原「本次运行回顾」保持原样。新键按项目约定登记进 `core/csh_migrate.js` 的 EXCLUDED（本机展示记录，不随存档导入）。新增 `tools/probe_feedback_archive_20261105.mjs`（18/0）；既有反馈专项 39/0、47/0、39/0；**真实宿主专项本副本起不来：缺 `ext/app/index.html`，与本轮改动无关，不算通过**。已重跑 `tools/release.js`（修前2不符、修后0）。详细见 `docs/audit/WORKBUDDY_B1_FEEDBACK_ARCHIVE_20261105.md`。以下为前五轮与交接记录。
+>
+> **2026-11-05 WorkBuddy接手第五轮（U4失败暂存与容量，已修）**：旧 `protect()` 把 staging/prepared 组无条件保护，`plan()` 与 `downloadsCleanable` 同样排除 → 无 journal 的失败组长期不可清理。现 `csh_update.js` 用 `recovering` 标记把「整组保护」与「只清下载副本」解耦：bundle 仍拒失败组、journal 引用时全保护，无 journal 且确有副本时允许 `plan({kind:'next'})` 只删 `next/`，保留 `before/` 与说明，并保留 metadata 写失败重试入口。新增 `tools/lib/update_limits.mjs`（512KiB 文本 / 16MiB 文件，真源 `core/csh_online.js`）；`tools/release.js` 生成前逐文件预检、超限拒绝并给「分块 / 完整安装包 / 同步提高上限」三条出路，catalog 新增 `limits` 字段；`csh_debug.js` 下载前按 `info.limits.maxFileBytes` 拒绝、备份面板明确「预算非设备可用空间、设备剩余空间无法可靠读取」；`check.js` E53 把上限声明与三处数字防漂移列为必检。新增 `tools/probe_update_backup_capacity_20261105.mjs`（10/0），既有备份专项两条旧断言按新规则改成更强检查（40/0），其余专项与完整门禁全通过，catalog 1035 文件 0 不符（预检实测最大 3,141,016 字节）。**明确未做**：失败组整组清理（保守保留 before/）、分块下载实现、设备空间读取能力；U5 安卓真机未动，无提交/推送/合并/安装。详见 `docs/audit/WORKBUDDY_U4_STAGING_CAPACITY_20261105.md`。以下为前四轮与交接记录。
+
+> **2026-11-05 WorkBuddy接手第四轮（U3进程中断与启动恢复，控制器侧已修）**：旧 `recover()` 只在更新弹窗调用，`extension.js` 静态导入全部业务模块，启动时没有任何早于业务的恢复检查 → 提交中途被杀后可能加载混合新旧模块。现 `core/csh_update.js` 加**同步** pending 标志（写 journal 前置位、删除成功后清除）与 `guardIO` 超时观察层：文件接口超时只置 `uncertain`，不清凭据、不宣布未写入、不释放锁，迟到回调不改结论。新增 `core/csh_startup_recovery.js`（`extension.js` 第一个业务 import，自己先 import csh_update.js 保证 `window.CSHUpdate` 就绪），未决时返回不启用 character/card/skill/content 的**受保护包**并异步恢复；成功清标志且只提示重启，不自动重启、不写版本/成功标志。`csh_debug.js` 更新面板在恢复状态不继续普通检查。新增 `tools/probe_update_startup_recovery_20261105.mjs`（5个中断点+超时/迟到回调+受保护包+入口接线，10/0）。**新增 core 文件且改了 3 个运行源码，已重跑 `tools/release.js`，catalog 1035 文件、0 不符。** 明确未做：动态 import + 顶层 await，ESM 静态依赖仍会求值业务模块定义，受保护是「不启用 package」而非「阻断模块求值」。U4/U5 与安卓真机未动，无提交/推送/合并/安装。详见 `docs/audit/WORKBUDDY_U3_STARTUP_RECOVERY_20261105.md`。以下为前三轮与交接记录。
+
+> **2026-11-05 WorkBuddy接手第三轮（U2镜像/缓存/完整性，已修）**：旧 `fetchFile` 首个 HTTP 200 即返回字节，哈希在 `csh_update.js:apply` 更外层校验 → 首源返回旧缓存时只报摘要不符、不试其他镜像。现按**本次目录同一预期 SHA-256** 逐源核验，旧缓存/HTML错误页/空/Content-Length截断/404/5xx/跳转全部拒绝并继续可信源；全源失败给可读聚合原因；取消不继续请求；事务层哈希校验保留不降级。`updateBases` 优先 `st.candidateBase`（本次 catalog 实际来源），避免目录从A、文件从B的构建混用；`cshFetchText` 加 `redirect:'error'` 与 HTML 拒绝。新增 `tools/probe_update_mirror_fallback_20261105.mjs`（真实 startUpdate + 真实事务在 vm，11/0）。**`csh_debug.js` 又改了运行源码，已重跑 `tools/release.js` 重生成 catalog，0 不符。** U3—U5 与安卓真机未动，无提交/推送/合并/安装。详见 `docs/audit/WORKBUDDY_U2_MIRROR_CACHE_INTEGRITY_20261105.md`。以下为前两轮与交接记录。
+
+> **2026-11-05 WorkBuddy接手第二轮（U1统一更新器任务生命周期，控制器与门禁已修）**：`checkUpdate`/`kill`/`startUpdate`/手动恢复改为同一页面唯一任务对象 + 弹窗代次，共享状态挂 `window.CSHUpdate.__cshUpdateState`（让被单独抽取执行的 startUpdate 也能取到）。修掉提交阶段守卫读 `updateTx.status().phase` 实际失效、旧 finally 无条件解全局锁、手动恢复不登记任务、旧探测回包覆盖 `_cshUpdBase`、Esc 监听泄漏。提交/恢复期间拒绝关闭与重开且不 abort，下载阶段可取消；旧任务回包不写新弹窗；失败文案按阶段区分，不误报「已取消」。新增 `tools/probe_update_lifecycle_20261105.mjs`（5组交叉反例29/0）；`tools/check.js` E46/E48 断言按语义更新并补 U1 接线守卫；`tools/lib/audit_scratch.mjs`/`chromium_audit.mjs` 加固清理与端口读取。**`core/csh_debug.js` 是运行源码，改后已重跑 `tools/release.js` 重生成 catalog，0 不符。** 既有专项全通过、完整门禁通过；U2—U5 与安卓真机未动，无提交/推送/合并/安装。详见 `docs/audit/WORKBUDDY_U1_UPDATE_TASK_LIFECYCLE_20261105.md`。以下为第一轮与交接记录。
+
+> **2026-11-05 WorkBuddy接手第一轮（U0发布字节一致性，已完成生成侧与门禁侧）**：catalog.hashes 改按 Git 提交后 blob 字节生成，不再用工作目录CRLF字节。修前当前4.0.15工作区候选实测20个不符（历史开发提交5b266c6为17个，两者勿混用；main b169698为0），修后0；隔离索引候选tree 0错。新增 `tools/catalog_git_bytes.mjs`（`--rev`/`--tree`/`--worktree`）、重写 `tools/release.js`（`--check` 纯只读、`--push` 提交后字节复核不过即拒推）、`tools/check.js` E53 加入全量发布字节对账；`catalog.js` 重新生成，**catalog.files 里的运行源码一个字节未改**。未提交/推送/合并main/安装/发版，无安卓真机证据，U1—U5未动。发布硬步骤：候选提交后跑 `node tools/catalog_git_bytes.mjs --rev <最终提交>`，0错才可发布；手工commit/push路径无硬阻断。详见 `docs/audit/WORKBUDDY_U0_RELEASE_BYTES_20261105.md`。以下为交接时的用户决定与历史。
+
+> **2026-11-05最新用户决定：后续更新交WorkBuddy。** 先读docs/handoff/WORKBUDDY_CONTINUATION_20261105.md。主线是当前4.0.15及以后在线更新可靠性，4.0.13截图只作回归，不再旧端自救专案。GitHub仍main b169698、开发5b266c6，4.0.15在本地脏工作区；用户安卓自述4.0.15不可与电脑另一份4.0.14混淆。新发现开发提交5b266c6有17个catalog/Git字节不符，main1033全匹配；发布一致性首优先，未修前不得将开发分支当发布候选。Codex交接后不与WorkBuddy并发施工，不自动推送/升版/安装；以下条目为历史。
+
+> **2026-11-05当前P0：安卓4.0.13更新故障**。用户已确认安卓。目录提前回调竞态/错误后截断及对象错误、横屏裁切已在开发副本修复，179/0及完整门禁通过；**旧端兼容交付与安卓真机验证仍待**，不能宣称手机已恢复。4.0.15未升版/推送/安装，详见docs/audit/ANDROID_UPDATE_REPAIR_20261105.md。
+
+> **2026-11-05单待办完成：退隐可达性**。17个152人数条件改为150且保留旧ID/奖励/资格/已领，156条文案澄清当前人数，生成器和1507维护规格完全一致。专项及相关104/0；4.0.15，未提交推送/安装；静态路由872/2000、1128未匹配不变。见docs/audit/RETIRED_REACHABILITY_20261105.md，以下17条“待修”为历史状态。
+
+> **2026-11-05最新：本地4.0.15**。作者要求+0.0.1及完成一个待办：34档当前世界资金观察已接可靠来源（50/0，相邻28/0，完整门禁通过）。静态路由872/2000，未匹配1128=1072组合+53世界+3彩蛋，非自然验收比例；17条退隐152条件优先修。工作板已重整，见docs/audit/VERSION_BACKLOG_REVIEW_20261105.md。上轮5b266c6已推开发分支，本轮4.0.15未提交推送；正式安装/main仍4.0.14，不覆盖。以下各条是历史状态。
+
 > **2026-11-05作者授权GitHub同步**：本批集成正式未提交维护与成就副本到work/achievement-integration-20261105开发分支，4.0.14，完整门禁通过、语义63/0、扩容各13/0；补齐规则源数据。正式安装及main更新渠道保留，未创建Release，未把全部12042定义当作质量/来源完成。实际推送结果见本次回执；详见docs/audit/GITHUB_DEV_SYNC_20261105.md。
 
 > **2026-11-05 GPT续工第十一节点（仅WorkBuddy副本）**：8档poorai资金观察接严格来源/持久快照，真实零值保留、无见证默认零不解锁；修已零资金名义输款误造最低见证，仅实际下降新增。专项28/0及相关301/0；4.0.14未安装/推送。其他世界动态/跨源等仍待办，见docs/audit/CAREER_WORLD_FUNDS_20261105.md。
@@ -207,6 +227,15 @@
 - 按已有备份约定处理业务改动，避免无关重构；不要将历史计划中的一次性 Git 重置命令当作初始化步骤。
 
 ## 验证命令
+
+> **2026-11-05 U0—U4 收口**：更新链路的一键只读复核入口是
+> `node tools/check_update_suite.mjs --out <D盘目录> [--rev <最终候选提交>] [--full]`，
+> 串跑 `release.js --check`、工作区发布字节对账、9 个更新/备份专项，可选最终提交 `--rev` 核对与完整门禁；
+> 实跑 11/11 全绿。**发布硬步骤**：候选提交后必须单独跑
+> `node tools/catalog_git_bytes.mjs --rev <最终提交>` 且 0 错；手工 commit/push 路径没有硬阻断。
+> 五轮改动清单、归属与残余限制见 `docs/audit/WORKBUDDY_U0_U4_DELTA_20261105.md`；
+> `git diff` 里大部分是交接前 Codex 的 4.0.15 成果，不要误当可丢弃的脏改动。
+> 作者已明确**U5 安卓真机链路验收由本人届时测试，WorkBuddy 不执行**；不要拿隔离探针冒充真机证据。
 
 按改动风险选择验证。文档只核对内容/引用/diff；小型UI做目标交互与必要横屏检查，不一律跑全套。共享基础层、高风险或稳定集成候选批次，在扩展根目录集中运行完整门禁；世界模拟按世界耦合与候选批次需要选择：
 

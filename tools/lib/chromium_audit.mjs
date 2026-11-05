@@ -10,7 +10,14 @@ export async function withChromium({width,height,browser='C:/Program Files/Googl
   try{
     const portFile=path.join(profile,'DevToolsActivePort');
     for(let i=0;i<180&&!fs.existsSync(portFile);i++)await new Promise(r=>setTimeout(r,50));
-    const port=fs.readFileSync(portFile,'utf8').split('\n')[0];
+    /* Windows: 文件刚被 Chrome 创建时可能短暂 EBUSY / 尚未写完端口行 */
+    let port='';
+    for(let i=0;i<40;i++){
+      try{port=fs.readFileSync(portFile,'utf8').split('\n')[0].trim();if(port)break;}
+      catch(e){if(!['EBUSY','EACCES','EPERM'].includes(e.code))throw e;}
+      await new Promise(r=>setTimeout(r,50));
+    }
+    if(!port)throw Error('DevToolsActivePort 未能读取');
     const targets=await(await fetch('http://127.0.0.1:'+port+'/json/list')).json();
     ws=new WebSocket(targets.find(t=>t.type==='page').webSocketDebuggerUrl);
     await new Promise((resolve,reject)=>{ws.onopen=resolve;ws.onerror=reject;});

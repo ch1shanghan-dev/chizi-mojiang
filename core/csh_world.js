@@ -754,11 +754,13 @@ import { MINIONS } from "./csh_bossdata.js";
 	}
     /* Career hands use accepted player history, never AI-only totals or a failed soft save. */
     function worldCareerSnapshot(value){
-        if(value==null)return {worldHands:0,playerFundMin:0,playerFundWitness:0,worldSkillTop:0,playerOpponents:0,playerFamiliar:0,playerRevenge:0,playerBalanced:0,careerUnlocks:null};
+        if(value==null)return {worldHands:0,worldFundMax:0,worldTopFund:0,billionaires:0,billionaireBroke:0,playerFundMin:0,playerFundWitness:0,worldSkillTop:0,playerOpponents:0,playerFamiliar:0,playerRevenge:0,playerBalanced:0,careerUnlocks:null};
         if(!value||typeof value!=="object"||Array.isArray(value)||!Array.isArray(value.ai))throw Error("世界亲历来源格式异常");
-        var total=0,fundMin=Infinity,fundWitness=0,skillTop=0,opponents=0,familiar=0,revenge=0,balanced=0,seen=Object.create(null);
+        var total=0,worldMax=0,richCount=0,brokeCount=0,fundMin=Infinity,fundWitness=0,skillTop=0,opponents=0,familiar=0,revenge=0,balanced=0,seen=Object.create(null);
         value.ai.forEach(function(a){
             if(!a||typeof a.id!=="string"||!Object.prototype.hasOwnProperty.call(ROSTER_IDS,a.id)||seen[a.id])throw Error("世界亲历角色异常");seen[a.id]=true;
+            if(!Number.isSafeInteger(a.fund)||a.fund<0||a.fund>AI_FUND_CAP||a.everTier3!=null&&typeof a.everTier3!=="boolean")throw Error("世界资金观察来源异常");
+            worldMax=Math.max(worldMax,a.fund);if(a.fund>=TIER3_FUND)richCount++;else if(a.everTier3===true)brokeCount++;
             var p=a.withPlayer;
             if(p==null)return;
             if(typeof p!=="object"||Array.isArray(p)||!Number.isSafeInteger(p.hands)||p.hands<0||p.hands>9999999)throw Error("世界亲历人次异常");
@@ -776,7 +778,7 @@ import { MINIONS } from "./csh_bossdata.js";
                 fundMin=Math.min(fundMin,p.lowestFund);fundWitness++;
             }
         });
-        return {worldHands:total,playerFundMin:fundWitness?fundMin:0,playerFundWitness:fundWitness,worldSkillTop:skillTop,playerOpponents:opponents,playerFamiliar:familiar,playerRevenge:revenge,playerBalanced:balanced,careerUnlocks:lib.cshWallet.validateCareerUnlocks(value.careerUnlocks)};
+        return {worldHands:total,worldFundMax:worldMax,worldTopFund:worldMax,billionaires:richCount,billionaireBroke:brokeCount,playerFundMin:fundWitness?fundMin:0,playerFundWitness:fundWitness,worldSkillTop:skillTop,playerOpponents:opponents,playerFamiliar:familiar,playerRevenge:revenge,playerBalanced:balanced,careerUnlocks:lib.cshWallet.validateCareerUnlocks(value.careerUnlocks)};
     }
     function worldCareerSaved(){var raw=localStorage.getItem(K_WORLD);return worldCareerSnapshot(raw==null?null:JSON.parse(raw));}
 	/* Wallet-owned table intents are applied as one strict world write, with their receipt. */

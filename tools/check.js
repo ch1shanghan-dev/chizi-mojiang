@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { auditTempRoot, removeAuditScratch, disposeAuditBrowser } from './lib/audit_scratch.mjs';
+import { worktreeBlobHashes, verifyCatalog } from './catalog_git_bytes.mjs';
 /**
  * 池子魔将 · 改动门禁（只读检查，不改任何业务文件）
  *
@@ -2358,8 +2359,12 @@ async function runBossChecks() {
 			"extension_池子魔将_csh_enable_pingxing": "无名杀设置项（同上）",
 			"extension_池子魔将_csh_eg_group_scroll": "无名杀设置项（同上 · 2026-10-16 新增：选将势力面板滚动条开关，engine-compat C4）",
 			"extension_池子魔将_csh_kami_group": "无名杀设置项（同上 · 2026-10-18 新增：非身份场「神将选势力」的独立开关，作者要求能单独关掉以免与别的扩展重复）",
-			"extension_池子魔将_version": "引擎写入的扩展版本号（架构级内部键，非玩家数据、不进行囊；2026-10-17 「检查更新」读它比对远端版本）",
-		};
+		"extension_池子魔将_version": "引擎写入的扩展版本号（架构级内部键，非玩家数据、不进行囊；2026-10-17 「检查更新」读它比对远端版本）",
+		/* U3 2026-11-05：更新事务的同步恢复标志。写 journal 前置位、删除成功后清除，
+		   是**设备本地的瞬时状态**，不是玩家数据；刻意不进 csh_migrate 键表，
+		   避免导入/导出存档时把别的设备的「未决恢复」状态带过来。 */
+		"csh_update_recovery_pending_v1": "U3 更新恢复同步标志（core/csh_update.js 与 core/csh_startup_recovery.js；设备本地瞬时状态，不迁移、不进行囊）",
+	};
 		const walkDirs = ["core", "main", "games", "character", "skills"];
 		const files41 = [];
 		const walk41 = (d) => {
@@ -2523,8 +2528,12 @@ async function runBossChecks() {
 		else if (!/CSH_UPDATE_SRC\s*=\s*"https:\/\/raw\.githubusercontent\.com\/ch1shanghan-dev\/chizi-mojiang\/main\/"/.test(db46))
 			e46.push("更新源未硬编码为仓库 raw 根（自动化要求不依赖引擎「获取扩展地址」设置项）");
 		else if (/lib\.config\.extension_sources?\[/.test(db46)) e46.push("更新逻辑读了 lib.config.extension_sources（应由内置源接管）");
-		else if (!/updateTx\.apply/.test(db46) || !/updateTx\.recover/.test(db46) || !/engine\.digest/.test(db46))
-            e46.push("更新缺暂存、摘要核验或恢复接线");
+		/* 2026-11-05 U1：控制器重写后事务句柄改名为 task.tx，断言按语义兼容两种拼写，
+		   并补一条唯一任务生命周期接线，防止后来改动把 U1 保护删掉。 */
+		else if (!/(?:updateTx|task\.tx)\.apply/.test(db46) || !/(?:updateTx|task\.tx)\.recover/.test(db46) || !/engine\.digest/.test(db46))
+			e46.push("更新缺暂存、摘要核验或恢复接线");
+		else if (!/__cshUpdateState/.test(db46) || !/task\.settled/.test(db46) || !/panelSeq/.test(db46))
+			e46.push("更新器缺唯一任务生命周期/弹窗代次接线（U1 保护被移除）");
         else if (!fs.existsSync(path.join(ROOT, "core/csh_update.js")))
             e46.push("缺分阶段更新事务模块");
 		else if (!/csh_check_update/.test(cf46) || !/lib\.cshDebug\.checkUpdate/.test(cf46))
@@ -2656,7 +2665,7 @@ async function runBossChecks() {
 		/* 逐文件回退：必须有 updateBases（多源）与逐文件尝试，而不是整批塞给引擎 */
 		else if (!/function updateBases\s*\(/.test(db48)) e48.push("更新下载未做逐文件多源回退（单源挂 = 整批挂）");
 		else if (/game\.multiDownload/.test(db48)) e48.push("仍在用 game.multiDownload（onfinish 无条件触发 → 失败也会重启）");
-		else if (!/catch\(e\)\{status\.textContent/.test(db48) || !/updateTx\.apply/.test(db48)) e48.push("更新失败缺可见反馈或绕过事务");
+		else if (!/errorBody\.textContent\s*=\s*failureText/.test(db48) || !/(?:updateTx|task\.tx)\.apply/.test(db48)) e48.push("更新失败缺可见反馈或绕过事务");
 		/* 2026-10-19 三个回归点（都是玩家端真实踩到的）：
 		   ① 源必须「并列摆出来」而不是串行试探（作者：所有可选源都列出来）；
 		   ② 本机版本必须以包内/info.json 为准 —— `extension_<名>_version` 只在「从网址安装」时写一次，
@@ -3020,6 +3029,9 @@ async function runBossChecks() {
 			try { cat53 = JSON.parse(catJson53)["池子魔将"]; } catch (err) { e53.push("catalog.js 解析失败：" + err.message); }
 			if (cat53) {
 				if (cat53.version !== info53.version) e53.push("catalog.js 版本 " + cat53.version + " ≠ info.json " + info53.version + "（发版前必须重跑 tools/release.js）");
+				/* U4：目录必须声明发布侧读取上限，客户端才能在下载前判断自己是否支持。 */
+				if (!cat53.limits || cat53.limits.textBytes !== 512 * 1024 || cat53.limits.fileBytes !== 16 * 1024 * 1024 || !Number.isSafeInteger(cat53.limits.maxFileBytes))
+					e53.push("catalog 缺发布读取上限声明或与在线读取能力不一致（重跑 tools/release.js）");
 				const catFiles53 = (cat53.files || []).slice().sort();
 				const miss53 = expect53.filter((f) => !catFiles53.includes(f));
 				const extra53 = catFiles53.filter((f) => !expect53.includes(f));
@@ -3027,10 +3039,34 @@ async function runBossChecks() {
 				if (extra53.length) e53.push("catalog 多列 " + extra53.length + " 个文件（" + extra53.slice(0, 3).join("、") + (extra53.length > 3 ? " …" : "") + "）——玩家会下到 404");
 				const nonAscii53 = catFiles53.filter((f) => /[^A-Za-z0-9._\-/]/.test(f));
 				if (nonAscii53.length) e53.push("catalog 里有非 ASCII 文件名 " + nonAscii53.length + " 个（" + nonAscii53.slice(0, 2).join("、") + " …），raw 拼接下载有风险");
+				/* 2026-11-05 U0：catalog.hashes 必须对得上玩家真正下载的 Git blob 字节。
+				   .gitattributes 的 eol=lf 会让 CRLF 工作文件提交后变字节，旧门禁只看
+				   files 清单，抓不到这个失配（5b266c6 曾漏 17 个）。改任何运行源码后
+				   不重跑 tools/release.js，这里就会红。 */
+				try {
+					const byPath53 = worktreeBlobHashes(cat53.files);
+					const v53 = verifyCatalog(cat53, byPath53);
+					if (v53.mismatches.length) {
+						e53.push("catalog 哈希与 Git 发布字节不符 " + v53.mismatches.length + " 个（" + v53.mismatches.slice(0, 3).map((d) => d.file).join("、") + " …）——重跑 node tools/release.js");
+					}
+					if (v53.extraKeys.length || v53.missingKeys.length) {
+						e53.push("catalog.hashes 键与 files 不一致（多 " + v53.extraKeys.length + " / 少 " + v53.missingKeys.length + "）");
+					}
+					if (!v53.buildOk) e53.push("catalog build 与 hashes 不一致（重跑 node tools/release.js）");
+				} catch (err53) {
+					e53.push("发布字节核对失败：" + err53.message);
+				}
 			}
 		}
+		/* U4：发布预检的接线与三处上限数字不能漂移。 */
+		const rel53 = fs.readFileSync(path.join(ROOT, "tools", "release.js"), "utf8");
+		const onl53 = fs.readFileSync(path.join(ROOT, "core", "csh_online.js"), "utf8");
+		const lim53 = fs.readFileSync(path.join(ROOT, "tools", "lib", "update_limits.mjs"), "utf8");
+		if (!/checkLimits\s*\(/.test(rel53) || !/limitsBlock\s*\(/.test(rel53)) e53.push("发布工具缺大小预检或上限声明");
+		if (!/16\s*\*\s*1024\s*\*\s*1024/.test(onl53) || !/512\s*\*\s*1024/.test(onl53)) e53.push("在线读取上限发生变化，发布预检需同步");
+		if (!/FILE_LIMIT\s*=\s*16\s*\*\s*1024\s*\*\s*1024/.test(lim53) || !/TEXT_LIMIT\s*=\s*512\s*\*\s*1024/.test(lim53)) e53.push("发布预检上限与在线读取上限不一致");
 		if (e53.length) fail("执行级 E53：发版对账（" + e53.slice(0, 4).join("；") + "）");
-		else ok("执行级 E53：发版对账（版本 " + info53.version + " 三处一致 · catalog " + expect53.length + " 文件与磁盘一一对应）");
+		else ok("执行级 E53：发版对账（版本 " + info53.version + " 三处一致 · catalog " + expect53.length + " 文件与磁盘一一对应 · 发布字节全匹配）");
 
 		/* ------------------------------------------------------------------ *
 		 * E54（2026-10-20 · 字号标尺：禁止新增裸 font-size:px）

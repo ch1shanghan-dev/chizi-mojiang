@@ -143,7 +143,7 @@ import { careerSnapshot as projectBossCareer } from "./csh_bossrecord.js";
         playerDefs().forEach(function(def){if(record.entries[def.key]||!met(def,stats))return;record.entries[def.key]={observedAt:observedAt};if(observedAt>0)fresh.push(def.key);});
         return {record:bank().validateCareerUnlocks(record),fresh:fresh,epoch:epoch()};
     }
-    function worldHandsRule(def){return /^(hands|cx_hands|tablefriends|oldfriend|revengefriend|balancedfriend|poorai)_\d+$/.test(def.key) || /^skilltop_(?:1|0\.(?:7|8|85|9|95|98|99))$/.test(def.key);}
+    function worldHandsRule(def){return /^(hands|cx_hands|tablefriends|oldfriend|revengefriend|balancedfriend|poorai|topdown|topfund|billionaires|broke)_\d+$/.test(def.key) || /^skilltop_(?:1|0\.(?:7|8|85|9|95|98|99))$/.test(def.key);}
     function worldHandsDefs(){return engine().defs.filter(worldHandsRule);}
     function worldHandsRecord(){
         var G=lib.cshWorld;

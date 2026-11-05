@@ -38,7 +38,7 @@ for (const d of existing) {
 
 /* ---------- 字段表：名称、单位、类别、图标、物理上限、递增曲线 ---------- */
 /* cap 取自真实实现：PC_CAP=1e11、merit 上限 999999999、场次存储 16000、
-   世界名册约 97 人、豪赌桌数有上限。超过 cap 的档位一律不生成。 */
+   世界当前名册 150 人、豪赌桌数有上限。超过 cap 的档位一律不生成。 */
 const FIELDS = {
   merit:      { stats: 'merit', cat: '功勋', ico: '🏅', name: '功勋', unit: '点功勋', cap: 999999999, tiers: [400000, 550000, 750000, 1000000, 1400000, 1900000, 2600000, 3500000, 4700000, 6300000, 8500000, 11500000, 15500000, 21000000, 28000000, 38000000, 52000000, 70000000, 95000000, 130000000, 180000000, 250000000, 350000000, 480000000, 660000000, 900000000] },
   meritday:   { stats: 'meritToday', cat: '功勋', ico: '🏅', name: '单日功勋', unit: '点', cap: 999999999, tiers: [8000, 10000, 13000, 17000, 22000, 28000, 36000, 46000, 58000, 73000, 92000, 115000] },
@@ -59,7 +59,7 @@ const FIELDS = {
   gmbust:     { stats: 'gambleBust', cat: '豪赌桌', ico: '🎲', name: '爆仓次数', unit: '次', cap: 5000, tiers: [185, 205, 228, 253, 281, 312, 347, 386, 430, 478, 531, 560, 590, 620, 660, 700, 750, 800, 830, 860, 890] },
   sign:       { stats: 'streak', cat: '签到', ico: '📅', name: '连续签到', unit: '天', cap: 3650, tiers: [380, 400, 420, 445, 470, 500, 530, 565, 600, 640, 680, 730, 785, 845] },
   task:       { stats: 'taskCompletedTotal', cat: '任务', ico: '📋', name: '日课完成', unit: '项', cap: 100000, tiers: [17, 19, 21, 23, 26, 29, 32, 36, 40, 45, 51, 58, 66, 75] },
-  retired:    { stats: 'worldRetired', cat: 'AI世界', ico: '🌍', name: '退隐人次', unit: '人次', cap: 4000000, tiers: [84, 88, 92, 96, 100, 105, 110, 116, 122, 130, 140, 152] },
+  retired:    { stats: 'worldRetired', cat: 'AI世界', ico: '🌍', name: '当前退隐人数', unit: '名', cap: 150, tiers: [84, 88, 92, 96, 100, 105, 110, 116, 122, 130, 140, 150] },
 };
 
 /* 高难度档位的奖励可以更多（作者 2026-11-04 明确允许）。
@@ -87,7 +87,8 @@ for (const field of Object.keys(FIELDS)) {
   tiers.forEach((v, i) => {
     const ok = addRow({
       kind: 'single',
-      key: 'cx_' + field + '_' + v,
+      /* Preserve the shipped ID while correcting its unreachable 152-person goal. */
+      key: 'cx_' + field + '_' + (field === 'retired' && v === 150 ? 152 : v),
       cat: f.cat, ico: f.ico,
       label: f.name + ' · ' + fmtNum(v),
       desc: f.name + '达到 ' + fmtNum(v) + ' ' + f.unit,
@@ -183,7 +184,7 @@ for (const [fa, fb] of comboPairs()) {
       cat: '组合',
       ico: '🧩',
       label: title + ' · ' + fmtNum(ga) + '·' + fmtNum(gb),
-      desc: '累计' + A1.name + '达到 ' + fmtNum(ga) + ' ' + A1.unit + '，且' + B1.name + '达到 ' + fmtNum(gb) + ' ' + B1.unit,
+      desc: (fa === 'retired' ? '' : '累计') + A1.name + '达到 ' + fmtNum(ga) + ' ' + A1.unit + '，且' + B1.name + '达到 ' + fmtNum(gb) + ' ' + B1.unit,
       all: [{ field: A1.stats, goal: ga }, { field: B1.stats, goal: gb }],
       reward: rewardFor(i, COMBO_TIERS.length, 1500),
     });

@@ -16,12 +16,21 @@ function checked(dir){
  if(fs.existsSync(target)){const real=fs.realpathSync(target),r=path.relative(root,real);if(!r||r==='..'||r.startsWith('..'+path.sep)||path.isAbsolute(r))throw Error('Scratch path escapes its root');}
  return target;
 }
-export function removeAuditScratch(dir){fs.rmSync(checked(dir),{recursive:true,force:true,maxRetries:6,retryDelay:100});}
+/* 2026-11-05：宿主环境的批量删除保护 / Windows 文件占用可能拒绝递归删除。
+   清理失败不应推翻已经跑完的检查结论；路径校验失败仍然照抛。 */
+function cleanupBlocked(e){return /SAFE_DELETE_BULK_CONFIRM_REQUIRED|EPERM|EBUSY|ENOTEMPTY|safe-delete|trash|Some operations were aborted/i.test(String(e&&e.message||e));}
+function warnCleanup(target,e){console.warn('[audit-scratch] 临时目录未能删除（不影响检查结论）：'+target+' · '+(e&&e.message||e));}
+export function removeAuditScratch(dir){
+ const target=checked(dir);
+ try{fs.rmSync(target,{recursive:true,force:true,maxRetries:6,retryDelay:100});}
+ catch(e){if(!cleanupBlocked(e))throw e;warnCleanup(target,e);}
+}
 export async function disposeAuditBrowser(proc,dir){
- checked(dir);
+ const target=checked(dir);
  if(proc&&proc.exitCode===null&&proc.signalCode===null){
   const exited=new Promise(resolve=>{const timer=setTimeout(resolve,2000);proc.once('exit',()=>{clearTimeout(timer);resolve();});});
   proc.kill();await exited;
  }
- await fs.promises.rm(checked(dir),{recursive:true,force:true,maxRetries:8,retryDelay:100});
+ try{await fs.promises.rm(target,{recursive:true,force:true,maxRetries:8,retryDelay:100});}
+ catch(e){if(!cleanupBlocked(e))throw e;warnCleanup(target,e);}
 }

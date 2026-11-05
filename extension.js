@@ -6,6 +6,9 @@
    本文件的 noname import 保留——门禁 tools/check.js 会同时盯两个文件。
    教训：node --check 只查语法，查不出未定义变量；已把自由变量扫描并入 tools/check.js 常驻门禁。 */
 import { lib, game, ui, get, ai, _status } from "../../noname.js";
+/* U3：第一个业务 import。它在 bootstrap/character/card/skills 之前同步检查
+   更新恢复标志，未决时不启用业务内容并触发启动期恢复。 */
+import { cshRecoveryPending, cshProtectedPackage, cshRecoverAtStartup } from "./core/csh_startup_recovery.js";
 import "./decadeUI-compat.js"; // 十周年UI接入兼容（全局暴露 setupDecadeUICompat），未装十周年UI时静默跳过
 import "./main/bootstrap.js";
 import { cshContent } from "./main/content.js";
@@ -19,7 +22,7 @@ import cshSkillPack from "./skills/index.js";
 
 export const type = "extension";
 export default function(){
-	return {name:"池子魔将",editable:false,connect:true,content:cshContent,precontent:cshPrecontent,help:cshHelp,config:cshConfig,package:{
+	const full = {name:"池子魔将",editable:false,connect:true,content:cshContent,precontent:cshPrecontent,help:cshHelp,config:cshConfig,package:{
     character: cshCharacter,
     characterSubstitute: {
         "csh_mingrixiang": [
@@ -67,10 +70,17 @@ export default function(){
     },
     card: cshCard,
     skill: cshSkillPack,
-    intro: "<font color=#c9a84c>版本</font> <font color=#00FFFF>4.0.14</font>",
+    intro: "<font color=#c9a84c>版本</font> <font color=#00FFFF>4.0.15</font>",
     author: "池上寒",
     diskURL: "",
     forumURL: "",
-    version: "4.0.14"
-}}
+    version: "4.0.15"
+}};
+    /* 未决恢复：不启用业务内容，不写版本/成功标志、不自动重启。
+       异步恢复只处理更新凭据与原文件；失败则保留标志，下次启动继续受保护。 */
+    if (cshRecoveryPending()) {
+        cshRecoverAtStartup({ lib: lib, game: game });
+        return cshProtectedPackage(full);
+    }
+    return full;
 }

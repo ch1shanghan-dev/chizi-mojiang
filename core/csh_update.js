@@ -6,6 +6,10 @@
  function safe(rel){if(typeof rel!=='string'||!rel||rel.length>240||rel.startsWith('/')||rel.includes('\\')||rel.includes(':')||/[?#%]/.test(rel)||rel.split('/').some(s=>!s||s==='.'||s==='..')||/[\x00-\x1f]/.test(rel))throw Error('更新文件路径无效');return rel;}
  async function digest(v){if(!root.crypto||!root.crypto.subtle)throw Error('当前环境缺少文件校验能力');const hash=await root.crypto.subtle.digest('SHA-256',bytes(v));return Array.from(new Uint8Array(hash),n=>n.toString(16).padStart(2,'0')).join('');}
  const LOCKS=new Set(),META='backup.json';
+ const PENDING='csh_update_recovery_pending_v1';
+ function isRecoveryPending(){try{return !!(root.localStorage&&root.localStorage.getItem(PENDING));}catch(e){return false;}}
+ function markRecoveryPending(){try{if(root.localStorage)root.localStorage.setItem(PENDING,'1');}catch(e){}}
+ function clearRecoveryPending(){try{if(root.localStorage)root.localStorage.removeItem(PENDING);}catch(e){}}
  const lockKey=io=>io.scope||io;
  function acquire(io){const key=lockKey(io);if(LOCKS.has(key))throw Error('更新或备份任务正在进行，请稍后再试');LOCKS.add(key);return ()=>LOCKS.delete(key);}
  const validId=id=>typeof id==='string'&&id.length<=120&&/^update-[a-zA-Z0-9-]+$/.test(id);
@@ -29,13 +33,13 @@
    const rawJournal=await io.read(JOURNAL);let journalId=null,blocked='';
    if(rawJournal){blocked='有未完成的更新，请先恢复后再清理';try{const j=JSON.parse(decode(rawJournal));if(validId(j.id))journalId=j.id;else blocked='更新恢复说明异常，暂不清理任何备份';}catch(e){blocked='更新恢复说明异常，暂不清理任何备份';}}
    const top=await io.list(AREA);if(!top||!Array.isArray(top.directories)||!Array.isArray(top.files))throw Error('备份目录未完整读取');const rows=[];
-   for(const id of top.directories){safe(id);if(id.includes('/'))throw Error('备份目录名称异常');const tree=await entries(AREA+'/'+id),row={id,bytes:tree.files.reduce((n,f)=>n+f.size,0),beforeBytes:0,nextBytes:0,created:null,fromVersion:'',toVersion:'',state:'unknown',trusted:false,protected:true,reason:'缺少可核对说明，保留不清理',meta:null,metaHash:null,tree};
+   for(const id of top.directories){safe(id);if(id.includes('/'))throw Error('备份目录名称异常');const tree=await entries(AREA+'/'+id),row={id,bytes:tree.files.reduce((n,f)=>n+f.size,0),beforeBytes:0,nextBytes:0,created:null,fromVersion:'',toVersion:'',state:'unknown',trusted:false,protected:true,recovering:false,reason:'缺少可核对说明，保留不清理',meta:null,metaHash:null,tree};
     for(const f of tree.files){if(f.path.startsWith(AREA+'/'+id+'/before/'))row.beforeBytes+=f.size;if(f.path.startsWith(AREA+'/'+id+'/next/'))row.nextBytes+=f.size;}
     const raw=await io.read(AREA+'/'+id+'/'+META);if(raw)try{const m=metadata(JSON.parse(decode(raw)),id),allowed=new Set([AREA+'/'+id+'/'+META]);for(const f of m.files){if(f.existed===true)allowed.add(AREA+'/'+id+'/before/'+f.rel);if(!m.nextRemoved&&f.nextHash)allowed.add(AREA+'/'+id+'/next/'+f.rel);}if(tree.files.some(f=>!allowed.has(f.path)))throw Error('有未识别内容');row.trusted=true;row.meta=m;row.metaHash=await digest(raw);row.created=m.created;row.state=m.state;row.fromVersion=typeof m.fromVersion==='string'?m.fromVersion.slice(0,40):'';row.toVersion=typeof m.toVersion==='string'?m.toVersion.slice(0,40):'';row.reason='';}catch(e){row.reason='备份说明或内容无法完整确认，保留不清理';}
     if(id===journalId){row.reason='未完成更新正在使用，保留不清理';row.protected=true;}
     rows.push(row);
    }
-   for(const name of top.files){safe(name);if(name=== 'journal.json')continue;const st=await io.stat(AREA+'/'+name);if(!st||st.kind!=='file')throw Error('备份目录已变化');rows.push({id:name,bytes:st.size,beforeBytes:0,nextBytes:0,created:null,state:'unknown',trusted:false,protected:true,reason:'未识别的资料，保留不清理',tree:{files:[],dirs:[]}});}
+   for(const name of top.files){safe(name);if(name=== 'journal.json')continue;const st=await io.stat(AREA+'/'+name);if(!st||st.kind!=='file')throw Error('备份目录已变化');rows.push({id:name,bytes:st.size,beforeBytes:0,nextBytes:0,created:null,state:'unknown',trusted:false,protected:true,recovering:false,reason:'未识别的资料，保留不清理',tree:{files:[],dirs:[]}});}
    rows.sort((a,b)=>(b.created||0)-(a.created||0)||String(b.id).localeCompare(String(a.id)));return {rows,blocked,journalId,totalBytes:rows.reduce((n,r)=>n+r.bytes,0)};
   }
   async function recoverable(row){
@@ -45,11 +49,11 @@
   async function protect(state,keep){
    const managed=state.rows.filter(r=>r.trusted);let latest=null;
    for(const row of managed){if(!['staging','prepared'].includes(row.state)&&!(row.meta.cleaning&&row.meta.cleaning.kind==='bundle')&&await recoverable(row)){latest=row.id;break;}}
-   for(let i=0;i<managed.length;i++){const row=managed[i];row.protected=!!state.blocked||['staging','prepared'].includes(row.state)||row.id===latest||i<keep||!latest&&row.beforeBytes>0;row.reason=state.blocked||(['staging','prepared'].includes(row.state)?'更新写入尚未完成，保留不清理':'')||(row.id===latest?'最近可校验的回退资料，保留不清理':i<keep?'按保留组数保留':!latest&&row.beforeBytes>0?'没有其他可校验回退资料，保留不清理':'');}
+   for(let i=0;i<managed.length;i++){const row=managed[i];row.recovering=!!state.blocked||row.id===state.journalId;row.protected=!!state.blocked||['staging','prepared'].includes(row.state)||row.id===latest||i<keep||!latest&&row.beforeBytes>0;row.reason=state.blocked||(['staging','prepared'].includes(row.state)?'更新未完成：原文件副本保留，下载副本可单独清理':'')||(row.id===latest?'最近可校验的回退资料，保留不清理':i<keep?'按保留组数保留':!latest&&row.beforeBytes>0?'没有其他可校验回退资料，保留不清理':'');}
    return latest;
   }
   function policy(options={}){return {keep:[1,2,3].includes(options.keep)?options.keep:2,budgetBytes:[256,512,1024].includes(options.budgetMB)?options.budgetMB*1024*1024:512*1024*1024};}
-  function publicRow(row){return {id:row.id,bytes:row.bytes,beforeBytes:row.beforeBytes,nextBytes:row.nextBytes,created:row.created,fromVersion:row.fromVersion||'',toVersion:row.toVersion||'',state:row.state,trusted:row.trusted,protected:row.protected,reason:row.reason,interrupted:!!(row.meta&&row.meta.cleaning),downloadsCleanable:row.trusted&&!['staging','prepared'].includes(row.state)&&row.nextBytes>0};}
+  function publicRow(row){return {id:row.id,bytes:row.bytes,beforeBytes:row.beforeBytes,nextBytes:row.nextBytes,created:row.created,fromVersion:row.fromVersion||'',toVersion:row.toVersion||'',state:row.state,trusted:row.trusted,protected:row.protected,reason:row.reason,interrupted:!!(row.meta&&row.meta.cleaning),downloadsCleanable:row.trusted&&!row.recovering&&!(row.meta&&row.meta.nextRemoved)&&(row.nextBytes>0||!!(row.meta&&row.meta.cleaning&&row.meta.cleaning.kind==='next'))};}
   async function inventory(options){return locked(async()=>{const s=await scan(),p=policy(options);const retained=await protect(s,p.keep);return {ok:true,blocked:s.blocked,totalBytes:s.totalBytes,rows:s.rows.map(publicRow),keep:p.keep,budgetBytes:p.budgetBytes,retained};});}
   async function fingerprint(state){return digest(encode(JSON.stringify({blocked:state.blocked,rows:state.rows.map(r=>[r.id,r.metaHash||null,r.tree.files.map(f=>[f.path,f.size])])})));}
   async function verifyTargets(row,kind){
@@ -60,13 +64,13 @@
    const state=await scan(),p=policy(options);if(state.blocked)throw Error(state.blocked);const retained=await protect(state,p.keep),kind=options.kind==='next'?'next':'bundle';let selected;
    if(options.ids!=null){if(!Array.isArray(options.ids)||!options.ids.length||options.ids.length>1000||options.ids.some(id=>typeof id!=='string'||!state.rows.some(r=>r.id===id)))throw Error('请选择当前可识别的备份');selected=state.rows.filter(r=>options.ids.includes(r.id));}
    else {selected=[];let total=state.totalBytes,count=state.rows.filter(r=>r.trusted).length;for(const row of state.rows.slice().reverse())if(row.trusted&&!row.protected&&(total>p.budgetBytes||count>p.keep)){selected.push(row);total-=row.bytes;count--;}}
-   const jobs=[];for(const row of selected){if(!row.trusted||['staging','prepared'].includes(row.state)||kind==='bundle'&&row.protected)throw Error(row.reason||'这组资料受保护，不能清理');const files=await verifyTargets(row,kind);if(!files.length&&!(row.meta.cleaning&&row.meta.cleaning.kind===kind))continue;jobs.push({id:row.id,meta:JSON.parse(JSON.stringify(row.meta)),metaHash:row.metaHash,files,dirs:row.tree.dirs});}
+   const jobs=[];for(const row of selected){if(!row.trusted)throw Error(row.reason||'这组资料无法核对，不能清理');if(kind==='bundle'&&(row.protected||row.recovering||['staging','prepared','aborted','rolledback'].includes(row.state)))throw Error(row.reason||'这组资料受保护，不能清理');if(kind==='next'){const retryMeta=row.meta.cleaning&&row.meta.cleaning.kind==='next';if(row.recovering||row.meta.nextRemoved||(!(row.nextBytes>0)&&!retryMeta))throw Error('这组资料没有可清理的下载副本或正在恢复');}const files=await verifyTargets(row,kind);if(!files.length&&!(row.meta.cleaning&&row.meta.cleaning.kind===kind))continue;jobs.push({id:row.id,meta:JSON.parse(JSON.stringify(row.meta)),metaHash:row.metaHash,files,dirs:row.tree.dirs});}
    const bytes=jobs.reduce((n,j)=>n+j.files.reduce((m,f)=>m+f.size,0)+(kind==='bundle'?state.rows.find(r=>r.id===j.id).tree.files.find(f=>f.path===AREA+'/'+j.id+'/'+META).size:0),0),id='cleanup-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2);issued.clear();issued.set(id,{kind,jobs,fingerprint:await fingerprint(state),policy:p,retained});return {ok:true,id,kind,groups:jobs.length,bytes,files:jobs.reduce((n,j)=>n+j.files.length,0),retained,empty:!jobs.length};
   });}
   async function cleanup(id){return locked(async()=>{
    const plan=issued.get(typeof id==='string'?id:id&&id.id);issued.clear();if(!plan)throw Error('清理预览已失效，请重新查看');const current=await scan();if(current.blocked||await fingerprint(current)!==plan.fingerprint)throw Error(current.blocked||'备份目录已变化，未清理，请重新查看');
    const retained=await protect(current,plan.policy.keep);if(plan.retained!==retained)throw Error('需要保留的回退资料已变化，请重新查看');let freedBytes=0,removedFiles=0;
-   try{for(const job of plan.jobs){const row=current.rows.find(r=>r.id===job.id);if(plan.kind==='bundle'&&row&&row.beforeBytes>0&&(!retained||!await recoverable(current.rows.find(r=>r.id===retained))))throw Error('保留的回退资料已变化，未继续清理');if(!row||!row.trusted||plan.kind==='bundle'&&row.protected)throw Error('这组资料目前受保护，未继续清理');const meta=job.meta;meta.cleaning={kind:plan.kind,started:Date.now()};await putMeta(job.id,meta);
+   try{for(const job of plan.jobs){const row=current.rows.find(r=>r.id===job.id);if(plan.kind==='bundle'&&row&&row.beforeBytes>0&&(!retained||!await recoverable(current.rows.find(r=>r.id===retained))))throw Error('保留的回退资料已变化，未继续清理');if(!row||!row.trusted||row.recovering||plan.kind==='bundle'&&row.protected)throw Error('这组资料目前受保护或正在恢复，未继续清理');const meta=job.meta;meta.cleaning={kind:plan.kind,started:Date.now()};await putMeta(job.id,meta);
      for(const file of job.files){if(await io.read(JOURNAL))throw Error('检测到更新恢复任务，未继续清理');const raw=await io.read(file.path);if(!raw||await digest(raw)!==file.hash)throw Error('备份内容已变化，未继续清理');await io.remove(file.path);if(await io.read(file.path)!==null)throw Error('文件未能清理，请稍后重试');freedBytes+=file.size;removedFiles++;}
      if(plan.kind==='next'){meta.nextRemoved=true;meta.cleaning=null;await putMeta(job.id,meta);const dirs=job.dirs.filter(d=>d===AREA+'/'+job.id+'/next'||d.startsWith(AREA+'/'+job.id+'/next/'));for(const dir of dirs)await io.removeEmptyDirectory(dir);}
      else {const remaining=await entries(AREA+'/'+job.id);if(remaining.files.some(f=>f.path!==AREA+'/'+job.id+'/'+META))throw Error('目录出现新内容，未继续清理');const raw=await io.read(AREA+'/'+job.id+'/'+META);await io.remove(AREA+'/'+job.id+'/'+META);if(await io.read(AREA+'/'+job.id+'/'+META)!==null)throw Error('备份说明未能清理');freedBytes+=row.tree.files.find(f=>f.path===AREA+'/'+job.id+'/'+META).size;for(const dir of remaining.dirs)await io.removeEmptyDirectory(dir);await io.removeEmptyDirectory(AREA+'/'+job.id);}
@@ -75,18 +79,43 @@
   return {inventory,plan,cleanup,status:()=>({busy:running})};
  }
 
- function create(io){
-  let busy=false,phase='idle';
+ /* U3：文件接口可能永不回调。超时后**不能**宣布「未写入」并放行新任务 ——
+    旧写入也许仍会发生。这里只置 uncertain，保留 journal 与事务锁，
+    交给重启后的受保护恢复状态处理；迟到回调到达时也不改变这个结论。 */
+ function guardIO(source,onTimeout){
+  if(typeof setTimeout!=='function'||typeof clearTimeout!=='function')return source;
+  const out=Object.assign({},source);
+  for(const key of ['read','write','remove','list','stat','removeEmptyDirectory']){
+   const fn=source[key];if(typeof fn!=='function')continue;
+   out[key]=function(...args){
+    return new Promise((resolve,reject)=>{
+     let settled=false;
+     const timer=setTimeout(()=>{
+      if(settled)return;settled=true;onTimeout(key);
+      reject(Object.assign(Error('文件接口超时，写入结果未知，请重启后恢复'),{uncertain:true}));
+     },15000);
+     Promise.resolve().then(()=>fn.apply(source,args)).then(
+      v=>{if(settled)return;settled=true;clearTimeout(timer);resolve(v);},
+      e=>{if(settled)return;settled=true;clearTimeout(timer);reject(e);}
+     );
+    });
+   };
+  }
+  return out;
+ }
+ function create(rawIO){
+  let busy=false,phase='idle',uncertain=false;
+  const io=guardIO(rawIO,()=>{uncertain=true;});
   const note=(fn,p,n,total)=>{phase=p;if(fn)fn({phase:p,done:n,total});};
   async function put(file,data){await io.write(file,bytes(data));const saved=await io.read(file);if(!saved||await digest(saved)!==await digest(data))throw Error('文件写入校验失败：'+file);}
-  async function journal(state){if(state)await put(JOURNAL,encode(JSON.stringify(state)));else {await io.remove(JOURNAL);if(await io.read(JOURNAL))throw Error('更新凭据未能清理');}}
+  async function journal(state){if(state){markRecoveryPending();await put(JOURNAL,encode(JSON.stringify(state)));}else {await io.remove(JOURNAL);if(await io.read(JOURNAL))throw Error('更新凭据未能清理');clearRecoveryPending();}}
   function validate(state){if(!state||state.v!==1||!/^update-[a-zA-Z0-9-]+$/.test(state.id)||!['prepared','committing','committed'].includes(state.phase)||!Array.isArray(state.files)||state.files.length>5000)throw Error('更新恢复凭据无效');const seen=new Set();state.files.forEach(f=>{safe(f.rel);if(seen.has(f.rel)||typeof f.existed!=='boolean'||f.existed&&!/^[a-f0-9]{64}$/.test(f.hash))throw Error('更新恢复内容无效');seen.add(f.rel);});return state;}
   async function restore(state,progress){
    validate(state);if(state.phase==='committed'){await journal(null);return {ok:true,committed:true};}if(state.phase==='prepared'){await journal(null);return {ok:true,untouched:true};}
    for(let i=state.files.length-1;i>=0;i--){const f=state.files[i];note(progress,'recovering',state.files.length-i,state.files.length);if(f.existed){const data=await io.read(AREA+'/'+state.id+'/before/'+f.rel);if(!data||await digest(data)!==f.hash)throw Error('原文件备份不可校验：'+f.rel);await put(TARGET+f.rel,data);}else {await io.remove(TARGET+f.rel);if(await io.read(TARGET+f.rel))throw Error('新增文件未能回滚：'+f.rel);}}
    await journal(null);return {ok:true,recovered:true};
   }
-  async function recover(progress){if(busy)throw Error('更新任务正在进行');const release=acquire(io);busy=true;try{const raw=await io.read(JOURNAL);if(!raw)return {ok:true,empty:true};return await restore(validate(JSON.parse(decode(raw))),progress);}finally{busy=false;phase='idle';release();}}
+  async function recover(progress){if(busy)throw Error('更新任务正在进行');const release=acquire(io);busy=true;try{const raw=await io.read(JOURNAL);if(!raw)return {ok:true,empty:true};return await restore(validate(JSON.parse(decode(raw))),progress);}finally{if(!uncertain){busy=false;phase='idle';release();}}}
   async function apply(files,download,{hashes={},signal,progress,fromVersion='',toVersion=''}={}){
    if(busy)throw Error('更新任务正在进行');const release=acquire(io);busy=true;let state=null,committing=false,meta=null;
    const cancelled=()=>{if(signal&&signal.aborted)throw Error('下载已取消，原安装未改动');};
@@ -95,7 +124,7 @@
     const list=Array.from(new Set(files.map(safe)));if(!list.length||list.length>5000)throw Error('更新清单数量无效');
     const id='update-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2),staged=new Map();let index=0,done=0;
     if(await io.read(AREA+'/'+id+'/'+META))throw Error('更新备份目录已存在，请重新尝试');meta={v:1,id,created:Date.now(),state:'staging',fromVersion:String(fromVersion).slice(0,40),toVersion:String(toVersion).slice(0,40),files:list.map(rel=>({rel,existed:null,beforeHash:null,beforeSize:null,nextHash:/^[a-f0-9]{64}$/.test(hashes[rel]||'')?hashes[rel]:null,nextSize:null}))};await put(AREA+'/'+id+'/'+META,encode(JSON.stringify(meta)));
-    let downloadError=null;const worker=async()=>{while(index<list.length&&!downloadError){cancelled();const rel=list[index++];try{const data=bytes(await download(rel,signal));cancelled();if(!data.length)throw Error('文件为空：'+rel);const hash=await digest(data);if(hashes[rel]&&hash!==hashes[rel])throw Error('文件摘要不符：'+rel);cancelled();await put(AREA+'/'+id+'/next/'+rel,data);staged.set(rel,{hash,size:data.byteLength});note(progress,'downloading',++done,list.length);}catch(e){downloadError=Object.assign(Error("文件 "+rel+"："+String(e.message||e)),{file:rel,cause:e});throw downloadError;}}};
+    let downloadError=null;const worker=async()=>{while(index<list.length&&!downloadError){cancelled();const rel=list[index++];try{const data=bytes(await download(rel,signal));cancelled();if(!data.length)throw Error('文件为空：'+rel);const hash=await digest(data);if(hashes[rel]&&hash!==hashes[rel])throw Error('文件摘要不符：'+rel);cancelled();await put(AREA+'/'+id+'/next/'+rel,data);staged.set(rel,{hash,size:data.byteLength});note(progress,'downloading',++done,list.length);}catch(e){downloadError=Object.assign(Error("文件 "+rel+"："+errorText(e)),{file:rel,cause:e});throw downloadError;}}};
     const results=await Promise.allSettled(Array.from({length:Math.min(3,list.length)},worker));const failed=results.filter(r=>r.status==='rejected');if(failed.length)throw Object.assign(Error(failed.map(r=>r.reason.message).join('；')),{files:failed.map(r=>r.reason.file).filter(Boolean)});cancelled();
     const records=[];for(const rel of list){cancelled();const data=await io.read(TARGET+rel),record={rel,existed:data!==null,hash:data?await digest(data):null,size:data?data.byteLength:null};if(data)await put(AREA+'/'+id+'/before/'+rel,data);records.push(record);note(progress,'backing-up',records.length,list.length);}
     meta.files=records.map(f=>({rel:f.rel,existed:f.existed,beforeHash:f.hash,beforeSize:f.size,nextHash:staged.get(f.rel).hash,nextSize:staged.get(f.rel).size}));meta.state='prepared';await put(AREA+'/'+id+'/'+META,encode(JSON.stringify(meta)));
@@ -104,22 +133,43 @@
     const ordered=records.slice().sort((a,b)=>Number(a.existed)-Number(b.existed)||Number(/^(extension\.js|info\.json|package\.js)$/.test(a.rel))-Number(/^(extension\.js|info\.json|package\.js)$/.test(b.rel)));
     for(let i=0;i<ordered.length;i++){const f=ordered[i],data=await io.read(AREA+'/'+id+'/next/'+f.rel);if(!data||await digest(data)!==staged.get(f.rel).hash)throw Error('暂存文件校验失败：'+f.rel);await put(TARGET+f.rel,data);note(progress,'committing',i+1,ordered.length);}
     state.phase='committed';await journal(state);await journal(null);meta.state='committed';let backupNotice='';try{await put(AREA+'/'+id+'/'+META,encode(JSON.stringify(meta)));}catch(e){backupNotice='更新完成，备份说明暂未更新；原文件副本仍保留';}return {ok:true,count:list.length,backup:AREA+'/'+id+'/before',backupNotice};
-   }catch(error){if(state&&state.phase==='committed')throw Object.assign(Error('文件已全部提交，更新凭据清理待恢复：'+error.message),{recovery:true,cause:error});if(state&&committing){try{await restore(state,progress);}catch(rollback){throw Object.assign(Error('更新未完成，原文件恢复尚未完成：'+rollback.message),{recovery:true,cause:error});}}else if(state){await journal(null);}throw error;}
-   finally{busy=false;phase='idle';release();}
+   }catch(error){if(uncertain)throw Object.assign(Error('文件接口结果未知，已保留更新凭据，请重启后恢复：'+error.message),{recovery:true,uncertain:true,cause:error});if(state&&state.phase==='committed')throw Object.assign(Error('文件已全部提交，更新凭据清理待恢复：'+error.message),{recovery:true,cause:error});if(state&&committing){try{await restore(state,progress);}catch(rollback){throw Object.assign(Error('更新未完成，原文件恢复尚未完成：'+rollback.message),{recovery:true,cause:error});}}else if(state){await journal(null);}throw error;}
+   finally{if(!uncertain){busy=false;phase='idle';release();}}
   }
   return {apply,recover,status:()=>({busy,phase}),journal:JOURNAL};
  }
+ function fileError(value){let e=value,seen=new Set();while(e&&typeof e==='object'&&!seen.has(e)){seen.add(e);let next=e.error||(e.target&&e.target.error);if(!next)break;e=next;}return e;}
+ function errorText(value){
+  const e=fileError(value),code=e&&e.code;
+  const names={1:'文件或目录不存在',2:'文件访问受限，请检查存储权限',3:'操作已取消',4:'文件暂时无法读取',6:'文件不可修改，请检查存储权限',7:'文件当前状态不可写',9:'文件操作不被允许',10:'存储空间或配额不足',11:'文件路径类型不符',12:'同名文件或目录冲突',ENOENT:'文件或目录不存在',EACCES:'文件访问受限，请检查存储权限',EPERM:'文件操作权限不足',ENOSPC:'存储空间不足'};
+  if(code!=null&&names[code])return names[code];
+  if(e&&e.name==='NotFoundError')return names[1];
+  if(e&&e.name==='AbortError')return '请求已取消或超时';
+  if(e&&typeof e.message==='string'&&e.message.trim())return e.message.slice(0,600);
+  if(typeof e==='string'&&e.trim())return e.slice(0,600);
+  if(code!=null)return '文件操作失败（代码 '+String(code).slice(0,40)+'）';
+  return '操作未能完成，请检查网络连接与存储权限后重试';
+ }
  function hostIO({game,lib}){
   if(!game||typeof game.readFile!=='function'||typeof game.writeFile!=='function'||typeof game.removeFile!=='function')throw Error('当前环境缺少安全更新所需的文件接口');
-  const read=rel=>new Promise((resolve,reject)=>{try{safe(rel);if(lib.node&&lib.node.fs)nodePath(rel);}catch(e){reject(e);return;}game.readFile(rel,v=>resolve(bytes(v)),e=>{if(e&&(e.code==='ENOENT'||e.code===1))resolve(null);else reject(e||Error('文件不可读取：'+rel));});});
+  const read=rel=>new Promise((resolve,reject)=>{try{safe(rel);if(lib.node&&lib.node.fs)nodePath(rel);}catch(e){reject(e);return;}game.readFile(rel,v=>resolve(bytes(v)),e=>{const cause=fileError(e);if(cause&&(cause.code==='ENOENT'||cause.code===1||cause.name==='NotFoundError'))resolve(null);else reject(Object.assign(Error('文件读取失败：'+errorText(e)),{cause:e}));});});
   const remove=async rel=>{if(await read(rel)===null)return;const base=root.localStorage&&root.localStorage.getItem('noname_inited');if(!(lib.node&&lib.node.fs)&&base&&typeof root.resolveLocalFileSystemURL==='function'){await new Promise((resolve,reject)=>root.resolveLocalFileSystemURL(base+rel,entry=>entry.remove(resolve,reject),e=>e&&e.code===1?resolve():reject(e)));return;}await new Promise((resolve,reject)=>game.removeFile(rel,e=>e&&(e.code||e instanceof Error)?reject(e):resolve()));};
   const write=async(rel,data)=>{
    const i=rel.lastIndexOf('/'),dir=rel.slice(0,i),name=rel.slice(i+1);safe(rel);
    if(lib.node&&lib.node.fs){nodePath(rel);await new Promise((resolve,reject)=>game.writeFile(data,dir,name,e=>e?reject(e):resolve()));return;}
    /* Host Cordova writer does not truncate shorter files. Use its actual root and FileWriter lifecycle. */
    const base=root.localStorage&&root.localStorage.getItem('noname_inited');if(!base||typeof root.resolveLocalFileSystemURL!=='function')throw Error('当前设备缺少可验证的文件写入接口，请使用完整包安装');
-   await new Promise((resolve,reject)=>game.ensureDirectory(dir,resolve));
-   await new Promise((resolve,reject)=>root.resolveLocalFileSystemURL(base+dir,entry=>entry.getFile(name,{create:true},file=>file.createWriter(writer=>{let truncating=false;writer.onerror=reject;writer.onwriteend=()=>{if(!truncating){truncating=true;writer.truncate(data.byteLength);}else resolve();};writer.write(new Blob([data]));},reject),reject),reject));
+   // Some host ensureDirectory callbacks fire before recursive creation has finished.
+   // Await each actual DirectoryEntry; concurrent stage workers may safely share parents.
+   try{
+    let entry=await new Promise((resolve,reject)=>root.resolveLocalFileSystemURL(base,resolve,reject));
+    for(const part of dir.split('/'))entry=await new Promise((resolve,reject)=>entry.getDirectory(part,{create:true},resolve,reject));
+    await new Promise((resolve,reject)=>entry.getFile(name,{create:true},file=>file.createWriter(writer=>{
+     let truncating=false,settled=false;const fail=e=>{if(settled)return;settled=true;reject(e);};
+     writer.onerror=fail;writer.onwriteend=()=>{if(settled)return;try{if(!truncating){truncating=true;writer.truncate(data.byteLength);}else {settled=true;resolve();}}catch(e){fail(e);}};
+     try{writer.write(new Blob([data]));}catch(e){fail(e);}
+    },reject),reject));
+   }catch(e){throw Object.assign(Error('文件写入失败：'+errorText(e)),{cause:e});}
   };
   function nodePath(rel){
    safe(rel);const fs=lib.node&&lib.node.fs,path=lib.node&&lib.node.path;if(!fs||!path||typeof root.__dirname!=='string')throw Error('当前环境缺少可核对的安装目录');
@@ -144,5 +194,5 @@
 
   return {read,write,remove,list,stat,removeEmptyDirectory,scope:'host-update:'+String(root.__dirname||'cordova')};
  }
- root.CSHUpdate={create,backups:createBackups,hostIO,digest,safe};
+ root.CSHUpdate={create,backups:createBackups,hostIO,digest,safe,errorText,isRecoveryPending,clearRecoveryPending,recoveryJournal:JOURNAL};
 })(typeof window!=='undefined'?window:globalThis);

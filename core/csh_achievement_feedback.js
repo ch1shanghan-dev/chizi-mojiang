@@ -1,5 +1,8 @@
 /* Presentation only. Never imports a wallet, writes a reward or acknowledges a receipt. */
 export const ACHIEVEMENT_UI_KEY = 'csh_achievement_ui_v1';
+export const ACHIEVEMENT_ARCHIVE_KEY = 'csh_achievement_archive_v1';
+export const ACHIEVEMENT_ARCHIVE_LIMIT = 200;
+export const ACHIEVEMENT_ARCHIVE_PAGE = 20;
 
 export function createAchievementQueue(env) {
     const now=env.now||Date.now, later=env.setTimeout||setTimeout, cancel=env.clearTimeout||clearTimeout;
@@ -53,6 +56,8 @@ export function createAchievementFeedback(env) {
     const doc=env.document,win=env.window,storage=env.storage;
     const holds=new Set(),reading=new Set();
     let card=null,review=null,reviewBody=null,focusBack=null,guard=null,closed=false,preferenceError='',reviewGeneration=0,lastSoundId=0;
+    let archive={v:1,rows:[]},archiveError='',archiveGeneration=null,inbox=null,archiveOpen=false,archivePage=0;
+    let archivePrev=null,archivePos=null,archiveNext=null;
     function preferences(){try{const raw=storage.getItem(ACHIEVEMENT_UI_KEY);if(!raw)return {v:1,enabled:true,reduced:false,sound:false};const p=JSON.parse(raw);if(p.v!==1||['enabled','reduced','sound'].some(k=>typeof p[k]!=='boolean'))throw Error('format');return p;}catch(e){return {v:1,enabled:false,reduced:true,sound:false};}}
     function setPreferences(change){try{const p={...preferences(),...change,v:1},text=JSON.stringify(p);storage.setItem(ACHIEVEMENT_UI_KEY,text);if(storage.getItem(ACHIEVEMENT_UI_KEY)!==text)throw Error('readback');preferenceError='';if(!p.enabled)queue.skip();render();return {ok:true};}catch(e){preferenceError='显示设置未保存，请恢复本机存储后重试';return {ok:false,reason:preferenceError};}}
     const el=(tag,cls,text)=>{const n=doc.createElement(tag);if(cls)n.className=cls;if(text!=null)n.textContent=text;return n;};
@@ -78,7 +83,7 @@ export function createAchievementFeedback(env) {
       #csh-ach-feedback h3{display:block!important;font-size:var(--csh-lfs-xl,16px)!important;line-height:1.4!important;margin:0!important;overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important;color:#fff0c8!important}
       #csh-ach-feedback p{display:block!important;margin:0!important;font-size:var(--csh-lfs-sm,12px)!important;line-height:1.5!important;color:#d8dfd1!important}
       #csh-ach-feedback .csh-ach-actions{grid-column:1/-1!important;display:flex!important;justify-content:flex-end!important;gap:6px!important}
-      #csh-ach-feedback .csh-ach-action,#csh-ach-review button{display:inline-flex!important;align-items:center!important;justify-content:center!important;min-height:44px!important;padding:6px 12px!important;border-radius:7px!important;border:1px solid #b8a47377!important;background:#ffffff09!important;color:#f0e3bf!important;font:inherit!important;font-size:var(--csh-lfs-md,13px)!important;cursor:pointer!important}
+      #csh-ach-feedback .csh-ach-action,#csh-ach-review button,#csh-ach-inbox{display:inline-flex!important;align-items:center!important;justify-content:center!important;min-height:44px!important;padding:6px 12px!important;border-radius:7px!important;border:1px solid #b8a47377!important;background:#ffffff09!important;color:#f0e3bf!important;font:inherit!important;font-size:var(--csh-lfs-md,13px)!important;cursor:pointer!important}
       #csh-ach-feedback button:focus-visible,#csh-ach-review button:focus-visible,#csh-ach-review input:focus-visible{outline:2px solid #ffe2a0!important;outline-offset:1px!important}
       #csh-ach-review{position:fixed!important;inset:0!important;z-index:${env.modal-1}!important;background:#0008!important;display:flex!important;align-items:center!important;justify-content:center!important;padding:12px!important}
       #csh-ach-review .csh-ach-review-card{position:relative!important;display:flex!important;flex-direction:column!important;width:min(680px,100%)!important;max-height:100%!important;min-height:0!important;background:#202823!important;border:1px solid #c3a873!important;border-radius:12px!important;padding:12px!important;box-shadow:0 16px 52px #0008!important}
@@ -102,13 +107,134 @@ export function createAchievementFeedback(env) {
       #csh-ach-feedback[data-compact='true'] .csh-ach-next{display:none!important}
       @keyframes cshAchEnter{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
       @media(max-height:340px){#csh-ach-feedback{grid-template-columns:32px minmax(0,1fr) auto!important;gap:2px 6px!important;padding:6px 8px!important}#csh-ach-feedback svg{width:32px!important;height:38px!important;grid-row:1/3!important}#csh-ach-feedback .csh-ach-kicker{display:none!important}#csh-ach-feedback h3{font-size:var(--csh-lfs-lg,14px)!important}#csh-ach-feedback .csh-ach-actions{grid-column:3!important;grid-row:1/3!important;gap:4px!important}#csh-ach-feedback .csh-ach-action{padding:4px 8px!important}#csh-ach-feedback .csh-ach-next{display:none!important}}
+      #csh-ach-inbox{position:fixed!important;right:max(12px,env(safe-area-inset-right,0px))!important;bottom:max(12px,env(safe-area-inset-bottom,0px))!important;z-index:${env.z}!important;border-radius:999px!important;color:#f0e3bf!important;font-family:'Microsoft YaHei','PingFang SC',system-ui,sans-serif!important;cursor:pointer!important;opacity:.94!important}
+      #csh-ach-inbox[data-unread='0']{opacity:.62!important}
+      #csh-ach-inbox:focus-visible{outline:2px solid #ffe2a0!important;outline-offset:1px!important}
       @media(prefers-reduced-motion:reduce){#csh-ach-feedback{animation:none!important}}
     `;(doc.head||doc.documentElement).appendChild(s);}
     const queue=createAchievementQueue({now:env.now,scope:env.scope,enabled:()=>preferences().enabled,setTimeout:env.setTimeout,clearTimeout:env.clearTimeout,changed:()=>render()});
+    /* ---- 常驻未读入口与本机通知归档（PF-01 后半） ----
+       只存展示记录：不写钱包、不改成就条件/奖励/领取凭据。
+       本机键，不随存档迁移；换档即清空；最多 200 条，淘汰最旧并如实说明。 */
+    function readArchive(){
+        try{
+            const raw=storage.getItem(ACHIEVEMENT_ARCHIVE_KEY);
+            if(!raw)return {v:1,rows:[]};
+            const a=JSON.parse(raw);
+            if(!a||a.v!==1||!Array.isArray(a.rows))throw Error('format');
+            const rows=[];
+            for(const r of a.rows.slice(0,ACHIEVEMENT_ARCHIVE_LIMIT)){
+                if(!r||typeof r.id!=='string'||typeof r.title!=='string'||!Number.isFinite(r.time))continue;
+                rows.push({id:r.id,source:r.source==='career'?'career':'pool',kind:r.kind==='claim'?'claim':'unlock',
+                    title:r.title.slice(0,100),description:typeof r.description==='string'?r.description.slice(0,400):'',
+                    rare:[1,2,3].includes(r.rare)?r.rare:1,
+                    pc:Number.isSafeInteger(r.pc)&&r.pc>=0?r.pc:0,merit:Number.isSafeInteger(r.merit)&&r.merit>=0?r.merit:0,
+                    time:r.time,read:r.read===true});
+            }
+            return {v:1,rows};
+        }catch(e){return {v:1,rows:[],damaged:true};}
+    }
+    function saveArchive(){
+        try{
+            const text=JSON.stringify({v:1,rows:archive.rows});
+            storage.setItem(ACHIEVEMENT_ARCHIVE_KEY,text);
+            if(storage.getItem(ACHIEVEMENT_ARCHIVE_KEY)!==text)throw Error('readback');
+            archiveError='';return true;
+        }catch(e){archiveError='通知归档未保存，请恢复本机存储后重试';return false;}
+    }
+    function unreadCount(){let n=0;for(const r of archive.rows)if(!r.read)n++;return n;}
+    function syncArchiveScope(){
+        const g=queue.snapshot().generation;
+        if(archiveGeneration===null){archiveGeneration=g;return false;}   /* 首次启动：保留本机归档 */
+        if(g===archiveGeneration)return false;
+        archiveGeneration=g;archive={v:1,rows:[]};archivePage=0;archiveError='';
+        try{storage.removeItem(ACHIEVEMENT_ARCHIVE_KEY);}catch(e){}
+        if(inbox){inbox.remove();inbox=null;}
+        return true;
+    }
+    function appendArchive(rows){
+        const keys=new Set(archive.rows.map(r=>r.source+':'+r.kind+':'+r.id)),add=[];
+        for(const r of rows){
+            const k=r.source+':'+r.kind+':'+r.id;
+            if(keys.has(k))continue;keys.add(k);
+            add.push({id:r.id,source:r.source,kind:r.kind,title:r.title,description:r.description,rare:r.rare,pc:r.pc,merit:r.merit,time:r.time,read:false});
+        }
+        if(!add.length)return 0;
+        archive={v:1,rows:add.concat(archive.rows).slice(0,ACHIEVEMENT_ARCHIVE_LIMIT)};
+        saveArchive();renderInbox();return add.length;
+    }
+    function markArchiveRead(key,all){
+        let changed=false;
+        for(const r of archive.rows){
+            if((all||r.source+':'+r.kind+':'+r.id===key)&&!r.read){r.read=true;changed=true;if(!all)break;}
+        }
+        if(!changed)return false;
+        saveArchive();renderInbox();if(archiveOpen&&reviewBody)paintArchive();return true;
+    }
+    function renderInbox(){
+        if(closed)return;
+        if(!archive.rows.length){if(inbox){inbox.remove();inbox=null;}return;}
+        if(!inbox){style();inbox=el('button');inbox.id='csh-ach-inbox';inbox.type='button';inbox.addEventListener('click',()=>openArchive());doc.documentElement.appendChild(inbox);}
+        const n=unreadCount();
+        inbox.textContent=n?'成就回顾 · 新 '+n:'成就回顾';
+        inbox.dataset.unread=String(n);
+        inbox.setAttribute('aria-label',n?'成就回顾，'+n+' 项未读':'成就回顾，无未读');
+        if(archiveError)inbox.title=archiveError;else inbox.removeAttribute('title');
+    }
+    function paintArchive(){
+        if(!reviewBody)return;
+        const total=archive.rows.length,pages=Math.max(1,Math.ceil(total/ACHIEVEMENT_ARCHIVE_PAGE));
+        archivePage=Math.min(Math.max(0,archivePage),pages-1);
+        const first=archivePage*ACHIEVEMENT_ARCHIVE_PAGE,page=archive.rows.slice(first,first+ACHIEVEMENT_ARCHIVE_PAGE);
+        if(archivePrev)archivePrev.disabled=archivePage<=0;
+        if(archiveNext)archiveNext.disabled=first+ACHIEVEMENT_ARCHIVE_PAGE>=total;
+        if(archivePos)archivePos.textContent='第 '+(archivePage+1)+' / '+pages+' 页 · '+total+' 项 · 未读 '+unreadCount();
+        reviewBody.replaceChildren();
+        if(!page.length){reviewBody.appendChild(el('p','','暂无通知记录；成就进度与领奖状态仍以成就页为准。'));return;}
+        for(const row of page){
+            const a=el('article');
+            a.appendChild(el('h3','',(row.read?'':'新 · ')+(row.kind==='claim'?'已领取 · ':'已解锁 · ')+row.title));
+            a.appendChild(el('p','',row.description));
+            a.appendChild(el('p','',words(row)+' · '+new Date(row.time).toLocaleString()));
+            if(!row.read)a.appendChild(button('标记已读',()=>markArchiveRead(row.source+':'+row.kind+':'+row.id,false)));
+            reviewBody.appendChild(a);
+        }
+        reviewBody.scrollTop=0;
+    }
+    function openArchive(){
+        if(!queue.check())return false;
+        syncArchiveScope();style();if(review)closeReview();
+        focusBack=doc.activeElement;queue.pause(true);reviewGeneration=queue.snapshot().generation;
+        archiveOpen=true;archivePage=0;
+        review=el('div');review.id='csh-ach-review';
+        const box=el('section','csh-ach-review-card');box.setAttribute('role','dialog');box.setAttribute('aria-modal','true');box.setAttribute('aria-label','成就回顾');
+        const head=el('div','csh-ach-review-head');head.appendChild(el('h2','','成就回顾 · 本机最近 '+archive.rows.length+' 项'));
+        head.appendChild(button('全部标记已读',()=>markArchiveRead(null,true)));
+        const back=button('返回',closeReview);head.appendChild(back);box.appendChild(head);
+        const note=el('p','csh-ach-settings-note',archiveError||'仅保留本机最近 '+ACHIEVEMENT_ARCHIVE_LIMIT+' 条展示记录；成就进度与领奖状态以成就页为准，此归档不随存档迁移。');
+        note.setAttribute('role','status');box.appendChild(note);
+        const nav=el('div','csh-ach-preferences');
+        archivePrev=button('上一页',()=>{if(archivePage>0){archivePage--;paintArchive();}});
+        archivePos=el('span');archivePos.setAttribute('role','status');
+        archiveNext=button('下一页',()=>{if((archivePage+1)*ACHIEVEMENT_ARCHIVE_PAGE<archive.rows.length){archivePage++;paintArchive();}});
+        nav.append(archivePrev,archivePos,archiveNext);box.appendChild(nav);
+        reviewBody=el('div','csh-ach-review-list');box.appendChild(reviewBody);
+        review.appendChild(box);review.addEventListener('click',e=>{if(e.target===review)closeReview();});
+        doc.documentElement.appendChild(review);paintArchive();back.focus({preventScroll:true});guarding();return true;
+    }
+    function showWithArchive(items,options){
+        syncArchiveScope();
+        const n=queue.accept(items,options);
+        if(n>0)appendArchive(queue.snapshot().history.slice(0,n));
+        return n;
+    }
+    archive=readArchive();renderInbox();   /* 重启后立刻恢复常驻入口，不等下一次通知 */
+
     function removeCard(){reading.clear();if(card){card.remove();card=null;}}
     function words(item){return item.kind==='claim'?'本次到账 +'+item.pc+' CBY'+(item.merit?' / +'+item.merit+' 功勋':''):'奖励待领取 · '+item.pc+' CBY'+(item.merit?' / '+item.merit+' 功勋':'');}
     function render(){
         if(closed)return;
+        syncArchiveScope();renderInbox();
         const state=queue.snapshot();
         if(review&&reviewGeneration!==state.generation){closeReview();return;}
         if(doc.getElementById("csh-ui-confirm")){removeCard();guarding();return;}
@@ -128,7 +254,7 @@ export function createAchievementFeedback(env) {
     function guarding(){if(guard!==null){win.clearTimeout(guard);guard=null;}if(!closed&&!doc.hidden&&(review||queue.snapshot().current))guard=win.setTimeout(()=>{queue.check();render();},350);}
     function syncPause(){const paused=doc.hidden||!!review||holds.size>0||reading.size>0;if(queue.snapshot().paused!==paused)queue.pause(paused);}
     function hold(key,value){if(closed||typeof key!=="string"||!key||key.length>80)return false;if(value)holds.add(key);else holds.delete(key);syncPause();render();return true;}
-    function closeReview(){if(!review)return;review.remove();review=null;reviewBody=null;syncPause();if(focusBack&&focusBack.isConnected)focusBack.focus({preventScroll:true});else if(card&&card.querySelector("button"))card.querySelector("button").focus({preventScroll:true});focusBack=null;}
+    function closeReview(){if(!review)return;archiveOpen=false;archivePrev=archivePos=archiveNext=null;review.remove();review=null;reviewBody=null;syncPause();if(focusBack&&focusBack.isConnected)focusBack.focus({preventScroll:true});else if(card&&card.querySelector("button"))card.querySelector("button").focus({preventScroll:true});focusBack=null;}
     function openReview(item){
         if(!queue.check())return false;style();if(review)closeReview();focusBack=doc.activeElement;queue.pause(true);reviewGeneration=queue.snapshot().generation;review=el('div');review.id='csh-ach-review';const box=el('section','csh-ach-review-card');box.setAttribute('role','dialog');box.setAttribute('aria-modal','true');box.setAttribute('aria-label',item?'成就详情':'最近成就反馈');
         const head=el('div','csh-ach-review-head');head.appendChild(el('h2','',item?'成就详情':'最近成就反馈 · 本次运行最多保留200项'));const back=button('返回',closeReview),settings=button('显示设置',()=>{prefs.hidden=!prefs.hidden;note.hidden=prefs.hidden&&!preferenceError;settings.setAttribute('aria-expanded',String(!prefs.hidden));});settings.setAttribute('aria-expanded','false');head.appendChild(settings);head.appendChild(back);box.appendChild(head);
@@ -154,7 +280,9 @@ export function createAchievementFeedback(env) {
     function visibility(){syncPause();}
     function pageHide(e){if(e&&e.persisted){closeReview();queue.skip();queue.pause(true);}else destroy();}
     function pageShow(e){if(e&&e.persisted)syncPause();}
-    function destroy(){if(closed)return;closed=true;if(guard!==null)win.clearTimeout(guard);guard=null;removeCard();if(review)review.remove();review=null;queue.destroy();doc.removeEventListener('keydown',onKey,true);doc.removeEventListener('visibilitychange',visibility);win.removeEventListener('pagehide',pageHide);win.removeEventListener('pageshow',pageShow);}
+    function destroy(){if(closed)return;closed=true;archiveOpen=false;if(inbox){inbox.remove();inbox=null;}if(guard!==null)win.clearTimeout(guard);guard=null;removeCard();if(review)review.remove();review=null;queue.destroy();doc.removeEventListener('keydown',onKey,true);doc.removeEventListener('visibilitychange',visibility);win.removeEventListener('pagehide',pageHide);win.removeEventListener('pageshow',pageShow);}
     doc.addEventListener('keydown',onKey,true);doc.addEventListener('visibilitychange',visibility);win.addEventListener('pagehide',pageHide);win.addEventListener('pageshow',pageShow);visibility();
-    return {show:queue.accept,hold,review:()=>openReview(null),skip:queue.skip,preferences,setPreferences,status:queue.snapshot,destroy};
+    return {show:showWithArchive,hold,review:()=>openReview(null),archive:()=>openArchive(),
+        archiveStatus:()=>({rows:archive.rows.length,unread:unreadCount(),error:archiveError,page:archivePage,limit:ACHIEVEMENT_ARCHIVE_LIMIT}),
+        markRead:markArchiveRead,skip:queue.skip,preferences,setPreferences,status:queue.snapshot,destroy};
 }
