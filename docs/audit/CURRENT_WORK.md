@@ -4,7 +4,7 @@
 
 ## 版本与位置
 
-- 当前工作目录：D:/CodexWork/chizi-mojiang/workbuddy/ext/app/extension/池子魔将；本地4.0.15，未提交修改必须保留。
+- 当前工作目录：D:/CodexWork/chizi-mojiang/workbuddy/ext/app/extension/池子魔将；本地**4.0.16**（2026-11-05 升版，按作者要求），未提交修改必须保留。
 - 开发分支work/achievement-integration-20261105已本地提交（2026-11-05作者授权一次性提交，首个候选`7e00900`、50文件；之后每轮收口继续提交，**当前候选以分支HEAD为准**）；每次提交后跑`node tools/catalog_git_bytes.mjs --rev HEAD` **0错、build一致**，`release.js --check`与`--worktree`也均0错。**未推送**；远端main仍b169698/4.0.14，玩家在线更新源仍指main，不是远端已发布4.0.15。发布前须对当前HEAD重新复核。
 - 作者报告安卓现用4.0.15，精确build未核对；电脑另一份正式安装info=4.0.14，不能用它否定安卓报告。
 - 定义12042=生涯2000+池子10042；规模已足够，继续质量/可靠来源/体验，不为数量新增模板。

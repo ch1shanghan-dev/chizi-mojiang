@@ -70,11 +70,11 @@ export default function(){
     },
     card: cshCard,
     skill: cshSkillPack,
-    intro: "<font color=#c9a84c>版本</font> <font color=#00FFFF>4.0.15</font>",
+    intro: "<font color=#c9a84c>版本</font> <font color=#00FFFF>4.0.16</font>",
     author: "池上寒",
     diskURL: "",
     forumURL: "",
-    version: "4.0.15"
+    version: "4.0.16"
 }};
     /* 未决恢复：不启用业务内容，不写版本/成功标志、不自动重启。
        异步恢复只处理更新凭据与原文件；失败则保留标志，下次启动继续受保护。 */

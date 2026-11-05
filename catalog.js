@@ -1,7 +1,7 @@
-/* 自动生成于 2026-11-05T09:52:13.174Z by tools/release.js —— hashes 对应 Git 发布字节，发版后 git push 即生效，勿手改 files */
+/* 自动生成于 2026-11-05T10:30:51.980Z by tools/release.js —— hashes 对应 Git 发布字节，发版后 git push 即生效，勿手改 files */
 window.extension = {
 	"池子魔将": {
-		"build": "7ba630a97ae51ed3828002d418a4f8f68a1379799d2cf43821faef7b9985191a",
+		"build": "41628ba41f90e338828de5aadde29164d24af9637a0d0784cbba5fb831e248f9",
 		"hashes": {
 			"LICENSE": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
 			"README.md": "5c6dd7a33fc76175bb59a9e3911c1476e26a0c8db3418ba3bad7b88c69a9f266",
@@ -372,7 +372,7 @@ window.extension = {
 			"effect/csh_wenyang_quedi_banner.mp4": "e5b70cf477a353da434c1bbd759b3ad31f9e61b412a7b4da5e7827a0e6a1f119",
 			"effect/csh_zhonghui_paiyi_banner.mp4": "7b8c76be1045b8fe498766957500ded34fb47ef0fc26a7d86ef73f900fb29004",
 			"effect/csh_zhugeke_duwu_banner.mp4": "80d9488be1032a8b59522b0ca6815eb93e44a6c4287deaf261a4717a412dde51",
-			"extension.js": "dc92e4428f5c6aab9cd33e0581fcb486c6f454b870c6923b458d889d851901f7",
+			"extension.js": "5b93ec10658423093a10ada33b31684986e9975955e27d221ab98157f4624676",
 			"font/OFL-ZhiMangXing.txt": "e9957416b280a765ebd38da979467a5dfe0908382de04c85e9f7c0b34ed8209f",
 			"font/csh_fx_font_1.woff2": "f78752bf5f8639db8a228e2348740c6b52d7f6a33f2880011fefed7e39f58573",
 			"font/csh_fx_font_2.woff2": "ad894385b4e996e5f4b237cc6f5ead035237fb4c0cceaa603081ea63ab2b1da9",
@@ -655,7 +655,7 @@ window.extension = {
 			"image/ui/art-v1/target-banner.png": "13c4085685b790d124d30f1dcfbee40d848d9066cf95eca9b2ef31dbd5be815c",
 			"image/ui/art-v1/transfer-chest.png": "879161c6f5d715711d2e1ddc439a061e89c97aeb08aa79437528f0e775a404c1",
 			"image/ui/art-v1/war-record.png": "4f500282106fa7fc8cc763c7a3ab2cd95797bd3211b926c20c2205514c084e30",
-			"info.json": "c04844cfeca0af366c30d18102d506f344c5a6fc2fa0f5de576268067b5cadaf",
+			"info.json": "281e4cb9ac58eb683d14a02bfaed5cc334c105166b505cd9b9fa6a38040fc79a",
 			"main/bootstrap.js": "0559a434b52ce0d1bed1f0263cfb00770fd4cf74fe2c9e33838d5a572ecab948",
 			"main/bossmode.js": "fb0aee5f744f35e46dce7f79b039f998fa401d32a08c7829b280ddc4e197a8a6",
 			"main/build-flags.js": "60d491a2ac24949d6328faabccb6978d87d0590365ce2f14270f8a4f0d43c0c8",
@@ -1034,15 +1034,15 @@ window.extension = {
 			"mobilefx/wanjun/wushuanghuo_00017.png": "a847d20068a55543b18a8fd0afc5a1cc1349917e3a7e72e4dbc9387cc912ea39",
 			"mobilefx/wanjun/wushuanghuo_00018.png": "06d747bede74a16f0f5a58a0b9233e44b9a25222801dd54a0a35d37829fc20b2",
 			"mobilefx/wanjun/wushuanghuo_00019.png": "a1ec576661147d6d874b607b487f5cdba955fdf441a9c13038f217472ad89528",
-			"package.js": "a5f9c6223d5d48f7577fb67efbfa2a7e9668dd56f062530c5f2d3eace3bdaa54",
+			"package.js": "cb2d40d6878c13bb0539eee31ac3e7f8ebc64e57f355d31c47e9aa799f96ff68",
 			"skills/boss.js": "4a70c826c804f0d80b7cc60230cb893c62c6e3e09380163a6dff08e5ab38b869",
 			"skills/index.js": "352e3c6e4c4c9f074d28119bef4dd0eb7ab75f57067cee29d614ca18d21ba16f",
 			"store.json": "372a558d374277a685a94ca8e0f2ebc1abe6be3d90feb0d9053ee71c72eccc47"
 		},
 		"name": "池子魔将",
 		"author": "池上寒",
-		"intro": "<font color=#c9a84c>版本</font> <font color=#00FFFF>4.0.15</font>",
-		"version": "4.0.15",
+		"intro": "<font color=#c9a84c>版本</font> <font color=#00FFFF>4.0.16</font>",
+		"version": "4.0.16",
 		"date": "2026-11-05",
 		"size": "137.4MB",
 		"limits": {
