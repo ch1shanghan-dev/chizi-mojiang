@@ -134,7 +134,7 @@ try {
     results.push(...uiCases(ctx.confirmBox, dom.document, dom.key, dom.click, dom.listenerCount).map(r => ({ ...r, name: "DOM: " + r.name })));
     check("DOM: closed dialogs leave no focus timers", dom.timerCount() === 0);
 
-    const names = ["saveBlocked", "readData", "modeKey", "collect", "charNames", "record", "recordCamp", "recordMe", "capture"];
+    const names = ["saveBlocked", "readData", "modeKey", "collect", "charNames", "record", "recordCamp", "recordMe", "capturePersonal", "capture"];
     const statsCode = names.map(name => extract(wrSource, name)).join("\n");
     const modeNames = JSON.parse(wrSource.match(/var MODE_NAMES=(\{[^\n]*?\});/)[1].replace(/([{,])(\w+):/g, '$1"$2":'));
     function stats(mode = "identity", outcome = true, overrides = {}) {
