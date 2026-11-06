@@ -3365,6 +3365,7 @@ if (spawnOk && execFileSync && !ONLY_SYNTAX && !ONLY_VERSIONS) {
       ['E95F','probe_world_lifecycle.mjs',[],67,'世界生命周期回归',20000],
       ['E95G','probe_career_rewards.mjs',[],29,'生涯奖励探针（动态定义数）',20000],
       ['E95H','probe_world_encounters.mjs',[],35,'世界名册/旧键留存（动态定义数）',20000],
+      ['E95I','probe_4_0_12_economy.mjs',[],23,'旧经济基线（场供0.5%动态断言/守恒/no-cap）',20000],
     ];
     for (const [tag95, script95, args95, min95, label95, timeout95] of reg95) {
       const r95 = runProbeJson(script95, args95, { timeout: timeout95 });
