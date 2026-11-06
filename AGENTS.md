@@ -247,6 +247,17 @@
 > 反复出现 `[RETRY]` 是待办信号：去修该探针的真实时钟/随机依赖，不要长期靠重试续命。
 > 背景与边界见 `docs/audit/WORKBUDDY_B4_GATE_RETRY_20261105.md`。
 >
+> **2026-11-06 三条验证入口，别混用**：
+> ① 日常门禁 `node tools/check.js`（E95A–O 注册区已覆盖 15 个关键专项，含注册自检 E95L/M）；
+> ② 更新链路一键复核 `node tools/check_update_suite.mjs --out <D盘目录>`（14/14）；
+> ③ **慢速通道** `node tools/check_slow_suite.mjs --out <D盘目录> [--only <探针名>]`
+> —— 8 个 >30s 的 Chromium 探针，整条约 8 分钟，**不进日常门禁**，发布前或怀疑回归时手动跑。
+> `probe_achievement_quality.mjs` 约 90s、默认 20s 超时会被误杀，只能走③。
+> **新增或救回任何探针后必须注册**：`tools/check_probe_registry.mjs`（`--self-test` 5/0，普通模式 3/0）
+> 会硬查注册行是否指向不存在的文件、以及 6 个关键专项是否仍被覆盖；差集只报告不判失败。
+> 报告：`WORKBUDDY_B13_REGISTRY_GUARD_20261106.md` / `WORKBUDDY_B14_SLOW_SUITE_20261106.md`。
+> 跑浏览器类探针时**显式 `--out` 到 D 盘**，否则会覆盖 `docs/audit/ui/` 下的界面基线截图。
+>
 > **2026-11-05 行囊跨版本纪律（作者要求：不修老版本，新版本与在线更新必须可靠）**：
 > 1) 新增存档键必须允许旧行囊缺失（清洗器对 `null/undefined` 返回 `null` 跳过，不抛错拒绝整包）；
 > 2) 不得改变已有键的结构或语义，必须改时升 `VERSION` 并给迁移路径；

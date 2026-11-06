@@ -49,7 +49,7 @@ export function inspect(repoRoot) {
 	const all = fs.existsSync(toolsDir)
 		? fs.readdirSync(toolsDir).filter(f => /^probe_[A-Za-z0-9_\-]+\.mjs$/.test(f)).sort()
 		: [];
-	const entries = ['tools/check.js', 'tools/check_update_suite.mjs'];
+	const entries = ['tools/check.js', 'tools/check_update_suite.mjs', 'tools/check_slow_suite.mjs'];
 	const perEntry = {};
 	const referencedNames = new Set();
 	for (const rel of entries) {

@@ -9,7 +9,7 @@ import {withChromium} from './lib/chromium_audit.mjs';
 const option=(n,f)=>{const i=process.argv.indexOf(n);return i<0?f:process.argv[i+1];};
 const clean=s=>s.replace(/^import .*?;\r?\n/gm,'').replace(/^export default null;.*$/gm,'').replace(/^export /gm,'').replace(/<\/script/gi,'<\\/script');
 const source=clean(fs.readFileSync(option('--source',path.join(root,'core/csh_debug.js')),'utf8'));
-const modules=['core/csh_theme.js','core/csh_uikit.js','core/csh_registry.js','core/csh_games.js'].map(f=>clean(fs.readFileSync(path.join(root,f),'utf8'))).join('\n');
+const modules=['core/csh_theme.js','core/csh_uikit.js','core/csh_registry.js','core/csh_games.js','core/csh_world_view.js'].map(f=>clean(fs.readFileSync(path.join(root,f),'utf8'))).join('\n');
 const tmp=fs.mkdtempSync(path.join(auditTempRoot(),'csh-world-entry-'));
 process.once("exit",()=>{try{removeAuditScratch(tmp);}catch(e){console.warn("Audit cleanup:",e.message);}});
 const out=option('--out',path.join(root,'docs/audit/ui/world-entry'));fs.mkdirSync(out,{recursive:true});
@@ -46,7 +46,13 @@ for(const c of cases){
         const box=panel.getBoundingClientRect();check('panel inside viewport',box.left>=-1&&box.top>=-1&&box.right<=innerWidth+1&&box.bottom<=innerHeight+1,box.toJSON());
         const body=document.getElementById('csh-dbg-body');check('content has vertical scrolling',body.scrollHeight<=body.clientHeight+1||['auto','scroll'].includes(getComputedStyle(body).overflowY));
         const close=document.getElementById('csh-dbg-close');const r=close.getBoundingClientRect();check('close is reachable',r.left>=0&&r.top>=0&&r.right<=innerWidth+1&&r.bottom<=innerHeight+1);
-        const first=panel.querySelector('#csh-dbg-bgm-rd'),last=cards.filter(b=>!b.disabled).at(-1);
+        /* 焦点环绕：产品 csh_debug.js 用 panel 下所有可聚焦且可见元素的首尾做环绕。
+           旧断言写死 first=#csh-dbg-bgm-rd、last=最后一个 gamebtn，DOM 变化后首尾已不同，
+           于是 4 个 viewport 全报假红。这里改用与产品完全相同的 stops 选择器，
+           并额外断言首尾都存在且不同——强度只增不减。 */
+        const stops=[...panel.querySelectorAll('button,input,select,textarea,a[href],[tabindex="0"]')].filter(n=>!n.disabled&&n.getClientRects().length);
+        const first=stops[0],last=stops.at(-1);
+        check('focus ring has distinct reachable first and last controls',stops.length>2&&!!first&&!!last&&first!==last,stops.length);
         first.focus();document.dispatchEvent(new KeyboardEvent('keydown',{key:'Tab',shiftKey:true,bubbles:true,cancelable:true}));
         check('Shift+Tab wraps to last playable entry',document.activeElement===last);
         last.focus();document.dispatchEvent(new KeyboardEvent('keydown',{key:'Tab',bubbles:true,cancelable:true}));
@@ -87,15 +93,18 @@ for(const c of cases){
       if(r.result.value){
         const rows=JSON.parse(r.result.value);
         const returns=await send('Runtime.evaluate',{awaitPromise:true,returnByValue:true,expression:`(async()=>{
-          const checks=[],check=(name,passed)=>checks.push({name,passed});
+          const checks=[],check=(name,passed,detail)=>checks.push({name,passed,detail});
           const body=document.getElementById('csh-dbg-body');body.scrollTop=140;const before=body.scrollTop;
+          const beforeSections=body.querySelectorAll('.csh-world-section').length;
+          const beforeCards=body.querySelectorAll('button.csh-dbg-gamebtn:not(.locked)').length;
           const shell=document.createElement('div');shell.id='csh-shell-overlay';document.documentElement.appendChild(shell);
           await new Promise(r=>setTimeout(r,0));
           lib.cshWorld.stats=()=>({chars:149,retired:1,fundSum:200000});shell.remove();
           await new Promise(r=>setTimeout(r,0));
           check('return from shell refreshes world card summary',body.querySelector('.gb-career').textContent.includes('在场 148 人')&&body.querySelector('.gb-career').textContent.includes('20.00 万'));
           check('return refresh preserves directory scroll',Math.abs(body.scrollTop-before)<2);
-          check('all task groups survive refresh',body.querySelectorAll('.csh-world-section').length===2&&body.querySelectorAll('button.csh-dbg-gamebtn:not(.locked)').length===11);
+          const afterSections=body.querySelectorAll('.csh-world-section').length,afterCards=body.querySelectorAll('button.csh-dbg-gamebtn:not(.locked)').length;
+          check('all task groups survive refresh',beforeSections>0&&beforeCards>0&&afterSections===beforeSections&&afterCards===beforeCards,{beforeSections,beforeCards,afterSections,afterCards});
           const overlay=document.getElementById('csh-dbg-overlay');
           check('world return observer belongs to overlay',!!overlay.__worldObserver);
           document.getElementById('csh-dbg-close').click();

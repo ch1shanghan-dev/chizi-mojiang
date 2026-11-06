@@ -3374,7 +3374,7 @@ if (spawnOk && execFileSync && !ONLY_SYNTAX && !ONLY_VERSIONS) {
       /* B12 统一了这两个专项的 stdout 契约（原为文本汇总，JSON.parse 会抛错、长期无法注册）。
          career 是 Chromium 类实测约 54s，必须显式给超时，否则会被 20s 默认值误杀。 */
       ['E95N','probe_first_batch.mjs',[],56,'首批修复回归（双将/身份/观战/重复入账）',20000],
-      ['E95O','probe_career_achievements.mjs',[],142,'生涯成就浏览器回归（2000条/分页/横屏）',200000],
+      ['E95O','probe_career_achievements.mjs',['--out',path.join(tmp95,'career-achievements')],142,'生涯成就浏览器回归（2000条/分页/横屏）',200000],
     ];
     for (const [tag95, script95, args95, min95, label95, timeout95] of reg95) {
       const r95 = runProbeJson(script95, args95, { timeout: timeout95 });
