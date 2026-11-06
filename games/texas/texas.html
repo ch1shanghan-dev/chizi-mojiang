@@ -1549,11 +1549,12 @@ function grantAch(k) {
    AI 人格（徽记 20% 是假的 —— 读人乐趣）
    ============================================================ */
 var PERSONAS = {
-  tag:   { key: 'tag',   label: '紧凶',   thr: 0.62, bluff: 0.05, agg: 1.00 },
-  loose: { key: 'loose', label: '松被动', thr: 0.38, bluff: 0.04, agg: 0.60 },
-  bluff: { key: 'bluff', label: '诈唬',   thr: 0.45, bluff: 0.25, agg: 1.10 },
+  tag:     { key: 'tag',     label: '紧凶',   thr: 0.62, bluff: 0.05, agg: 1.00 },
+  loose:   { key: 'loose',   label: '松被动', thr: 0.38, bluff: 0.04, agg: 0.60 },
+  bluff:   { key: 'bluff',   label: '诈唬',   thr: 0.45, bluff: 0.25, agg: 1.10 },
+  trapper: { key: 'trapper', label: '埋伏',   thr: 0.68, bluff: 0.02, agg: 0.52 },
 };
-var PERSONA_KEYS = ['tag', 'loose', 'bluff'];
+var PERSONA_KEYS = ['tag', 'loose', 'bluff', 'trapper'];
 var AI_NAMES = [
   ['曹', '曹孟德'], ['关', '关云长'], ['赵', '赵子龙'], ['张', '张翼德'],
   ['孙', '孙仲谋'], ['周', '周公瑾'], ['吕', '吕奉先'], ['黄', '黄汉升'],
@@ -1569,11 +1570,27 @@ function displayTag(pk) {
   }
   return PERSONAS[pk].label;
 }
-/* 世界性格（csh_world）→ 本页牌风 的映射（2026-09-29 世界接入）。
-   world: aggro 激进 / tight 保守 / bluff 诈唬 / math 数学家 / wild 莽夫
-   here : tag 紧凶 / loose 松被动 / bluff 诈唬 */
-var PERSONA_MAP = { aggro: 'tag', tight: 'tag', math: 'tag', bluff: 'bluff', wild: 'loose' };
-function mapPersona(wp) { return PERSONA_MAP[wp] || pickPersona(); }
+/* 世界性格（csh_world，v6.3 起 12 种）→ 本页 4 款 AI 牌风。
+   旧实现只写了 5 个 key，其余 7 个（chaser / trapper / grinder / bull / maniac /
+   reader / lucky）落进 pickPersona() 随机三选一 —— 世界角色精心设计的牌风在牌桌上被丢掉。
+   本轮补齐到 12 个，新增 7 条按 csh_world 的 raiseThreshold / bluffRate 机械推导，
+   不按角色意象拍脑袋（顺序即优先级）：
+     bluffRate >= .30        → bluff   （高诈唬：maniac .26/.36）
+     raiseThreshold >= .60   → trapper （高门槛埋伏：trapper .64/.28、bull .80/.02、reader .60/.16）
+     raiseThreshold <= .44   → loose   （低门槛爱入池：chaser .38/.10）
+     其余                    → tag     （紧凶技术流：grinder .55/.03、lucky .48/.12）
+   前 5 条是 2026-09-29 的历史映射，其中 aggro(.42/.20) / tight(.72/.04) 与上述规则不符，
+   为不改变既有对局行为特意保留；门禁探针分别按「既有 5 条」与「新增 7 条规则」两套口径锁住。 */
+var PERSONA_MAP = {
+  aggro: 'tag', tight: 'tag', math: 'tag', bluff: 'bluff', wild: 'loose',
+  maniac: 'bluff',
+  trapper: 'trapper', bull: 'trapper', reader: 'trapper',
+  chaser: 'loose',
+  grinder: 'tag', lucky: 'tag'
+};
+function mapPersona(wp) {
+  return Object.prototype.hasOwnProperty.call(PERSONA_MAP, wp) ? PERSONA_MAP[wp] : pickPersona();
+}
 
 /* ============================================================
    对局状态

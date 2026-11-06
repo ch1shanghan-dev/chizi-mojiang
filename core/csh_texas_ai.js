@@ -1,11 +1,26 @@
 /* Offline Texas policy. Observation contains own cards and public facts only; no table/deck reference. */
 (function (root) {
   'use strict';
+  /* 第 4 款 trapper（陷阱型）：收紧开池、放慢强牌、极少诈唬。
+     注意 style.open 在 decide() 里是「入池 / 后位偷池 / 便宜跟注」的 strength 门槛，
+     数值越高越紧（tag .57 / bluff .47 / loose .40），不是「开放程度」。
+     设计方案初稿曾写 .34，照抄会得到最松的一款；实施期按代码语义定案为 .62。 */
   var styles = {
     tag: { edge: .055, valueOpen: .59, open: .57, bluff: .045, size: .66 },
     loose: { edge: -.015, valueOpen: .65, open: .40, bluff: .025, size: .45 },
-    bluff: { edge: .025, valueOpen: .56, open: .47, bluff: .13, size: .75 }
+    bluff: { edge: .025, valueOpen: .56, open: .47, bluff: .13, size: .75 },
+    trapper: { edge: .075, valueOpen: .68, open: .62, bluff: .020, size: .52 }
   };
+  /* 只读副本，供门禁对账参数，外部改不动决策表。 */
+  function personas() {
+    var out = {};
+    for (var k in styles) if (Object.prototype.hasOwnProperty.call(styles, k)) {
+      var row = {}, s = styles[k];
+      for (var f in s) if (Object.prototype.hasOwnProperty.call(s, f)) row[f] = s[f];
+      out[k] = Object.freeze(row);
+    }
+    return Object.freeze(out);
+  }
   function clamp(n, a, b) { return Math.max(a, Math.min(b, n)); }
   function decide(o, random) {
     random = random || Math.random;
@@ -49,5 +64,5 @@
     return { act: act, amount: amount, reason: reason, bluff: bluff,
       features: { estimatedEquity: eq, potOdds: odds, callCost: call, contestablePot: o.contestablePot, opponents: o.opponents, skill: skill } };
   }
-  root.CSHTexasAI = { decide: decide, version: 1 };
+  root.CSHTexasAI = { decide: decide, personas: personas, version: 1 };
 })(typeof window !== 'undefined' ? window : this);

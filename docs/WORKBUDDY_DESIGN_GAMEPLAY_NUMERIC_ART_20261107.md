@@ -130,11 +130,26 @@ uniquePlayerText 50 · problems []
 | tag（现有） | .055 | .59 | .57 | .045 | .66 |
 | loose（现有） | -.015 | .65 | .40 | .025 | .45 |
 | bluff（现有） | .025 | .56 | .47 | .130 | .75 |
-| **trapper（新增）** | **.075** | **.68** | **.34** | **.020** | **.52** |
+| **trapper（新增）** | **.075** | **.68** | **.62**（实施期纠偏，初稿 .34） | **.020** | **.52** |
+
+**实施期纠偏（2026-11-07，D1）**：`style.open` 在 `core/csh_texas_ai.js:decide()` 里是
+「翻前后位偷池 / 便宜跟注」的 `strength` 门槛，**数值越高越紧**（tag .57 / bluff .47 / loose .40），
+不是「开放程度」。初稿给 trapper 写 .34 会把它变成四款里最松的一款，与「收紧开池」自相矛盾；
+按代码语义定案为 **.62**，比最紧的 tag 还高一档。参数表其余四项不变。
 
 这是**世界角色的牌风**，不是玩家可选的难度档。快照仍只含自己的牌与公开事实，
 隐藏牌/牌堆 getter 抛错的测试必须照常能决策。验收沿用既有口径：
 VPIP/PFR 按发牌手数去重、诈唬不泄漏到台词、10000 手自对弈 0 停滞 / 0 非法行动 / 0 筹码守恒失败。
+
+**实施期查出的真缺陷（方案阶段没看到）**：`games/texas/texas.html` 的 `PERSONA_MAP` 自
+2026-09-29 起只写了 5 个世界牌风（aggro/tight/math/bluff/wild），而 `core/csh_world.js`
+自 v6.3 起已有 **12 种**。其余 7 种（chaser/trapper/grinder/bull/maniac/reader/lucky）
+全部落进 `pickPersona()` 随机三选一 —— 世界角色精心设计的牌风在德州桌上被丢掉。
+D1 一并补齐到 12 个：既有 5 条为不改既有对局行为特意保留；新增 7 条按
+`csh_world` 的 `raiseThreshold` / `bluffRate` 机械推导（高诈唬→bluff、高门槛→trapper、
+低门槛→loose、其余→tag），规则与逐条依据写进页面注释并由门禁断言复算。
+`mapPersona` 同时改用 `hasOwnProperty`，堵住 `toString` / `__proto__` 这类原型键返回
+`Object.prototype.toString` 的旧行为。
 
 ### 3.4 音效：方案阶段只定边界
 
