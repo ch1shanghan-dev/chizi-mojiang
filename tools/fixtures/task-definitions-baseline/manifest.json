@@ -1,0 +1,14 @@
+{
+  "schema": 1,
+  "capturedFrom": "core/csh_achv.js @ 本副本（2000 条运行时）",
+  "capturedDefCount": 2000,
+  "dynamicCount": 2000,
+  "minDefs": 420,
+  "legacyPreExpansionDefCount": 493,
+  "metaFingerprint": {
+    "algo": "sha256",
+    "recipe": "sha256(JSON.stringify(defs.map(d=>[d.key,d.cat,d.ico,d.label,d.desc,d.reward])))",
+    "value": "341b842c66ef9640ba356fa8ff3579f7221258394cb56ab63fa980955d374b14"
+  },
+  "notes": "本副本自洽静态基线：从当前 2000 条运行时导出的有序键集合（keys.json）+ 全量定义结构指纹。仅用于 self-consistency 模式（默认、strictComparison=false），不冒充改前/改后严格比对；严格比对须显式 --baseline <dir>（内含 before-csh_achv.js）。合法的定义变更需经人工复核后，用本脚本 --write 重建。"
+}

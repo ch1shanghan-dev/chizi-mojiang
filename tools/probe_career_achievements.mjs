@@ -118,6 +118,12 @@ for(const [name,width,height,scale] of cases){
   all.push(...rows.map(r=>({viewport:name,...r})));
 }
 fs.writeFileSync(path.join(out,'results.json'),JSON.stringify(all,null,2)+'\n');
-const failed=all.filter(r=>!r.passed);failed.forEach(r=>console.log('FAIL',r.viewport,r.name,r.detail||''));
-console.log('Career achievement browser:',all.length-failed.length,'PASS /',failed.length,'FAIL');
+const failed=all.filter(r=>!r.passed);
+const passed=all.length-failed.length;
+const summary='Career achievement browser: '+passed+' PASS / '+failed.length+' FAIL';
+const failLines=failed.map(r=>'FAIL '+r.viewport+' '+r.name+' '+(r.detail||''));
+const text=[summary,...failLines].join('\n');
+fs.writeFileSync(path.join(out,'summary.txt'),text+'\n');
+const payload={scope:'career achievements browser (headless Chromium)',passed,failed:failed.length,total:all.length,summary,failures:failed.map(r=>({viewport:r.viewport,name:r.name,detail:r.detail??null})),text,out};
+process.stdout.write(JSON.stringify(payload)+'\n');
 process.exitCode=failed.length?1:0;

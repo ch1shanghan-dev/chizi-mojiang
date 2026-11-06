@@ -3366,6 +3366,15 @@ if (spawnOk && execFileSync && !ONLY_SYNTAX && !ONLY_VERSIONS) {
       ['E95G','probe_career_rewards.mjs',[],29,'生涯奖励探针（动态定义数）',20000],
       ['E95H','probe_world_encounters.mjs',[],35,'世界名册/旧键留存（动态定义数）',20000],
       ['E95I','probe_4_0_12_economy.mjs',[],23,'旧经济基线（场供0.5%动态断言/守恒/no-cap）',20000],
+      ['E95J','probe_task_definitions.mjs',['--out',path.join(tmp95,'task-definitions')],48,'任务定义基线（自洽48条/动态2000）',20000],
+      ['E95K','probe_texas_rules.mjs',['--out',path.join(tmp95,'texas-rules.json')],33,'德州规则/账本守恒（--out须为结果文件）',30000],
+      /* E95L/M 是注册自检本身：防止注册行指向被删/改名的文件，或自检退化成永远绿的摆设。 */
+      ['E95L','check_probe_registry.mjs',['--self-test'],5,'门禁注册自检（隔离假仓库5条反例）',20000],
+      ['E95M','check_probe_registry.mjs',[],3,'门禁注册自检（真实仓库无悬空注册）',20000],
+      /* B12 统一了这两个专项的 stdout 契约（原为文本汇总，JSON.parse 会抛错、长期无法注册）。
+         career 是 Chromium 类实测约 54s，必须显式给超时，否则会被 20s 默认值误杀。 */
+      ['E95N','probe_first_batch.mjs',[],56,'首批修复回归（双将/身份/观战/重复入账）',20000],
+      ['E95O','probe_career_achievements.mjs',[],142,'生涯成就浏览器回归（2000条/分页/横屏）',200000],
     ];
     for (const [tag95, script95, args95, min95, label95, timeout95] of reg95) {
       const r95 = runProbeJson(script95, args95, { timeout: timeout95 });

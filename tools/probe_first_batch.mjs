@@ -16,6 +16,7 @@ const option = (name, fallback) => {
     return i >= 0 && args[i + 1] ? args[i + 1] : fallback;
 };
 const root = path.resolve(option("--root", path.join(path.dirname(fileURLToPath(import.meta.url)), "..")));
+const outDir = option("--out", "");
 const uiSource = fs.readFileSync(path.join(root, "core/csh_uikit.js"), "utf8");
 const wrSource = fs.readFileSync(path.join(root, "core/csh_winrate.js"), "utf8");
 const uiScript = uiSource.replace(/^import[^\n]*\n/gm, "").replace(/^export (const|function) /gm, "$1 ").replace(/^export default null;[^\n]*/gm, "");
@@ -186,6 +187,7 @@ try {
     const resumed = stats("versus", true, { data: historical });
     check("existing personal history is incremented without backfill", resumed.data.me.chars.hero.games === 2 && resumed.data.me.chars.hero.win === 1 && resumed.data.versus.hero.games === 3);
 
+    let browserArtifact = null;
     const browser = option("--browser", "");
     if (browser) {
         const dir = fs.mkdtempSync(path.join(auditTempRoot(), "csh-first-batch-browser-"));
@@ -206,13 +208,27 @@ catch(error){document.getElementById('results').textContent=JSON.stringify({erro
         const report = JSON.parse(match[1].replace(/&quot;/g, '"').replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&"));
         if (!Array.isArray(report)) throw new Error(JSON.stringify(report));
         results.push(...report.map(r => ({ ...r, name: "Chromium: " + r.name })));
-        console.log("Browser artifact: " + file);
+        browserArtifact = file;
     }
-    for (const result of results) console.log((result.passed ? "[PASS] " : "[FAIL] ") + result.name);
     const fail = results.filter(r => !r.passed).length;
-    console.log(`First batch: PASS ${results.length - fail} / FAIL ${fail}${browser ? " (includes real Chromium DOM)" : " (VM only)"}`);
+    const passed = results.length - fail;
+    const mode = browser ? " (includes real Chromium DOM)" : " (VM only)";
+    const summary = `First batch: PASS ${passed} / FAIL ${fail}${mode}`;
+    const lines = results.map(r => (r.passed ? "[PASS] " : "[FAIL] ") + r.name);
+    const text = [...lines, summary].join("\n");
+    const payload = { scope: "first batch (confirm box lifecycle + personal winrate)", passed, failed: fail, total: results.length, summary, failures: results.filter(r => !r.passed).map(r => r.name), checks: lines, text };
+    if (browserArtifact) payload.browserArtifact = browserArtifact;
+    if (outDir) {
+        fs.mkdirSync(outDir, { recursive: true });
+        fs.writeFileSync(path.join(outDir, "results.json"), JSON.stringify(results, null, 2) + "\n");
+        fs.writeFileSync(path.join(outDir, "summary.txt"), text + "\n");
+        payload.out = outDir;
+    }
+    process.stdout.write(JSON.stringify(payload) + "\n");
     process.exitCode = fail ? 1 : 0;
 } catch (error) {
-    console.error("HARNESS_ERROR: " + error.stack);
+    const msg = "HARNESS_ERROR: " + error.stack;
+    console.error(msg);
+    process.stdout.write(JSON.stringify({ passed: 0, failed: 0, total: 0, harnessError: true, summary: msg, text: msg }) + "\n");
     process.exitCode = 2;
 }
