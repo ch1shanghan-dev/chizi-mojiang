@@ -1,7 +1,7 @@
-/* 自动生成于 2026-11-05T22:55:23.024Z by tools/release.js —— hashes 对应 Git 发布字节，发版后 git push 即生效，勿手改 files */
+/* 自动生成于 2026-11-06T17:49:08.523Z by tools/release.js —— hashes 对应 Git 发布字节，发版后 git push 即生效，勿手改 files */
 window.extension = {
 	"池子魔将": {
-		"build": "8876cb5a2b62535dcc2b7927e5749aec2c4070cc793f4454c59c8ce2767eb92f",
+		"build": "6ca301bce7d6209a50937e02cf65075341eb77ec95c1fd09c2bcc0a921ac3d05",
 		"hashes": {
 			"LICENSE": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
 			"README.md": "41102b34ebc984b6b84b361baa0e78aa9defe5633a4a270cde6ed0ff7bc9ae4d",
@@ -346,6 +346,7 @@ window.extension = {
 			"core/csh_selftest.js": "14e4acf537174481382c84370af8264027ea46cd0544731650bf675e20019ac4",
 			"core/csh_sfx.js": "ec1f16c1db81b13a1dc57ada2b30351a1a9337c78effeafb5511c186e6008540",
 			"core/csh_shell.js": "4cef80e055d889ebee96a0f704fe48902f214109471ca7fedf73666275f2c7a6",
+			"core/csh_spirit_buffs.js": "5cd06ef0728e9414756b39699948424980631b2e1c327945ab002e762cdd55db",
 			"core/csh_spirit_skins.js": "ab4a53b640fbcaeb2c45f64e2fdd4251ef24cf8ef2c26aec036660a046725703",
 			"core/csh_startup_recovery.js": "b601c05e3a4d8583c28966f09651d2490f633391da0bffc3d58296f56374c2d1",
 			"core/csh_svggen.js": "f19d55550094a1ae300fb60f877d37c293bdead6e280c7e75a10ed71c717e7ff",
@@ -1043,8 +1044,8 @@ window.extension = {
 		"author": "池上寒",
 		"intro": "<font color=#c9a84c>版本</font> <font color=#00FFFF>4.0.16</font>",
 		"version": "4.0.16",
-		"date": "2026-11-05",
-		"size": "137.4MB",
+		"date": "2026-11-06",
+		"size": "137.5MB",
 		"limits": {
 			"textBytes": 524288,
 			"fileBytes": 16777216,
@@ -1396,6 +1397,7 @@ window.extension = {
 			"core/csh_selftest.js",
 			"core/csh_sfx.js",
 			"core/csh_shell.js",
+			"core/csh_spirit_buffs.js",
 			"core/csh_spirit_skins.js",
 			"core/csh_startup_recovery.js",
 			"core/csh_svggen.js",

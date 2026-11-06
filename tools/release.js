@@ -126,7 +126,11 @@ console.log(`[release] 发布预检：${files.length} 文件，最大 ${(preflig
 if (checkMode) {
 	const cat = readCatalog();
 	const v = verifyCatalog(cat, blob);
-	const issues = v.mismatches.length + v.extraKeys.length + v.missingKeys.length + (v.buildOk ? 0 : 1);
+	/* 磁盘上存在、但清单里没有的文件，比哈希不符更危险：玩家在线更新不会下载它，
+	   代码一旦引用就是缺文件。verifyCatalog 只遍历 cat.files，看不见这种漏登记。 */
+	const catSet = new Set(cat.files);
+	const extraOnDisk = files.filter((f) => !catSet.has(f));
+	const issues = v.mismatches.length + v.extraKeys.length + v.missingKeys.length + (v.buildOk ? 0 : 1) + extraOnDisk.length;
 	console.log(JSON.stringify({
 		mode: "read-only",
 		version: cat.version,
@@ -135,9 +139,15 @@ if (checkMode) {
 		mismatchCount: v.mismatches.length,
 		extraHashKeys: v.extraKeys.length,
 		missingHashKeys: v.missingKeys.length,
+		extraDiskFiles: extraOnDisk.length,
 		buildOk: v.buildOk,
 		ok: issues === 0,
 	}, null, 2));
+	if (extraOnDisk.length) {
+		console.error("[release] 磁盘有但发布清单漏登记的文件（最多列 8 个）：");
+		for (const f of extraOnDisk.slice(0, 8)) console.error("  " + f);
+		console.error("  修复：运行 node tools/release.js 重新生成清单。");
+	}
 	if (v.mismatches.length) {
 		console.error("[release] 不一致文件（最多列 8 个）：");
 		for (const d of v.mismatches.slice(0, 8)) {
