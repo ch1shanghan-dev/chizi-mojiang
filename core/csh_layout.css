@@ -38,6 +38,17 @@
   --game-dock-h: clamp(52px, 13vh, 72px);
   --game-pad: clamp(6px, 1.2vw, 18px);
 
+  /* ---------- 视口令牌（§4.1 · 2026-11-07 纠偏）----------
+     数值就是各页 @media 实际在用的三档；JS 侧唯一真值在 core/csh_viewport.js。
+     media query 里不能用 var()，本组变量是文档与未来 @custom-media 迁移的单一来源。
+     ⚠ 330 / 500 不是「混用」：330 = 极矮横屏（640×286）额外收缩，
+       500 = 一般矮横屏（915×412 / 844×390）常规收缩；合并成 420 会挤爆极矮屏牌桌。
+     ⚠ art-direction.md §4.3：手机横屏宽度常 >760，不能因 width>760 就套桌面布局；
+       桌面档须同时满足 1365×768。 */
+  --csh-vp-tiny-h: 330px;
+  --csh-vp-short-h: 500px;
+  --csh-vp-narrow-w: 760px;
+
   /* 统一间距阶梯（禁止各页自造 mobileTop / shortScreen 之类分裂体系） */
   --gap-xs: clamp(3px, .5vw, 8px);
   --gap-sm: clamp(6px, .8vw, 12px);

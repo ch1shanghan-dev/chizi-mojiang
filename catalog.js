@@ -1,7 +1,7 @@
-/* 自动生成于 2026-11-07T14:22:48.936Z by tools/release.js —— hashes 对应 Git 发布字节，发版后 git push 即生效，勿手改 files */
+/* 自动生成于 2026-11-07T14:49:29.078Z by tools/release.js —— hashes 对应 Git 发布字节，发版后 git push 即生效，勿手改 files */
 window.extension = {
 	"池子魔将": {
-		"build": "d10dee3f37a53155a9ae7c1a59f8387319cc2be856af81a10c5b465d2dbf6758",
+		"build": "ece492333a99a714774c8f9c4ee26bd1e89554fd848f88d9420897aae26c29a7",
 		"hashes": {
 			"LICENSE": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
 			"README.md": "41102b34ebc984b6b84b361baa0e78aa9defe5633a4a270cde6ed0ff7bc9ae4d",
@@ -330,7 +330,7 @@ window.extension = {
 			"core/csh_interact_lines.js": "3fcb572f4c8c5d5d76f106c7f670e0ec85acb29b283d5215c25eebe36219fad3",
 			"core/csh_interact_lines_gen.js": "7f5c741c00077015e3309fe9df526d22aff5ba7c59fb0d8f0416c70330c72fcc",
 			"core/csh_journal.css": "b22ea4618c9af00c168bdae094332e6fe86f57319a2cfca747ba243939a2378e",
-			"core/csh_layout.css": "7bcc666701e0b327aca29eb9833639f9516acc04ec30fecdd44493738d3efae9",
+			"core/csh_layout.css": "ea6ff34a52c280a1bdab3617bcabede7ee46a673c1a4ab041fa8422072c75a2a",
 			"core/csh_market.js": "e103ae31d60b89bc4994a4aa25df1e39274982e1dc47c1fcfe2fea2893617805",
 			"core/csh_match_reward.js": "af18572aff53049e3c95b6275a7a672b6ced1a815c7966e41b05b76977354b47",
 			"core/csh_migrate.js": "69057b41e526724cf5201f43a3d8e35543976b59869c9b82ac1c171990bf5757",
@@ -362,6 +362,7 @@ window.extension = {
 			"core/csh_trick_tables.css": "2d5716939b60ed24578e96a070d4ab6797880532d11cc4a47ca65b5409344715",
 			"core/csh_uikit.js": "6be863f80ba7542cd4fe25931303f85421439be771f562d0137a03d4892009a9",
 			"core/csh_update.js": "edbc79fadf2686f5a77b63aa18a8d98af8ad3ab0d1e74663d26d8ba35e430fcd",
+			"core/csh_viewport.js": "1740cb8028b1f631b12bab1a2ecbf49d32b7bd8945d5246863a528801d875bd8",
 			"core/csh_voice.js": "4c6616186f89d559578a4fa63032daebc5c4d9223f0ecc39b68bd6831aa323c6",
 			"core/csh_wallet.js": "ceeff50a26c101a72352f04861a3519e8ac9c0b623563d9e3dcc2b7ab7a0f509",
 			"core/csh_winrate.js": "8dbd3146f396fbea2551691b42295329ce2ba89e3569d8c4e6ea63ee95b0190b",
@@ -1418,6 +1419,7 @@ window.extension = {
 			"core/csh_trick_tables.css",
 			"core/csh_uikit.js",
 			"core/csh_update.js",
+			"core/csh_viewport.js",
 			"core/csh_voice.js",
 			"core/csh_wallet.js",
 			"core/csh_winrate.js",

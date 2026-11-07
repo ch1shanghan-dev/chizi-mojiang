@@ -3393,6 +3393,8 @@ if (spawnOk && execFileSync && !ONLY_SYNTAX && !ONLY_VERSIONS) {
       ['E95V','probe_topup_journal_20261107.mjs',['--out',path.join(tmp95,'topup-journal')],48,'补码未决事务（prepare/commit/幂等退款/不白送钱，改前自检1红）',20000],
       /* S4：六类特色增益接线。一次性 consume / 持续型 activate 分路，改前基线能判红。 */
       ['E95W','probe_spirit_buffs_wired_20261107.mjs',['--out',path.join(tmp95,'spirit-wired')],41,'妖灵六类增益接线（首触生效/二触拒绝/零副作用，改前自检1红）',20000],
+      /* 方案 4.1 纠偏：四档视口分类 + 断点基线锁定，禁止新增随意数值。 */
+      ['E95X','probe_viewport_tokens_20261107.mjs',['--out',path.join(tmp95,'viewport')],35,'横屏视口令牌（四档分类/断点基线/不套桌面，改前自检1红）',20000],
     ];
     for (const [tag95, script95, args95, min95, label95, timeout95] of reg95) {
       const r95 = runProbeJson(script95, args95, { timeout: timeout95 });
