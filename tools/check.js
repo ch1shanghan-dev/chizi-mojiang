@@ -3403,6 +3403,10 @@ if (spawnOk && execFileSync && !ONLY_SYNTAX && !ONLY_VERSIONS) {
       ['E95AA','probe_feedback_error_boundary_20261108.mjs',['--out',path.join(tmp95,'feedback-boundary')],125,'成就反馈错误边界（不抛出/不弹Alert/形状安全，改前自检1红）',20000],
       /* PF-08 第一批：名录搜索 + 关系摘要 + 低频内容收纳，纯 UI 只读。 */
       ['E95AB','probe_codex_hierarchy_20261108.mjs',['--out',path.join(tmp95,'codex-hierarchy')],39,'图鉴信息层级（搜索纯过滤/摘要只读/材质与断点约束，改前自检3红）',20000],
+      /* B1 归档探针长期无入口（B13 差集里的孤儿）：实测仅 4.4s，不该塞 >30s 慢速通道，直接进日常门禁。 */
+      ['E95AC','probe_feedback_archive_20261105.mjs',['--out',path.join(tmp95,'feedback-archive')],18,'成就通知归档（跨重启/分页/容量/写失败，Chromium 实测4.4s）',60000],
+      /* G1：断点逐值收敛的迁移真值。只给依据、零 CSS 改动；完备性/方向/单调/基线对账。 */
+      ['E95AD','probe_viewport_migration_20261108.mjs',['--out',path.join(tmp95,'viewport-migration')],37,'断点迁移真值（按轴24种/6档目标/68处高风险，改前自检3红）',20000],
     ];
     for (const [tag95, script95, args95, min95, label95, timeout95] of reg95) {
       const r95 = runProbeJson(script95, args95, { timeout: timeout95 });

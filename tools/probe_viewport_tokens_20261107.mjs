@@ -29,7 +29,8 @@ const V = load(src);
 if (!V) throw Error('CSHViewport not mounted');
 
 /* ---------- 模块与四档分类 ---------- */
-check('视口模块挂载、版本、导出冻结', V.VERSION === 1 && Object.isFrozen(V) &&
+/* v2 增加断点迁移真值（G1），分类与 TOKENS 数值未变；随模块版本同步此断言。 */
+check('视口模块挂载、版本、导出冻结', V.VERSION === 2 && Object.isFrozen(V) &&
   Object.isFrozen(V.TOKENS) && Object.isFrozen(V.PROFILES));
 check('令牌数值按实测三档 + 桌面下限',
   V.TOKENS.tinyMaxHeight === 330 && V.TOKENS.shortMaxHeight === 500 && V.TOKENS.narrowMaxWidth === 760 &&
