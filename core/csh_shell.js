@@ -123,6 +123,9 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 	/* ---------- 状态 ---------- */
 	var current = null;      // 当前游戏 key
 	var currentBuyIn = 0;    // 本次入场带入（已在收费屏扣除；供子页面读取，§4.1.1）
+	/* 德州补码（§3.1）：入场原始带入与补码累计分开记。unit 只能用原始带入算，
+	   否则第二次补码的额度基准会随 currentBuyIn 累加而漂移。 */
+	var topUpBaseBuyIn = 0, topUpCount = 0, topUpTotal = 0;
 	var paused = false;
 	var pausedAuto = false;   // 本次暂停是否自动触发（失焦/切页）。手动暂停不参与「回前台自动恢复」
 	var msgBound = false;
@@ -1299,6 +1302,8 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 		   现在统一在 paintTop 之前从 opts.buyIn 取真值（doCharge 传的就是它）。 */
 		current = key;
 		currentBuyIn = Math.max(0, Math.floor(Number(opts && opts.buyIn) || 0));
+		/* 新入场重置补码状态：次数是「每桌」而不是「每账号」。 */
+		topUpBaseBuyIn = currentBuyIn; topUpCount = 0; topUpTotal = 0;
 		ensureStyle();
 		bindMessage(); bindEsc(); bindVisibility();
 		/* 新入场 = 新会话：清空结算守卫（上一局的"已结算"不能带到这一局） */
@@ -1366,7 +1371,7 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 		/* 2026-09-29 优化：关壳前强制落盘最后一拍（钱包已改合并写盘，避免退出瞬间丢 ≤250ms 改动） */
 		try { var _W = wallet(); if (_W && typeof _W.flushSave === "function") _W.flushSave(); } catch (eFs) {}
 		if (!silent) logInfo("关壳 " + (current || "?"));
-		current = null; paused = false; currentBuyIn = 0; SAVE_SESSION = null;
+		current = null; paused = false; currentBuyIn = 0; topUpBaseBuyIn = 0; topUpCount = 0; topUpTotal = 0; SAVE_SESSION = null;
 		/* 【2026-09-30 修复 · 配乐叠播】退出小游戏后恢复主页面 BGM。
 		   只有当「池子休闲面板还开着」才恢复 —— 玩家会回到面板继续挑游戏；
 		   若面板已关（例如从悬浮球直接开局再退出），则不擅自起播，
@@ -1453,7 +1458,7 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 			var migReply = typeof cmd === "string" && cmd.indexOf("shell-mig-") === 0 ? captureMigReply(e, req0) : null;
 			/* 这些命令包含进度写入；先拒绝，不能让下层空结果变成成功 ACK。
 			   只读查询、关闭和行囊恢复入口仍可使用。 */
-			var mutatesSave = ["shell-settle", "shell-settle-session", "shell-task-add", "shell-merit",
+			var mutatesSave = ["shell-settle", "shell-settle-session", "shell-topup", "shell-task-add", "shell-merit",
 				"shell-sign", "shell-relief", "shell-career-sync", "shell-ach-claim", "shell-ach-claim-all", "shell-pool-ach-claim", "shell-pool-ach-claim-all", "shell-trade", "shell-goldfish", "shell-market-new",
 				"shell-aff-do", "shell-cheer", "shell-cheer-ack", "shell-cheer-import", "shell-bounty", "shell-seat", "shell-world-round",
 				"shell-world-result", "shell-world-finish"].indexOf(cmd) >= 0 || (cmd === "shell-open" && !(META[d.key] && META[d.key].lobby));
@@ -1489,6 +1494,34 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 			}
 			/* 经济桥（§4.1.1）：子页面请求宿主钱包快照 */
 			if (cmd === "shell-wallet") { ackToGame("shell-wallet", true, walletSnapshot()); return; }
+			/* 德州补码（2026-11-07 · 方案 §3.1）：走与开局带入同一条出账路径 spendPC，
+			   读回确认后才回 ACK；页面收到 ACK 才增加桌面筹码。宿主侧独立校验次数与额度，
+			   不信任子页面传来的金额，防止伪造 postMessage 刷钱。 */
+			if (cmd === "shell-topup") {
+				var WT = wallet(), amt = Math.max(0, Math.floor(Number(d && d.amount) || 0));
+				var topUnit = Math.max(1, Math.ceil(topUpBaseBuyIn / 10));
+				if (current !== "texas" || !WT || typeof WT.wallet.spend !== "function" || typeof WT.wallet.pc !== "function") {
+					ackToGame(cmd, false, { ok: false, reason: "补码通道未就绪" }); return;
+				}
+				if (!Number.isSafeInteger(amt) || amt <= 0 || amt % topUnit !== 0 || amt > topUpBaseBuyIn) {
+					ackToGame(cmd, false, { ok: false, reason: "补码额度无效" }); return;
+				}
+				if (topUpCount >= 2) { ackToGame(cmd, false, { ok: false, reason: "本桌补码已达 2 次上限" }); return; }
+				var pcBefore = WT.wallet.pc();
+				if (!Number.isSafeInteger(pcBefore) || pcBefore < amt) {
+					ackToGame(cmd, false, { ok: false, reason: "余额不足" }); return;
+				}
+				var spent = WT.wallet.spend(amt, "德州补码");
+				if (spent !== true) { ackToGame(cmd, false, { ok: false, reason: "扣款被拒绝，桌面筹码未变" }); return; }
+				if (WT.wallet.pc() !== pcBefore - amt) {
+					/* 绝不出现「扣了钱没上桌」：读回不一致就回补并如实失败，页面可重试。 */
+					try { WT.wallet.add(amt, "补码读回回补"); } catch (eRb) {}
+					ackToGame(cmd, false, { ok: false, reason: "扣款读回不一致，已回补，请重试" }); return;
+				}
+				topUpCount++; topUpTotal += amt; currentBuyIn += amt;
+				ackToGame(cmd, true, { ok: true, amount: amt, balance: WT.wallet.pc(), buyIn: currentBuyIn, count: topUpCount, total: topUpTotal });
+				return;
+			}
 			/* ★ 账本（v6.2）：池子币的**来源与去处**（作者："就是做账，账本"）。
 			   d.days = 热力格天数（缺省 42 = 6 周，GitHub 贡献图同款口径）。
 			   单列一条命令而**不并进 walletSnapshot**：账本最多 400 条，

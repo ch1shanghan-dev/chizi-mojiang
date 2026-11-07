@@ -1254,6 +1254,8 @@ var Bridge = (function () {
     settleSession: function (payload, cb) {
       T.settle('shell-settle-session', payload, cb, 4000);
     },
+    /* 补码（§3.1）：宿主扣款成功且读回确认后才应答，页面收到应答才加桌面筹码。 */
+    topUp: function (amount, cb) { call('shell-topup', { key: 'texas', amount: amount }, cb, 3000); },
     /* 每日任务上报（唯一真值在 csh_wallet，生涯大厅读同一份） */
     taskAdd: function (kind, n, cb) { call('shell-task-add', { kind: kind, n: n }, cb); },
   };
@@ -1664,6 +1666,8 @@ function makeSession() {
     minChips: buyIn,          /* 本场最低筹码（绝地翻盘判定） */
     noFoldStreak: 0,          /* 连续未弃牌手数（寸土不让判定） */
     handCount: 0,             /* 本场已打手数 */
+    /* 补码（§3.1）：入场原始带入 = buyIn - topUpTotal，额度基准不随补码累加漂移。 */
+    topUps: 0, topUpTotal: 0, topUpPending: false,
     /* 台下可赢总额 = 同桌 AI 实际带入合计（自然封顶，§H.1） */
     aiStakeTotal: seats.reduce(function (s, x) { return s + (x.stake || 0); }, 0),
   };
@@ -2323,6 +2327,50 @@ function announceAction(idx, text) {
 }
 
 /* ============================================================
+   真实补码（2026-11-07 · 方案 §3.1）
+   只在一手结算完成、下一手发牌前提供；额度 / 次数 / 状态转移由 core/csh_topup.js 统一算。
+   ★ 头号红线：桌面筹码 +N 时 G.buyIn 必须同时 +N —— endSession 拿 G.buyIn 当本金基数，
+     不同步累加就会把补码的钱算成「盈利」发回钱包，等于刷钱。
+   ============================================================ */
+function topUpApi(){try{return (typeof window!=='undefined'&&window.CSHTexasTopUp)||null;}catch(e){return null;}}
+function topUpQuote(){
+  var A=topUpApi();
+  if(!A||!G)return {ok:false,reason:'补码模块未就绪'};
+  if(!Bridge.active)return {ok:false,reason:'补码需要宿主钱包'};   /* 离线调试没有真钱包，不提供 */
+  var me=G.players[0],base=Math.max(0,(Number(G.buyIn)||0)-(Number(G.topUpTotal)||0));
+  var snap=Bridge.snapshot&&Bridge.snapshot();
+  var settled=!!(G.ledger&&G.ledger.roundId===(G.sessionId+':'+G.handNo));
+  return A.quote({
+    minBuyIn:base,tableChips:me.chips,walletBalance:snap&&Number(snap.pc)||0,
+    used:G.topUps||0,handOver:!!G.over,sessionOver:!!G.sessionOver,settled:settled,
+    conservationFailed:!!G.conservationFailed,pending:!!G.topUpPending
+  });
+}
+function requestTopUp(btn){
+  var A=topUpApi(),q=topUpQuote();
+  if(!q.ok){toast(q.reason,'bad');return;}
+  var session=G,hand=G.handNo,amount=q.amount;
+  var base=Math.max(0,(Number(G.buyIn)||0)-(Number(G.topUpTotal)||0));
+  G.topUpPending=true;if(btn)btn.disabled=true;
+  Bridge.topUp(amount,function(ok,data){
+    /* 迟到回调隔离：会话 / 手数 / 结算状态变了，绝不把钱写进旧桌。 */
+    if(G!==session||G.sessionOver||G.handNo!==hand||!G.over){if(btn)btn.disabled=false;return;}
+    G.topUpPending=false;
+    if(!ok||!data||data.ok===false||data.amount!==amount){
+      if(btn)btn.disabled=false;toast('补码未成功，桌面筹码未变，可重试','bad');return;
+    }
+    var me=G.players[0];
+    var next=A.apply({chips:me.chips,buyIn:G.buyIn,topUpTotal:G.topUpTotal,topUps:G.topUps},amount,base);
+    if(!next){if(btn)btn.disabled=false;toast('补码状态校验失败，桌面筹码未变','bad');return;}
+    me.chips=next.chips;G.buyIn=next.buyIn;G.topUpTotal=next.topUpTotal;G.topUps=next.topUps;
+    if(Bridge.active&&typeof syncBankFromWallet==='function')syncBankFromWallet();
+    renderHud();
+    toast('补码 +'+fmt(amount)+' CBY 已上桌，本金同步计入');
+    showHandBanner();   /* 重绘按钮区：额度/次数刷新，输光分支变回「下一手」 */
+  });
+}
+
+/* ============================================================
    本场结束 / 收工（手内已计场供，整场不叠折扣，沿用收益封顶）
    ============================================================ */
 var DECAY_TEXAS = 1;    /* 盈利回收率（§4.1.1） */
@@ -2964,6 +3012,13 @@ function showHandBanner() {
     row.appendChild(mkBtn('下一手', 'btn', function () { hideBanner(); startHand(); }));
   } else {
     row.appendChild(mkBtn('本场结算', 'btn', function () { hideBanner(); endSession('bust'); }));
+  }
+  /* 补码（§3.1）：两种分支都提供 —— 输光时正是「补码重上桌」的场景。
+     不自动补码、不自动开下一手；拒绝或点「收工」随时可走。 */
+  var tq = topUpQuote();
+  if (tq.ok) {
+    var topBtn = mkBtn('补码 +' + fmt(tq.amount) + ' CBY', 'btn ghost', function () { requestTopUp(topBtn); });
+    row.appendChild(topBtn);
   }
   row.appendChild(mkBtn('收工', 'btn ghost', function () { hideBanner(); endSession('quit'); }));
   $('#banner').classList.remove('hidden');
