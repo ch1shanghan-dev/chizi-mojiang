@@ -1,7 +1,7 @@
-/* 自动生成于 2026-11-06T18:16:14.307Z by tools/release.js —— hashes 对应 Git 发布字节，发版后 git push 即生效，勿手改 files */
+/* 自动生成于 2026-11-07T07:33:51.212Z by tools/release.js —— hashes 对应 Git 发布字节，发版后 git push 即生效，勿手改 files */
 window.extension = {
 	"池子魔将": {
-		"build": "8dcbd663675c80c390d7599f9fe21e80db2e1a0dfcb49a274a7684672a1b7c73",
+		"build": "d5be141f7f882ed5a479fee7a361f9e1f3f0618adbf1a50e26b4526635bb7230",
 		"hashes": {
 			"LICENSE": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
 			"README.md": "41102b34ebc984b6b84b361baa0e78aa9defe5633a4a270cde6ed0ff7bc9ae4d",
@@ -310,7 +310,7 @@ window.extension = {
 			"core/csh_aff_lines.js": "a08e3a944e845310c47e035385d6db12668e79cbed2026a3ac9576183630f1ab",
 			"core/csh_affection.js": "b57c1bbab04f325e5d5658f69c2c85e4f8050f200dcc66513e0842edadb8bdf3",
 			"core/csh_art.js": "0618ccdeb6e9a78b688ec9369908b43c22e4378e82ac93de4dc62e991b081520",
-			"core/csh_aux_spirit.js": "8b4256fbfa4555ec987acd80bd7b43769e5d3c374e6aa62db102e247430e7e5d",
+			"core/csh_aux_spirit.js": "e959cf6b55fd7bb7a95672595adf81bb893398ca62e4a0f95e1e8b093e09a8fc",
 			"core/csh_badge.js": "e181a7f3d22ecf40575f0b3078e983465237b33c5835d5c7622dba24c61277e1",
 			"core/csh_bgm.js": "7fe7e9fbbf3943b2b9a7f71ee8ecc89cee20bba52fdd535234ff66d4fe5fa96c",
 			"core/csh_bond.js": "250104a172023dae2e51e6f46d8af381fd413cdc44f30a288c011b4baac0e6ab",
@@ -346,6 +346,7 @@ window.extension = {
 			"core/csh_selftest.js": "14e4acf537174481382c84370af8264027ea46cd0544731650bf675e20019ac4",
 			"core/csh_sfx.js": "ec1f16c1db81b13a1dc57ada2b30351a1a9337c78effeafb5511c186e6008540",
 			"core/csh_shell.js": "4cef80e055d889ebee96a0f704fe48902f214109471ca7fedf73666275f2c7a6",
+			"core/csh_spirit_buff_runtime.js": "b091fd5c26fcddb13a1eceaa7311eccc8aa0ff79183ad2621a7472b1547fcb9a",
 			"core/csh_spirit_buffs.js": "5cd06ef0728e9414756b39699948424980631b2e1c327945ab002e762cdd55db",
 			"core/csh_spirit_skins.js": "ab4a53b640fbcaeb2c45f64e2fdd4251ef24cf8ef2c26aec036660a046725703",
 			"core/csh_startup_recovery.js": "b601c05e3a4d8583c28966f09651d2490f633391da0bffc3d58296f56374c2d1",
@@ -1044,7 +1045,7 @@ window.extension = {
 		"author": "池上寒",
 		"intro": "<font color=#c9a84c>版本</font> <font color=#00FFFF>4.0.16</font>",
 		"version": "4.0.16",
-		"date": "2026-11-06",
+		"date": "2026-11-07",
 		"size": "137.5MB",
 		"limits": {
 			"textBytes": 524288,
@@ -1397,6 +1398,7 @@ window.extension = {
 			"core/csh_selftest.js",
 			"core/csh_sfx.js",
 			"core/csh_shell.js",
+			"core/csh_spirit_buff_runtime.js",
 			"core/csh_spirit_buffs.js",
 			"core/csh_spirit_skins.js",
 			"core/csh_startup_recovery.js",

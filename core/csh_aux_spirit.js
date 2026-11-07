@@ -22,6 +22,9 @@ export function installAuxSpirit(host) {
   if(lib.cshAuxSpirit)return lib.cshAuxSpirit;
   let run=null,timer=null;
   const aliases=[];
+  /* S2：增益运行态是可选模块（纯内存、零依赖）。宿主没加载它时整条增益链静默跳过，
+     既有助战流程一行不变；所有调用都包在 try 里。 */
+  function buffRuntime(){try{var w=typeof window!=='undefined'?window:null;return w&&w.CSHSpiritBuffRuntime?w.CSHSpiritBuffRuntime:null;}catch(e){return null;}}
   function summary(){
     if(!run)return null;const p=run.spirit,ownerAlive=!!(run.owner&&run.owner.isIn()),alive=!!(p&&p.isIn()),guardLeft=Math.max(0,3-Number(p&&p.storage.cshAuxGuard||0)),aidLeft=Math.max(0,3-Number(p&&p.storage.cshAuxAid||0)),rescueReady=!(p&&p.storage.cshAuxRescue);
     let state=!p?'waiting':!alive?'dead':!ownerAlive?'owner-dead':'active',reason='';
@@ -56,7 +59,10 @@ export function installAuxSpirit(host) {
   function restore(){
     if(!run)return;
     for(const [key,item]of Object.entries(run.hooks||{}))if(game[key]===item.wrapper)game[key]=item.previous;
-    if(timer!==null){clearTimeout(timer);timer=null;}for(const p of [run.owner,run.spirit])if(p&&p.unmarkSkill)try{p.unmarkSkill('csh_aux_status');}catch(e){}if(run.owner&&run.owner.storage)delete run.owner.storage.cshAssistedMatch;run=null;delete status.cshAssistedMatch;
+    if(timer!==null){clearTimeout(timer);timer=null;}for(const p of [run.owner,run.spirit])if(p&&p.unmarkSkill)try{p.unmarkSkill('csh_aux_status');}catch(e){}if(run.owner&&run.owner.storage)delete run.owner.storage.cshAssistedMatch;
+    /* 助战结束 / 换局 / 召唤回滚：本局计数不残留，迟到回包找不到会话。 */
+    try{const RT=buffRuntime();if(RT)RT.end(run.id);}catch(e){}
+    run=null;delete status.cshAssistedMatch;
   }
   function hook(key,fn){const previous=game[key];if(typeof previous!=='function')throw Error('缺少 '+key);const wrapper=function(...args){return fn.call(this,previous,args);};run.hooks[key]={previous,wrapper};game[key]=wrapper;}
   function retry(){timer=null;if(!run||run.cancelled||run.result===undefined||run.saved||lib.cshWallet.saveEpoch()!==run.epoch)return;
@@ -65,7 +71,10 @@ export function installAuxSpirit(host) {
     if(result.ok){run.saved=true;if(!result.already)toast((run.fallback?'本局':'妖灵助战')+(run.result?'胜利':'完局')+'，获得 '+(Number.isSafeInteger(result.gained)?result.gained:0)+' CBY');}else {if(!run.saveNotice){toast(result.durable?'本局结果与奖励已保留，恢复存储后会自动补记':'本局结果暂未写入本机，请保持页面打开并恢复存储');run.saveNotice=true;}timer=setTimeout(retry,2000);}refresh();}
   function arm(){
     if(run&&run.owner===game.me&&run.epoch===lib.cshWallet.saveEpoch())return run;
-    restore();const reason=spiritEligibility({lib,game,get,status});if(reason){if(lib.config.extension_池子魔将_csh_aux_spirit)toast('妖灵未预约：'+reason);return null;}
+    restore();
+    /* 换档隔离：不属于当前存档代次的增益会话一律清掉。 */
+    try{const RT=buffRuntime();if(RT)RT.switchEpoch(lib.cshWallet.saveEpoch());}catch(e){}
+    const reason=spiritEligibility({lib,game,get,status});if(reason){if(lib.config.extension_池子魔将_csh_aux_spirit)toast('妖灵未预约：'+reason);return null;}
     run={id:'spirit-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2),epoch:lib.cshWallet.saveEpoch(),owner:game.me,ownerIdentity:game.me.identity,engaged:false,spirit:null,hooks:{},result:undefined,saved:false,summoning:false};status.cshAssistedMatch=true;
     const normal=lib.cshMatchReward&&typeof lib.cshMatchReward.session==='function'?lib.cshMatchReward.session():null;run.rewardId=normal&&normal.id||run.id;
     for(const key of ['swapPlayer','swapControl'])hook(key,function(previous,args){if(args.some(p=>p&&p._cshAuxSpirit))return;return previous.apply(this,args);});
@@ -92,6 +101,16 @@ export function installAuxSpirit(host) {
       if(!sameSession()||!spirit||game.players.length!==before.length+1||!game.players.includes(spirit))throw Error('召唤会话已失效或扩席未完成');
       spirit._cshAuxSpirit=true;spirit._cshAuxSource='csh_boss_minion_'+name.slice('csh_aux_'.length);spirit._cshAuxOwner=human;spirit.identity=human.identity==='fan'?'fan':'zhong';spirit.identityShown=true;spirit.isZhu=false;spirit.ai.shown=1;spirit.setIdentity();
       spirit.storage.cshAuxiliarySpirit=true;human.storage.cshAssistedMatch=true;current.spirit=spirit;
+      /* S2：用真实助战妖灵 id 与当前好感档位建立本局运行态；B 以下不解锁，
+         数据层缺失 / 好感接口异常时静默不启用，绝不默认放行。 */
+      try{
+        const RT=buffRuntime();
+        if(RT){
+          let level='D';
+          try{const AF=lib.cshAffection||(typeof window!=='undefined'&&window.CSH&&window.CSH.affection)||null;const info=AF&&typeof AF.get==='function'?AF.get(spirit._cshAuxSource):null;if(info&&typeof info.level==='string')level=info.level;}catch(eLv){}
+          RT.begin({sessionId:current.id,spiritId:spirit._cshAuxSource,level:level,epoch:current.epoch});
+        }
+      }catch(eRt){}
       game.addVideo('cshAuxSpawn',null,{position:Number(spirit.dataset.position),name:spirit.name,identity:spirit.identity,owner:Number(human.dataset.position)});
       await spirit.draw(4);
       if(!sameSession())throw Error('入场等待期间会话已变化');

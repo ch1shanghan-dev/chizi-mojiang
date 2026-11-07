@@ -3383,6 +3383,8 @@ if (spawnOk && execFileSync && !ONLY_SYNTAX && !ONLY_VERSIONS) {
          与 mode/identity.js 都在，此前「本副本跑不起来」是路径层数测错，不是缺文件。
          266 条覆盖真实 addPlayerOL / identity checkResult / 钱包 / 迁移 / 迟到回调。 */
       ['E95R','probe_aux_spirit.mjs',[],266,'妖灵助战宿主回归（真实扩席与身份结算，266条）',120000],
+      /* S2/S3：增益运行态与助战接线。六类每局一次、迟到回调、关闭重开、换档隔离、零副作用。 */
+      ['E95S','probe_spirit_buff_runtime_20261107.mjs',['--out',path.join(tmp95,'spirit-runtime')],46,'妖灵增益运行态（六类一次性/零副作用，改前自检3红）',20000],
     ];
     for (const [tag95, script95, args95, min95, label95, timeout95] of reg95) {
       const r95 = runProbeJson(script95, args95, { timeout: timeout95 });
