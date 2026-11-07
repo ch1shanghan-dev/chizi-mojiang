@@ -3379,6 +3379,10 @@ if (spawnOk && execFileSync && !ONLY_SYNTAX && !ONLY_VERSIONS) {
       ['E95P','probe_spirit_buffs_20261107.mjs',['--out',path.join(tmp95,'spirit-buffs')],17,'妖灵增益数据层（50条/MINIONS对账/只读红线）',20000],
       /* D1：第四款德州 AI 牌风 trapper + 世界 12 牌风完整映射；内置改前基线自检，防止断言退化。 */
       ['E95Q','probe_texas_persona_20261107.mjs',['--out',path.join(tmp95,'texas-persona')],32,'第四款AI牌风与世界12牌风映射（改前自检16红）',20000],
+      /* E1：救回长期无门禁入口的妖灵助战宿主回归。实测宿主夹具 ext/app/noname/game/index.js
+         与 mode/identity.js 都在，此前「本副本跑不起来」是路径层数测错，不是缺文件。
+         266 条覆盖真实 addPlayerOL / identity checkResult / 钱包 / 迁移 / 迟到回调。 */
+      ['E95R','probe_aux_spirit.mjs',[],266,'妖灵助战宿主回归（真实扩席与身份结算，266条）',120000],
     ];
     for (const [tag95, script95, args95, min95, label95, timeout95] of reg95) {
       const r95 = runProbeJson(script95, args95, { timeout: timeout95 });

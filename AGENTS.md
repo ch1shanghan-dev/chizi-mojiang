@@ -247,9 +247,9 @@
 > 反复出现 `[RETRY]` 是待办信号：去修该探针的真实时钟/随机依赖，不要长期靠重试续命。
 > 背景与边界见 `docs/audit/WORKBUDDY_B4_GATE_RETRY_20261105.md`。
 >
-> **2026-11-06 三条验证入口，别混用**：
-> ① 日常门禁 `node tools/check.js`（E95A–O 注册区已覆盖 15 个关键专项，含注册自检 E95L/M）；
-> ② 更新链路一键复核 `node tools/check_update_suite.mjs --out <D盘目录>`（14/14）；
+> **2026-11-06 三条验证入口，别混用**（2026-11-07 E1 校正数量与范围）：
+> ① 日常门禁 `node tools/check.js`（E95A–R 注册区已覆盖 17 个关键专项，含注册自检 E95L/M）；
+> ② 更新链路一键复核 `node tools/check_update_suite.mjs --out <D盘目录>`（15/0）；
 > ③ **慢速通道** `node tools/check_slow_suite.mjs --out <D盘目录> [--only <探针名>]`
 > —— 8 个 >30s 的 Chromium 探针，整条约 8 分钟，**不进日常门禁**，发布前或怀疑回归时手动跑。
 > `probe_achievement_quality.mjs` 约 90s、默认 20s 超时会被误杀，只能走③。
@@ -257,6 +257,13 @@
 > 会硬查注册行是否指向不存在的文件、以及 6 个关键专项是否仍被覆盖；差集只报告不判失败。
 > 报告：`WORKBUDDY_B13_REGISTRY_GUARD_20261106.md` / `WORKBUDDY_B14_SLOW_SUITE_20261106.md`。
 > 跑浏览器类探针时**显式 `--out` 到 D 盘**，否则会覆盖 `docs/audit/ui/` 下的界面基线截图。
+>
+> **2026-11-07 E1 宿主夹具位置（别再数错层数）**：`tools/lib/skill_audit.mjs` 的 `root` 是**扩展根**；
+> `probe_aux_spirit.mjs` 读 `root+'/../../noname/game/index.js'` = `ext/app/noname/game/index.js`，
+> 与 `ext/app/mode/identity.js` **两份都在**，实跑 `node tools/probe_aux_spirit.mjs` **266/0**，
+> 已注册门禁 **E95R**。B1 记的「缺 `ext/app/index.html`，真实宿主专项起不来」指**另一个**
+> 需要 `index.html` 的宿主专项，与妖灵助战探针无关，别混读成 S2 无法验证。
+> 代码目录已挂为工作区内目录联接 `repo/`，后续读写走 `repo/...`，不触发工作区外读取询问。
 >
 > **2026-11-05 行囊跨版本纪律（作者要求：不修老版本，新版本与在线更新必须可靠）**：
 > 1) 新增存档键必须允许旧行囊缺失（清洗器对 `null/undefined` 返回 `null` 跳过，不抛错拒绝整包）；
