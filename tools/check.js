@@ -3395,6 +3395,10 @@ if (spawnOk && execFileSync && !ONLY_SYNTAX && !ONLY_VERSIONS) {
       ['E95W','probe_spirit_buffs_wired_20261107.mjs',['--out',path.join(tmp95,'spirit-wired')],41,'妖灵六类增益接线（首触生效/二触拒绝/零副作用，改前自检1红）',20000],
       /* 方案 4.1 纠偏：四档视口分类 + 断点基线锁定，禁止新增随意数值。 */
       ['E95X','probe_viewport_tokens_20261107.mjs',['--out',path.join(tmp95,'viewport')],35,'横屏视口令牌（四档分类/断点基线/不套桌面，改前自检1红）',20000],
+      /* 方案 4.3：人物回应任务生命周期。迟到守卫提前 return 时必须释放 job，改前基线两红。 */
+      ['E95Y','probe_interact_reply_20261107.mjs',['--out',path.join(tmp95,'interact-reply')],63,'人物回应队列（一次一条/迟到不串台/丢弃释放，改前自检2红）',20000],
+      /* S4 图鉴展示：50 条只读增益 + 好感 B 解锁态，零存档零钱包，改前基线三红。 */
+      ['E95Z','probe_codex_spirit_buff_20261107.mjs',['--out',path.join(tmp95,'codex-buff')],35,'图鉴助战增益展示（50条/档位/只读/XSS防护，改前自检3红）',20000],
     ];
     for (const [tag95, script95, args95, min95, label95, timeout95] of reg95) {
       const r95 = runProbeJson(script95, args95, { timeout: timeout95 });

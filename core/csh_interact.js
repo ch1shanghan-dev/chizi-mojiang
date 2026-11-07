@@ -160,7 +160,8 @@ import GEN_LINES from "./csh_interact_lines_gen.js";
       if(!isEnabled()||cfg(KEY.chat,true)===false||!manualAllowed(job.from,job.to)||Date.now()-manualReplyAt<6000)return;
       var bank=PLAYER_PROP_REPLY[job.kind],lines=bank&&(bank[personaOf(job.to)]||bank.base),line=pickLine(lines);
       if(!line)return;manualReplyAt=Date.now();manualReplyJob=job;
-      queueScene(function(){if(manualReplyJob!==job)return;manualReplyJob=null;if(job.saveEpoch===manualSaveEpoch()&&manualAllowed(job.from,job.to)){try{job.to.chat(line);}catch(e){logError('玩家互动回应',e);}}},650,job.to,job.from,true);
+      queueScene(function(){if(manualReplyJob!==job)return;manualReplyJob=null;if(job.saveEpoch===manualSaveEpoch()&&manualAllowed(job.from,job.to)){try{job.to.chat(line);}catch(e){logError('玩家互动回应',e);}}},650,job.to,job.from,true,
+        function(){if(manualReplyJob===job){manualReplyJob=null;manualReplyAt=0;}});
     }
 	function propStatus(){var b=manualBatch||manualLast;return b?{busy:!!manualBatch,kind:b.kind,requested:b.quantity,sent:b.sent,reason:b.reason||""}:{busy:false,requested:0,sent:0};}
 	function ensurePropStyle(){
@@ -924,16 +925,19 @@ import GEN_LINES from "./csh_interact_lines_gen.js";
 		sceneTimers.forEach(function (timer) { clearTimeout(timer); });
 		sceneTimers.clear();
 	}
-	function queueScene(callback, delay, speaker, other, chat) {
+	function queueScene(callback, delay, speaker, other, chat, onDrop) {
 		var epoch = sceneEpoch;
 		var chatEpoch = sceneChatEpoch;
 		var players = game.players;
 		var timer = setTimeout(function () {
 			sceneTimers.delete(timer);
-			if (epoch !== sceneEpoch || players !== game.players || !isEnabled() || _status.over) return;
-			if (!isAI(speaker) || game.players.indexOf(speaker) < 0) return;
-			if (other && (!usable(other) || game.players.indexOf(other) < 0)) return;
-			if (chat && (chatEpoch !== sceneChatEpoch || cfg(KEY.chat, true) === false)) return;
+			/* 表现被丢弃时必须通知调用方释放引用（§4.3）：否则迟到守卫直接 return，
+			   排在 callback 里的任务清理永远跑不到，旧 job 会一直悬挂并占住节流。 */
+			function drop() { if (typeof onDrop === "function") { try { onDrop(); } catch (e) {} } }
+			if (epoch !== sceneEpoch || players !== game.players || !isEnabled() || _status.over) return drop();
+			if (!isAI(speaker) || game.players.indexOf(speaker) < 0) return drop();
+			if (other && (!usable(other) || game.players.indexOf(other) < 0)) return drop();
+			if (chat && (chatEpoch !== sceneChatEpoch || cfg(KEY.chat, true) === false)) return drop();
 			callback();
 		}, delay);
 		sceneTimers.add(timer);
