@@ -3384,7 +3384,7 @@ if (spawnOk && execFileSync && !ONLY_SYNTAX && !ONLY_VERSIONS) {
          266 条覆盖真实 addPlayerOL / identity checkResult / 钱包 / 迁移 / 迟到回调。 */
       ['E95R','probe_aux_spirit.mjs',[],266,'妖灵助战宿主回归（真实扩席与身份结算，266条）',120000],
       /* S2/S3：增益运行态与助战接线。六类每局一次、迟到回调、关闭重开、换档隔离、零副作用。 */
-      ['E95S','probe_spirit_buff_runtime_20261107.mjs',['--out',path.join(tmp95,'spirit-runtime')],46,'妖灵增益运行态（六类一次性/零副作用，改前自检3红）',20000],
+      ['E95S','probe_spirit_buff_runtime_20261107.mjs',['--out',path.join(tmp95,'spirit-runtime')],64,'妖灵增益运行态（一次性/持续型/零副作用，改前自检4红）',20000],
       /* 方案 3.2 纠偏：只做同角色跨桌冷却；分档、降级、不改公平性由纯函数反例锁住。 */
       ['E95T','probe_seat_cooldown_20261107.mjs',['--out',path.join(tmp95,'seat-cooldown')],42,'世界同桌跨桌冷却（分档/候选降级/不改数值，改前自检2红）',20000],
       /* 方案 3.1：德州真实补码。头号红线是桌面筹码与 G.buyIn 同步累加，改前基线能判红。 */

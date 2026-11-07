@@ -58,7 +58,7 @@ const TEMPLATES = Object.keys(B.TEMPLATES);
 const sid = (t) => 's-' + t;
 
 /* ---------- 模块边界 ---------- */
-check('运行态模块挂载且版本为 1', R.VERSION === 1 && typeof R.begin === 'function' && typeof R.consume === 'function');
+check('运行态模块挂载且核心 API 齐备', R.VERSION >= 2 && typeof R.begin === 'function' && typeof R.consume === 'function');
 check('导出对象冻结，篡改不生效', Object.isFrozen(R));
 const writePattern = /\blocalStorage\s*\.|\bsessionStorage\s*\.|\bindexedDB\b|\bcshWallet\b|\bclaim\s*\(|\bsettle\s*\(|\breward\b|\bCBY\b|\bsaveConfig\s*\(/;
 check('运行态源码无落盘 / 经济 / 奖励写入路径', !writePattern.test(rtCode), (rtCode.match(writePattern) || [])[0]);
@@ -167,6 +167,49 @@ for (const t of TEMPLATES) {
   check('未解锁会话的 activeTemplate 为 null', R.activeTemplate('lvx-C') === null);
 }
 
+/* ---------- S4 语义：持续型增益（本局激活一次后常驻） ---------- */
+check('运行态版本 2 且导出持续型接口', R.VERSION === 2 &&
+  typeof R.activate === 'function' && typeof R.isActive === 'function' && typeof R.isPersistent === 'function' &&
+  Object.isFrozen(R.PERSISTENT));
+check('持续型模板恰为 T3 手牌上限与 T4 距离',
+  Object.keys(R.PERSISTENT).sort().join() === 'T3_hand_cap,T4_distance' &&
+  TEMPLATES.filter(t => !R.isPersistent(t)).length === 4);
+for (const t of ['T3_hand_cap', 'T4_distance']) {
+  const id = 'persist-' + t;
+  R.begin({ sessionId: id, spiritId: byTemplate[t].id, level: 'B', epoch: 5 });
+  const first = R.activate(id, t, 'act-' + t, 5);
+  check(t + ' 首次激活：占掉一次机会并置常驻',
+    first.ok === true && first.active === true && first.first === true && R.snapshot(id).used[t] === 1, first);
+  const repeat = R.activate(id, t, 'act2-' + t, 5);
+  check(t + ' 引擎每帧重复查询不再消耗次数',
+    repeat.ok === true && repeat.active === true && repeat.first === false && repeat.repeated === true &&
+    R.snapshot(id).used[t] === 1, repeat);
+  check(t + ' isActive 常驻为 true', R.isActive(id, t, 5) === true);
+  check(t + ' 激活后快照含 activated 标记', R.snapshot(id).activated[t] === true && Object.isFrozen(R.snapshot(id).activated));
+}
+{
+  const id = 'persist-mutex';
+  R.begin({ sessionId: id, spiritId: byTemplate.T3_hand_cap.id, level: 'B', epoch: 5 });
+  check('一次性模板不能走 activate', R.activate(id, 'T1_guard_damage', 'x', 5).reason === 'not-persistent');
+  check('错模板不能 activate', R.activate(id, 'T4_distance', 'x', 5).reason === 'not-persistent');
+  check('好感未解锁不能 activate', R.activate('lvx-C', 'T3_hand_cap', 'x', 1).reason === 'no-session');
+  check('错 epoch 的持续型激活被隔离且不计次',
+    R.activate(id, 'T3_hand_cap', 'x', 6).reason === 'epoch-changed' && R.snapshot(id).used.T3_hand_cap === undefined);
+  R.activate(id, 'T3_hand_cap', 'x', 5);
+  check('持续型与一次性 consume 天然互斥（activate 后 consume 被拒）',
+    R.consume(id, 'T3_hand_cap', 'y', 5).reason === 'exhausted');
+  const id2 = 'persist-mutex2';
+  R.begin({ sessionId: id2, spiritId: byTemplate.T4_distance.id, level: 'B', epoch: 5 });
+  R.consume(id2, 'T4_distance', 'z', 5);
+  check('先走 consume 再 activate 同样被拒', R.activate(id2, 'T4_distance', 'z2', 5).ok === false);
+  R.end(id);
+  check('助战结束后常驻状态失效', R.isActive(id, 'T3_hand_cap', 5) === false && R.activate(id, 'T3_hand_cap', 'x', 5).reason === 'no-session');
+  const id3 = 'persist-epoch';
+  R.begin({ sessionId: id3, spiritId: byTemplate.T4_distance.id, level: 'B', epoch: 8 });
+  R.activate(id3, 'T4_distance', 'x', 8);
+  check('换档后旧 epoch 的 isActive 为 false', R.isActive(id3, 'T4_distance', 9) === false && R.isActive(id3, 'T4_distance', 8) === true);
+}
+
 /* ---------- 助战接线（静态源码断言；动态回归由 E95R 266/0 覆盖） ---------- */
 check('助战模块定义了可选的 buffRuntime 取用器', /function buffRuntime\(\)/.test(auxSource));
 check('召唤成功用真实妖灵 id 建立会话',
@@ -186,8 +229,11 @@ check('全程零存储读写、零钱包调用（不发 CBY / 不写存档）', 
 /* ---------- 自检：改前实现必须被判红 ---------- */
 const guardA = 'if (has(sessions, id)) return snapshot(id);';
 const guardB = "if (tk && has(s.tokens, tk)) {\n      var c = s.tokens[tk];\n      return { ok: c.ok, reason: c.reason, repeated: true, used: used };\n    }";
-if (!rtSource.includes(guardA) || !rtSource.includes(guardB)) throw Error('negative-baseline anchors changed');
-const beforeSource = rtSource.replace(guardA, '/* removed: reopen reset */').replace(guardB, '/* removed: late callback */');
+const guardC = "    if (s.activated[template]) return { ok: true, reason: '', active: true, first: false, repeated: true };";
+if (!rtSource.includes(guardA) || !rtSource.includes(guardB) || !rtSource.includes(guardC)) throw Error('negative-baseline anchors changed');
+const beforeSource = rtSource.replace(guardA, '/* removed: reopen reset */')
+  .replace(guardB, '/* removed: late callback */')
+  .replace(guardC, '/* removed: persistent short-circuit */');
 const beforeCtx = makeContext('normal');
 vm.runInContext(buffSource, beforeCtx);
 vm.runInContext(beforeSource, beforeCtx);
@@ -204,6 +250,12 @@ const bcheck = (name, ok) => beforeRows.push({ name, passed: !!ok });
   bcheck('关闭重开不重置', BR.snapshot(id).used[t] === 1);
   bcheck('每局一次', BR.consume(id, t, 'other', 1).ok === false);
   bcheck('解锁判定', BR.snapshot(id).active === true);
+  {
+    const t = 'T3_hand_cap', pid = 'before-persist';
+    BR.begin({ sessionId: pid, spiritId: byTemplate[t].id, level: 'B', epoch: 1 });
+    bcheck('持续型重复激活不消耗次数',
+      BR.activate(pid, t, 'a', 1).ok === true && BR.activate(pid, t, 'b', 1).ok === true && BR.snapshot(pid).used[t] === 1);
+  }
 }
 const beforeFailed = beforeRows.filter(r => !r.passed).length;
 check('改前实现（去掉迟到防护与重开复用）能被断言集检出 >= 2 条红', beforeFailed >= 2,

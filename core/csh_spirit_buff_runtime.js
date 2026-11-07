@@ -15,9 +15,15 @@
  */
 (function (root) {
   'use strict';
-  var VERSION = 1;
+  var VERSION = 2;
   var sessions = Object.create(null);
   var has = function (o, k) { return Object.prototype.hasOwnProperty.call(o, k); };
+  /* 持续型模板（S4 语义定案）：本局**激活一次**后常驻，直到助战结束。
+     设计方案 §2.1 的 perGame=1 对它们指「激活一次」，不是「每次查询消耗一次」——
+     手牌上限 / 距离每帧都会被引擎查询，若走 consume 会在第二次被判 exhausted。
+     其余四类仍是一次性触发，走 consume。两类共用同一份 perGame 计数，天然互斥。 */
+  var PERSISTENT = Object.freeze({ T3_hand_cap: 1, T4_distance: 1 });
+  function isPersistent(template) { return has(PERSISTENT, template); }
 
   function table() { return root && root.CSHSpiritBuffs ? root.CSHSpiritBuffs : null; }
   function deny(reason, used) { return { ok: false, reason: reason, repeated: false, used: used || 0 }; }
@@ -26,13 +32,15 @@
   function snapshot(id) {
     var s = has(sessions, id) ? sessions[id] : null;
     if (!s) return null;
-    var used = {}, tokens = {}, k;
+    var used = {}, tokens = {}, activated = {}, k;
     for (k in s.used) if (has(s.used, k)) used[k] = s.used[k];
     for (k in s.tokens) if (has(s.tokens, k)) tokens[k] = s.tokens[k].ok;
+    for (k in s.activated) if (has(s.activated, k)) activated[k] = true;
     return Object.freeze({
       sessionId: s.id, epoch: s.epoch, spiritId: s.spiritId, level: s.level,
       active: s.active, template: s.template, perGame: s.perGame,
-      used: Object.freeze(used), tokens: Object.freeze(tokens), ended: s.ended
+      used: Object.freeze(used), tokens: Object.freeze(tokens),
+      activated: Object.freeze(activated), ended: s.ended
     });
   }
 
@@ -49,7 +57,8 @@
       id: id, epoch: opt.epoch, spiritId: opt.spiritId, level: level,
       active: active, template: buff ? buff.template : null,
       perGame: buff ? buff.perGame : 0,
-      used: Object.create(null), tokens: Object.create(null), ended: false
+      used: Object.create(null), tokens: Object.create(null),
+      activated: Object.create(null), ended: false
     };
     return snapshot(id);
   }
@@ -78,6 +87,28 @@
     return res;
   }
 
+  /* 持续型增益：首次调用占掉 perGame=1 的机会并置 activated，之后每次查询直接返回常驻。
+     引擎会反复调用 mod 函数，所以重复调用绝不能再消耗次数。 */
+  function activate(id, template, token, epoch) {
+    var s = has(sessions, id) ? sessions[id] : null;
+    if (!s || s.ended) return { ok: false, reason: 'no-session', active: false, first: false };
+    if (epoch !== undefined && epoch !== s.epoch) return { ok: false, reason: 'epoch-changed', active: false, first: false };
+    if (!s.active || template !== s.template || !isPersistent(template))
+      return { ok: false, reason: 'not-persistent', active: false, first: false };
+    if (s.activated[template]) return { ok: true, reason: '', active: true, first: false, repeated: true };
+    var r = consume(id, template, token, epoch);
+    if (!r.ok) return { ok: false, reason: r.reason, active: false, first: false };
+    s.activated[template] = true;
+    return { ok: true, reason: '', active: true, first: true, repeated: !!r.repeated };
+  }
+  /* 供 mod 函数每帧只读查询：会话结束 / 换档 / 未激活一律 false。 */
+  function isActive(id, template, epoch) {
+    var s = has(sessions, id) ? sessions[id] : null;
+    if (!s || s.ended || !s.active) return false;
+    if (epoch !== undefined && epoch !== s.epoch) return false;
+    return !!s.activated[template];
+  }
+
   function end(id) {
     if (typeof id === 'string' && has(sessions, id)) { delete sessions[id]; return true; }
     return false;
@@ -93,8 +124,9 @@
   function activeTemplate(id) { var s = snapshot(id); return s && s.active ? s.template : null; }
 
   root.CSHSpiritBuffRuntime = Object.freeze({
-    VERSION: VERSION,
-    begin: begin, consume: consume, end: end, switchEpoch: switchEpoch,
+    VERSION: VERSION, PERSISTENT: PERSISTENT,
+    begin: begin, consume: consume, activate: activate, isActive: isActive,
+    isPersistent: isPersistent, end: end, switchEpoch: switchEpoch,
     reset: reset, count: count, snapshot: snapshot, activeTemplate: activeTemplate
   });
 })(typeof window !== 'undefined' ? window : this);
