@@ -126,6 +126,21 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 	/* 德州补码（§3.1）：入场原始带入与补码累计分开记。unit 只能用原始带入算，
 	   否则第二次补码的额度基准会随 currentBuyIn 累加而漂移。 */
 	var topUpBaseBuyIn = 0, topUpCount = 0, topUpTotal = 0;
+	/* 补码未决事务（D2 后续）：凭据模块缺失时宁可拒绝补码，也不静默降级成无跨进程保护。 */
+	function topUpJournalApi(){try{var w=typeof window!=='undefined'?window:null;return w&&w.CSHTopUpJournal?w.CSHTopUpJournal:null;}catch(e){return null;}}
+	function topUpStorage(){try{return typeof localStorage!=='undefined'?localStorage:null;}catch(e){return null;}}
+	var topUpRecovered=false;
+	function recoverTopUp(){
+		if(topUpRecovered)return null;topUpRecovered=true;
+		var J=topUpJournalApi(),S=topUpStorage(),W=wallet();
+		if(!J||!S||!W||!W.wallet||typeof W.wallet.add!=='function'||typeof W.wallet.pc!=='function')return null;
+		try{
+			/* E30：入账调用点必须是双引号字面量来源，否则会被 CBY 防护静默丢掉。 */
+			var r=J.recover(S,{pc:function(){return W.wallet.pc();},add:function(n){return W.wallet.add(n,"德州补码未决退款");}});
+			if(r.refunded)toast('已退回一笔未完成的德州补码 '+r.refunded+' CBY');
+			return r;
+		}catch(eR){return null;}
+	}
 	var paused = false;
 	var pausedAuto = false;   // 本次暂停是否自动触发（失焦/切页）。手动暂停不参与「回前台自动恢复」
 	var msgBound = false;
@@ -1458,7 +1473,7 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 			var migReply = typeof cmd === "string" && cmd.indexOf("shell-mig-") === 0 ? captureMigReply(e, req0) : null;
 			/* 这些命令包含进度写入；先拒绝，不能让下层空结果变成成功 ACK。
 			   只读查询、关闭和行囊恢复入口仍可使用。 */
-			var mutatesSave = ["shell-settle", "shell-settle-session", "shell-topup", "shell-task-add", "shell-merit",
+			var mutatesSave = ["shell-settle", "shell-settle-session", "shell-topup", "shell-topup-commit", "shell-task-add", "shell-merit",
 				"shell-sign", "shell-relief", "shell-career-sync", "shell-ach-claim", "shell-ach-claim-all", "shell-pool-ach-claim", "shell-pool-ach-claim-all", "shell-trade", "shell-goldfish", "shell-market-new",
 				"shell-aff-do", "shell-cheer", "shell-cheer-ack", "shell-cheer-import", "shell-bounty", "shell-seat", "shell-world-round",
 				"shell-world-result", "shell-world-finish"].indexOf(cmd) >= 0 || (cmd === "shell-open" && !(META[d.key] && META[d.key].lobby));
@@ -1511,16 +1526,29 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 				if (!Number.isSafeInteger(pcBefore) || pcBefore < amt) {
 					ackToGame(cmd, false, { ok: false, reason: "余额不足" }); return;
 				}
+				/* 扣款前先同步落盘未决凭据；写不进去就不扣、不上桌。 */
+				var TJ = topUpJournalApi(), TS = topUpStorage();
+				if (!TJ || !TS) { ackToGame(cmd, false, { ok: false, reason: "补码事务未就绪，桌面筹码未变" }); return; }
+				var txId = "tu-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 10);
+				var prep = TJ.prepare(TS, { id: txId, amount: amt, balanceBefore: pcBefore, t: Date.now() });
+				if (!prep.ok) { ackToGame(cmd, false, { ok: false, reason: prep.reason || "补码凭据未写入" }); return; }
 				var spent = WT.wallet.spend(amt, "德州补码");
-				if (spent !== true) { ackToGame(cmd, false, { ok: false, reason: "扣款被拒绝，桌面筹码未变" }); return; }
+				if (spent !== true) { TJ.abort(TS, txId); ackToGame(cmd, false, { ok: false, reason: "扣款被拒绝，桌面筹码未变" }); return; }
 				if (WT.wallet.pc() !== pcBefore - amt) {
 					/* 绝不出现「扣了钱没上桌」：读回不一致就回补并如实失败，页面可重试。 */
 					try { WT.wallet.add(amt, "补码读回回补"); } catch (eRb) {}
+					TJ.abort(TS, txId);
 					ackToGame(cmd, false, { ok: false, reason: "扣款读回不一致，已回补，请重试" }); return;
 				}
 				topUpCount++; topUpTotal += amt; currentBuyIn += amt;
-				ackToGame(cmd, true, { ok: true, amount: amt, balance: WT.wallet.pc(), buyIn: currentBuyIn, count: topUpCount, total: topUpTotal });
+				ackToGame(cmd, true, { ok: true, amount: amt, txId: txId, balance: WT.wallet.pc(), buyIn: currentBuyIn, count: topUpCount, total: topUpTotal });
 				return;
+			}
+			/* 页面确认筹码已上桌 → 清未决凭据。失败不清也不影响本局，下次启动恢复兜底。 */
+			if (cmd === "shell-topup-commit") {
+				var CJ = topUpJournalApi(), CS = topUpStorage();
+				var cr = CJ && CS ? CJ.commit(CS, d && d.txId) : { ok: false, reason: "补码事务未就绪" };
+				ackToGame(cmd, !!cr.ok, cr); return;
 			}
 			/* ★ 账本（v6.2）：池子币的**来源与去处**（作者："就是做账，账本"）。
 			   d.days = 热力格天数（缺省 42 = 6 周，GitHub 贡献图同款口径）。
@@ -2424,4 +2452,7 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 	} catch (e) {}
 
 	logInfo("Game Shell 已加载（门票表已去重至 csh_wallet；带入档位 " + buyInTiers().join("/") + "）");
+	/* 启动恢复：上次扣了钱但没等到页面上桌确认的补码，按凭据幂等退回。
+	   延迟一拍等钱包模块就绪；只跑一次（topUpRecovered 标志）。 */
+	try { if (typeof setTimeout === "function") setTimeout(function () { recoverTopUp(); }, 0); } catch (eStartup) {}
 })();

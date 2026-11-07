@@ -86,7 +86,7 @@ function pageHarness(pureSource, opts) {
     if (n.type === 'FunctionDeclaration' && names.indexOf(n.id.name) >= 0)
       vm.runInContext(inline.slice(n.range[0], n.range[1]), ctx);
   });
-  const toasts = []; let bannerRedraws = 0;
+  const toasts = [], commits = []; let bannerRedraws = 0;
   ctx.toast = (msg) => toasts.push(String(msg));
   ctx.fmt = n => String(n);
   ctx.renderHud = () => {};
@@ -102,9 +102,10 @@ function pageHarness(pureSource, opts) {
   ctx.Bridge = {
     active: true,
     snapshot: () => ({ pc: 1000 }),
-    topUp: (amount, cb) => opts.topUp ? opts.topUp(amount, cb, ctx) : cb(true, { ok: true, amount: amount }),
+    topUp: (amount, cb) => opts.topUp ? opts.topUp(amount, cb, ctx) : cb(true, { ok: true, amount: amount, txId: 'tu-test-00000001' }),
+    topUpCommit: (txId, cb) => { commits.push(String(txId)); if (cb) cb(true, { ok: true }); },
   };
-  return { ctx, toasts, redraws: () => bannerRedraws };
+  return { ctx, toasts, redraws: () => bannerRedraws, commits };
 }
 {
   const h = pageHarness(modSource);
@@ -118,6 +119,7 @@ function pageHarness(pureSource, opts) {
     { chips: G.players[0].chips, buyIn: G.buyIn });
   check('端到端净赢守恒', T.netOf(175, 200) === T.netOf(G.players[0].chips, G.buyIn));
   check('成功后重绘横幅且 pending 已释放', h.redraws() === 1 && G.topUpPending === false);
+  check('成功后向宿主发上桌确认（清未决凭据）', h.commits.length === 1 && h.commits[0] === 'tu-test-00000001', h.commits);
 }
 {
   const h = pageHarness(modSource, { topUp: (amount, cb) => cb(false, { ok: false, reason: '余额不足' }) });
@@ -129,16 +131,22 @@ function pageHarness(pureSource, opts) {
   check('失败如实提示而不是谎报成功', h.toasts.some(t => /未成功/.test(t)));
 }
 {
-  const h = pageHarness(modSource, { topUp: (amount, cb) => cb(true, { ok: true, amount: amount + 20 }) });
+  const h = pageHarness(modSource, { topUp: (amount, cb) => cb(true, { ok: true, amount: amount + 20, txId: 'tu-test-00000002' }) });
   h.ctx.requestTopUp({ disabled: false });
   check('宿主回包金额不一致时拒绝上桌', h.ctx.G.players[0].chips === 175 && h.ctx.G.buyIn === 200);
+}
+{
+  const h = pageHarness(modSource, { topUp: (amount, cb) => cb(true, { ok: true, amount: amount }) });
+  h.ctx.requestTopUp({ disabled: false });
+  check('宿主没给事务编号时拒绝上桌（无跨进程保护）',
+    h.ctx.G.players[0].chips === 175 && h.ctx.G.buyIn === 200 && h.commits.length === 0);
 }
 {
   let stale = null;
   const h = pageHarness(modSource, { topUp: (amount, cb) => { stale = cb; } });
   h.ctx.requestTopUp({ disabled: false });
   h.ctx.G.handNo = 4;   /* 下一手已发，旧回包迟到 */
-  stale(true, { ok: true, amount: 40 });
+  stale(true, { ok: true, amount: 40, txId: 'tu-test-00000003' });
   check('迟到回调不改新一手的筹码与本金', h.ctx.G.players[0].chips === 175 && h.ctx.G.buyIn === 200);
 }
 {
@@ -179,6 +187,12 @@ check('宿主走与开局带入同一条 spend 出账路径', /WT\.wallet\.spend
 check('宿主读回确认，不一致时回补且不 ACK 成功', /WT\.wallet\.pc\(\) !== pcBefore - amt/.test(shellSource) && /WT\.wallet\.add\(amt, "补码读回回补"\)/.test(shellSource));
 check('宿主独立校验次数 / 额度 / 单位，不信任页面金额',
   /topUpCount >= 2/.test(shellSource) && /amt % topUnit !== 0 \|\| amt > topUpBaseBuyIn/.test(shellSource));
+check('页面暴露上桌确认通道且成功后调用', /topUpCommit: function \(txId, cb\) \{ call\('shell-topup-commit'/.test(htmlSource) && /Bridge\.topUpCommit\(data\.txId,function\(\)\{\}\)/.test(htmlSource));
+check('页面要求宿主回包带事务编号', /!data\.txId/.test(htmlSource));
+check('宿主有 shell-topup-commit 命令与写保护', /cmd === "shell-topup-commit"/.test(shellSource) && /"shell-topup", "shell-topup-commit"/.test(shellSource));
+check('宿主扣款前 prepare 凭据、失败 abort、启动恢复',
+  /TJ\.prepare\(TS, \{ id: txId/.test(shellSource) && /TJ\.abort\(TS, txId\)/.test(shellSource) &&
+  /setTimeout\(function \(\) \{ recoverTopUp\(\); \}, 0\)/.test(shellSource));
 check('入场重置补码状态（次数是每桌不是每账号）',
   /topUpBaseBuyIn = currentBuyIn; topUpCount = 0; topUpTotal = 0;/.test(shellSource) &&
   /topUpBaseBuyIn = 0; topUpCount = 0; topUpTotal = 0;/.test(shellSource));

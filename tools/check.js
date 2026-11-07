@@ -3388,7 +3388,9 @@ if (spawnOk && execFileSync && !ONLY_SYNTAX && !ONLY_VERSIONS) {
       /* 方案 3.2 纠偏：只做同角色跨桌冷却；分档、降级、不改公平性由纯函数反例锁住。 */
       ['E95T','probe_seat_cooldown_20261107.mjs',['--out',path.join(tmp95,'seat-cooldown')],42,'世界同桌跨桌冷却（分档/候选降级/不改数值，改前自检2红）',20000],
       /* 方案 3.1：德州真实补码。头号红线是桌面筹码与 G.buyIn 同步累加，改前基线能判红。 */
-      ['E95U','probe_texas_topup_20261107.mjs',['--out',path.join(tmp95,'texas-topup')],53,'德州真实补码（额度/守恒/迟到回调/扣款回滚，改前自检2红）',20000],
+      ['E95U','probe_texas_topup_20261107.mjs',['--out',path.join(tmp95,'texas-topup')],59,'德州真实补码（额度/守恒/迟到回调/事务编号，改前自检2红）',20000],
+      /* D2 后续：补码未决事务。头号不变量是钱包没扣款时绝不退款，改前基线能判红。 */
+      ['E95V','probe_topup_journal_20261107.mjs',['--out',path.join(tmp95,'topup-journal')],48,'补码未决事务（prepare/commit/幂等退款/不白送钱，改前自检1红）',20000],
     ];
     for (const [tag95, script95, args95, min95, label95, timeout95] of reg95) {
       const r95 = runProbeJson(script95, args95, { timeout: timeout95 });

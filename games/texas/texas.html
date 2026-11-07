@@ -1256,6 +1256,8 @@ var Bridge = (function () {
     },
     /* 补码（§3.1）：宿主扣款成功且读回确认后才应答，页面收到应答才加桌面筹码。 */
     topUp: function (amount, cb) { call('shell-topup', { key: 'texas', amount: amount }, cb, 3000); },
+    /* 上桌确认：清掉宿主的未决凭据。失败不清不影响本局，下次启动恢复会兜底退款。 */
+    topUpCommit: function (txId, cb) { call('shell-topup-commit', { txId: txId }, cb, 2000); },
     /* 每日任务上报（唯一真值在 csh_wallet，生涯大厅读同一份） */
     taskAdd: function (kind, n, cb) { call('shell-task-add', { kind: kind, n: n }, cb); },
   };
@@ -2356,7 +2358,8 @@ function requestTopUp(btn){
     /* 迟到回调隔离：会话 / 手数 / 结算状态变了，绝不把钱写进旧桌。 */
     if(G!==session||G.sessionOver||G.handNo!==hand||!G.over){if(btn)btn.disabled=false;return;}
     G.topUpPending=false;
-    if(!ok||!data||data.ok===false||data.amount!==amount){
+    if(!ok||!data||data.ok===false||data.amount!==amount||!data.txId){
+      /* 没有事务编号 = 没有跨进程凭据，绝不上桌；宿主凭据会在下次启动退款。 */
       if(btn)btn.disabled=false;toast('补码未成功，桌面筹码未变，可重试','bad');return;
     }
     var me=G.players[0];
@@ -2364,6 +2367,7 @@ function requestTopUp(btn){
     if(!next){if(btn)btn.disabled=false;toast('补码状态校验失败，桌面筹码未变','bad');return;}
     me.chips=next.chips;G.buyIn=next.buyIn;G.topUpTotal=next.topUpTotal;G.topUps=next.topUps;
     if(Bridge.active&&typeof syncBankFromWallet==='function')syncBankFromWallet();
+    Bridge.topUpCommit(data.txId,function(){});   /* 清未决凭据；失败由启动恢复兜底 */
     renderHud();
     toast('补码 +'+fmt(amount)+' CBY 已上桌，本金同步计入');
     showHandBanner();   /* 重绘按钮区：额度/次数刷新，输光分支变回「下一手」 */
