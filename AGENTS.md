@@ -248,7 +248,7 @@
 > 背景与边界见 `docs/audit/WORKBUDDY_B4_GATE_RETRY_20261105.md`。
 >
 > **2026-11-06 三条验证入口，别混用**（2026-11-07 E1 校正数量与范围）：
-> ① 日常门禁 `node tools/check.js`（E95A–V 注册区已覆盖 21 个关键专项，含注册自检 E95L/M）；
+> ① 日常门禁 `node tools/check.js`（E95A–W 注册区已覆盖 22 个关键专项，含注册自检 E95L/M）；
 > ② 更新链路一键复核 `node tools/check_update_suite.mjs --out <D盘目录>`（15/0）；
 > ③ **慢速通道** `node tools/check_slow_suite.mjs --out <D盘目录> [--only <探针名>]`
 > —— 8 个 >30s 的 Chromium 探针，整条约 8 分钟，**不进日常门禁**，发布前或怀疑回归时手动跑。

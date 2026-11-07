@@ -3391,6 +3391,8 @@ if (spawnOk && execFileSync && !ONLY_SYNTAX && !ONLY_VERSIONS) {
       ['E95U','probe_texas_topup_20261107.mjs',['--out',path.join(tmp95,'texas-topup')],59,'德州真实补码（额度/守恒/迟到回调/事务编号，改前自检2红）',20000],
       /* D2 后续：补码未决事务。头号不变量是钱包没扣款时绝不退款，改前基线能判红。 */
       ['E95V','probe_topup_journal_20261107.mjs',['--out',path.join(tmp95,'topup-journal')],48,'补码未决事务（prepare/commit/幂等退款/不白送钱，改前自检1红）',20000],
+      /* S4：六类特色增益接线。一次性 consume / 持续型 activate 分路，改前基线能判红。 */
+      ['E95W','probe_spirit_buffs_wired_20261107.mjs',['--out',path.join(tmp95,'spirit-wired')],41,'妖灵六类增益接线（首触生效/二触拒绝/零副作用，改前自检1红）',20000],
     ];
     for (const [tag95, script95, args95, min95, label95, timeout95] of reg95) {
       const r95 = runProbeJson(script95, args95, { timeout: timeout95 });

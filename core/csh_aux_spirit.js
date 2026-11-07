@@ -32,7 +32,8 @@ export function installAuxSpirit(host) {
     try{if(run.result!==undefined&&lib.cshWallet.wallet.assistedStats().receipts.includes(run.rewardId))run.saved=true;}catch(e){}
     return {armed:true,summoned:!!p,alive:alive,ownerAlive:ownerAlive,state:state,reason:reason,name:p?MINION_NAMES['csh_boss_minion_'+p.name.slice('csh_aux_'.length)]||lib.translate[p.name]||p.name:'随机妖灵',guardLeft:guardLeft,aidLeft:aidLeft,rescueReady:rescueReady,supportActive:state==='active'&&(guardLeft>0||aidLeft>0||rescueReady),fallback:!!run.fallback,saved:run.saved,resultPending:run.result!==undefined&&!run.saved&&!run.cancelled};
   }
-  function describe(){const s=summary();if(!s)return '本局未预约妖灵：'+spiritEligibility({lib,game,get,status});const names={waiting:'等待你的准备阶段',active:'守护中',dead:'妖灵已阵亡', 'owner-dead':'主人阵亡，妖灵按原身份继续作战',paused:'守护暂停',ended:'本局已结束',cancelled:'本局未形成有效对局',fallback:'妖灵未入场，按普通对局结算'};return s.name+' · '+names[s.state]+(s.reason?'（'+s.reason+'）':'')+'。本局剩余：护主'+s.guardLeft+'次、援助'+s.aidLeft+'次、濒死回复'+(s.rescueReady?'1':'0')+'次。'+(!s.supportActive?'当前不能提供支援。':'')+'阵亡不补召，复活不重置次数；支援仅回复1点体力，不保证脱离濒死。助战独立战绩，完局按身份场标准发放奖励；不计普通战绩或池子成就。'+(s.resultPending?'本局结果与奖励待保存，可在行囊重试。':'');}
+  function buffText(){try{const RT=buffRuntime(),tpl=RT&&run?RT.activeTemplate(run.id):null;if(!tpl)return '';const T=(typeof window!=='undefined'&&window.CSHSpiritBuffs&&window.CSHSpiritBuffs.TEMPLATES[tpl])||null;return '本局特色增益：'+(T?T.text:tpl)+'（本局仅生效一次，不叠加、不跨局）。';}catch(eBuffText){return '';}}
+  function describe(){const s=summary();if(!s)return '本局未预约妖灵：'+spiritEligibility({lib,game,get,status});const names={waiting:'等待你的准备阶段',active:'守护中',dead:'妖灵已阵亡', 'owner-dead':'主人阵亡，妖灵按原身份继续作战',paused:'守护暂停',ended:'本局已结束',cancelled:'本局未形成有效对局',fallback:'妖灵未入场，按普通对局结算'};return s.name+' · '+names[s.state]+(s.reason?'（'+s.reason+'）':'')+'。本局剩余：护主'+s.guardLeft+'次、援助'+s.aidLeft+'次、濒死回复'+(s.rescueReady?'1':'0')+'次。'+(!s.supportActive?'当前不能提供支援。':'')+'阵亡不补召，复活不重置次数；支援仅回复1点体力，不保证脱离濒死。助战独立战绩，完局按身份场标准发放奖励；不计普通战绩或池子成就。'+(s.resultPending?'本局结果与奖励待保存，可在行囊重试。':'')+buffText();}
   function refresh(){if(!run)return;for(const p of [run.owner,run.spirit])if(p&&p.markSkill)try{p.markSkill('csh_aux_status');}catch(e){}}
   lib.skill.csh_aux_status={charlotte:true,marktext:'灵',intro:{content:function(){return lib.cshAuxSpirit?lib.cshAuxSpirit.describe():'妖灵状态未就绪';}}};lib.translate.csh_aux_status='妖灵守护状态';
   const toast=s=>{if(lib.cshUI&&lib.cshUI.toast)lib.cshUI.toast(s);};
@@ -56,6 +57,28 @@ export function installAuxSpirit(host) {
     filter(e,p){return active(p)&&!p.storage.cshAuxEntered;},
     async content(event,trigger,player){player.storage.cshAuxEntered=true;game.addVideo('storage',run.owner,['cshAssistedMatch',{v:1,type:'identity_with_spirit',spirit:player.name,owner:run.owner.playerid}]);if(player.$skill)player.$skill('妖灵守护','legend','water');game.log(player,'妖灵守护：本局战绩单独记录，完局按身份场标准发放奖励');}};
   Object.assign(lib.translate,{csh_aux_guard:'护主',csh_aux_guard_info:'本局限三次，真人受到伤害时令此伤害-1。',csh_aux_aid:'助战',csh_aux_aid_info:'前三个准备阶段，令真人摸一张牌。',csh_aux_rescue:'同契',csh_aux_rescue_info:'本局限一次，真人濒死时回复1点体力。',csh_aux_entry:'妖灵守护',csh_aux_entry_info:'本局为辅助身份场，战绩独立记录，完局按身份场标准发放奖励。'});
+  /* S4：六类特色增益。用 addGlobalSkill 注册，**不进 character.skills** ——
+     probe_aux_spirit.mjs 断言助战妖灵恰好 4 个技能，加进去会立刻红，也会让 50 只妖灵各多 6 技。
+     模块缺失时整段跳过，既有助战流程一行不变。 */
+  try{
+    var SBM=(typeof window!=='undefined'&&window.CSHSpiritBuffSkills)||null;
+    if(SBM){
+      var buffSkills=SBM.create({
+        runtime:buffRuntime,
+        session:function(){return run;},
+        active:active,
+        me:function(){return game.me;},
+        draw:function(n){return game.me.draw(n);},
+        recover:function(n){return game.me.recover(n);},
+        refresh:refresh,
+        log:function(text){game.log(run&&run.spirit||game.me,text);}
+      });
+      for(const bk of ['t1','t2','t5','t6','t3','t4']){
+        lib.skill['csh_spirit_buff_'+bk]=buffSkills[bk];
+        game.addGlobalSkill('csh_spirit_buff_'+bk);
+      }
+    }
+  }catch(eBuffSkills){}
   function restore(){
     if(!run)return;
     for(const [key,item]of Object.entries(run.hooks||{}))if(game[key]===item.wrapper)game[key]=item.previous;
