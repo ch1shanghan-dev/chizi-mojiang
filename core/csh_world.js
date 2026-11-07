@@ -1701,6 +1701,11 @@ import { MINIONS } from "./csh_bossdata.js";
             return { id: a.id, name: a.name, title: title, text: text, persona: P.name, fund: a.fund, invited: invited, response: invited ? invitedReply : '', hands: p.hands };
         });
     }
+	/* 跨桌冷却（2026-11-07 · 方案 §3.2 实施期纠偏）：只记最近 2 桌的角色 id，纯内存不落盘。
+	   模块缺失时整段降级为原有行为；过滤后候选为空会回退完整池，绝不改变能否开局。 */
+	var recentSeats = [];
+	function seatCooldownApi(){try{var w=typeof window!=='undefined'?window:null;return w&&w.CSHSeatCooldown?w.CSHSeatCooldown:null;}catch(e){return null;}}
+	function retiredNow(){var n=0;for(var i=0;i<world.ai.length;i++)if(world.ai[i].retired)n++;return n;}
 	function seat(n, buyIn, opts) {		opts = opts || {};
         pruneInvitation();
 		n = clampNum(Math.floor(Number(n) || 0), 0, 5);
@@ -1712,6 +1717,9 @@ import { MINIONS } from "./csh_bossdata.js";
 			: activeList().filter(function (a) {
 				return normalStake(a, buyIn) >= AI_MIN_STAKE;
 			});
+		/* 只过滤候选池，不改已入座者的 stake / skill / persona / 发牌。 */
+		var SC = seatCooldownApi();
+		if (SC) pool = SC.filter(pool, recentSeats, SC.cooldownTables(retiredNow())).pool;
 		if (!pool.length) return [];
 
 		var chosen = [];
@@ -1737,6 +1745,7 @@ import { MINIONS } from "./csh_bossdata.js";
 			usedPersona[cand.persona] = 1;
 		}
 
+		if (SC) recentSeats = SC.push(recentSeats, chosen.map(function (a) { return String(a.id); }), 2);
 		return chosen.map(function (a) {
 			var g = gamble ? gambleStakeOf(a, buyIn) : null;
 			var stake = gamble ? g.stake : Math.min(buyIn, Math.floor(a.fund * 0.3));

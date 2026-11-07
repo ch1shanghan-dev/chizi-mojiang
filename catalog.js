@@ -1,7 +1,7 @@
-/* 自动生成于 2026-11-07T07:33:51.212Z by tools/release.js —— hashes 对应 Git 发布字节，发版后 git push 即生效，勿手改 files */
+/* 自动生成于 2026-11-07T10:06:32.016Z by tools/release.js —— hashes 对应 Git 发布字节，发版后 git push 即生效，勿手改 files */
 window.extension = {
 	"池子魔将": {
-		"build": "d5be141f7f882ed5a479fee7a361f9e1f3f0618adbf1a50e26b4526635bb7230",
+		"build": "e13d1b971089ae9fe6b3737ac86b410e7de764f8c25ff2469f52f26b195ce97f",
 		"hashes": {
 			"LICENSE": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
 			"README.md": "41102b34ebc984b6b84b361baa0e78aa9defe5633a4a270cde6ed0ff7bc9ae4d",
@@ -343,6 +343,7 @@ window.extension = {
 			"core/csh_records.css": "b74604a75709d137999a4dddcc1746335bcc048022672ca147a7f8049ab66fc0",
 			"core/csh_registry.js": "b7bb6868db37cbe9bab5c6601f91eb6751c406be30c694218917f39904a75599",
 			"core/csh_rules.js": "7ac7bc8227037d4ba9e4f2423f819255dcead54a0ef75f60289bb709183a9d7e",
+			"core/csh_seat_cooldown.js": "afa2cee9c7ebae30dac38221b00e807631e24e7e53070adfd5e90283a625a91e",
 			"core/csh_selftest.js": "14e4acf537174481382c84370af8264027ea46cd0544731650bf675e20019ac4",
 			"core/csh_sfx.js": "ec1f16c1db81b13a1dc57ada2b30351a1a9337c78effeafb5511c186e6008540",
 			"core/csh_shell.js": "4cef80e055d889ebee96a0f704fe48902f214109471ca7fedf73666275f2c7a6",
@@ -361,7 +362,7 @@ window.extension = {
 			"core/csh_voice.js": "4c6616186f89d559578a4fa63032daebc5c4d9223f0ecc39b68bd6831aa323c6",
 			"core/csh_wallet.js": "ceeff50a26c101a72352f04861a3519e8ac9c0b623563d9e3dcc2b7ab7a0f509",
 			"core/csh_winrate.js": "8dbd3146f396fbea2551691b42295329ce2ba89e3569d8c4e6ea63ee95b0190b",
-			"core/csh_world.js": "ef1df08db7f5c18274450bbf2e28de3468688bbf415d3f149d1d50887b6f5aab",
+			"core/csh_world.js": "851f130183ff7adf278a09093d84b70d0e8ec5bb8fddeb5dedbb8089ae67db9e",
 			"core/csh_world_view.js": "44117e771251457435093a35da02e99a679d6aff94a136af8cc91b067dfd11f6",
 			"core/lines_final_pool.json": "2c0931248f24398f37e6f343d6e28ad0ab93d5bb45eb814d703a08757b98c5a4",
 			"core/voices.js": "e88f29b031dee14946a96fa715cb67bf75dfa7b4d0e9e781f3ff95fe3c4447f3",
@@ -1395,6 +1396,7 @@ window.extension = {
 			"core/csh_records.css",
 			"core/csh_registry.js",
 			"core/csh_rules.js",
+			"core/csh_seat_cooldown.js",
 			"core/csh_selftest.js",
 			"core/csh_sfx.js",
 			"core/csh_shell.js",
