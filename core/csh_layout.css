@@ -48,6 +48,15 @@
   --csh-vp-tiny-h: 330px;
   --csh-vp-short-h: 500px;
   --csh-vp-narrow-w: 760px;
+  /* G1（2026-11-08）补齐 6 档迁移目标：四档分类装不下中等高度 520–640 / 中宽 899–1199。
+     与 core/csh_viewport.js 的 TARGETS 双向对账（tools/probe_layout_tokens_20261108.mjs）。
+     same（映射到自身、零风险）的 27 处归属：
+       max-height 330 → --csh-vp-tiny-h，500 → --csh-vp-short-h，640 → --csh-vp-mid-h；
+       max-width  760 → --csh-vp-narrow-w，1000 → --csh-vp-mid-w。
+     其余 59 处 expand / 9 处 shrink 必须逐页比三横屏截图后再逐值收缩，不在本批改。 */
+  --csh-vp-mid-h: 640px;
+  --csh-vp-mid-w: 1000px;
+  --csh-vp-wide-w: 1200px;
 
   /* 统一间距阶梯（禁止各页自造 mobileTop / shortScreen 之类分裂体系） */
   --gap-xs: clamp(3px, .5vw, 8px);

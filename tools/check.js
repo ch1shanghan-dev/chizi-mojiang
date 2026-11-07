@@ -3407,6 +3407,12 @@ if (spawnOk && execFileSync && !ONLY_SYNTAX && !ONLY_VERSIONS) {
       ['E95AC','probe_feedback_archive_20261105.mjs',['--out',path.join(tmp95,'feedback-archive')],18,'成就通知归档（跨重启/分页/容量/写失败，Chromium 实测4.4s）',60000],
       /* G1：断点逐值收敛的迁移真值。只给依据、零 CSS 改动；完备性/方向/单调/基线对账。 */
       ['E95AD','probe_viewport_migration_20261108.mjs',['--out',path.join(tmp95,'viewport-migration')],37,'断点迁移真值（按轴24种/6档目标/68处高风险，改前自检3红）',20000],
+      /* H1：CSS 侧 6 档令牌与 JS 真值双向对账，零 @media 改动。 */
+      ['E95AE','probe_layout_tokens_20261108.mjs',['--out',path.join(tmp95,'layout-tokens')],9,'CSS视口令牌对账（6档/零断点改动，改前自检2红）',20000],
+      /* art-direction §4.7 收尾：Chromium 实测 13.5 与 13 几何一致后才并档。 */
+      ['E95AF','probe_lfs_merge_20261108.mjs',['--out',path.join(tmp95,'lfs-merge')],17,'同档字号并档（双横屏实机几何/8处兜底，改前自检2红）',60000],
+      /* PF-08 第二批：低频详情分区导航，主操作常驻、矮屏全展开。 */
+      ['E95AG','probe_codex_sections_20261108.mjs',['--out',path.join(tmp95,'codex-sections')],22,'图鉴分区导航（相处/记忆/档案/矮屏降级，改前自检1红）',20000],
     ];
     for (const [tag95, script95, args95, min95, label95, timeout95] of reg95) {
       const r95 = runProbeJson(script95, args95, { timeout: timeout95 });

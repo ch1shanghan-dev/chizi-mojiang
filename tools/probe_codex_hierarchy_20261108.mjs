@@ -139,8 +139,9 @@ function harness(overrides) {
 
 /* ---------- 3. 信息层级与材质约束 ---------- */
 {
-  check('共同经历与回响收进 details 按需展开，且 dlines id 保留',
-    /<details class="collection-details" id="character-echo"><summary>共同经历与回响<\/summary><div class="dlines" id="dlines"><\/div><\/details>/.test(html));
+  /* H1 给低频 details 加了 data-section 分区属性，断言随结构同步（分组由 sections 反例细验） */
+  check('共同经历与回响收进 details 按需展开、归入记忆分区，且 dlines id 保留',
+    /<details class="collection-details" id="character-echo" data-section="memory"><summary>共同经历与回响<\/summary><div class="dlines" id="dlines"><\/div><\/details>/.test(html));
   check('人物小传 / 增益 / 讨伐记录仍各自按需折叠',
     (html.match(/<details class="collection-details"/g) || []).length >= 4);
   check('摘要在极矮横屏收起，复用既有 340px 断点不新增数值',

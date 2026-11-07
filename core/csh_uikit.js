@@ -149,7 +149,7 @@ function ensureStyle() {
         "#" + CF_ID + " .csh-ui-cf-acts{display:flex!important;flex-wrap:wrap!important;justify-content:flex-end!important;gap:10px!important;}",
         "#" + CF_ID + " .csh-ui-cf-btn{display:inline-block!important;cursor:pointer!important;padding:11px 20px!important;min-height:44px!important;",
         "position:static!important;width:auto!important;font-family:inherit!important;line-height:1.5!important;text-align:center!important;",
-        "border-radius:999px!important;border:1px solid rgba(216,180,106,.32)!important;color:#e3d6b2!important;font-size:var(--csh-lfs-md2,13.5px)!important;",
+        "border-radius:999px!important;border:1px solid rgba(216,180,106,.32)!important;color:#e3d6b2!important;font-size:var(--csh-lfs-md2,13px)!important;",
         "background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.015))!important;}",
         "#" + CF_ID + " .csh-ui-cf-btn.ok{color:#221a0c!important;font-weight:700!important;border-color:rgba(216,180,106,.85)!important;",
         "background:linear-gradient(180deg,#f4dfa8,#cfa958)!important;}",

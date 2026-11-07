@@ -444,6 +444,14 @@ body.empty .foot{display:none}
 #bond-brief .bb-v{color:var(--ink,#eee6d5)}
 #bond-brief .bb-next,#bond-brief .bb-act,#bond-brief .bb-cost{font-family:var(--ff-num,"Times New Roman",serif)}
 @media(max-height:340px){#bond-brief{display:none}}
+/* PF-08 第二批：分区导航只收拢低频详情，主操作 affbox 与增益面板常驻 */
+.dnav{display:flex;gap:6px;flex:none}
+.dnav[hidden]{display:none}
+.dnav .dnav-tab{flex:0 0 auto;min-height:44px;min-width:64px;padding:6px 12px;font:inherit;font-size:var(--pfs-sm,12px);color:var(--ink-dim,#c6c9bc);border:1px solid var(--line-2,#776c52);border-radius:7px;background:rgba(0,0,0,.22);cursor:pointer}
+.dnav .dnav-tab[aria-selected="true"]{border-color:var(--gold,#d9bd7d);background:rgba(216,189,122,.16);color:#fff0bd}
+.dnav .dnav-tab:focus-visible{outline:2px solid var(--gold,#d9bd7d);outline-offset:-2px}
+.dinfo details[hidden]{display:none}
+@media(max-height:340px){.dnav{display:none}}
 </style>
 <link rel="stylesheet" href="../core/csh_collection.css">
 </head>
@@ -472,17 +480,24 @@ body.empty .foot{display:none}
         </div>
         <!-- PF-08：首屏一条紧凑关系摘要，帮助玩家决定下一步；不新增按钮、不写存档 -->
         <div class="bond-brief" id="bond-brief"></div>
+        <!-- PF-08 第二批：低频详情分区导航。affbox（好感/互动）与增益面板常驻，
+             导航只收拢低频 details；矮横屏隐藏导航并全部展开，保证可用性。 -->
+        <nav class="dnav" id="dnav" role="tablist" aria-label="人物档案分区">
+          <button type="button" class="affbtn dnav-tab" data-section="relation" role="tab" aria-selected="true">相处</button>
+          <button type="button" class="affbtn dnav-tab" data-section="memory" role="tab" aria-selected="false">记忆</button>
+          <button type="button" class="affbtn dnav-tab" data-section="archive" role="tab" aria-selected="false">档案</button>
+        </nav>
         <div class="affbox" id="affbox"></div>
         <details class="collection-details" id="spirit-buff" hidden><summary>助战增益</summary><div id="spirit-buff-body"></div></details>
-        <details class="collection-details" id="character-story"><summary>人物小传与题壁</summary>
+        <details class="collection-details" id="character-story" data-section="memory"><summary>人物小传与题壁</summary>
         <!-- 花榜·魁首题壁（v2.2）：该只妖灵的魁首（累计缠头第一）留的那句话。
              样式用行内：本页 <style> 里没有稳定的插入锚点，避免为四条装饰属性去动大段 CSS。 -->
         <div id="dchief" hidden style="font-size:var(--pfs-md);color:#b08d3e;border-left:2px solid #b08d3e;padding-left:10px;margin-top:6px;line-height:1.6"></div>
         <div class="dbio" id="dbio"></div>
         </details>
         <!-- PF-08：共同经历与台词属低频信息，按需展开，不在立绘下堆成超长页面 -->
-        <details class="collection-details" id="character-echo"><summary>共同经历与回响</summary><div class="dlines" id="dlines"></div></details>
-        <details class="collection-details" id="character-records"><summary>讨伐与挂牌记录</summary>
+        <details class="collection-details" id="character-echo" data-section="memory"><summary>共同经历与回响</summary><div class="dlines" id="dlines"></div></details>
+        <details class="collection-details" id="character-records" data-section="archive"><summary>讨伐与挂牌记录</summary>
         <div class="dfacts">
           <div class="fact"><div class="k">讨伐次数</div><div class="v num" id="fN">—</div></div>
           <div class="fact"><div class="k">金鳞市热度</div><div class="v num" id="fHeat">—</div></div>
@@ -747,6 +762,23 @@ function renderSpiritBuff(it) {
   meta.appendChild(el("span", "sbcond", "好感 " + A.UNLOCK_LEVEL + "（亲近）解锁 · 每局 1 次 · 不累积"));
   body.appendChild(meta);
   body.appendChild(el("div", "sbnote", "仅作展示，不写入存档、不产生池子币；当前好感 " + (st && st.levelName ? st.levelName : level) + "。"));
+}
+
+/* PF-08 第二批（2026-11-08）：低频详情分区导航。
+   affbox（好感/互动）与 spirit-buff（增益）常驻，不受分区影响；
+   极矮横屏隐藏导航并展开全部详情，保证关键内容始终可达。纯表现层，不写存档。 */
+var DNAV_SECTIONS=["relation","memory","archive"],dnavSection="relation";
+function applySection(key){
+  if(DNAV_SECTIONS.indexOf(key)<0)key="relation";
+  dnavSection=key;
+  var compact=!!(window.matchMedia&&window.matchMedia("(max-height:340px)").matches);
+  var nav=$("#dnav");
+  if(nav)nav.hidden=compact;
+  var details=document.querySelectorAll(".dinfo details[data-section]");
+  for(var i=0;i<details.length;i++)details[i].hidden=!compact&&details[i].getAttribute("data-section")!==key;
+  if(nav){var tabs=nav.querySelectorAll("[data-section]");
+    for(var j=0;j<tabs.length;j++)tabs[j].setAttribute("aria-selected",String(tabs[j].getAttribute("data-section")===key));}
+  return key;
 }
 
 /* PF-08 信息层级（2026-11-08）：名录搜索只过滤可见行，不重排 Data.items、不改选中索引、
@@ -1383,6 +1415,13 @@ $("#codex-roster-toggle").addEventListener("click", function () {
 });
 var rosterSearch=$("#codex-roster-search");
 if(rosterSearch)rosterSearch.addEventListener("input",applyRosterFilter,false);
+var dnav=$("#dnav");
+if(dnav)dnav.addEventListener("click",function(e){
+  var n=e.target;
+  while(n&&n!==dnav&&(!n.getAttribute||!n.getAttribute("data-section")))n=n.parentNode;
+  if(n&&n!==dnav)applySection(n.getAttribute("data-section"));
+},false);
+applySection("relation");
 
 function select(idx) {
   closeSkinDialog(false);

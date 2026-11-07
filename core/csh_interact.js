@@ -1876,7 +1876,7 @@ import GEN_LINES from "./csh_interact_lines_gen.js";
 			"width:100%!important;margin:0 0 10px!important;padding:14px 16px!important;border-radius:12px!important;",
 			"background:var(--csh-light)!important;border:1px solid rgba(var(--csh-bg-rgb),.08)!important;}",
 			".csh-ia-card .txt{display:block!important;flex:1 1 auto!important;min-width:0!important;text-align:left!important;}",
-			".csh-ia-card .t{display:block!important;font-size:var(--csh-lfs-md2,13.5px)!important;font-weight:600!important;color:var(--csh-bg)!important;letter-spacing:-.005em!important;}",
+			".csh-ia-card .t{display:block!important;font-size:var(--csh-lfs-md2,13px)!important;font-weight:600!important;color:var(--csh-bg)!important;letter-spacing:-.005em!important;}",
 			".csh-ia-card .d{display:block!important;margin-top:4px!important;font-size:var(--csh-lfs-cap2,11.5px)!important;line-height:1.55!important;color:var(--csh-gray-soft)!important;}",
 			".csh-ia-card.dis{opacity:.5!important;}",
 			/* 开关：纯 flex，不用绝对定位，避免被引擎样式污染 */
@@ -1905,7 +1905,7 @@ import GEN_LINES from "./csh_interact_lines_gen.js";
 			".csh-ia-stat b{color:var(--csh-bg)!important;font-weight:600!important;}",
 			".csh-ia-foot{display:block!important;width:100%!important;margin-top:4px!important;text-align:center!important;}",
 			".csh-ia-btn{display:inline-block!important;cursor:pointer!important;margin:0 4px!important;padding:10px 26px!important;border-radius:8px!important;",
-			"font-size:var(--csh-lfs-md2,13.5px)!important;font-weight:500!important;letter-spacing:.01em!important;color:var(--csh-bg)!important;font-family:inherit!important;",
+			"font-size:var(--csh-lfs-md2,13px)!important;font-weight:500!important;letter-spacing:.01em!important;color:var(--csh-bg)!important;font-family:inherit!important;",
 			"touch-action:manipulation!important;-webkit-tap-highlight-color:transparent!important;",
 			"background:var(--csh-fg)!important;border:1px solid rgba(var(--csh-bg-rgb),.12)!important;box-shadow:0 1px 1px rgba(var(--csh-bg-rgb),.03)!important;",
 			"transition:border-color .16s ease,background .16s ease,box-shadow .16s ease,transform .16s ease!important;}",
@@ -2110,7 +2110,7 @@ import GEN_LINES from "./csh_interact_lines_gen.js";
 				+ "#csh-ia-cust-ov .csh-cust-add input:focus{background:var(--csh-fg);border-color:var(--csh-blue);box-shadow:0 0 0 3px rgba(var(--csh-blue-rgb),.14);}"
 				+ "#csh-ia-cust-ov .csh-cust-add .b{display:inline-block;cursor:pointer;padding:10px 18px;border-radius:8px;font-size:var(--csh-lfs-md,13px);font-weight:600;color:var(--csh-bg);background:var(--csh-accent);border:1px solid var(--csh-accent);flex:0 0 auto;}"
 				+ "#csh-ia-cust-ov .csh-cust-foot{text-align:center;margin-top:4px;}"
-				+ "#csh-ia-cust-ov .csh-cust-btn{display:inline-block;cursor:pointer;margin:0 4px;padding:10px 26px;border-radius:8px;font-size:var(--csh-lfs-md2,13.5px);font-weight:600;color:var(--csh-bg);background:var(--csh-accent);border:1px solid var(--csh-accent);box-shadow:0 1px 2px rgba(var(--csh-accent-rgb),.38);}";
+				+ "#csh-ia-cust-ov .csh-cust-btn{display:inline-block;cursor:pointer;margin:0 4px;padding:10px 26px;border-radius:8px;font-size:var(--csh-lfs-md2,13px);font-weight:600;color:var(--csh-bg);background:var(--csh-accent);border:1px solid var(--csh-accent);box-shadow:0 1px 2px rgba(var(--csh-accent-rgb),.38);}";
 			box.appendChild(reset);
 
 			var t = document.createElement("div");

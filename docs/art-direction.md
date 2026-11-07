@@ -150,7 +150,11 @@ background-size: 100% 1px; background-position: top left; background-repeat: no-
 游戏页用页内 `--pfs-*`（各自 :root，与宿主互不污染）；调试面板已并入主题标尺。
 内容层（技能名艺术字/台词：`character/index.js` 31 处、`skills/index.js` 7 处）不属于 UI 标尺，E54 白名单锁定。
 门禁 E54：白名单外出现裸 `font-size:Npx` 即失败，白名单计数漂移也失败。
-⏳ 剩余待办：同档多值（如 `--csh-lfs-md:13px` 与 `--csh-lfs-md2:13.5px`）待实机测量后并档，并档只改 csh_theme.js 一处。
+✅ **同档多值已并档（2026-11-08 · H1）**：`--csh-lfs-md2` 由 13.5px 并到 `md` 的 13px。
+   先由 `tools/probe_lfs_merge_20261108.mjs` 在 Chromium 915×412 / 640×286 实测：
+   computed line-height 20.25→19.5（差 0.75px），但按钮高度 44 / 内容高度 42 /
+   滚动宽度 158 / 换行 / 页面溢出全部一致，才允许并档。`csh_theme.js` 的 LFS 与
+   4 个使用文件共 8 处同值兜底同步；游戏页 `--pfs-*` 独立标尺未动。门禁 **E95AF 17/0**，E54 仍通过。
 
 1. `:root` 加三档字族 + 标尺（**游戏页**照 `core/csh_layout.css`：字体栈内联在 `var()` 默认值里，
    保证自包含单文件在任何加载顺序下都拿得到字体；**大厅类整页**照 `games/career.html`：定义在页内 `:root`）；

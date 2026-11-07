@@ -743,7 +743,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                 "#csh-wr-io-stat.bad{color:#f0a3b0!important;}",
                 "#csh-wr-io #csh-wr-io-acts{display:flex!important;flex-wrap:wrap!important;justify-content:flex-end!important;gap:10px!important;}",
                 "#csh-wr-io .csh-wr-iobtn{display:inline-block!important;cursor:pointer!important;padding:11px 20px!important;min-height:44px!important;",
-                "border-radius:999px!important;border:1px solid rgba(216,180,106,.3)!important;color:#e3d6b2!important;font-size:var(--csh-lfs-md2,13.5px)!important;letter-spacing:1px!important;",
+                "border-radius:999px!important;border:1px solid rgba(216,180,106,.3)!important;color:#e3d6b2!important;font-size:var(--csh-lfs-md2,13px)!important;letter-spacing:1px!important;",
                 "background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.015))!important;",
                 "transition:border-color .16s ease,background .16s ease!important;}",
                 "#csh-wr-io .csh-wr-iobtn:hover{border-color:rgba(216,180,106,.8)!important;background:linear-gradient(180deg,rgba(216,180,106,.2),rgba(216,180,106,.05))!important;}",
