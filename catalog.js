@@ -1,7 +1,7 @@
-/* 自动生成于 2026-11-07T15:18:51.020Z by tools/release.js —— hashes 对应 Git 发布字节，发版后 git push 即生效，勿手改 files */
+/* 自动生成于 2026-11-07T16:36:47.903Z by tools/release.js —— hashes 对应 Git 发布字节，发版后 git push 即生效，勿手改 files */
 window.extension = {
 	"池子魔将": {
-		"build": "1b4bc192289233981c2153aa6d8f9465d7a6d70e4e3fce8ff0443d91fae3005c",
+		"build": "cf58d98c5350be573a9da336a8214c9c0163c3acce65583f242385ab7961b89b",
 		"hashes": {
 			"LICENSE": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
 			"README.md": "41102b34ebc984b6b84b361baa0e78aa9defe5633a4a270cde6ed0ff7bc9ae4d",
@@ -305,7 +305,7 @@ window.extension = {
 			"core/csh_achievement_album.css": "5dbe5a5ceb1abd1b4b3ccc6dfc12c3ae79768ad3db3c47d74093e4e2eb353e6c",
 			"core/csh_achievement_badges.css": "89b95f23e1a58f705dfee8a1c319a6169ca39cb3be796d9dbdedfd659a84601b",
 			"core/csh_achievement_badges.js": "b0cb763d8b3735624f63d5b978af4a5ed076c32889c0e131b556e4214f42a394",
-			"core/csh_achievement_feedback.js": "20355e9ad99388047e9894deec7bed95579737740996563a942f066e26146729",
+			"core/csh_achievement_feedback.js": "07a50297d9a183f193d884af2a6e3f4fcf14d4abbc90ec7962c2a34a2e1aac9f",
 			"core/csh_achv.js": "4d10418e8131fc446cea2a21eeeb12ce151a94eca82c8225519e4108a6d8554a",
 			"core/csh_aff_lines.js": "a08e3a944e845310c47e035385d6db12668e79cbed2026a3ac9576183630f1ab",
 			"core/csh_affection.js": "b57c1bbab04f325e5d5658f69c2c85e4f8050f200dcc66513e0842edadb8bdf3",
@@ -360,7 +360,7 @@ window.extension = {
 			"core/csh_topup.js": "533e940fd7dadc008f6f77e4400c2b76bd1c791fad9470a4af7108346b9497b6",
 			"core/csh_topup_journal.js": "dd1970c6a70d87b0ba856bbaf4710b526d47b530b133e7fed01b7fd06ed7fe30",
 			"core/csh_trick_tables.css": "2d5716939b60ed24578e96a070d4ab6797880532d11cc4a47ca65b5409344715",
-			"core/csh_uikit.js": "6be863f80ba7542cd4fe25931303f85421439be771f562d0137a03d4892009a9",
+			"core/csh_uikit.js": "5fbf67b24afc80b5dbeb12374130abe58e0df550cee385f07bbcda1f07924669",
 			"core/csh_update.js": "edbc79fadf2686f5a77b63aa18a8d98af8ad3ab0d1e74663d26d8ba35e430fcd",
 			"core/csh_viewport.js": "1740cb8028b1f631b12bab1a2ecbf49d32b7bd8945d5246863a528801d875bd8",
 			"core/csh_voice.js": "4c6616186f89d559578a4fa63032daebc5c4d9223f0ecc39b68bd6831aa323c6",
@@ -388,7 +388,7 @@ window.extension = {
 			"games/blackjack/blackjack.html": "2e0e0104575806e61dc9bd3a5d81993cf70f323af200dc2c00c3bdc5f75df771",
 			"games/bossbook.html": "3a5a9070073a66ea8db6628e14c2c44768108b123d1639177b473d268d8bdc7b",
 			"games/career.html": "6dd73efdac3df9ee568b104479b3c090936c623f9a501ea2951f9b74b993d2b9",
-			"games/codex.html": "6d43159189ccc7e0ba45d7d9f121ae7bb9a2d735ef6a898744e8a63ec3ac0a7d",
+			"games/codex.html": "c58e96bb0dd4f730de78c026ebe7888ab2136d8bceb172e2ae75c8dfc3129d5b",
 			"games/doudizhu/doudizhu.html": "29c30adbdc241b4bc0ba8b5acfc5ff02e5f7ef919563b4c796a7797df7404e31",
 			"games/goldfish.html": "bf2b36d296aa8bce41347619d04831f90e88f446854562e7d89055b64f89698c",
 			"games/rank.html": "92a316a88405b253635c6e8b83a5f7b2786131cc54951c974e1e7c2446de8f3b",

@@ -420,11 +420,30 @@ function confirmBox(opts, cb) {
 }
 
 var _achievementUI = null;
+/* 即使反馈模块本身无法构造（损坏存档/DOM 未就绪/宿主环境异常），也只降级为安全的空表现层，
+   绝不让异常冒到宿主把源码上下文弹成原生 Alert。形状与真实实现一致，调用方无需分支。 */
+function inertAchievementUI() {
+    return {
+        show:function(){return 0;},hold:function(){return false;},review:function(){return false;},
+        archive:function(){return false;},markRead:function(){return false;},skip:function(){},destroy:function(){},
+        archiveStatus:function(){return {rows:0,unread:0,error:"成就通知暂不可用，成就进度不受影响",page:0,limit:200};},
+        preferences:function(){return {v:1,enabled:false,reduced:true,sound:false};},
+        setPreferences:function(){return {ok:false,reason:"成就通知暂不可用"};},
+        status:function(){return {generation:0,current:null,pending:0,overflow:0,history:[],paused:false};}
+    };
+}
 function achievementUI() {
-    if (!_achievementUI) _achievementUI=createAchievementFeedback({document:document,window:window,storage:localStorage,z:CSH_Z.toast,modal:CSH_Z.modal,
-        scope:function(){var w=lib.cshWallet,m=lib.cshMigrate,blocked=true;try{blocked=!w||typeof w.saveEpoch!=="function"||!w.saveGuard||w.saveGuard.blocked()!==false||localStorage.getItem("csh_migrate_recovery")!==null;if(m){var s=m.recoveryState();blocked=blocked||s.pending!==false||s.busy!==false||!!s.err;}}catch(e){blocked=true;}return {owner:w,epoch:w&&w.saveEpoch?w.saveEpoch():0,blocked:blocked};},
-        sound:function(){if(lib.cshSfx&&lib.cshSfx.play)lib.cshSfx.play("win");}
-    });
+    if (!_achievementUI) {
+        try {
+            _achievementUI=createAchievementFeedback({document:document,window:window,storage:localStorage,z:CSH_Z.toast,modal:CSH_Z.modal,
+                scope:function(){var w=lib.cshWallet,m=lib.cshMigrate,blocked=true;try{blocked=!w||typeof w.saveEpoch!=="function"||!w.saveGuard||w.saveGuard.blocked()!==false||localStorage.getItem("csh_migrate_recovery")!==null;if(m){var s=m.recoveryState();blocked=blocked||s.pending!==false||s.busy!==false||!!s.err;}}catch(e){blocked=true;}return {owner:w,epoch:w&&w.saveEpoch?w.saveEpoch():0,blocked:blocked};},
+                sound:function(){if(lib.cshSfx&&lib.cshSfx.play)lib.cshSfx.play("win");}
+            });
+        } catch (e) {
+            try { if (lib.cshDebug && typeof lib.cshDebug.error === "function") lib.cshDebug.error("uikit: 成就反馈不可用", e); } catch (eD) {}
+            _achievementUI = inertAchievementUI();
+        }
+    }
     return _achievementUI;
 }
 export function installUIKit() {
@@ -440,9 +459,9 @@ export function installUIKit() {
         confirm: confirmBox,
         achievement: function(items, options){try{return achievementUI().show(items,options);}catch(e){return 0;}},
         achievementHistory: function(){try{return achievementUI().review()===true;}catch(e){return false;}},
-        achievementState: function(){return achievementUI().status();},
-        achievementHold: function(key,value){return achievementUI().hold(key,value);},
-        achievementSkip: function(){achievementUI().skip();},
+        achievementState: function(){try{return achievementUI().status();}catch(e){return inertAchievementUI().status();}},
+        achievementHold: function(key,value){try{return achievementUI().hold(key,value);}catch(e){return false;}},
+        achievementSkip: function(){try{achievementUI().skip();}catch(e){}},
     };
     lib.cshUI = api;
     try { if (typeof window !== "undefined") { window.CSH = window.CSH || {}; window.CSH.ui = api; } } catch (eW) {}

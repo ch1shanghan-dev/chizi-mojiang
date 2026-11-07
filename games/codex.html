@@ -431,6 +431,19 @@ body.empty .foot{display:none}
 #spirit-buff-body .sbtag{font-size:var(--pfs-sm,12px);color:#c6c9bc;border:1px solid #776c52;border-radius:5px;padding:1px 6px}
 #spirit-buff-body .sbtag.on{color:#fff0bd;border-color:#d9bd7d;background:#4a4931}
 #spirit-buff-body .sbnote{color:#c6c9bc}
+/* PF-08 信息层级：名录可查找；当前关系一条摘要；低频经历按需展开。
+   材质只走 border/background/box-shadow，不改任何既有元素的 padding/margin/尺寸。 */
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.roster-search{flex:none;padding:0 4px 8px 0}
+#codex-roster-search{box-sizing:border-box;width:100%;min-height:44px;padding:8px 10px;font:inherit;font-size:var(--pfs-sm,12px);color:var(--ink,#eee6d5);border:1px solid var(--line-2,#776c52);border-radius:8px;background:rgba(0,0,0,.28)}
+#codex-roster-search:focus-visible{outline:2px solid var(--gold,#d9bd7d);outline-offset:-2px}
+.roster-empty{margin:8px 4px 0;font-size:var(--pfs-sm,12px);line-height:1.6;color:var(--ink-dim,#c6c9bc)}
+#rolodex .gitem[hidden]{display:none}
+#bond-brief{display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px;flex:none;padding:8px 10px;border-radius:8px;border:1px solid rgba(216,189,122,.20);font-size:var(--pfs-sm,12px);line-height:1.5;color:var(--ink-dim,#c6c9bc);box-shadow:inset 0 1px 0 rgba(255,255,255,.05);background-image:linear-gradient(90deg,transparent,rgba(216,189,122,.34) 22%,rgba(216,189,122,.34) 78%,transparent),linear-gradient(180deg,rgba(216,189,122,.07),transparent);background-size:100% 1px,100% 100%;background-position:top left,top left;background-repeat:no-repeat,no-repeat}
+#bond-brief .bb-k{letter-spacing:.12em;color:var(--gold,#d9bd7d)}
+#bond-brief .bb-v{color:var(--ink,#eee6d5)}
+#bond-brief .bb-next,#bond-brief .bb-act,#bond-brief .bb-cost{font-family:var(--ff-num,"Times New Roman",serif)}
+@media(max-height:340px){#bond-brief{display:none}}
 </style>
 <link rel="stylesheet" href="../core/csh_collection.css">
 </head>
@@ -444,7 +457,7 @@ body.empty .foot{display:none}
 
   <div id="codex-read-status" role="status" style="display:flex;align-items:center;gap:8px;flex:none;min-height:44px;font-size:var(--pfs-sm)"><span id="codex-read-message" style="flex:1;min-width:0"></span><button id="codex-read-retry" class="affbtn" type="button" style="min-width:88px;min-height:44px;font:inherit" hidden>重新读取</button></div>
   <div class="main">
-    <div class="rolodexwrap" id="codex-roster" role="region" aria-label="妖灵名录"><div class="rolodex" id="rolodex"></div></div>
+    <div class="rolodexwrap" id="codex-roster" role="region" aria-label="妖灵名录"><div class="roster-search"><label class="sr-only" for="codex-roster-search">按名字查找妖灵</label><input id="codex-roster-search" type="search" autocomplete="off" placeholder="按名字查找" aria-controls="rolodex"></div><div class="rolodex" id="rolodex"></div><p class="roster-empty" id="codex-roster-empty" role="status" hidden>名录里没有这个名字</p></div>
 
     <div class="dossier" id="dossier">
       <div class="dstage">
@@ -457,6 +470,8 @@ body.empty .foot{display:none}
           <div class="dtag" id="dtag"></div>
           <button class="affbtn" id="codex-skin-open" type="button" style="margin-left:auto;min-width:66px;min-height:44px">装扮</button>
         </div>
+        <!-- PF-08：首屏一条紧凑关系摘要，帮助玩家决定下一步；不新增按钮、不写存档 -->
+        <div class="bond-brief" id="bond-brief"></div>
         <div class="affbox" id="affbox"></div>
         <details class="collection-details" id="spirit-buff" hidden><summary>助战增益</summary><div id="spirit-buff-body"></div></details>
         <details class="collection-details" id="character-story"><summary>人物小传与题壁</summary>
@@ -465,7 +480,8 @@ body.empty .foot{display:none}
         <div id="dchief" hidden style="font-size:var(--pfs-md);color:#b08d3e;border-left:2px solid #b08d3e;padding-left:10px;margin-top:6px;line-height:1.6"></div>
         <div class="dbio" id="dbio"></div>
         </details>
-        <div class="dlines" id="dlines"></div>
+        <!-- PF-08：共同经历与台词属低频信息，按需展开，不在立绘下堆成超长页面 -->
+        <details class="collection-details" id="character-echo"><summary>共同经历与回响</summary><div class="dlines" id="dlines"></div></details>
         <details class="collection-details" id="character-records"><summary>讨伐与挂牌记录</summary>
         <div class="dfacts">
           <div class="fact"><div class="k">讨伐次数</div><div class="v num" id="fN">—</div></div>
@@ -733,6 +749,36 @@ function renderSpiritBuff(it) {
   body.appendChild(el("div", "sbnote", "仅作展示，不写入存档、不产生池子币；当前好感 " + (st && st.levelName ? st.levelName : level) + "。"));
 }
 
+/* PF-08 信息层级（2026-11-08）：名录搜索只过滤可见行，不重排 Data.items、不改选中索引、
+   不写存档；关系摘要只读 affState，帮助玩家决定下一步，不新增按钮与确认。 */
+function rosterQuery(){
+  var n=$("#codex-roster-search");
+  return n?String(n.value||"").trim().toLowerCase():"";
+}
+function applyRosterFilter(){
+  var q=rosterQuery(),box=$("#rolodex"),rows=box?box.children:[],shown=0;
+  for(var i=0;i<rows.length;i++){
+    var row=rows[i],g=row.querySelector?row.querySelector(".gname"):null;
+    var text=String((g?g.textContent:row.textContent)||"").toLowerCase();
+    var hit=!q||text.indexOf(q)>=0;
+    row.hidden=!hit;if(hit)shown++;
+  }
+  var empty=$("#codex-roster-empty");
+  if(empty)empty.hidden=!(q&&shown===0);
+  return shown;
+}
+function renderBondBrief(it){
+  var box=$("#bond-brief");if(!box)return;
+  var st=(it&&it.affState)||affOf(it&&it.id),lv=st&&typeof st.level==="string"?st.level:"D";
+  box.textContent="";
+  box.appendChild(el("span","bb-k","当前关系"));
+  box.appendChild(el("span","bb-v",(st&&st.levelName?st.levelName:"陌路")+" · "+lv));
+  if(lv==="S")box.appendChild(el("span","bb-next","羁绊圆满"));
+  else if(st&&typeof st.toNext==="number"&&st.toNext>0)box.appendChild(el("span","bb-next","距下一阶 "+fmt(st.toNext)));
+  box.appendChild(el("span","bb-act","可行动：招呼 / 交谈 / 赠礼"));
+  if(AFF.gifts&&AFF.gifts.length)box.appendChild(el("span","bb-cost","礼自 "+fmt(AFF.gifts[0].cost)+" CBY 起"));
+}
+
 function refreshAff(id) {
   AFF.cache = null;
   var it = id ? Data.items.filter(function (x) { return x.id === id; })[0] : Data.items[Data.cur];
@@ -953,8 +999,9 @@ function renderAff(it) {
   var msg = (AFF.say && AFF.say.id === it.id && AFF.say.msg) ? AFF.say.msg : "";
   var hint = el("div", "affhint" + (affApi() ? "" : " bad"), affApi() ? msg : "宿主未连接，仅可查看");
   box.appendChild(hint);
-  /* 好感档位变化会重绘 affbox，增益解锁态随同一份 it.affState 同步刷新 */
+  /* 好感档位变化会重绘 affbox，增益解锁态与关系摘要随同一份 it.affState 同步刷新 */
   renderSpiritBuff(it);
+  renderBondBrief(it);
 }
 
 /* ★ v6.9 结契（直调宿主；宿主缺失给中性提示） */
@@ -1190,6 +1237,7 @@ function renderList() {
     row.addEventListener("click", function () { select(idx); }, false);
     box.appendChild(row);
   });
+  applyRosterFilter();   /* 名录重建后保留当前查找条件，不改 Data.items 顺序 */
 }
 
 /* ---------- 回响 · 台词汇编（v6.4）----------
@@ -1333,6 +1381,8 @@ function setRosterOpen(open, focusRow) {
 $("#codex-roster-toggle").addEventListener("click", function () {
   setRosterOpen(!document.body.classList.contains("codex-roster-open"), true);
 });
+var rosterSearch=$("#codex-roster-search");
+if(rosterSearch)rosterSearch.addEventListener("input",applyRosterFilter,false);
 
 function select(idx) {
   closeSkinDialog(false);

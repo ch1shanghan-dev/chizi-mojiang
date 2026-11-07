@@ -60,6 +60,17 @@ export function createAchievementFeedback(env) {
     let archivePrev=null,archivePos=null,archiveNext=null;
     function preferences(){try{const raw=storage.getItem(ACHIEVEMENT_UI_KEY);if(!raw)return {v:1,enabled:true,reduced:false,sound:false};const p=JSON.parse(raw);if(p.v!==1||['enabled','reduced','sound'].some(k=>typeof p[k]!=='boolean'))throw Error('format');return p;}catch(e){return {v:1,enabled:false,reduced:true,sound:false};}}
     function setPreferences(change){try{const p={...preferences(),...change,v:1},text=JSON.stringify(p);storage.setItem(ACHIEVEMENT_UI_KEY,text);if(storage.getItem(ACHIEVEMENT_UI_KEY)!==text)throw Error('readback');preferenceError='';if(!p.enabled)queue.skip();render();return {ok:true};}catch(e){preferenceError='显示设置未保存，请恢复本机存储后重试';return {ok:false,reason:preferenceError};}}
+    /* 错误边界（2026-11-08）：本模块是纯表现层。本机存档、DOM 或宿主回调异常一旦冒泡，
+       宿主会把出错模块的源码上下文弹成原生 Alert（作者实机截图）。一律降级为
+       「不显示但可安全调用」，绝不把异常交给宿主，也绝不弹原生 alert。 */
+    const failures=[];
+    function report(where,e){
+        failures.push(String(where));
+        try{if(env&&typeof env.onError==='function')env.onError(where,e);}catch(_){}
+        try{if(typeof console!=='undefined'&&console.warn)console.warn('[池子魔将] 成就反馈已降级：'+where,e);}catch(_){}
+    }
+    function safely(where,fn,fallback){try{return fn();}catch(e){report(where,e);return fallback;}}
+    function safeHandler(where,fn){return function(){try{return fn.apply(this,arguments);}catch(e){report(where,e);}};}
     const el=(tag,cls,text)=>{const n=doc.createElement(tag);if(cls)n.className=cls;if(text!=null)n.textContent=text;return n;};
     function reduced(){return preferences().reduced||!!(win.matchMedia&&win.matchMedia('(prefers-reduced-motion: reduce)').matches);}
     function button(text,fn,label){const b=el('button','csh-ach-action',text);b.type='button';if(label)b.setAttribute('aria-label',label);b.addEventListener('click',fn);return b;}
@@ -228,7 +239,21 @@ export function createAchievementFeedback(env) {
         if(n>0)appendArchive(queue.snapshot().history.slice(0,n));
         return n;
     }
-    archive=readArchive();renderInbox();   /* 重启后立刻恢复常驻入口，不等下一次通知 */
+    /* 重启后立刻恢复常驻入口；任何初始化异常都降级为空归档，不让宿主弹源码。 */
+    function bootArchive(){
+        try{
+            archive=readArchive();
+            if(archive.damaged)archiveError='本机成就通知存档异常，已按空归档显示；成就进度不受影响';
+            renderInbox();
+        }catch(e){
+            report('boot',e);
+            archive={v:1,rows:[]};
+            archiveError='成就通知暂不可用（本机显示异常），成就进度不受影响';
+            try{if(inbox&&inbox.remove)inbox.remove();}catch(_){}
+            inbox=null;
+        }
+    }
+    bootArchive();
 
     function removeCard(){reading.clear();if(card){card.remove();card=null;}}
     function words(item){return item.kind==='claim'?'本次到账 +'+item.pc+' CBY'+(item.merit?' / +'+item.merit+' 功勋':''):'奖励待领取 · '+item.pc+' CBY'+(item.merit?' / '+item.merit+' 功勋':'');}
@@ -251,7 +276,7 @@ export function createAchievementFeedback(env) {
         if(!item.summary&&item.displayId!==lastSoundId&&preferences().sound&&env.sound){lastSoundId=item.displayId;try{env.sound();}catch(e){}}
         guarding();
     }
-    function guarding(){if(guard!==null){win.clearTimeout(guard);guard=null;}if(!closed&&!doc.hidden&&(review||queue.snapshot().current))guard=win.setTimeout(()=>{queue.check();render();},350);}
+    function guarding(){if(guard!==null){win.clearTimeout(guard);guard=null;}if(!closed&&!doc.hidden&&(review||queue.snapshot().current))guard=win.setTimeout(safeHandler('guard',()=>{queue.check();render();}),350);}
     function syncPause(){const paused=doc.hidden||!!review||holds.size>0||reading.size>0;if(queue.snapshot().paused!==paused)queue.pause(paused);}
     function hold(key,value){if(closed||typeof key!=="string"||!key||key.length>80)return false;if(value)holds.add(key);else holds.delete(key);syncPause();render();return true;}
     function closeReview(){if(!review)return;archiveOpen=false;archivePrev=archivePos=archiveNext=null;review.remove();review=null;reviewBody=null;syncPause();if(focusBack&&focusBack.isConnected)focusBack.focus({preventScroll:true});else if(card&&card.querySelector("button"))card.querySelector("button").focus({preventScroll:true});focusBack=null;}
@@ -280,9 +305,33 @@ export function createAchievementFeedback(env) {
     function visibility(){syncPause();}
     function pageHide(e){if(e&&e.persisted){closeReview();queue.skip();queue.pause(true);}else destroy();}
     function pageShow(e){if(e&&e.persisted)syncPause();}
-    function destroy(){if(closed)return;closed=true;archiveOpen=false;if(inbox){inbox.remove();inbox=null;}if(guard!==null)win.clearTimeout(guard);guard=null;removeCard();if(review)review.remove();review=null;queue.destroy();doc.removeEventListener('keydown',onKey,true);doc.removeEventListener('visibilitychange',visibility);win.removeEventListener('pagehide',pageHide);win.removeEventListener('pageshow',pageShow);}
-    doc.addEventListener('keydown',onKey,true);doc.addEventListener('visibilitychange',visibility);win.addEventListener('pagehide',pageHide);win.addEventListener('pageshow',pageShow);visibility();
-    return {show:showWithArchive,hold,review:()=>openReview(null),archive:()=>openArchive(),
+    function destroy(){if(closed)return;closed=true;archiveOpen=false;if(inbox){inbox.remove();inbox=null;}if(guard!==null)win.clearTimeout(guard);guard=null;removeCard();if(review)review.remove();review=null;queue.destroy();doc.removeEventListener('keydown',boundKey,true);doc.removeEventListener('visibilitychange',boundVisibility);win.removeEventListener('pagehide',boundPageHide);win.removeEventListener('pageshow',boundPageShow);}
+    var boundKey=safeHandler('keydown',onKey),boundVisibility=safeHandler('visibilitychange',visibility),
+        boundPageHide=safeHandler('pagehide',pageHide),boundPageShow=safeHandler('pageshow',pageShow);
+    safely('listeners',function(){
+        doc.addEventListener('keydown',boundKey,true);doc.addEventListener('visibilitychange',boundVisibility);
+        win.addEventListener('pagehide',boundPageHide);win.addEventListener('pageshow',boundPageShow);
+    });
+    safely('visibility',visibility);
+    var api={show:showWithArchive,hold,review:()=>openReview(null),archive:()=>openArchive(),
         archiveStatus:()=>({rows:archive.rows.length,unread:unreadCount(),error:archiveError,page:archivePage,limit:ACHIEVEMENT_ARCHIVE_LIMIT}),
-        markRead:markArchiveRead,skip:queue.skip,preferences,setPreferences,status:queue.snapshot,destroy};
+        markRead:markArchiveRead,skip:queue.skip,preferences,setPreferences,status:queue.snapshot,destroy:destroy};
+    var fallbacks={
+        show:0,hold:false,review:false,archive:false,markRead:false,
+        archiveStatus:function(){return {rows:0,unread:0,error:archiveError||'成就通知暂不可用',page:0,limit:ACHIEVEMENT_ARCHIVE_LIMIT};},
+        preferences:function(){return {v:1,enabled:false,reduced:true,sound:false};},
+        setPreferences:function(){return {ok:false,reason:'成就通知暂不可用'};},
+        status:function(){return {generation:0,current:null,pending:0,overflow:0,history:[],paused:false};},
+        skip:undefined,destroy:undefined
+    };
+    /* 公开方法统一兜底：异常时返回同类型安全值，不把错误交给宿主。正常路径行为不变。 */
+    var guarded={};
+    Object.keys(api).forEach(function(k){
+        var fn=api[k];
+        guarded[k]=typeof fn==='function'?function(){
+            try{return fn.apply(null,arguments);}catch(e){report('api.'+k,e);
+                return typeof fallbacks[k]==='function'?fallbacks[k]():fallbacks[k];}
+        }:fn;
+    });
+    return guarded;
 }
