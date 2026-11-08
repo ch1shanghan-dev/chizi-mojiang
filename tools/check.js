@@ -3415,6 +3415,9 @@ if (spawnOk && execFileSync && !ONLY_SYNTAX && !ONLY_VERSIONS) {
       ['E95AF','probe_lfs_merge_20261108.mjs',['--out',path.join(tmp95,'lfs-merge')],17,'同档字号并档（双横屏实机几何/8处兜底，改前自检2红）',60000],
       /* PF-08 第二批：低频详情分区导航，主操作常驻、矮屏全展开。 */
       ['E95AG','probe_codex_sections_20261108.mjs',['--out',path.join(tmp95,'codex-sections')],22,'图鉴分区导航（相处/记忆/档案/矮屏降级，改前自检1红）',20000],
+      /* 工作包 B：房间跨进程恢复的事务骨架。头号不变量是「只有余额与扣款前完全一致才可判
+         扣款未落盘」，其余一律不许当没扣过 —— 改前基线（无条件丢弃）能判红。 */
+      ['E95AH','probe_room_journal_20261109.mjs',['--out',path.join(tmp95,'room-journal')],60,'房间凭据与快照（prepare/乐观锁/恢复判定/快照校验，改前自检2红）',20000],
     ];
     for (const [tag95, script95, args95, min95, label95, timeout95] of reg95) {
       const r95 = runProbeJson(script95, args95, { timeout: timeout95 });

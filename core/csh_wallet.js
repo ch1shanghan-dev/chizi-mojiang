@@ -1232,6 +1232,15 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
                 if(worldApi.raw&&Array.isArray(worldApi.raw().tableReceipts)&&worldApi.raw().tableReceipts.some(function(e){return e.id===worldEntry.id;}))throw Error("牌桌结果已经保存");
                 wallet.tableOutbox=validateTableOutbox(outbox.concat(worldEntry));
             }
+            /* 结算凭据与余额同一次落盘（工作包 B）：没这条，重启后就没有任何东西能证明
+               「这一局已经付过」，房间恢复只能重放结算 → 重复付款。编号非法直接中止，
+               不许「结算成功但没有凭据」这种半截状态存在。 */
+            if (opts.settleId != null) {
+                if (typeof opts.settleId !== "string" || !/^[a-zA-Z0-9_-]{10,100}$/.test(opts.settleId)) throw Error("结算凭据编号无效");
+                wallet.roomSettledId = opts.settleId;
+                wallet.roomSettledTx = credited;
+                wallet.roomSettledT = Date.now();
+            }
             wallet._sig=sigOf(wallet);if(saveBlocked())throw Error('save blocked');persistWallet(wallet);
         }catch(e){wallet=before;return {ok:false,credited:0,balance:wallet.pc,reason:'结算尚未保存，请保留页面后重试'};}
         flushCheckpoints();snapshot();r.ok=true;
@@ -2335,6 +2344,15 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 			catOf: catOf,
 			ticketOf: ticketOf, payTicket: payTicket,
 			capOf: capOf, settle: settle, settleRun: settleRun, planOf: planOf,
+			/* 最近一次带编号的结算凭据（工作包 B）：只读，供房间恢复判断「这局付过没有」。
+			   字段刻意放在顶层标量位上 —— 存档签名只覆盖顶层键，嵌对象改了签名也发现不了。 */
+			roomReceipt: function () {
+				return {
+					id: typeof wallet.roomSettledId === "string" ? wallet.roomSettledId : "",
+					credited: Number.isSafeInteger(wallet.roomSettledTx) ? wallet.roomSettledTx : 0,
+					t: Number.isSafeInteger(wallet.roomSettledT) ? wallet.roomSettledT : 0,
+				};
+			},
 			sign: sign, canSign: canSign, signAmount: signAmount,
 			relief: relief, reliefState: reliefState,
 			today: today,

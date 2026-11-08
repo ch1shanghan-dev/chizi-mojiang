@@ -1,7 +1,7 @@
-/* 自动生成于 2026-11-08T12:48:19.378Z by tools/release.js —— hashes 对应 Git 发布字节，发版后 git push 即生效，勿手改 files */
+/* 自动生成于 2026-11-08T16:54:41.177Z by tools/release.js —— hashes 对应 Git 发布字节，发版后 git push 即生效，勿手改 files */
 window.extension = {
 	"池子魔将": {
-		"build": "27a50536b963bfeebd2b989bb690824f79c2b7b32e234a09bd4f990013dccf7c",
+		"build": "7922edb0c81a210a0fecf6056a73ea4cd143308c469d46b907e8b7913a707ab3",
 		"hashes": {
 			"LICENSE": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
 			"README.md": "41102b34ebc984b6b84b361baa0e78aa9defe5633a4a270cde6ed0ff7bc9ae4d",
@@ -333,7 +333,7 @@ window.extension = {
 			"core/csh_layout.css": "0f97347e069cd80e7393620dc12765bd27cc094ebc0134dee32ea51dfbb1ace6",
 			"core/csh_market.js": "e103ae31d60b89bc4994a4aa25df1e39274982e1dc47c1fcfe2fea2893617805",
 			"core/csh_match_reward.js": "af18572aff53049e3c95b6275a7a672b6ced1a815c7966e41b05b76977354b47",
-			"core/csh_migrate.js": "69057b41e526724cf5201f43a3d8e35543976b59869c9b82ac1c171990bf5757",
+			"core/csh_migrate.js": "ffef4dece98eeac465b54c492b64d43e0025106c3f5e17498a819edef799ce7a",
 			"core/csh_net.js": "a278fa9e7137b87a669c336bdfb19e5a7a720dc82523090a07fe20c076846384",
 			"core/csh_online.js": "012ae2f14f3784f45eabaa3e1217dbd4cc0e398d22dcacadfc5a11869c19b0fb",
 			"core/csh_page.js": "ebbaa4daa63c05dec73a62770ed1e294dc73e2bb3acb185856d1cb394925bf67",
@@ -342,6 +342,7 @@ window.extension = {
 			"core/csh_pots.js": "55f9ebd7cb5b707c196359f114cf84a93e465f4183d48f69bc1b555b80a1d8e6",
 			"core/csh_records.css": "ee8fbd0a69a575b98525b85ab6145c428d268fa1ff856567376acb7bef53684d",
 			"core/csh_registry.js": "b7bb6868db37cbe9bab5c6601f91eb6751c406be30c694218917f39904a75599",
+			"core/csh_room.js": "433a37a7b999dd8913ee53d108734c80beb6c447c4fb74a58f48ecce9de1ae25",
 			"core/csh_rules.js": "7ac7bc8227037d4ba9e4f2423f819255dcead54a0ef75f60289bb709183a9d7e",
 			"core/csh_seat_cooldown.js": "afa2cee9c7ebae30dac38221b00e807631e24e7e53070adfd5e90283a625a91e",
 			"core/csh_selftest.js": "14e4acf537174481382c84370af8264027ea46cd0544731650bf675e20019ac4",
@@ -364,7 +365,7 @@ window.extension = {
 			"core/csh_update.js": "4cd83975adc40516ba5d82319fd72842ebf6a635acbaa06137d55af52a841f34",
 			"core/csh_viewport.js": "db264324ca4fad34d3e92f914615790382bf35c10eb223b1484ce181abd9c0cd",
 			"core/csh_voice.js": "4c6616186f89d559578a4fa63032daebc5c4d9223f0ecc39b68bd6831aa323c6",
-			"core/csh_wallet.js": "ceeff50a26c101a72352f04861a3519e8ac9c0b623563d9e3dcc2b7ab7a0f509",
+			"core/csh_wallet.js": "b973f2c2ce52414cd72e1abd439ac79e2dc6f063f8d76e0ed1f64ae4b66707e1",
 			"core/csh_winrate.js": "38483631a3121ac6b7a084142d8d9fe90b164c009743207def9ec0c89a2dcc2c",
 			"core/csh_world.js": "851f130183ff7adf278a09093d84b70d0e8ec5bb8fddeb5dedbb8089ae67db9e",
 			"core/csh_world_view.js": "44117e771251457435093a35da02e99a679d6aff94a136af8cc91b067dfd11f6",
@@ -1400,6 +1401,7 @@ window.extension = {
 			"core/csh_pots.js",
 			"core/csh_records.css",
 			"core/csh_registry.js",
+			"core/csh_room.js",
 			"core/csh_rules.js",
 			"core/csh_seat_cooldown.js",
 			"core/csh_selftest.js",
