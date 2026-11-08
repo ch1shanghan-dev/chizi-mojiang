@@ -172,6 +172,51 @@ async function clickElement(expression, inFrame = false, allowDisabled = false) 
   await page.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: point.x, y: point.y, button: 'left', clickCount: 1 });
   await delay(250);
 }
+/* ---------- 工作包 B · 房间凭据的真实宿主验证（2026-11-09） ----------
+   用未改动的无名杀宿主 + 真实钱包 + 真实 localStorage + 真实 Page.reload，
+   证明「扣款 → 落凭据 → 进程重启 → 判定续局 → 结算凭据可自证」这条链。
+   不驱动牌桌 UI，也不碰玩家档：一次性 Chromium 档案里自行注资。 */
+async function smokeRoomRecovery(){
+  const ID='room-host-smoke-0001', AMOUNT=50000;
+  stage('room-recovery-start',{id:ID,amount:AMOUNT});
+  check('真实宿主已加载房间凭据模块（此前从未进入加载图）',
+    await page.evaluate('typeof window.CSHRoom === "object" && typeof window.CSHRoom.prepare === "function"'));
+  check('真实宿主钱包暴露 roomReceipt',
+    await page.evaluate('lib.cshWallet && typeof lib.cshWallet.wallet.roomReceipt === "function"'));
+  check('真实宿主已加载补码凭据模块（此前补码恒失败）',
+    await page.evaluate('typeof window.CSHTopUpJournal === "object"'));
+
+  await page.evaluate('(()=>{lib.cshWallet.wallet.add(200000,"isolated room test funding");lib.cshWallet.flushSave();return lib.cshWallet.wallet.pc();})()');
+  const before=await page.evaluate(`(()=>{const pc=lib.cshWallet.wallet.pc();const r=window.CSHRoom.prepare(localStorage,{id:"${ID}",table:"blackjack",amount:${AMOUNT},balanceBefore:pc,t:Date.now(),shot:null});return {pc,prep:r};})()`);
+  check('★ 扣款前凭据在真实 localStorage 落盘并读回成功',before.prep&&before.prep.ok===true,before);
+
+  const act=await page.evaluate(`(()=>{const w=lib.cshWallet.wallet;const paid=w.spend(${AMOUNT},"入场:blackjack");lib.cshWallet.flushSave();const a=window.CSHRoom.activate(localStorage,"${ID}",{v:1,buyIn:${AMOUNT},s:{shoe:[1,2,3,4],hands:[],dealer:[],chips:${AMOUNT},phase:"deal"}});return {paid,a,pc:w.pc()};})()`);
+  check('扣款成功且凭据进入 active',act.paid===true&&act.a.ok===true&&act.pc===before.pc-AMOUNT,act);
+
+  /* 真实重载 = 新文档 + 钱包从磁盘重读。这一步才是「跨进程」的证据。 */
+  await reloadHost('!!window.lib?.cshWallet && typeof window.CSHRoom === "object"','房间凭据重载');
+  const after=await page.evaluate(`(()=>{const w=lib.cshWallet.wallet;const d=window.CSHRoom.decide(localStorage,{pc:()=>w.pc(),settledId:()=>w.roomReceipt().id});const raw=localStorage.getItem(window.CSHRoom.KEY);return {pc:w.pc(),action:d.action,charged:d.charged,phase:raw?JSON.parse(raw).phase:null,shot:raw?JSON.parse(raw).shot:null,receipt:w.roomReceipt()};})()`);
+  check('★ 重载后判定为 resume 且确认扣款已持久化',after.action==='resume'&&after.charged===true,after);
+  check('★ 重载后余额只扣一次（不重复入场费）',after.pc===before.pc-AMOUNT,{before:before.pc,after:after.pc});
+  check('重载后快照原样带回（牌靴未重抽）',after.phase==='active'&&after.shot&&after.shot.s&&after.shot.s.shoe.length===4,after);
+
+  const settled=await page.evaluate(`(()=>{const w=lib.cshWallet.wallet;const r=w.settleRun("blackjack",{buyIn:${AMOUNT},netWin:0,aiStakeTotal:0,settleId:"${ID}"});lib.cshWallet.flushSave();return {ok:r.ok,credited:r.credited,receipt:w.roomReceipt()};})()`);
+  check('真实钱包结算把房间编号写进同一次余额写入',settled.ok===true&&settled.receipt.id===ID,settled);
+  await reloadHost('!!window.lib?.cshWallet && typeof window.CSHRoom === "object"','结算凭据重载');
+  const rec=await page.evaluate('lib.cshWallet.wallet.roomReceipt()');
+  check('★ 结算凭据跨重载仍在（重启后能自证这一局付过，不必重放结算）',rec.id===ID&&rec.credited>0,rec);
+
+  const done=await page.evaluate(`(()=>{const R=window.CSHRoom;R.markSettled(localStorage,"${ID}",0);R.clear(localStorage);return R.decide(localStorage,{pc:()=>lib.cshWallet.wallet.pc(),settledId:()=>lib.cshWallet.wallet.roomReceipt().id});})()`);
+  check('结算收尾后房间凭据清空，恢复判定为 none',done.action==='none',done);
+
+  const discard=await page.evaluate(`(()=>{const R=window.CSHRoom,w=lib.cshWallet.wallet,pc=w.pc();R.prepare(localStorage,{id:"room-host-smoke-0002",table:"texas",amount:1000,balanceBefore:pc,t:Date.now(),shot:null});const d=R.decide(localStorage,{pc:()=>w.pc(),settledId:()=>w.roomReceipt().id});R.clear(localStorage);return {d,pcAfter:w.pc()};})()`);
+  check('★ 只写了凭据但没扣款 → 判 discard，绝不白送钱',
+    discard.d.action==='discard'&&discard.pcAfter===discard.d.entry.balanceBefore,discard);
+  const boot=await state();
+  check('房间验证期间宿主无脚本错误与对话框',
+    !boot.diagnostics?.errors?.length&&!boot.diagnostics?.rejections?.length&&!boot.diagnostics?.dialogs?.length,boot.diagnostics);
+  stage('room-recovery-done');
+}
 async function smokeExperience(){
  await page.evaluate('(async()=>{await lib.__cshLoadDebug();lib.cshWallet.wallet.add(250000,"isolated UI test funding");lib.cshWallet.flushSave();return lib.cshDebug.openLobby();})()');
  await until('!!document.querySelector(".csh-world-hero")&&!!document.getElementById("csh-experience-css")?.sheet','new world design and stylesheet');
@@ -582,6 +627,7 @@ try {
   }
   if (!recoveryBoot && current?.arena && current?.extensionLoaded && current?.character) {
     if(process.argv.includes('--world-layout-410'))await worldLayout410();
+    else if(process.argv.includes('--room-smoke'))await smokeRoomRecovery();
     else if(process.argv.includes('--noncharacter-survey'))await surveyNoncharacter({page,out,snap,until,delay,clickElement,check,stage});
     else if(process.argv.includes('--ui-recovery')){await smokeExperience();await smokeUiRecovery();}
     else if(process.argv.includes('--experience-smoke'))await smokeExperience();
