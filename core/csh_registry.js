@@ -220,6 +220,9 @@
 			if (g.settle !== "chips" && g.needBuyIn) errs.push(k + " 非牌桌类不允许 needBuyIn");
 			if (g.ticket < 0) errs.push(k + " 门票为负");
 			if (g.needBuyIn && g.ticket > 0) errs.push(k + " 带入制不应收门票（双重抽水）");
+			/* 房间快照只对「带入制 + 筹码结算」的桌有意义：名次制/无结算桌没有
+			   要续的资金与牌面，声明了反而会留下空凭据。 */
+			if (g.room && !(g.needBuyIn && g.settle === "chips")) errs.push(k + " room 仅允许带入制筹码桌声明");
 			if (seen[k]) errs.push("重复 key: " + k); seen[k] = 1;
 		});
 		if (ORDER.length !== keys().length) errs.push("ORDER 与 keys() 不一致");
