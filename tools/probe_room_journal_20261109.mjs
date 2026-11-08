@@ -242,6 +242,23 @@ check('shell-room-save 计入 mutatesSave（存档阻塞时不许写快照）',
 check('离开确认文案按是否有房间凭据分叉（不再一律说损失带入）',
   /currentRoomId\s*\n?\s*\?/.test(shellSrc) && /保留牌桌/.test(shellSrc));
 
+/* ---------- 静态接线：廿一点页面真的上报与恢复 ---------- */
+const reg = fs.readFileSync(root + '/core/csh_registry.js', 'utf8');
+const bjKeys = (bjSrc.match(/var ROOM_KEYS = \[([\s\S]*?)\];/) || [, ''])[1];
+check('廿一点已声明 room:true（否则宿主根本不建凭据）',
+  /key: "blackjack"[\s\S]{0,400}?room: true/.test(reg));
+check('廿一点暴露 roomState / roomSave 两个桥方法',
+  /roomState: function/.test(bjSrc) && /roomSave: function/.test(bjSrc));
+check('渲染出口调用 saveRoom（动作后自动快照）', /function renderAll\(\)[\s\S]{0,300}?saveRoom\(\)/.test(bjSrc));
+check('启动流程会先问宿主是否续局', /Bridge\.roomState\(function/.test(bjSrc) && /applyRoomShot\(/.test(bjSrc));
+check('恢复走白名单赋值，不整包 merge 存档',
+  !/Object\.assign\([^)]*shot\.s/.test(bjSrc) && /ROOM_KEYS/.test(bjSrc));
+check('快照字段含牌靴/手牌/庄家/筹码/阶段（缺一项就不是同一局）',
+  ['shoe', 'hands', 'dealer', 'chips', 'phase', 'activeHand'].every(k => new RegExp('[\'"]' + k + '[\'"]').test(bjKeys)));
+check('牌靴整副保存（不许截断：截断等于允许重抽）',
+  !/shot\.s\.shoe\s*=.*slice|shoe:\s*state\.shoe\.slice\(-/.test(bjSrc));
+check('同状态不重复写（渲染频繁，避免刷盘）', /text === lastRoomJson/.test(bjSrc));
+
 /* ---------- 自检：去掉「只有余额不变才丢弃」必须判红 ---------- */
 const anchor = "    if (pc === d.balanceBefore) return { action: 'discard', entry: d, reason: '扣款未持久化' };";
 if (!src.includes(anchor)) throw Error('negative-baseline anchor changed');

@@ -962,6 +962,10 @@ try { CRD = (typeof window !== 'undefined' && window.CSH && window.CSH.cards) ? 
         }, cb, 4000);
       },
       isSettled: T.isSettled,
+      /* 房间快照（工作包 B）：宿主是唯一写者 —— 本页只上报纯数据，不自己落盘。
+         两个进程各写一份必然出现撕裂态，而钱的真值在宿主。 */
+      roomState: function (cb) { call('shell-room-state', null, cb, 1500); },
+      roomSave: function (shot, seq, cb) { call('shell-room-save', { shot: shot, expectSeq: seq }, cb, 1500); },
     };
   })();
   /* ==BJ-BRIDGE-END== */
@@ -1345,6 +1349,66 @@ try { CRD = (typeof window !== 'undefined' && window.CSH && window.CSH.cards) ? 
 
   function renderAll() {
     renderHud(); renderHeat(); renderDealer(); renderHands(); renderActions(); renderHint(); renderStatus();
+    /* 状态出口即快照点：这里之后台上任何一处都已是新状态，
+       不必在 6 个动作函数里各埋一次（漏一个就是"续局少看一张牌"）。 */
+    saveRoom();
+  }
+
+  /* ============================================================
+     3.9 房间快照（工作包 B · 2026-11-09）
+     ------------------------------------------------------------
+     进程被杀后要能接着打，必须把「牌靴 + 各家已发牌 + 筹码 + 阶段」原样存下来。
+     ★ 牌靴必须整副保存：截断或重洗都等于换了一局，玩家会看到自己的牌变了。
+     ★ 白名单序列化，不用整包 Object.assign —— 存档里塞进来的未知字段
+       不该有机会覆盖 state 上的任何东西。
+     ============================================================ */
+  var roomSeq = 0, lastRoomJson = '';
+  var ROOM_KEYS = ['shoe', 'shoeSize', 'tier', 'hand', 'chips', 'dealerBank', 'dealerBankInit',
+    'dealerBust', 'tableTotal', 'streak', 'bet', 'hands', 'dealer', 'phase', 'activeHand',
+    'insuranceBet', 'holeHidden', 'roundDelta', 'insDelta', 'publicShoe'];
+
+  function roomShot() {
+    if (!state) return null;
+    var s = {};
+    for (var i = 0; i < ROOM_KEYS.length; i++) {
+      var k = ROOM_KEYS[i];
+      if (state[k] !== undefined) s[k] = state[k];
+    }
+    return {
+      v: 1,
+      buyIn: Bridge.buyIn(),
+      dealer: dealerSeat ? { id: dealerSeat.id, name: dealerSeat.name, stake: dealerSeat.stake, mult: dealerSeat.mult || 1 } : null,
+      s: s,
+    };
+  }
+
+  function saveRoom() {
+    if (!Bridge.active || !state || typeof Bridge.roomSave !== 'function') return;
+    if (state.phase === 'over') return;      // 已收工，等结算清凭据，不必再写
+    var shot, text;
+    try { shot = roomShot(); if (!shot) return; text = JSON.stringify(shot); } catch (eS) { return; }
+    if (text === lastRoomJson) return;       // 同一状态不重复写（渲染很频繁）
+    lastRoomJson = text;
+    Bridge.roomSave(shot, roomSeq, function (ok, d) {
+      if (ok && d && Number.isSafeInteger(d.saveSeq)) roomSeq = d.saveSeq;
+    });
+  }
+
+  /* 恢复：只接受白名单字段。返回 false 就当没恢复，走新局。 */
+  function applyRoomShot(shot) {
+    if (!shot || !shot.s || typeof shot.s !== 'object') return false;
+    try {
+      dealerSeat = shot.dealer && shot.dealer.id ? shot.dealer : null;
+      var base = newState();
+      for (var i = 0; i < ROOM_KEYS.length; i++) {
+        var k = ROOM_KEYS[i];
+        if (shot.s[k] !== undefined) base[k] = shot.s[k];
+      }
+      if (!(base.hands instanceof Array) || !(base.dealer instanceof Array)) return false;
+      state = base;
+      if (!state.shoe || !state.shoe.length) return false;
+      return true;
+    } catch (eR) { return false; }
   }
 
   /* ---------- toast / 反馈 ---------- */
@@ -2155,7 +2219,23 @@ function trapDialogKey(e, modal) {
     Bridge.pull(function () {
       runSceneTask(function () {
         prefetchDealer(function () {
-          runSceneTask(function () { state = newState(); newShoe(); showStart(); });
+          runSceneTask(function () {
+            var startFresh = function () { state = newState(); newShoe(); showStart(); };
+            if (typeof Bridge.roomState !== 'function') { startFresh(); return; }
+            /* 宿主会告诉我们：这桌是不是还有一局没打完。有就接着打，绝不重新发牌。 */
+            Bridge.roomState(function (ok, d) {
+              runSceneTask(function () {
+                if (ok && d && Number.isSafeInteger(d.saveSeq)) roomSeq = d.saveSeq;
+                if (ok && d && d.mode === 'resume' && d.shot && applyRoomShot(d.shot)) {
+                  switchView('view-game');
+                  renderAll();
+                  toast('已恢复上次未打完的牌桌');
+                  return;
+                }
+                startFresh();
+              });
+            });
+          });
         });
       });
     });
@@ -2176,6 +2256,10 @@ function trapDialogKey(e, modal) {
     getState: function () { return state; },
     getBest: function () { return best; },
     getSet: function () { return set; },
+    /* 房间快照的取证面：给隔离验证复现「存一份 → 重建 → 比对」用，
+       不参与任何玩法逻辑，也不改变默认渲染行为。 */
+    roomShot: roomShot, applyRoomShot: applyRoomShot,
+    getDealerSeat: function () { return dealerSeat; },
     setShoe: function (cards, size) {
       state.shoe = cards.slice();
       state.publicShoe=null;

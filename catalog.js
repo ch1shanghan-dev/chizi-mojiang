@@ -1,7 +1,7 @@
-/* 自动生成于 2026-11-08T17:33:52.371Z by tools/release.js —— hashes 对应 Git 发布字节，发版后 git push 即生效，勿手改 files */
+/* 自动生成于 2026-11-08T17:44:07.292Z by tools/release.js —— hashes 对应 Git 发布字节，发版后 git push 即生效，勿手改 files */
 window.extension = {
 	"池子魔将": {
-		"build": "e74942dbf6cc5f5f1191d95b97937d12c649e4bb839b587b4e1c97b9a8fc2ffc",
+		"build": "75270bf6b73853967d991958904ccb723d674346f3fcda55a923e984b6aab455",
 		"hashes": {
 			"LICENSE": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
 			"README.md": "41102b34ebc984b6b84b361baa0e78aa9defe5633a4a270cde6ed0ff7bc9ae4d",
@@ -341,8 +341,8 @@ window.extension = {
 			"core/csh_pool_achv.js": "948a81ff225822d24d24607662fdeef1924a992148afaeb4e95a42769f564ab1",
 			"core/csh_pots.js": "55f9ebd7cb5b707c196359f114cf84a93e465f4183d48f69bc1b555b80a1d8e6",
 			"core/csh_records.css": "ee8fbd0a69a575b98525b85ab6145c428d268fa1ff856567376acb7bef53684d",
-			"core/csh_registry.js": "b7bb6868db37cbe9bab5c6601f91eb6751c406be30c694218917f39904a75599",
-			"core/csh_room.js": "433a37a7b999dd8913ee53d108734c80beb6c447c4fb74a58f48ecce9de1ae25",
+			"core/csh_registry.js": "3fefb7a34f1bb678f9393087493c0b4b7be3f1985dff7d111a6acc69a84db0cc",
+			"core/csh_room.js": "23491db9e4d2dd3e826fa4b3178b75cf475026800c558dc1c237e6dec138c848",
 			"core/csh_rules.js": "7ac7bc8227037d4ba9e4f2423f819255dcead54a0ef75f60289bb709183a9d7e",
 			"core/csh_seat_cooldown.js": "afa2cee9c7ebae30dac38221b00e807631e24e7e53070adfd5e90283a625a91e",
 			"core/csh_selftest.js": "14e4acf537174481382c84370af8264027ea46cd0544731650bf675e20019ac4",
@@ -386,7 +386,7 @@ window.extension = {
 			"font/csh_fx_font_2.woff2": "ad894385b4e996e5f4b237cc6f5ead035237fb4c0cceaa603081ea63ab2b1da9",
 			"font/csh_fx_font_3.woff2": "d7ab0948a09d38fc75e71968e265385a124f98223c17d32dfe85e1aa3aadf51b",
 			"games/achv.html": "56d2e20cd20e7f295daceca08dde10915e7b63e17298ea0f4790835a7801d88e",
-			"games/blackjack/blackjack.html": "570fecb2f8d1b636f0242cacd66b7da7651fd4f72a745a595df6bbd174e41fdd",
+			"games/blackjack/blackjack.html": "c5b16b3d0c8159b64a29b438a67f990db11f42f068ac051357f997c6012c1dcc",
 			"games/bossbook.html": "e467279dfe5e1a17f32e21cbcc9749233b454720a380e4abe33d9b63d8723a22",
 			"games/career.html": "115f63a1a08c01257876b017649b95b98e2b19db8dc6551acaa6f1ea4e962847",
 			"games/codex.html": "fccbe04d418f903b725210f9b0053d687fa6e1ff65237dfa8f58d400a7c7bd8b",
@@ -1053,7 +1053,7 @@ window.extension = {
 		"intro": "<font color=#c9a84c>版本</font> <font color=#00FFFF>4.0.16</font>",
 		"version": "4.0.16",
 		"date": "2026-11-08",
-		"size": "137.5MB",
+		"size": "137.6MB",
 		"limits": {
 			"textBytes": 524288,
 			"fileBytes": 16777216,

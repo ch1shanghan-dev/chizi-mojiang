@@ -73,6 +73,10 @@
 			/* 2026-09-29：免门票 + 必选带入。回收率 95% 本身就是台费，
 			   再叠一张门票等于双重抽水；且门票与最低带入叠加会高于本金。 */
 			landscape: true, settle: "chips", needBuyIn: true, ticket: 0, decay: 0.95,
+			/* 工作包 B（2026-11-09）：本桌页面会上报局内快照，宿主可据此跨进程续局。
+			   只有真的接了 shell-room-save 的桌才能声明这个开关 —— 否则会留下
+			   「扣了钱没人回报牌面」的空凭据。 */
+			room: true,
 		},
 		uno: {
 			key: "uno", title: "UNO", dir: "uno", file: "uno.html",

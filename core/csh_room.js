@@ -48,7 +48,8 @@
     if (depth > 6) return '快照层级过深';
     if (obj === null || typeof obj !== 'object') return '';
     if (Object.prototype.toString.call(obj) === '[object Array]') {
-      if (obj.length > 64) return '快照数组过长';
+      /* 上限要盖住廿一点的整副牌靴（8 副 = 416 张，实际按桌规 ≤ 312 张）。 */
+      if (obj.length > 420) return '快照数组过长';
       for (var i = 0; i < obj.length; i++) {
         var e = scan(obj[i], depth + 1);
         if (e) return e;
@@ -97,6 +98,23 @@
       for (var i = 0; i < holes.length; i++) {
         err = cardArray(holes[i], 2, '手牌', null);
         if (err) return err;
+      }
+    }
+    /* 廿一点形态（shot.s）：整副牌靴 + 每手已发牌。牌靴必须完整保存 ——
+       截断等于允许重抽，发牌结果就跟原来那一局不是同一局了。 */
+    var s = shot.s;
+    if (s != null) {
+      if (typeof s !== 'object' || Object.prototype.toString.call(s) === '[object Array]') return '牌桌状态不是对象';
+      err = cardArray(s.shoe, 416, '牌靴', Object.create(null));
+      if (err) return err;
+      if (Object.prototype.toString.call(s.hands) === '[object Array]') {
+        if (s.hands.length > 4) return '手牌路数过多';
+        for (var k = 0; k < s.hands.length; k++) {
+          var h = s.hands[k];
+          if (!h || typeof h !== 'object') return '手牌记录非法';
+          err = cardArray(h.cards, 21, '手牌', null);
+          if (err) return err;
+        }
       }
     }
     return '';
