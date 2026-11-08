@@ -11,7 +11,7 @@
 import fs from 'node:fs';
 import vm from 'node:vm';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const arg = (k, d) => { const i = process.argv.indexOf(k); return i < 0 ? d : process.argv[i + 1]; };
@@ -258,6 +258,103 @@ check('快照字段含牌靴/手牌/庄家/筹码/阶段（缺一项就不是同
 check('牌靴整副保存（不许截断：截断等于允许重抽）',
   !/shot\.s\.shoe\s*=.*slice|shoe:\s*state\.shoe\.slice\(-/.test(bjSrc));
 check('同状态不重复写（渲染频繁，避免刷盘）', /text === lastRoomJson/.test(bjSrc));
+
+/* ---------- 廿一点快照往返：抽取真实页面函数在 vm 里跑 ----------
+   这是整套恢复里最容易出静默错的一环：白名单少一个字段，续局就少一张牌/少一段筹码，
+   而且不会报错。所以必须做「存一份 → 重建 → 逐字段比对」。 */
+{
+  const { parse, walk } = await import(pathToFileURL(root + '/tools/lib/skill_audit.mjs').href);
+  const bjInline = (bjSrc.match(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/) || [])[1];
+  check('廿一点内联脚本可抽取', !!bjInline && bjInline.length > 1000);
+  const keysArr = (bjSrc.match(/var ROOM_KEYS = \[([\s\S]*?)\];/) || [])[1];
+  check('ROOM_KEYS 可抽取', !!keysArr);
+
+  function bjHarness() {
+    const ctx = vm.createContext({
+      window: {}, Object, Array, JSON, Math, Number, String, Error, Date, isFinite,
+      console: { log() {}, warn() {}, error() {} },
+    });
+    vm.runInContext('var ROOM_KEYS = [' + keysArr + '];', ctx);
+    const names = ['roomShot', 'applyRoomShot', 'saveRoom'];
+    walk(parse(bjInline), n => {
+      if (n.type === 'FunctionDeclaration' && names.indexOf(n.id.name) >= 0)
+        vm.runInContext(bjInline.slice(n.range[0], n.range[1]), ctx);
+    });
+    ctx.Bridge = { active: true, buyIn: () => 200000, roomSave: () => {}, roomState: () => {} };
+    ctx.dealerSeat = { id: 'csh_testdealer', name: '测试庄', stake: 400000, mult: 2 };
+    ctx.newState = () => ({ hands: [], dealer: [], shoe: [], chips: 200000, phase: 'deal', activeHand: 0 });
+    ctx.state = null;
+    ctx.lastRoomJson = '';
+    ctx.roomSeq = 0;
+    return ctx;
+  }
+
+  /* 造一副「已打到一半」的真实形态：8 副牌剩 300 张、两手、庄家两张、暗牌未开。 */
+  function sampleState() {
+    const shoe = [];
+    for (let i = 0; i < 300; i++) shoe.push(i % 52);
+    /* 牌靴允许重复（真牌靴就是重复的），但不允许越界 */
+    return {
+      shoe: shoe.reverse(), shoeSize: 416,
+      tier: { name: '豪赌庄', min: 2000, decks: 4, h17: false, bjPay: 1.5, note: 'x' },
+      hand: 7, chips: 183500, dealerBank: 390000, dealerBankInit: 400000,
+      dealerBust: false, tableTotal: 583500, streak: 2, bet: 10000,
+      hands: [
+        { cards: [8, 21, 33], wager: 10000, fromSplit: false, done: false },
+        { cards: [5, 44], wager: 10000, fromSplit: true, doubled: true },
+      ],
+      dealer: [17, 30], phase: 'play', activeHand: 1, insuranceBet: 0,
+      holeHidden: true, roundDelta: -2500, insDelta: 0,
+      publicShoe: { total: 300, tens: 96, pendingHole: true },
+    };
+  }
+
+  const ctx = bjHarness();
+  ctx.state = sampleState();
+  const shot = ctx.roomShot();
+  check('快照能生成且带牌桌标记 v', !!shot && shot.v === 1 && shot.s && shot.buyIn === 200000);
+  check('快照记录了庄家席身份（结算要按原庄家记账）',
+    !!shot.dealer && shot.dealer.id === 'csh_testdealer' && shot.dealer.stake === 400000);
+  check('快照不含白名单外的字段（往台面塞私货的入口已封）',
+    Object.keys(shot.s).every(k => ctx.ROOM_KEYS.indexOf(k) >= 0), Object.keys(shot.s));
+
+  /* 关键：过一遍 JSON（模拟真正落盘再读回），再做逐字段比对 */
+  const wire = JSON.parse(JSON.stringify(shot));
+  const ctx2 = bjHarness();
+  const applied = ctx2.applyRoomShot(wire);
+  check('重建成功', applied === true);
+  const before = ctx.state, after = ctx2.state;
+  const diff = ctx.ROOM_KEYS.filter(k => JSON.stringify(before[k]) !== JSON.stringify(after[k]));
+  check('★ 往返后 20 个字段逐一相等（少一个字段就是续局少一张牌）', diff.length === 0, diff);
+  check('牌靴整副往返（长度与内容都不许变）',
+    after.shoe.length === 300 && JSON.stringify(after.shoe) === JSON.stringify(before.shoe));
+  check('手牌按路往返，含分牌与加倍标记',
+    after.hands.length === 2 && after.hands[1].doubled === true && after.hands[1].cards.length === 2);
+  check('庄家席身份一并恢复', ctx2.dealerSeat && ctx2.dealerSeat.id === 'csh_testdealer');
+  check('阶段与当前手往返（不然续局会从头要牌）',
+    after.phase === 'play' && after.activeHand === 1 && after.holeHidden === true);
+
+  /* 反例：不接受脏快照 */
+  const c3 = bjHarness();
+  check('无 s 的快照拒绝恢复', c3.applyRoomShot({ v: 1 }) === false);
+  check('shoe 为空的快照拒绝恢复', c3.applyRoomShot({ v: 1, s: { shoe: [], hands: [], dealer: [] } }) === false);
+  check('hands 不是数组拒绝恢复', c3.applyRoomShot({ v: 1, s: { shoe: [1], hands: 'x', dealer: [] } }) === false);
+  const c4 = bjHarness();
+  c4.applyRoomShot({ v: 1, s: { shoe: [1, 2], hands: [], dealer: [], 注入: 'x', __proto__: { evil: 1 } } });
+  check('白名单外的键不会落到 state 上（注入无效）',
+    c4.state && c4.state['注入'] === undefined && c4.state.evil === undefined);
+
+  /* 去重：同状态第二次 saveRoom 不再上报 */
+  const c5 = bjHarness();
+  let saves = 0;
+  c5.Bridge.roomSave = () => { saves++; };
+  c5.state = sampleState();
+  c5.saveRoom(); c5.saveRoom(); c5.saveRoom();
+  check('同状态只上报一次（渲染频繁也不刷盘）', saves === 1, saves);
+  c5.state.chips = 1;
+  c5.saveRoom();
+  check('状态真变了才再上报', saves === 2, saves);
+}
 
 /* ---------- 自检：去掉「只有余额不变才丢弃」必须判红 ---------- */
 const anchor = "    if (pc === d.balanceBefore) return { action: 'discard', entry: d, reason: '扣款未持久化' };";
