@@ -23,7 +23,7 @@ async function codexContent(){
   check('codex no horizontal overflow '+mode+' '+w,!m.bodyOverflow&&!m.infoOverflow,m);
   check('codex dossier has priority '+mode+' '+w,m.ratio>=(h<320?.55:w>1000?.75:.65),m);check('codex information is readable and directly hit '+mode+' '+w,m.infoVisibleHeight>=(h<320?110:160)&&m.infoHit,m);
  }
- for(const[w,h]of [[1365,768],[915,412],[844,390],[640,286],[390,844]]){
+ for(const[w,h]of [[1365,768],[915,412],[844,390],[760,480],[640,286]]){
   await page.send('Emulation.setDeviceMetricsOverride',{width:w,height:h,deviceScaleFactor:1,mobile:false});await delay(450);
   await page.evaluate(d+'.querySelector(".dinfo").scrollTop=0');await metric(w,h);
  }
@@ -90,4 +90,4 @@ let source=fs.readFileSync(path.join(root,'tools/probe_host_smoke.mjs'),'utf8').
 const marker="if(process.argv.includes('--world-layout-410'))";if(!source.includes(marker))throw Error('host harness anchor changed');source=source.replace(marker,"if(process.argv.includes('--codex-content'))await codexContent();\n    else "+marker);
 if(arg('--page-source')){const anchor="    const target = resolveReadOnly(decodeURIComponent(url.pathname === '/' ? '/index.html' : url.pathname));";if(!source.includes(anchor))throw Error('server anchor');source=source.replace(anchor,'    if(decodeURIComponent(url.pathname)==="/extension/池子魔将/games/codex.html"){item.status=200;res.writeHead(200,{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-cache"});return res.end(fs.readFileSync('+JSON.stringify(path.resolve(arg('--page-source')))+'));}\n'+anchor);}
 const runner=path.join(out,'isolated-codex-runner.mjs');fs.writeFileSync(runner,tests+'\n'+source);
-const child=spawn(process.execPath,[runner,'--codex-content',...(process.argv.includes('--baseline')?['--baseline']:[]),'--out',out],{stdio:'inherit',windowsHide:true});await new Promise((resolve,reject)=>{child.once('error',reject);child.once('exit',code=>{process.exitCode=code||0;resolve();});});
+const child=spawn(process.execPath,[runner,...(arg('--host')?['--host',arg('--host'),'--extension-source',root]:[]),'--codex-content',...(process.argv.includes('--baseline')?['--baseline']:[]),'--out',out],{stdio:'inherit',windowsHide:true});await new Promise((resolve,reject)=>{child.once('error',reject);child.once('exit',code=>{process.exitCode=code||0;resolve();});});

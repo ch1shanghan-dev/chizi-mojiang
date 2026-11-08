@@ -187,6 +187,21 @@ export function treeBlobHashes(treeish, files) {
 	return { treeish, byPath: oidMapFromTree(treeish, files) };
 }
 
+/** 同一个候选中的三处安装版本与目录版本必须一致。 */
+export function releaseVersions(cat, treeish) {
+	const read = (file) => treeish ? git(["show", treeish + ":" + file]).toString("utf8")
+		: fs.readFileSync(path.join(ROOT, file), "utf8");
+	const field = (file) => read(file).match(/^\s*version\s*:\s*"([^"]+)"/m)?.[1] || null;
+	const versions = {
+		info: JSON.parse(read("info.json")).version || null,
+		package: field("package.js"),
+		extension: field("extension.js"),
+		catalog: cat.version || null,
+	};
+	return { versions, versionOk: /^\d+\.\d+\.\d+$/.test(versions.info || "") &&
+		Object.values(versions).every(value => value === versions.info) };
+}
+
 /** 把 catalog 与精确发布字节逐项对账 */
 export function verifyCatalog(cat, byPath) {
 	const files = cat.files;
@@ -253,8 +268,11 @@ function main() {
 		scope = "Worktree bytes after .gitattributes clean filter (what a commit would publish); HEAD=" + head;
 	}
 	const v = verifyCatalog(cat, byPath);
-	const issues = v.mismatches.length + v.extraKeys.length + v.missingKeys.length + (v.buildOk ? 0 : 1);
+	const versions = releaseVersions(cat, args.rev || args.tree ? commit : null);
+	const issues = v.mismatches.length + v.extraKeys.length + v.missingKeys.length +
+		(v.buildOk ? 0 : 1) + (versions.versionOk ? 0 : 1);
 	const result = {
+		...versions,
 		scope,
 		commit,
 		version: cat.version,

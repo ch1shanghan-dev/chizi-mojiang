@@ -43,7 +43,7 @@ body[data-csh-journal="pool"] .achievement-actions .reward{font-size:var(--jp-no
 body[data-csh-journal="pool"] .achievement-actions button{width:100%;min-height:44px;font-size:var(--jp-note-size);white-space:normal;margin:0}
 body[data-csh-journal="pool"] .row[data-claimable="true"]{border-color:var(--jp-accent)}
 body[data-csh-journal="pool"] .claim.ready{background:var(--jp-accent);color:var(--jp-accent-ink)}
-@media(min-width:900px){body[data-csh-journal="pool"] #list{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(min-width:1001px){body[data-csh-journal="pool"] #list{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:1199px),(max-height:599px){
  body[data-csh-journal="pool"] .journal-workspace{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr);gap:10px}
  body[data-csh-journal="pool"] .journal-sidebar{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;gap:8px;overflow:visible;border:0;padding:0}

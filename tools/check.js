@@ -3392,9 +3392,9 @@ if (spawnOk && execFileSync && !ONLY_SYNTAX && !ONLY_VERSIONS) {
       /* D2 后续：补码未决事务。头号不变量是钱包没扣款时绝不退款，改前基线能判红。 */
       ['E95V','probe_topup_journal_20261107.mjs',['--out',path.join(tmp95,'topup-journal')],48,'补码未决事务（prepare/commit/幂等退款/不白送钱，改前自检1红）',20000],
       /* S4：六类特色增益接线。一次性 consume / 持续型 activate 分路，改前基线能判红。 */
-      ['E95W','probe_spirit_buffs_wired_20261107.mjs',['--out',path.join(tmp95,'spirit-wired')],41,'妖灵六类增益接线（首触生效/二触拒绝/零副作用，改前自检1红）',20000],
+      ['E95W','probe_spirit_buffs_wired_20261107.mjs',['--out',path.join(tmp95,'spirit-wired')],44,'妖灵六类增益接线（宿主加载/有效伤害/安全响应）',20000],
       /* 方案 4.1 纠偏：四档视口分类 + 断点基线锁定，禁止新增随意数值。 */
-      ['E95X','probe_viewport_tokens_20261107.mjs',['--out',path.join(tmp95,'viewport')],38,'横屏视口令牌（四档分类/23种基线/max-min配对/不套桌面，改前自检1红）',20000],
+      ['E95X','probe_viewport_tokens_20261107.mjs',['--out',path.join(tmp95,'viewport')],39,'横屏视口令牌（四档分类/22种基线/max-min配对）',20000],
       /* 方案 4.3：人物回应任务生命周期。迟到守卫提前 return 时必须释放 job，改前基线两红。 */
       ['E95Y','probe_interact_reply_20261107.mjs',['--out',path.join(tmp95,'interact-reply')],63,'人物回应队列（一次一条/迟到不串台/丢弃释放，改前自检2红）',20000],
       /* S4 图鉴展示：50 条只读增益 + 好感 B 解锁态，零存档零钱包，改前基线三红。 */
@@ -3406,7 +3406,7 @@ if (spawnOk && execFileSync && !ONLY_SYNTAX && !ONLY_VERSIONS) {
       /* B1 归档探针长期无入口（B13 差集里的孤儿）：实测仅 4.4s，不该塞 >30s 慢速通道，直接进日常门禁。 */
       ['E95AC','probe_feedback_archive_20261105.mjs',['--out',path.join(tmp95,'feedback-archive')],18,'成就通知归档（跨重启/分页/容量/写失败，Chromium 实测4.4s）',60000],
       /* G1：断点逐值收敛的迁移真值。只给依据、零 CSS 改动；完备性/方向/单调/基线对账。 */
-      ['E95AD','probe_viewport_migration_20261108.mjs',['--out',path.join(tmp95,'viewport-migration')],38,'断点迁移真值（按轴23种/6档目标/49处高风险，430已收敛，改前自检3红）',20000],
+      ['E95AD','probe_viewport_migration_20261108.mjs',['--out',path.join(tmp95,'viewport-migration')],39,'断点迁移真值（22种/6档目标，430与899已收敛）',20000],
       /* H1：CSS 侧 6 档令牌与 JS 真值双向对账，零 @media 改动。 */
       ['E95AE','probe_layout_tokens_20261108.mjs',['--out',path.join(tmp95,'layout-tokens')],9,'CSS视口令牌对账（6档/基线逐值同步收缩，改前自检2红）',20000],
       /* art-direction §4.7 收尾：Chromium 实测 13.5 与 13 几何一致后才并档。 */

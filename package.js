@@ -1,5 +1,5 @@
 extension["池子魔将"]={
-	intro:"<font color=#c9a84c>版本</font> <font color=#00FFFF>4.0.14</font>",
+	intro:"<font color=#c9a84c>版本</font> <font color=#00FFFF>4.0.16</font>",
 	author:"池上寒",
 	netdisk:"",
 	forum:"",

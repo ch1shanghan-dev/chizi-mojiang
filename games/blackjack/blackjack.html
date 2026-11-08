@@ -703,10 +703,11 @@
   chip: function () { sfxPlay('chip.bet'); },
   win: function () { sfxPlay('win'); },
   lose: function () { sfxPlay('lose'); },
+  push: function () { sfxPlay('settle.push'); },
   bj: function () { sfxPlay('bj'); },
   bust: function () { sfxPlay('bust'); },
   ins: function () { sfxPlay('ins'); },
-  streak: function (n) { sfxPlay('streak', { n: n }); },
+  streak: function (n) { sfxPlay('streak', { n: n, delay: .48, vol: .7 }); },
   /* 【2026-10-03】补齐缺失的 hit 键：actHit / actDouble 一直调用 sfx.hit()，
      而 sfx 对象里从来没有这个方法 —— 每次「要牌」都抛 TypeError，其后的
      renderAll() 被整段跳过，新牌要等下一个动作才出现（牌面"迟到"）。
@@ -1898,14 +1899,14 @@ try { CRD = (typeof window !== 'undefined' && window.CSH && window.CSH.cards) ? 
       var r = state.hands[0].result;
       if (r === 'bj') { title = '廿一点'; cls = 'win'; sound = 'bj'; }
       else if (r === 'win') { title = '胜'; cls = 'win'; sound = 'win'; }
-      else if (r === 'push') { title = '平局'; cls = ''; sound = 'ui'; }
+      else if (r === 'push') { title = '平局'; cls = ''; sound = 'push'; }
       else if (r === 'surrender') { title = '投降'; cls = 'lose'; sound = 'lose'; }
       else if (r === 'bust') { title = '爆牌'; cls = 'lose'; sound = 'bust'; }
       else { title = '负'; cls = 'lose'; sound = 'lose'; }
     } else {
       title = net > 0 ? '胜' : (net < 0 ? '负' : '平局');
       cls = net > 0 ? 'win' : (net < 0 ? 'lose' : '');
-      sound = net > 0 ? 'win' : (net < 0 ? 'lose' : 'ui');
+      sound = net > 0 ? 'win' : (net < 0 ? 'lose' : 'push');
     }
 
     var t = $('#banner-title');
@@ -2005,7 +2006,7 @@ try { CRD = (typeof window !== 'undefined' && window.CSH && window.CSH.cards) ? 
     $('#banner').classList.remove('hidden');
     if (sound && sfx[sound]) sfx[sound]();
     /* §4.7.1：连胜倍率起来时补一记升调提示，听得出现在赢得多 */
-    if (state.streak >= 2) sfx.streak(state.streak);
+    if (mainDelta > 0 && state.streak >= 2) sfx.streak(state.streak);
   }
 
   /* ---------- 玩法说明 ---------- */

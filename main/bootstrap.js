@@ -24,6 +24,10 @@ import "../core/csh_selftest.js";
 import "../core/csh_wallet.js";
 import { installCheer } from "../core/csh_cheer.js";
 import "../core/csh_match_reward.js";
+/* 妖灵增益在主宿主注册；图鉴 iframe 仍独立加载只读配置。 */
+import "../core/csh_spirit_buffs.js";
+import "../core/csh_spirit_buff_runtime.js";
+import "../core/csh_spirit_buff_skills.js";
 import { installAuxSpirit } from "../core/csh_aux_spirit.js";
 import { installUIKit } from "../core/csh_uikit.js";
 import "../core/csh_world.js";

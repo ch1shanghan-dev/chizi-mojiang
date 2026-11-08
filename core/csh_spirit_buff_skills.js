@@ -44,35 +44,50 @@
       var x = rt.activate(r.id, template, r.id + ':' + template + ':mod', r.epoch);
       return !!(x && x.ok && x.active);
     }
+    function hitWithCard(event, player) {
+      return event.player === player && !!event.card && typeof player.hasHistory === 'function' &&
+        player.hasHistory('sourceDamage', function (damage) {
+          return damage.num > 0 && damage.card === event.card && damage.getParent('useCard') === event;
+        });
+    }
+    function canInterceptResponse(event, player) {
+      if (event.player !== player || event.responded || typeof event.finish !== 'function' ||
+        typeof event.getParent !== 'function') return false;
+      const parent = event.getParent(), incoming = event.respondTo && event.respondTo[1];
+      /* 只有标准牌的这三种结算只读 bool，其他技能可能需要真实的响应牌。 */
+      return !!(incoming && parent && parent.card === incoming && parent.name === incoming.name &&
+        (parent.target === player || parent.turn === player) &&
+        ['nanman', 'wanjian', 'juedou'].includes(incoming.name));
+    }
     function note(text) { try { host.log(text); } catch (e) {} }
     function refresh() { try { host.refresh(); } catch (e) {} }
 
     return {
       /* T1 护主·减伤：本局首次受到伤害时，此伤害 -1 */
       t1: {
-        charlotte: true, forced: true, popup: false, trigger: { global: 'damageBegin4' },
+        charlotte: true, forced: true, popup: false, priority: 1, trigger: { global: 'damageBegin4' },
         filter: function (e, p) {
           return sessionOK(p) && e.player === p && e.num > 0 && available(ONCE.t1);
         },
         content: async function (event, trigger, player) {
-          if (!take(player, ONCE.t1)) return;
+          if (trigger.player !== player || trigger.num <= 0 || !take(player, ONCE.t1)) return;
           trigger.num -= 1;
           refresh();
           note('妖灵增益 · 护主减伤：本局首次伤害 -1');
           return true;
         }
       },
-      /* T2 助战·摸牌：本局首次出牌命中后，摸 1 张牌 */
+      /* T2 在整张牌结算后检查实际伤害。同一结算中的其他牌或技能伤害不占次数。 */
       t2: {
         charlotte: true, forced: true, popup: false, trigger: { global: 'useCardAfter' },
         filter: function (e, p) {
-          return sessionOK(p) && e.player === p && !!(e.targets && e.targets.length) && available(ONCE.t2);
+          return sessionOK(p) && available(ONCE.t2) && hitWithCard(e, p);
         },
         content: async function (event, trigger, player) {
-          if (!take(player, ONCE.t2)) return;
+          if (!hitWithCard(trigger, player) || !take(player, ONCE.t2)) return;
           await host.draw(1);
           refresh();
-          note('妖灵增益 · 助战摸牌：本局首次命中后摸 1 张');
+          note('妖灵增益 · 助战摸牌：本局首次用牌造成伤害，摸 1 张');
           return true;
         }
       },
@@ -94,30 +109,30 @@
           }
         }
       },
-      /* T5 接应·响应：本局首次需要响应时，视为已响应 1 次 */
+      /* T5 只代应对明确接受无实体牌结果的标准锦囊。 */
       t5: {
         charlotte: true, forced: true, popup: false, trigger: { player: 'chooseToRespondBegin' },
         filter: function (e, p) {
-          return sessionOK(p) && !!e && available(ONCE.t5);
+          return sessionOK(p) && !!e && canInterceptResponse(e, p) && available(ONCE.t5);
         },
         content: async function (event, trigger, player) {
-          if (!take(player, ONCE.t5)) return;
+          if (!canInterceptResponse(trigger, player) || !take(player, ONCE.t5)) return;
           /* 只标记本次响应已由妖灵接应，不伪造具体牌、不改牌堆、不改胜负。 */
           trigger.result = { bool: true, cards: [] };
-          if (typeof trigger.finish === 'function') trigger.finish();
+          trigger.finish();
           refresh();
-          note('妖灵增益 · 接应响应：本局首次需要响应时视为已响应 1 次');
+          note('妖灵增益 · 接应响应：已代为应对这次锦囊');
           return true;
         }
       },
       /* T6 回护·回复：本局首次濒死时，回复 1 点体力 */
       t6: {
-        charlotte: true, forced: true, popup: false, trigger: { global: 'dying' },
+        charlotte: true, forced: true, popup: false, priority: 1, trigger: { global: 'dying' },
         filter: function (e, p) {
           return sessionOK(p) && e.player === p && e.player.hp <= 0 && available(ONCE.t6);
         },
         content: async function (event, trigger, player) {
-          if (!take(player, ONCE.t6)) return;
+          if (trigger.player !== player || player.hp > 0 || !take(player, ONCE.t6)) return;
           await host.recover(1);
           refresh();
           note('妖灵增益 · 回护回复：本局首次濒死回复 1 点体力');

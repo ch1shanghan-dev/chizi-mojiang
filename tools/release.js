@@ -17,7 +17,7 @@
  * 用法（在扩展根目录执行）：
  *   node tools/release.js --check      → **只读**：核对现有 catalog.js 与发布字节，不写任何文件
  *   node tools/release.js              → 按 info.json 当前版本重新生成 catalog.js
- *   node tools/release.js 4.0.6        → 先升版 info.json / package.js，再生成 catalog.js
+ *   node tools/release.js 4.0.6        → 同步 info.json / package.js / extension.js，再生成 catalog.js
  *   node tools/release.js --push       → 生成 + 提交 + 提交后字节复核 + 推送（复核不过绝不推送）
  *
  * 生成后自行提交；**最终候选提交**必须再跑一次只读核对：
@@ -33,6 +33,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
+import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { TEXT_LIMIT, FILE_LIMIT, checkLimits, limitsBlock, REMEDY } from "./lib/update_limits.mjs";
 import {
@@ -40,6 +41,7 @@ import {
 	revBlobHashes,
 	readCatalog,
 	readCatalogAtRev,
+	releaseVersions,
 	parseCatalogText,
 	verifyCatalog,
 } from "./catalog_git_bytes.mjs";
@@ -52,6 +54,13 @@ const pushMode = process.argv.includes("--push");
 const checkMode = process.argv.includes("--check");
 const positional = process.argv.slice(2).filter((a) => a !== "--push" && a !== "--check");
 const newVersion = positional[0] || null;
+if (positional.length > 1 || (newVersion && !/^\d+\.\d+\.\d+$/.test(newVersion))) {
+	throw new Error("版本号必须是三段数字，例如 4.0.16");
+}
+if (pushMode) {
+	const branch = execFileSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
+	if (branch !== "main") throw new Error("--push 只能从本地 main 发布当前候选，当前分支为 " + branch);
+}
 if (checkMode && (pushMode || newVersion)) {
 	throw new Error("--check 是纯只读模式，不能同时 --push 或改版本号");
 }
@@ -59,20 +68,33 @@ if (checkMode && (pushMode || newVersion)) {
 /* ---------- 版本号（可选参数：node tools/release.js 4.0.6） ---------- */
 const infoPath = path.join(root, "info.json");
 const pkgPath = path.join(root, "package.js");
+const extPath = path.join(root, "extension.js");
+const versionField = /^(\s*version\s*:\s*")([^"]+)(")/m;
+const introVersion = /(<font color=#00FFFF>)\s*(\d+\.\d+\.\d+)\s*(<\/font>)/i;
+const info = JSON.parse(fs.readFileSync(infoPath, "utf8"));
+let pkg = fs.readFileSync(pkgPath, "utf8");
+let ext = fs.readFileSync(extPath, "utf8");
+if (!introVersion.test(info.intro) || !introVersion.test(pkg) || !introVersion.test(ext) ||
+	!versionField.test(pkg) || !versionField.test(ext)) throw new Error("版本字段或版本标题缺失");
 if (newVersion) {
-	const info = JSON.parse(fs.readFileSync(infoPath, "utf8"));
+	const replaceIntro = (_, open, before, close) => open + newVersion + close;
+	const replaceField = (_, prefix, before, suffix) => prefix + newVersion + suffix;
 	info.version = newVersion;
-	info.intro = info.intro.replace(/>\s*[\d.]+\s*</, `>${newVersion}<`);
+	info.intro = info.intro.replace(introVersion, replaceIntro);
+	pkg = pkg.replace(versionField, replaceField).replace(introVersion, replaceIntro);
+	ext = ext.replace(versionField, replaceField).replace(introVersion, replaceIntro);
 	fs.writeFileSync(infoPath, JSON.stringify(info, null, 2) + "\n", "utf8");
-	let pkg = fs.readFileSync(pkgPath, "utf8");
-	pkg = pkg.replace(/version\s*:\s*"[^"]+"/, `version:"${newVersion}"`);
 	fs.writeFileSync(pkgPath, pkg, "utf8");
-	console.log(`[release] 版本号已更新 -> ${newVersion}（info.json / package.js / intro 同步）`);
+	fs.writeFileSync(extPath, ext, "utf8");
+	console.log("[release] info.json、package.js、extension.js 及版本标题已同步到 " + newVersion);
 }
-const version = JSON.parse(fs.readFileSync(infoPath, "utf8")).version;
+const version = info.version;
+if (!/^\d+\.\d+\.\d+$/.test(version || "") || pkg.match(versionField)[2] !== version ||
+	ext.match(versionField)[2] !== version || [info.intro, pkg, ext].some(text => text.match(introVersion)[2] !== version)) {
+	throw new Error("info.json、package.js、extension.js 的安装版本或版本标题不一致");
+}
 
 /* ---------- 展开 package.js files 清单为完整文件列表 ---------- */
-const pkg = fs.readFileSync(pkgPath, "utf8");
 const m = pkg.match(/files\s*:\s*\[([^\]]*)\]/);
 if (!m) throw new Error("package.js 里找不到 files 清单");
 const entries = m[1].match(/"([^"]+)"/g).map((s) => s.slice(1, -1));
@@ -130,8 +152,11 @@ if (checkMode) {
 	   代码一旦引用就是缺文件。verifyCatalog 只遍历 cat.files，看不见这种漏登记。 */
 	const catSet = new Set(cat.files);
 	const extraOnDisk = files.filter((f) => !catSet.has(f));
-	const issues = v.mismatches.length + v.extraKeys.length + v.missingKeys.length + (v.buildOk ? 0 : 1) + extraOnDisk.length;
+	const versionOk = cat.version === version;
+	const issues = v.mismatches.length + v.extraKeys.length + v.missingKeys.length +
+		(v.buildOk ? 0 : 1) + extraOnDisk.length + (versionOk ? 0 : 1);
 	console.log(JSON.stringify({
+		versionOk,
 		mode: "read-only",
 		version: cat.version,
 		expectedVersion: version,
@@ -162,8 +187,8 @@ if (checkMode) {
 const catalog = {
 	build, hashes,
 	name: "池子魔将",
-	author: JSON.parse(fs.readFileSync(infoPath, "utf8")).author || "池上寒",
-	intro: JSON.parse(fs.readFileSync(infoPath, "utf8")).intro,
+	author: info.author || "池上寒",
+	intro: info.intro,
 	version,
 	date: new Date().toISOString().slice(0, 10),
 	size,
@@ -197,20 +222,22 @@ if (warnNonAscii.length) {
 
 /* ---------- 可选：--push 一步到位（add + commit + 提交后字节复核 + push） ---------- */
 if (pushMode) {
-	const { execSync } = await import("node:child_process");
-	const run = (cmd) => execSync(cmd, { cwd: root, stdio: "inherit" });
+	const run = (args) => execFileSync("git", args, { cwd: root, stdio: "inherit" });
 	try {
-		run("git add -A");
-		run(`git commit -m "release ${version}"`);
-		/* 提交后必须按玩家真正下载到的字节复核；不过就绝不推送 */
+		run(["add", "-A"]);
+		run(["commit", "-m", "release " + version]);
+		/* 提交后核对玩家下载到的字节和版本。 */
 		const final = revBlobHashes("HEAD", files);
-		const v = verifyCatalog(readCatalogAtRev(final.commit), final.byPath);
-		const issues = v.mismatches.length + v.extraKeys.length + v.missingKeys.length + (v.buildOk ? 0 : 1);
+		const candidate = readCatalogAtRev(final.commit);
+		const v = verifyCatalog(candidate, final.byPath);
+		const { versionOk } = releaseVersions(candidate, final.commit);
+		const issues = v.mismatches.length + v.extraKeys.length + v.missingKeys.length +
+			(v.buildOk ? 0 : 1) + (versionOk ? 0 : 1);
 		if (issues) {
-			throw new Error(`最终提交 ${final.commit} 发布字节核对失败（${v.mismatches.length} 个文件不符 / buildOk=${v.buildOk}），已阻止 push`);
+			throw new Error(`最终提交 ${final.commit} 发布字节核对失败（${v.mismatches.length} 个文件不符 / buildOk=${v.buildOk} / versionOk=${versionOk}），已阻止 push`);
 		}
 		console.log(`[release] 提交字节核对通过：${files.length}/${files.length} 文件哈希一致`);
-		run("git push origin main");
+		run(["push", "origin", final.commit + ":refs/heads/main"]);
 		console.log(`[release] ✅ 已提交并推送 ${version} —— 玩家在线扩展页稍后即可见「更新扩展」`);
 	} catch (e) {
 		console.warn("[release] git 步骤失败或未通过发布字节核对，未推送；请核对后重试：" + e.message);

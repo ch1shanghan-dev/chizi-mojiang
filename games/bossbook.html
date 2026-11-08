@@ -8,7 +8,7 @@
      零外部资源 / 零网络请求 / 数据只读（唯一自持写 = 已读标记 csh_bossbook_seen）。
      数据契约：权威通道 Bridge "shell-stats" 快照的 boss 字段；兜底直读父窗 lib.cshBossRecord.summary()。
      视觉纪律照 docs/art-direction.md：三档字体 token、单一基数字号标尺、
-     紧凑断点一律 (max-height:640px),(max-width:899px)。 -->
+     紧凑断点一律 (max-height:640px),(max-width:1000px)。 -->
 <script src="../core/csh_selftest.js" data-csh-selftest="auto"></script>
 <script src="../core/csh_page.js"></script>
 <style>
@@ -318,7 +318,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--cover-deep);co
    紧凑断点（art-direction §4.3：手机横屏 915×412 比桌面断点宽 —— 红线）
    只做三件事：收留白 / 改密度 / 换档字号，不藏信息。
    ============================================================ */
-@media (max-height:640px),(max-width:899px){
+@media (max-height:640px),(max-width:1000px){
   .phead{min-height:28px;padding:4px 10px 2px 26px}
   .pt-name{font-size:var(--fs-lead)}
   .pbody{padding:6px 10px 8px 26px}
@@ -340,9 +340,6 @@ html,body{width:100%;height:100%;overflow:hidden;background:var(--cover-deep);co
   /* ★ 2026-10-16 深夜（作者："画面利用率太低了"）：旧规则"竖屏 2 列 / 横屏 112px"在
      中宽度窗口下只出 2 列（一张卡占半屏）——统一改**自适应密排**：列数随宽度吃满。 */
   .vgrid{grid-template-columns:repeat(auto-fill,minmax(172px,1fr));gap:8px}
-  @media (min-width:900px){
-    .vgrid{grid-template-columns:repeat(auto-fill,minmax(172px,1fr))}
-  }
   .bcard{aspect-ratio:3/4}
   .ribbon{height:54px;right:16px}
 }

@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const opt = (name, fallback) => { const i = process.argv.indexOf(name); return i < 0 ? fallback : process.argv[i + 1]; };
 const host = path.resolve(opt('--host', path.resolve(root, '../..')));
+const extensionSource = opt('--extension-source', null);
 const matchUntilOver = process.argv.includes('--match-until-over');
 const matchMode = opt('--match-mode','identity');
 const rewardOnly = process.argv.includes('--reward-only');
@@ -36,6 +37,12 @@ function resolveReadOnly(relative) {
   const target = path.resolve(host, relative.replace(/^[/\\]+/, ''));
   if (target !== host && !target.startsWith(host + path.sep)) throw Error('path outside host');
   if (path.relative(host, target).split(path.sep).some(part => /^(home|userdata|user data|\.git)$/i.test(part))) return null;
+  const installedExt = path.join(host, 'extension', '池子魔将');
+  if(extensionSource&&(target===installedExt||target.startsWith(installedExt+path.sep))){
+    const file=path.relative(installedExt,target);
+    if(/^(docs|tools)([\\/]|$)/i.test(file))return null;
+    return path.resolve(extensionSource,file);
+  }
   // A portable real player config must never be imported into the smoke profile.
   if (path.basename(target).toLowerCase() === 'noname.config.txt') return null;
   return target;
@@ -336,7 +343,100 @@ async function smokeNaturalMatch() {
   if (sample.mode !== matchMode || sample.players.length !== expectedPlayers || sample.speed !== 'vvfast') throw Error('Actual supported test configuration was not applied');
   if (await page.evaluate("[...document.querySelectorAll('.control')].some(n=>n.textContent==='确定')")) await clickElement("[...document.querySelectorAll('.control')].find(n=>n.textContent==='确定')");
   if (!await page.evaluate('!!_status.auto')) await clickElement('ui.auto');
-  if(spiritMode){await until('!!_status.gameStarted && !!lib.cshAuxSpirit.current()?.spirit','owner preparation injection',spiritSeats>2?120000:20000);check('real gameStart adds a complete independent lower seat',await page.evaluate('game.players.concat(game.dead).length==='+String(spiritSeats+1)+' && game.me.next===lib.cshAuxSpirit.current().spirit && lib.cshAuxSpirit.current().spirit.identityShown'));}
+  if(spiritMode){await until('!!_status.gameStarted && !!lib.cshAuxSpirit.current()?.spirit','owner preparation injection',spiritSeats>2?120000:45000);check('real gameStart adds a complete independent lower seat',await page.evaluate('game.players.concat(game.dead).length==='+String(spiritSeats+1)+' && game.me.next===lib.cshAuxSpirit.current().spirit && lib.cshAuxSpirit.current().spirit.identityShown'));}
+  if(spiritMode&&process.argv.includes('--spirit-status-ui')){
+    for(const [width,height] of [[1365,768],[915,412],[640,286]]){
+      await page.send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:false});
+      // Noname applies its new body zoom 500 ms after resize.
+      await delay(650);
+      const mark='game.me.marks.csh_aux_status';
+      await clickElement(mark);
+      const pane=await page.evaluate('(()=>{const p=document.querySelector(".csh-aux-status-panel");if(!p)return null;const d=p.closest(".dialog"),r=d.getBoundingClientRect();return {left:r.left,top:r.top,right:r.right,bottom:r.bottom,text:p.innerText,marks:document.querySelectorAll(".csh-aux-status-mark").length,ruleHeight:p.querySelector("summary").getBoundingClientRect().height,font:parseFloat(getComputedStyle(p).fontSize)*p.getBoundingClientRect().width/p.offsetWidth};})()');
+      check('native spirit status fits '+width+'x'+height,pane&&pane.left>=-1&&pane.top>=-1&&pane.right<=width+1&&pane.bottom<=height+1&&pane.marks===1&&pane.font>=12&&pane.ruleHeight>=43,pane);
+      if(pane){
+        await clickElement('document.querySelector(".csh-aux-status-panel summary")');
+        check('native status rules expand without dismissing '+width,await page.evaluate('!!document.querySelector(".csh-aux-status-panel details[open]")'));
+        stage('spirit-status-'+width,{screenshot:await snap('spirit-status-'+width)});
+        await page.evaluate('(()=>{const d=document.querySelector(".csh-aux-status-dialog");if(d?.nextElementSibling?.classList.contains("poplayer"))d._close.call(d.nextElementSibling);})()');
+      }
+    }
+    return;
+  }
+  if(spiritMode&&process.argv.includes('--spirit-effect-smoke')){
+    check('host loads all six real guardian effects',await page.evaluate('!!window.CSHSpiritBuffs&&!!window.CSHSpiritBuffRuntime&&["t1","t2","t3","t4","t5","t6"].every(k=>lib.skill.global.includes("csh_spirit_buff_"+k))'));
+    await page.evaluate('('+function(){
+      window.__spiritEffectResult=null;
+      lib.skill.__cshAuditSpiritEffects={
+        trigger:{global:'phaseUseBegin'},forced:true,silent:true,firstDo:true,
+        filter(){return !window.__spiritEffectResult&&!!lib.cshAuxSpirit.current()?.spirit;},
+        async content(){
+          window.__spiritEffectResult={running:true};
+          const r=lib.cshAuxSpirit.current(),p=r.spirit,o=r.owner,rt=window.CSHSpiritBuffRuntime;
+          function equip(template){
+            const buff=window.CSHSpiritBuffs.list().find(b=>b.template===template);
+            rt.end(r.id);rt.begin({sessionId:r.id,spiritId:buff.id,level:'B',epoch:r.epoch});
+          }
+          const used=template=>rt.snapshot(r.id).used[template]||0;
+          equip('T2_draw_once');
+          await o.useCard({name:'wuzhong',isCard:true},o,false);
+          const harmless=used('T2_draw_once');
+          const hit=o.useCard({name:'sha',isCard:true},p,false);
+          hit.directHit=[p];
+          await hit;
+          const actualDamage=o.hasHistory('sourceDamage',d=>d.num>0&&d.getParent('useCard')===hit);
+          const hitUsed=used('T2_draw_once'),damageCard=o.getHistory('sourceDamage').find(d=>d.getParent('useCard')===hit);
+          equip('T5_response_once');
+          const responsesBefore=o.getHistory('respond').length;
+          const arrow=p.useCard({name:'wanjian',isCard:true},o,'nowuxie',false);
+          await arrow;
+          const arrowUsed=rt.snapshot(r.id).used.T5_response_once||0;
+          const physicalResponse=o.getHistory('respond').length>responsesBefore;
+          const arrowHarm=o.hasHistory('damage',d=>d.num>0&&d.getParent('useCard')===arrow);
+          const beforeGuard=p.storage.cshAuxGuard||0, beforeHp=o.hp;
+          equip('T1_guard_damage');
+          await o.damage(1,p,'nocard');
+          const specialtyGuard=used('T1_guard_damage')===1&&o.hp===beforeHp&&(p.storage.cshAuxGuard||0)===beforeGuard;
+          const normalCap=o.getHandcardLimit();
+          equip('T3_hand_cap');
+          const capBonus=o.getHandcardLimit()-normalCap;
+          const capPersistent=o.getHandcardLimit()===normalCap+1&&used('T3_hand_cap')===1;
+          const targets=game.players.filter(q=>q!==o), distances=targets.map(q=>get.distance(o,q));
+          equip('T4_distance');
+          const distanceChanges=targets.map((q,i)=>[distances[i],get.distance(o,q)]);
+          equip('T6_recover_once');
+          const basicRescue=p.storage.cshAuxRescue;
+          o.hp=1;o.update();
+          await o.loseHp(1);
+          const specialtyRescue=used('T6_recover_once')===1&&o.hp===1&&p.storage.cshAuxRescue===basicRescue;
+          await p.die(o);
+          const s=lib.cshAuxSpirit.summary();
+          window.__spiritEffectResult={
+            done:true,harmless,actualDamage,hitUsed,sameCard:damageCard?.card===hit.card,arrowUsed,physicalResponse,arrowHarm,
+            specialtyGuard,capBonus,capPersistent,distanceChanges,specialtyRescue,
+            removed:!game.players.includes(p)&&game.dead.includes(p),
+            inactive:s.state==='dead'&&!s.supportActive,mark:o.marks.csh_aux_status?.dataset.cshAuxStatus,
+            diagnostics:{errors:__hostSmoke.errors,rejections:__hostSmoke.rejections}
+          };
+        }
+      };
+      game.addGlobalSkill('__cshAuditSpiritEffects');
+    }.toString()+')()');
+    await until('window.__spiritEffectResult?.done','native damage and guardian death effects',60000);
+    const result=await page.evaluate('window.__spiritEffectResult');
+    check('non-damaging card does not consume the real guardian effect',result.harmless===0,result);
+    check('damage in a real card resolution consumes T2 exactly once',result.actualDamage&&result.hitUsed===1,result);
+    check('T5 native arrows resolve with no physical response and no damage',result.arrowUsed===1&&!result.physicalResponse&&!result.arrowHarm,result);
+    check('T1 uses its own protection before a base guard charge',result.specialtyGuard,result);
+    check('T3 native handcard limit remains increased by exactly one',result.capBonus===1&&result.capPersistent,result);
+    check('T4 reduces native distance and does not go below one',
+      result.distanceChanges.some(([before,after])=>before>1&&after===before-1)&&
+      result.distanceChanges.every(([before,after])=>after===Math.max(1,before-1)),result);
+    check('T6 saves the owner without spending the basic rescue',result.specialtyRescue,result);
+    check('dead spirit leaves active seating and its mark stops offering support',result.removed&&result.inactive&&result.mark==='dead',result);
+    check('native effects produced no errors',!result.diagnostics.errors.length&&!result.diagnostics.rejections.length,result);
+    stage('spirit-native-effects',{result,screenshot:await snap('spirit-native-effects')});
+    return;
+  }
   if(process.argv.includes('--spirit-seat-smoke')){
     await delay(500);const seating=await page.evaluate(`(()=>{const r=lib.cshAuxSpirit.current();return {number:ui.arena.dataset.number,count:game.players.concat(game.dead).length,cause:r.summonedAt,hand:r.spirit.countCards('h'),position:r.spirit.dataset.position,rects:game.players.map(p=>{const a=p.getBoundingClientRect();return {name:p.name,x:a.x,y:a.y,width:a.width,height:a.height};}),size:{w:innerWidth,h:innerHeight},errors:__hostSmoke.errors,rejections:__hostSmoke.rejections};})()`);
     check('real owner preparation summons ninth seat with initial hand',seating.count===spiritSeats+1&&seating.cause.trigger==='phaseZhunbeiBegin'&&seating.cause.owner&&seating.hand===4,seating);
@@ -367,7 +467,10 @@ async function smokeNaturalMatch() {
   check('actual '+matchMode+' match reached native game.over without forcing a result', sample.over, { round: sample.round, dialogs: sample.dialogs });
   if(spiritMode){
     const state=await page.evaluate(`(()=>{const r=lib.cshAuxSpirit.current(),s=lib.cshAuxSpirit.stats(),w=JSON.parse(localStorage.getItem('csh_wallet'));return {stats:s,pc:w.pc,claims:w.matchClaims||[],ordinary:lib.config.gameRecord.identity.data,assisted:_status.cshAssistedMatch,spirit:r.spirit.name,owner:r.owner.name,control:game.me===r.owner,skills:r.spirit.getSkills(),progress:CSH_POOL_ACHV.load().progress,videoMarker:lib.video.some(v=>v.type==='storage'&&v.content?.[0]==='cshAssistedMatch'&&v.content[1]?.type==='identity_with_spirit'),rejections:__hostSmoke.rejections,errors:__hostSmoke.errors};})()`);
-    check('natural assisted match writes separate result without ordinary rewards',state.assisted&&state.stats.wins+state.stats.losses===1&&state.pc===openingBalance&&state.claims.length===0,state);
+    const receipt=state.claims[0],rates=await page.evaluate('lib.cshWallet.wallet.matchRewardConfig().identity');
+    check('natural assisted match pays once with separate result and configured reward',
+      state.assisted&&state.stats.wins+state.stats.losses===1&&state.claims.length===1&&receipt.mode==='assisted_identity'&&
+      receipt.pc===rates[receipt.win?'win':'lose']&&state.pc===openingBalance+receipt.pc,state);
     check('natural assisted match never transfers human control or achievement progress',state.control&&Object.values(state.progress).every(n=>!n),state);
     await page.evaluate('game.over(false)');check('repeated assisted callback does not duplicate result',await page.evaluate('lib.cshAuxSpirit.stats().wins+lib.cshAuxSpirit.stats().losses===1'));
     check('assisted replay is tagged and runtime is clean',state.videoMarker&&!state.errors.length&&!state.rejections.length,state);
@@ -442,7 +545,7 @@ try {
   ` });
   await page.send('Page.navigate', { url: origin + '/__probe_init.html' });
   for (let i = 0; i < 120 && !(await page.evaluate('location.origin === ' + JSON.stringify(origin) + ' && document.readyState === "complete"')); i++) await new Promise(r => setTimeout(r, 20));
-  await page.evaluate(`(async()=>{localStorage.setItem('noname_0.9_loadtime','60000');localStorage.setItem('gplv3_noname_alerted','true');const request=indexedDB.open('noname_0.9_data',4);request.onupgradeneeded=()=>{for(const name of ['video','image','audio','config','data'])request.result.createObjectStore(name,name==='video'?{keyPath:'time'}:undefined);};const db=await new Promise((resolve,reject)=>{request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});const values={extensions:['池子魔将'],extensionInfo:{'池子魔将':{}},'extension_池子魔将_enable':true,'extension_池子魔将_csh_debug_menu':true,extension_auto_import:false,mode:${JSON.stringify(challengeMode?'boss':matchUntilOver?matchMode:'identity')},'extension_池子魔将_csh_aux_spirit':${JSON.stringify(spiritMode)},show_splash:'off',dev:true,debug:false,totouched:true,touchscreen:false,new_tutorial:true,show_time:false,...${JSON.stringify(matchUntilOver ? {game_speed:'vvfast',...matchConfig[matchMode]} : {})}};const tx=db.transaction(['config'],'readwrite');for(const [key,value]of Object.entries(values))tx.objectStore('config').put(value,key);await new Promise((resolve,reject)=>{tx.oncomplete=resolve;tx.onabort=()=>reject(tx.error);});db.close();return true;})()`);
+  await page.evaluate(`(async()=>{localStorage.setItem('noname_0.9_loadtime','60000');localStorage.setItem('gplv3_noname_alerted','true');const request=indexedDB.open('noname_0.9_data',4);request.onupgradeneeded=()=>{for(const name of ['video','image','audio','config','data'])request.result.createObjectStore(name,name==='video'?{keyPath:'time'}:undefined);};const db=await new Promise((resolve,reject)=>{request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});const values={extensions:['池子魔将'],extensionInfo:{'池子魔将':{}},'extension_池子魔将_enable':true,'extension_池子魔将_csh_debug_menu':true,extension_auto_import:false,mode:${JSON.stringify(challengeMode?'boss':matchUntilOver?matchMode:'identity')},'extension_池子魔将_csh_aux_spirit':${JSON.stringify(spiritMode)},show_splash:'off',...${JSON.stringify(spiritMode?{ban_identity_mode_config_identity:'nei'}:{})},dev:true,debug:false,totouched:true,touchscreen:false,new_tutorial:true,show_time:false,...${JSON.stringify(matchUntilOver ? {game_speed:'vvfast',...matchConfig[matchMode]} : {})}};const tx=db.transaction(['config'],'readwrite');for(const [key,value]of Object.entries(values))tx.objectStore('config').put(value,key);await new Promise((resolve,reject)=>{tx.oncomplete=resolve;tx.onabort=()=>reject(tx.error);});db.close();return true;})()`);
   stage('test-only-idb-seeded');
   await page.send('Page.navigate', { url: origin + '/index.html' });
   stage('unmodified-host-navigation-sent');

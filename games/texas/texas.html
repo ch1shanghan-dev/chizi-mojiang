@@ -977,10 +977,10 @@ var sfx = {
   ui: function () { sfxPlay('ui.tap'); },
   deal: function () { sfxPlay('card.deal'); },
   flip: function () { sfxPlay('card.flip'); },
-  chip: function () { sfxPlay('chip.bet'); },
-  raise: function () { sfxPlay('card.raise'); },
-  check: function () { sfxPlay('card.check'); },
-  fold: function () { sfxPlay('card.fold'); },
+  chip: function (opt) { sfxPlay('chip.bet', opt); },
+  raise: function (opt) { sfxPlay('card.raise', opt); },
+  check: function (opt) { sfxPlay('card.check', opt); },
+  fold: function (opt) { sfxPlay('card.fold', opt); },
   show: function () { sfxPlay('card.show'); },
   win: function () { sfxPlay('win'); },
   lose: function () { sfxPlay('lose'); },
@@ -1734,7 +1734,7 @@ function payChips(p, amt) {
   G.pot += amt;
   if (p.chips <= 0) {
     /* 【2026-09-30 音效增强】全下 riser：只在本手首次进入全下时响（盲注全入也算，够戏剧） */
-    if (!p.allin) sfxPlay("allin");
+    if (!p.allin) sfxPlay("allin", {vol:p.isHuman?1:.76});
     p.allin = true;
   }
   return amt;
@@ -1861,12 +1861,14 @@ function applyAction(idx, act, amount) {
   var actual = act;
   if (act === 'check' && toCall > 0) actual = 'call';   /* 有人下注时"过牌"即跟注 */
 
+  var cue = {vol:p.isHuman?1:.62};
   if (actual === 'fold') {
-    p.folded = true; p.acted = true; sfx.fold();
+    p.folded = true; p.acted = true; sfx.fold(cue);
   } else if (actual === 'check') {
-    p.acted = true; sfx.check();
+    p.acted = true; sfx.check(cue);
   } else if (actual === 'call') {
-    payChips(p, toCall); p.acted = true; sfx.chip();
+    payChips(p, toCall); p.acted = true;
+    if (!p.allin) sfx.chip(cue);
   } else {
     var maxTo = p.bet + p.chips;
     var to = (actual === 'allin') ? maxTo : Math.max(Math.round(amount || 0), G.currentBet + G.minRaise);
@@ -1877,7 +1879,7 @@ function applyAction(idx, act, amount) {
     if (to > G.currentBet) { G.currentBet = to; G.lastAggressor = idx; }
     /* nextActor sees unmatched bets; retain each player’s last action level. */
     p.acted = true;
-    sfx.raise();
+    if (!p.allin) sfx.raise(cue);
   }
 
   p.actionAt = G.currentBet;
@@ -2980,7 +2982,7 @@ function showHandBanner() {
       '<div class="rs-row' + (meLed.net > 0 ? ' win' : '') + '"><div class="rs-name">本手净变化</div><div class="rs-hand">获奖 + 返还 − 投入 − 场供</div><div class="rs-gain' + (meLed.net === 0 ? ' zero' : '') + '">' + (meLed.net > 0 ? '+' : '') + fmt(meLed.net) + '</div></div>' +
       (meLed.endStack != null ? '<div class="rs-row"><div class="rs-name">结算后筹码</div><div class="rs-hand">本手开始 ' + fmt(meLed.startStack) + '</div><div class="rs-gain">' + fmt(meLed.endStack) + '</div></div>' : '');
   }
-  if (won) sfx.win(); else sfx.lose();
+  if (net > 0) sfx.win(); else if (net < 0) sfx.lose(); else sfxPlay('settle.push');
 
   /* 关键手复盘：最多展示 4 个决策点；矮屏（手机横屏）只留 1~2 条，且省掉独立标题行
      （标题并进第一条的抬头），把横幅压在首屏内 —— 摊牌对比表才是主信息，复盘是次要参考。 */

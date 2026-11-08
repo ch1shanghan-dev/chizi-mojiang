@@ -25,7 +25,7 @@
   },
   "T2_draw_once": {
     "name": "助战·摸牌",
-    "text": "本局首次出牌命中后，摸 1 张牌"
+    "text": "本局首次用牌造成伤害，结算后摸 1 张牌"
   },
   "T3_hand_cap": {
     "name": "共谋·手牌",
@@ -37,7 +37,7 @@
   },
   "T5_response_once": {
     "name": "接应·响应",
-    "text": "本局首次需要响应时，可视为已响应 1 次"
+    "text": "本局首次应对南蛮入侵、万箭齐发或决斗时，妖灵替你响应一次"
   },
   "T6_recover_once": {
     "name": "回护·回复",
@@ -62,7 +62,7 @@
     "unlockLevel": "B",
     "magnitude": 1,
     "perGame": 1,
-    "playerText": "艾达王的助战·摸牌：本局首次出牌命中后，摸 1 张牌",
+    "playerText": "艾达王的助战·摸牌：本局首次用牌造成伤害，结算后摸 1 张牌",
     "sourceSkill": "csh_boss_kan_guzao"
   },
   {
@@ -72,7 +72,7 @@
     "unlockLevel": "B",
     "magnitude": 1,
     "perGame": 1,
-    "playerText": "天天的助战·摸牌：本局首次出牌命中后，摸 1 张牌",
+    "playerText": "天天的助战·摸牌：本局首次用牌造成伤害，结算后摸 1 张牌",
     "sourceSkill": "csh_boss_feng_fengshi"
   },
   {
@@ -82,7 +82,7 @@
     "unlockLevel": "B",
     "magnitude": 1,
     "perGame": 1,
-    "playerText": "女帝的助战·摸牌：本局首次出牌命中后，摸 1 张牌",
+    "playerText": "女帝的助战·摸牌：本局首次用牌造成伤害，结算后摸 1 张牌",
     "sourceSkill": "csh_boss_lang_nongchao"
   },
   {
@@ -102,7 +102,7 @@
     "unlockLevel": "B",
     "magnitude": 1,
     "perGame": 1,
-    "playerText": "吹雪的接应·响应：本局首次需要响应时，可视为已响应 1 次",
+    "playerText": "吹雪的接应·响应：本局首次应对南蛮入侵、万箭齐发或决斗时，妖灵替你响应一次",
     "sourceSkill": "csh_boss_kui_qiansi"
   },
   {
@@ -112,7 +112,7 @@
     "unlockLevel": "B",
     "magnitude": 1,
     "perGame": 1,
-    "playerText": "希里的助战·摸牌：本局首次出牌命中后，摸 1 张牌",
+    "playerText": "希里的助战·摸牌：本局首次用牌造成伤害，结算后摸 1 张牌",
     "sourceSkill": "csh_boss_you_cannian"
   },
   {
@@ -142,7 +142,7 @@
     "unlockLevel": "B",
     "magnitude": 1,
     "perGame": 1,
-    "playerText": "塞尔达的接应·响应：本局首次需要响应时，可视为已响应 1 次",
+    "playerText": "塞尔达的接应·响应：本局首次应对南蛮入侵、万箭齐发或决斗时，妖灵替你响应一次",
     "sourceSkill": "csh_boss_xiushi"
   },
   {
@@ -182,7 +182,7 @@
     "unlockLevel": "B",
     "magnitude": 1,
     "perGame": 1,
-    "playerText": "绫里姐妹的接应·响应：本局首次需要响应时，可视为已响应 1 次",
+    "playerText": "绫里姐妹的接应·响应：本局首次应对南蛮入侵、万箭齐发或决斗时，妖灵替你响应一次",
     "sourceSkill": "csh_boss_jiangling"
   },
   {
@@ -202,7 +202,7 @@
     "unlockLevel": "B",
     "magnitude": 1,
     "perGame": 1,
-    "playerText": "艾米莉亚的接应·响应：本局首次需要响应时，可视为已响应 1 次",
+    "playerText": "艾米莉亚的接应·响应：本局首次应对南蛮入侵、万箭齐发或决斗时，妖灵替你响应一次",
     "sourceSkill": "csh_boss_bingjie"
   },
   {
@@ -262,7 +262,7 @@
     "unlockLevel": "B",
     "magnitude": 1,
     "perGame": 1,
-    "playerText": "人造人的助战·摸牌：本局首次出牌命中后，摸 1 张牌",
+    "playerText": "人造人的助战·摸牌：本局首次用牌造成伤害，结算后摸 1 张牌",
     "sourceSkill": "csh_boss_yongdong"
   },
   {
@@ -272,7 +272,7 @@
     "unlockLevel": "B",
     "magnitude": 1,
     "perGame": 1,
-    "playerText": "伊什塔尔的助战·摸牌：本局首次出牌命中后，摸 1 张牌",
+    "playerText": "伊什塔尔的助战·摸牌：本局首次用牌造成伤害，结算后摸 1 张牌",
     "sourceSkill": "csh_boss_tianzhou"
   },
   {
@@ -352,7 +352,7 @@
     "unlockLevel": "B",
     "magnitude": 1,
     "perGame": 1,
-    "playerText": "妮露的助战·摸牌：本局首次出牌命中后，摸 1 张牌",
+    "playerText": "妮露的助战·摸牌：本局首次用牌造成伤害，结算后摸 1 张牌",
     "sourceSkill": "csh_boss_wuqi"
   },
   {
@@ -392,7 +392,7 @@
     "unlockLevel": "B",
     "magnitude": 1,
     "perGame": 1,
-    "playerText": "月火的接应·响应：本局首次需要响应时，可视为已响应 1 次",
+    "playerText": "月火的接应·响应：本局首次应对南蛮入侵、万箭齐发或决斗时，妖灵替你响应一次",
     "sourceSkill": "csh_boss_fenshen"
   },
   {
@@ -402,7 +402,7 @@
     "unlockLevel": "B",
     "magnitude": 1,
     "perGame": 1,
-    "playerText": "柳离悲的接应·响应：本局首次需要响应时，可视为已响应 1 次",
+    "playerText": "柳离悲的接应·响应：本局首次应对南蛮入侵、万箭齐发或决斗时，妖灵替你响应一次",
     "sourceSkill": "csh_boss_libei"
   },
   {
@@ -422,7 +422,7 @@
     "unlockLevel": "B",
     "magnitude": 1,
     "perGame": 1,
-    "playerText": "毛利兰的助战·摸牌：本局首次出牌命中后，摸 1 张牌",
+    "playerText": "毛利兰的助战·摸牌：本局首次用牌造成伤害，结算后摸 1 张牌",
     "sourceSkill": "csh_boss_kongshou"
   },
   {
@@ -452,7 +452,7 @@
     "unlockLevel": "B",
     "magnitude": 1,
     "perGame": 1,
-    "playerText": "神奇女侠的接应·响应：本局首次需要响应时，可视为已响应 1 次",
+    "playerText": "神奇女侠的接应·响应：本局首次应对南蛮入侵、万箭齐发或决斗时，妖灵替你响应一次",
     "sourceSkill": "csh_boss_shendun"
   },
   {
@@ -462,7 +462,7 @@
     "unlockLevel": "B",
     "magnitude": 1,
     "perGame": 1,
-    "playerText": "结衣的助战·摸牌：本局首次出牌命中后，摸 1 张牌",
+    "playerText": "结衣的助战·摸牌：本局首次用牌造成伤害，结算后摸 1 张牌",
     "sourceSkill": "csh_boss_shuju"
   },
   {
@@ -532,7 +532,7 @@
     "unlockLevel": "B",
     "magnitude": 1,
     "perGame": 1,
-    "playerText": "高卷杏的接应·响应：本局首次需要响应时，可视为已响应 1 次",
+    "playerText": "高卷杏的接应·响应：本局首次应对南蛮入侵、万箭齐发或决斗时，妖灵替你响应一次",
     "sourceSkill": "csh_boss_ranxin"
   },
   {

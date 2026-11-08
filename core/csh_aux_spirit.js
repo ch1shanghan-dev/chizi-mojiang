@@ -28,14 +28,98 @@ export function installAuxSpirit(host) {
   function summary(){
     if(!run)return null;const p=run.spirit,ownerAlive=!!(run.owner&&run.owner.isIn()),alive=!!(p&&p.isIn()),guardLeft=Math.max(0,3-Number(p&&p.storage.cshAuxGuard||0)),aidLeft=Math.max(0,3-Number(p&&p.storage.cshAuxAid||0)),rescueReady=!(p&&p.storage.cshAuxRescue);
     let state=!p?'waiting':!alive?'dead':!ownerAlive?'owner-dead':'active',reason='';
-    if(run.cancelled)state='cancelled';else if(run.fallback)state='fallback';else if(status.over)state='ended';else if(p&&alive&&ownerAlive&&!active(p)){state='paused';reason=run.owner!==game.me?'当前控制者已变化':run.owner.identity!==run.ownerIdentity?'主人身份已变化':lib.cshWallet.saveGuard.blocked()?'存档正在恢复':'本局会话已变化';}
+    if(run.cancelled)state='cancelled';else if(run.fallback)state='fallback';else if(status.over||run.result!==undefined)state='ended';else if(p&&alive&&ownerAlive&&!active(p)){state='paused';reason=run.owner!==game.me?'当前控制者已变化':run.owner.identity!==run.ownerIdentity?'主人身份已变化':lib.cshWallet.saveGuard.blocked()?'存档正在恢复':'本局会话已变化';}
     try{if(run.result!==undefined&&lib.cshWallet.wallet.assistedStats().receipts.includes(run.rewardId))run.saved=true;}catch(e){}
     return {armed:true,summoned:!!p,alive:alive,ownerAlive:ownerAlive,state:state,reason:reason,name:p?MINION_NAMES['csh_boss_minion_'+p.name.slice('csh_aux_'.length)]||lib.translate[p.name]||p.name:'随机妖灵',guardLeft:guardLeft,aidLeft:aidLeft,rescueReady:rescueReady,supportActive:state==='active'&&(guardLeft>0||aidLeft>0||rescueReady),fallback:!!run.fallback,saved:run.saved,resultPending:run.result!==undefined&&!run.saved&&!run.cancelled};
   }
-  function buffText(){try{const RT=buffRuntime(),tpl=RT&&run?RT.activeTemplate(run.id):null;if(!tpl)return '';const T=(typeof window!=='undefined'&&window.CSHSpiritBuffs&&window.CSHSpiritBuffs.TEMPLATES[tpl])||null;return '本局特色增益：'+(T?T.text:tpl)+'（本局仅生效一次，不叠加、不跨局）。';}catch(eBuffText){return '';}}
+  function buffStatus(){
+    try{
+      const rt=buffRuntime(),s=rt&&run?rt.snapshot(run.id):null;
+      if(!s||!s.active)return null;
+      const table=typeof window!=='undefined'&&window.CSHSpiritBuffs;
+      const t=table&&table.TEMPLATES[s.template];
+      if(!t)return null;
+      return {name:t.name,text:t.text,ready:!!s.activated[s.template]||(s.used[s.template]||0)<s.perGame};
+    }catch(e){return null;}
+  }
+  function buffText(){
+    const buff=buffStatus();
+    return buff?'本局增益 · '+buff.name+'：'+(buff.ready?buff.text:'本局已使用。'):'';
+  }
   function describe(){const s=summary();if(!s)return '本局未预约妖灵：'+spiritEligibility({lib,game,get,status});const names={waiting:'等待你的准备阶段',active:'守护中',dead:'妖灵已阵亡', 'owner-dead':'主人阵亡，妖灵按原身份继续作战',paused:'守护暂停',ended:'本局已结束',cancelled:'本局未形成有效对局',fallback:'妖灵未入场，按普通对局结算'};return s.name+' · '+names[s.state]+(s.reason?'（'+s.reason+'）':'')+'。本局剩余：护主'+s.guardLeft+'次、援助'+s.aidLeft+'次、濒死回复'+(s.rescueReady?'1':'0')+'次。'+(!s.supportActive?'当前不能提供支援。':'')+'阵亡不补召，复活不重置次数；支援仅回复1点体力，不保证脱离濒死。助战独立战绩，完局按身份场标准发放奖励；不计普通战绩或池子成就。'+(s.resultPending?'本局结果与奖励待保存，可在行囊重试。':'')+buffText();}
-  function refresh(){if(!run)return;for(const p of [run.owner,run.spirit])if(p&&p.markSkill)try{p.markSkill('csh_aux_status');}catch(e){}}
-  lib.skill.csh_aux_status={charlotte:true,marktext:'灵',intro:{content:function(){return lib.cshAuxSpirit?lib.cshAuxSpirit.describe():'妖灵状态未就绪';}}};lib.translate.csh_aux_status='妖灵守护状态';
+  const statusLabel={
+    waiting:'等待你的准备阶段',active:'守护中',dead:'妖灵已阵亡','owner-dead':'你已阵亡，妖灵继续作战',
+    paused:'守护暂停',ended:'本局已结束',cancelled:'对局未结算',fallback:'妖灵未入场，按普通对局结算'
+  };
+  function statusTitle(s){
+    const label=s.state==='active'&&!s.supportActive&&!buffStatus()?.ready?'支援已用完':statusLabel[s.state];
+    return s.name+' · '+label;
+  }
+  function remaining(s){
+    return s&&s.state==='active'?s.guardLeft+s.aidLeft+Number(s.rescueReady):0;
+  }
+  function statusPanel(dialog,storage,player,event){
+    const s=summary(),doc=dialog.content&&dialog.content.ownerDocument;
+    if(!s||!doc)return describe();
+    const panel=doc.createElement('section');panel.className='csh-aux-status-panel';
+    function add(parent,tag,cls,text){
+      const el=doc.createElement(tag);if(cls)el.className=cls;el.textContent=text;parent.appendChild(el);return el;
+    }
+    add(panel,'strong','csh-aux-status-title',statusTitle(s));
+    if(s.state==='active'){
+      const charges=add(panel,'div','csh-aux-status-counts','');
+      for(const [name,left] of [['护主',s.guardLeft],['援助',s.aidLeft],['同契',Number(s.rescueReady)]]){
+        add(charges,'span',left?'':'depleted',name+' '+left);
+      }
+      const special=buffText();if(special)add(panel,'div','',special);
+    }
+    if(s.reason)add(panel,'div','',s.reason);
+    if(s.resultPending)add(panel,'div','','本局奖励待保存，可在行囊重试。');
+    const rules=add(panel,'details','','');
+    add(rules,'summary','','助战规则');
+    add(rules,'p','','护主抵消1点伤害，援助摸1张牌，同契在濒死时回复1点体力。妖灵阵亡后停止支援，复活保留剩余次数。助战战绩单独记录，奖励按身份场标准结算。');
+    dialog.classList.add('csh-aux-status-dialog');
+    dialog.clickintro=true;
+    /* 无名杀缩放施加在 body，弹层的入场动画不能作为尺寸依据。 */
+    const body=doc.body;
+    const zoom=(body.offsetWidth&&body.getBoundingClientRect().width/body.offsetWidth)||Number(game.documentZoom)||1;
+    panel.style.setProperty('--csh-aux-scale',String(1/zoom));
+    dialog.style.width=Math.min(300,doc.defaultView.innerWidth*.43)/zoom+'px';
+    dialog.content.appendChild(panel);
+    const point=event&&(event.touches&&event.touches[0]||event);
+    const anchor=point&&Number.isFinite(point.clientX)?{clientX:point.clientX,clientY:point.clientY}:null;
+    function place(){
+      if(anchor&&dialog.isConnected&&typeof lib.placePoppedDialog==='function')lib.placePoppedDialog(dialog,anchor);
+    }
+    rules.addEventListener('toggle',place);
+  }
+  function refresh(){
+    if(!run)return;
+    const p=run.owner;
+    if(!p||!p.markSkill)return;
+    try{
+      const existing=p.marks&&p.marks.csh_aux_status;
+      if(existing&&p.updateMark)p.updateMark('csh_aux_status');
+      else p.markSkill('csh_aux_status');
+      const mark=p.marks&&p.marks.csh_aux_status,s=summary();
+      if(!mark||!s||typeof mark.setAttribute!=='function')return;
+      const text=statusTitle(s)+(remaining(s)?' · 剩余 '+remaining(s)+' 次基础支援':'');
+      mark.title=text;mark.setAttribute('aria-label',text);mark.dataset.cshAuxStatus=s.state;
+      if(!mark.classList.contains('csh-aux-status-mark')){
+        mark.classList.add('csh-aux-status-mark');mark.tabIndex=0;mark.setAttribute('role','button');
+        mark.addEventListener('keydown',function(e){
+          if(e.repeat||(e.key!=='Enter'&&e.key!==' '))return;
+          if(!ui.click||typeof ui.click.intro!=='function')return;
+          e.preventDefault();e.stopPropagation();
+          const rect=mark.getBoundingClientRect();
+          ui.click.intro.call(mark,{clientX:rect.left+rect.width/2,clientY:rect.top+rect.height/2});
+        });
+      }
+    }catch(e){}
+  }
+  lib.skill.csh_aux_status={charlotte:true,marktext:'灵',intro:{
+    name:false,content:describe,mark:statusPanel,markcount:()=>remaining(summary())
+  }};lib.translate.csh_aux_status='妖灵守护';lib.translate.csh_aux_status_bg='灵';
   const toast=s=>{if(lib.cshUI&&lib.cshUI.toast)lib.cshUI.toast(s);};
   for(const [id,m] of Object.entries(MINIONS)){
     const alias='csh_aux_'+id.slice('csh_boss_minion_'.length);
@@ -82,7 +166,7 @@ export function installAuxSpirit(host) {
   function restore(){
     if(!run)return;
     for(const [key,item]of Object.entries(run.hooks||{}))if(game[key]===item.wrapper)game[key]=item.previous;
-    if(timer!==null){clearTimeout(timer);timer=null;}for(const p of [run.owner,run.spirit])if(p&&p.unmarkSkill)try{p.unmarkSkill('csh_aux_status');}catch(e){}if(run.owner&&run.owner.storage)delete run.owner.storage.cshAssistedMatch;
+    if(timer!==null){clearTimeout(timer);timer=null;}if(run.owner&&run.owner.unmarkSkill)try{run.owner.unmarkSkill('csh_aux_status');}catch(e){}if(run.owner&&run.owner.storage)delete run.owner.storage.cshAssistedMatch;
     /* 助战结束 / 换局 / 召唤回滚：本局计数不残留，迟到回包找不到会话。 */
     try{const RT=buffRuntime();if(RT)RT.end(run.id);}catch(e){}
     run=null;delete status.cshAssistedMatch;
@@ -100,7 +184,10 @@ export function installAuxSpirit(host) {
     const reason=spiritEligibility({lib,game,get,status});if(reason){if(lib.config.extension_池子魔将_csh_aux_spirit)toast('妖灵未预约：'+reason);return null;}
     run={id:'spirit-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2),epoch:lib.cshWallet.saveEpoch(),owner:game.me,ownerIdentity:game.me.identity,engaged:false,spirit:null,hooks:{},result:undefined,saved:false,summoning:false};status.cshAssistedMatch=true;
     const normal=lib.cshMatchReward&&typeof lib.cshMatchReward.session==='function'?lib.cshMatchReward.session():null;run.rewardId=normal&&normal.id||run.id;
-    for(const key of ['swapPlayer','swapControl'])hook(key,function(previous,args){if(args.some(p=>p&&p._cshAuxSpirit))return;return previous.apply(this,args);});
+    for(const key of ['swapPlayer','swapControl'])hook(key,function(previous,args){
+      if(args.some(p=>p&&p._cshAuxSpirit))return;
+      const result=previous.apply(this,args);refresh();return result;
+    });
     hook('addRecord',function(previous,args){if(status.cshAssistedMatch)return;return previous.apply(this,args);});
     hook('over',function(previous,args){
       if(run&&typeof args[0]==='boolean'&&run.result===undefined&&!status.over&&!status.video&&!status.connectMode&&!lib.config.connectMode&&!game.online&&!game.observe&&game.me===run.owner&&run.owner.identity===run.ownerIdentity&&lib.cshWallet.saveEpoch()===run.epoch){
@@ -138,14 +225,14 @@ export function installAuxSpirit(host) {
       await spirit.draw(4);
       if(!sameSession())throw Error('入场等待期间会话已变化');
       if(active(spirit)&&!spirit.storage.cshAuxEntered)await lib.skill.csh_aux_entry.content(null,null,spirit);
-      refresh();toast('妖灵以守护形态加入下家；点“灵”查看状态与剩余支援，本局战绩独立');return current;
+      refresh();toast(summary().name+' 已入席 · 点「灵」查看支援');return current;
     }catch(error){
       // Remove only this attempt's hidden participant. A late completion must never roll back a newer table.
       const owned=playersRef.filter(p=>!before.includes(p)&&(p===spawned||p.name===name));if(spawned&&!owned.includes(spawned))owned.push(spawned);
       const sameActors=run===current&&game.me===human&&game.players===playersRef;
       for(const p of owned){for(const list of [playersRef,game.players]){const at=list.indexOf(p);if(at>=0)list.splice(at,1);}if(game.playerMap&&game.playerMap[p.playerid]===p)delete game.playerMap[p.playerid];if(p.remove)p.remove();}
       if(sameActors&&game.players.length===before.length&&before.every(p=>game.players.includes(p))){all.forEach((p,i)=>{p.dataset.position=positions[i];if(seats[i]!=null&&p.setSeatNum)p.setSeatNum(seats[i]);});ui.arena.setNumber(all.length);game.arrangePlayers();}
-      delete human.storage.cshAssistedMatch;if(run===current){if(sameActors&&current.epoch===lib.cshWallet.saveEpoch()&&!status.over){current.spirit=null;current.summoning=false;current.fallback=true;delete status.cshAssistedMatch;}else restore();}toast('妖灵未召唤：本局继续普通对局结算');console.warn('[池子魔将] 妖灵扩席失败',error);return null;
+      delete human.storage.cshAssistedMatch;if(run===current){if(sameActors&&current.epoch===lib.cshWallet.saveEpoch()&&!status.over){current.spirit=null;current.summoning=false;current.fallback=true;delete status.cshAssistedMatch;}else restore();}refresh();toast('妖灵未召唤：本局继续普通对局结算');console.warn('[池子魔将] 妖灵扩席失败',error);return null;
     }
   }
   if(game.videoContent)game.videoContent.cshAuxSpawn=function(data){
@@ -158,6 +245,15 @@ export function installAuxSpirit(host) {
   lib.skill.csh_aux_start={charlotte:true,trigger:{global:['gameStart','phaseZhunbeiBegin','phaseBefore','useCardAfter','respondAfter','damageEnd']},forced:true,silent:true,popup:false,priority:10000,firstDo:true,
     filter(e,p,name){return p===game.me&&(name==='gameStart'||!!run&&(name==='phaseZhunbeiBegin'?!run.fallback&&!run.spirit&&!run.summoning&&e.player===run.owner:!!e.player&&game.players.concat(game.dead||[]).includes(e.player)));},
     async content(event,trigger){if(event.triggername==='gameStart'){if(run&&run.spirit&&game.players.concat(game.dead||[]).includes(run.spirit))return;restore();arm();}else if(event.triggername==='phaseZhunbeiBegin')await start({triggername:event.triggername,player:trigger.player});else if(run&&run.epoch===lib.cshWallet.saveEpoch()&&game.me===run.owner)run.engaged=true;}};
+  lib.skill.csh_aux_status_sync={
+    charlotte:true,forced:true,silent:true,popup:false,
+    trigger:{global:['dieAfter','reviveAfter','phaseBefore']},
+    filter(e,p,name){
+      return !!(run&&p===run.owner&&(name==='phaseBefore'||e.player===run.owner||e.player===run.spirit));
+    },
+    async content(){refresh();}
+  };
   game.addGlobalSkill('csh_aux_start');
+  game.addGlobalSkill('csh_aux_status_sync');
   const api={start,arm,eligibility:()=>spiritEligibility({lib,game,get,status}),current:()=>run,summary,describe,refresh,stats:()=>lib.cshWallet.wallet.assistedStats()};lib.cshAuxSpirit=api;return api;
 }

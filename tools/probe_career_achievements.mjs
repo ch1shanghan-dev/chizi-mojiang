@@ -29,7 +29,7 @@ source=source.replace('<script>\n',mock+'<script>\n').replace('<script>\r\n',moc
 // Expose existing functions only, without replacing their implementations.
 const end=source.lastIndexOf('})();');
 source=source.slice(0,end)+'window.auditCareer={refresh:renderAch,rows:()=>achRows};\n'+source.slice(end);
-const cases=[['desktop',1200,820,1],['portrait',390,844,1],['landscape',915,412,1],['zoom',480,400,1.5]];
+const cases=[['desktop',1200,820,1],['narrow-landscape',590,470,1],['landscape',915,412,1],['zoom',480,400,1.5]];
 const all=[];
 for(const [name,width,height,scale] of cases){
   const file=path.join(tmp,name+'.html');fs.writeFileSync(file,source);
@@ -49,6 +49,12 @@ for(const [name,width,height,scale] of cases){
       try{
         check('real HTML script booted',!!window.auditCareer);
         if(!window.auditCareer)return checks;
+        if(innerWidth<=760){
+          $('[data-p="overview"]').click();
+          const tabs=$('#tabs').getBoundingClientRect(),body=$('#body').getBoundingClientRect();
+          check('narrow landscape keeps navigation beside the overview',tabs.width>=88&&tabs.right<=body.left+1&&body.width>innerWidth*.7&&$('#tabs .tab').getBoundingClientRect().height>=44,
+            {tabs:tabs.toJSON(),body:body.toJSON(),width:innerWidth,mode:getComputedStyle($('#app')).flexDirection});
+        }
         document.querySelector('[data-p="board"]').click();
         check('world page distinguishes actual player encounters',$('#bd-most').textContent.includes('结识 3 位牌友')&&$('#bd-most').textContent.includes('同桌 10 人次'));
         check('world page shows chronological revenge summary',$('#bd-most').textContent.includes('赢回来的对手有 1 位'));
@@ -104,7 +110,8 @@ for(const [name,width,height,scale] of cases){
         check('expanded filter controls remain reachable and within viewport',!$('#ach-refinements').hidden&&optional.length>2&&optional.every(n=>{const r=n.getBoundingClientRect();return r.width>0&&r.left>=-1&&r.right<=innerWidth+1;}));
         $('#ach-filters-toggle').click();
         check('no horizontal page overflow',document.documentElement.scrollWidth<=innerWidth+1);
-        if(innerWidth<=600)check('portrait navigation preserves content width',$('#body').getBoundingClientRect().width>=innerWidth-2&&getComputedStyle($('#tabs')).flexDirection==='row');
+        if(innerWidth<=760)check('compact achievement navigation is on demand and keeps the content width',
+          $('#body').getBoundingClientRect().width>=innerWidth-2&&$('#career-nav-toggle').getBoundingClientRect().height>=44);
         check('current cards contain complete readable conditions',[...document.querySelectorAll('#ach-grid .ach')].every(n=>n.querySelector('.adesc')?.textContent===CSH_ACHV.byKey(n.dataset.key)?.desc));
       }catch(e){check('real page execution',false,e.stack);}
       document.querySelectorAll('body>div').forEach(n=>{if(n!==document.querySelector('#app')&&n!==document.querySelector('#modal'))n.remove();});

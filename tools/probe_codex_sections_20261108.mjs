@@ -1,6 +1,6 @@
 /* H1：PF-08 第二批 图鉴低频详情分区导航（2026-11-08）
    AST 抽真实 applySection 在最小 DOM 里验证：默认相处、记忆/档案切换、未知回落、
-   矮横屏全部展开、aria-selected、主操作常驻不受分区影响、零写入。
+   矮横屏保留一栏滚动、aria-pressed、零写入。
    不改页面源码；内置改前基线必须判红。 */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -38,6 +38,7 @@ function node(attrs) {
 
 function harness(compact, override) {
   const nav = node({});
+  const relation = node({});
   const tabs = ['relation', 'memory', 'archive'].map(k => { const t = node({ 'data-section': k }); t.parentNode = nav; return t; });
   nav.querySelectorAll = () => tabs;
   const details = [
@@ -48,7 +49,7 @@ function harness(compact, override) {
   const writes = [], bridgeCalls = [], walletCalls = [];
   const ctx = vm.createContext({
     console: { log() {}, warn() {}, error() {} },
-    $: sel => (sel === '#dnav' ? nav : null),
+    $: sel => (sel === '#dnav' ? nav : sel === '#codex-relationship' ? relation : null),
     document: { querySelectorAll: sel => (sel === '.dinfo details[data-section]' ? details : []) },
     window: { matchMedia: () => ({ matches: !!compact }) },
     localStorage: { getItem() { return null; }, setItem(k, v) { writes.push(k); } },
@@ -60,8 +61,8 @@ function harness(compact, override) {
     ctx, nav, tabs, details, writes, bridgeCalls, walletCalls,
     apply: k => ctx.applySection(k),
     state: () => ({
-      hidden: details.map(d => d.hidden), navHidden: nav.hidden,
-      selected: tabs.map(t => t.getAttribute('aria-selected'))
+      hidden: details.map(d => d.hidden), navHidden: nav.hidden, relationHidden: relation.hidden,
+      selected: tabs.map(t => t.getAttribute('aria-pressed'))
     })
   };
 }
@@ -70,14 +71,14 @@ function harness(compact, override) {
 {
   const h = harness(false);
   check('默认「相处」：三个低频详情全部收起、导航可见',
-    h.apply('relation') === 'relation' && h.state().hidden.every(Boolean) && h.state().navHidden === false, h.state());
-  check('默认 aria-selected 只有相处为 true',
+    h.apply('relation') === 'relation' && h.state().hidden.every(Boolean) && !h.state().relationHidden && !h.state().navHidden, h.state());
+  check('默认 aria-pressed 只有相处为 true',
     JSON.stringify(h.state().selected) === JSON.stringify(['true', 'false', 'false']), h.state().selected);
   check('切到「记忆」：小传与回响展开、讨伐记录仍收起',
-    h.apply('memory') === 'memory' && JSON.stringify(h.state().hidden) === JSON.stringify([false, false, true]), h.state());
+    h.apply('memory') === 'memory' && h.state().relationHidden && JSON.stringify(h.state().hidden) === JSON.stringify([false, false, true]), h.state());
   check('切到「档案」：只展开讨伐记录',
     h.apply('archive') === 'archive' && JSON.stringify(h.state().hidden) === JSON.stringify([true, true, false]), h.state());
-  check('aria-selected 随分区同步',
+  check('aria-pressed 随分区同步',
     JSON.stringify(h.state().selected) === JSON.stringify(['false', 'false', 'true']), h.state().selected);
   check('未知分区回落到相处，不默认全展开',
     h.apply('nope') === 'relation' && h.state().hidden.every(Boolean), h.state());
@@ -87,7 +88,7 @@ function harness(compact, override) {
 {
   const h = harness(true);
   check('极矮横屏：导航隐藏且三个详情全部展开（关键内容仍可达）',
-    h.apply('memory') === 'memory' && h.state().navHidden === true && h.state().hidden.every(v => v === false), h.state());
+    h.apply('memory') === 'memory' && h.state().navHidden && !h.state().relationHidden && h.state().hidden.every(v => v === false), h.state());
   const wide = harness(false);
   check('回到宽屏后分区重新生效，不残留矮屏状态',
     wide.apply('archive') === 'archive' && JSON.stringify(wide.state().hidden) === JSON.stringify([true, true, false]), wide.state());
@@ -95,14 +96,14 @@ function harness(compact, override) {
 
 /* ---------- 2. 静态接线与 UI 约束 ---------- */
 {
-  check('三个分区按钮都有 role/aria 与 44px 触控目标',
-    (html.match(/class="affbtn dnav-tab" data-section=/g) || []).length === 3 &&
-    /<nav class="dnav" id="dnav" role="tablist" aria-label="人物档案分区">/.test(html) &&
+  check('三个分区按钮都有可读状态、面板关联和 44px 触控目标',
+    (html.match(/class="affbtn dnav-tab" data-section=[^>]+aria-pressed=[^>]+aria-controls=/g) || []).length === 3 &&
+    /<nav class="dnav" id="dnav" aria-label="人物档案分区">/.test(html) &&
     /\.dnav \.dnav-tab\{[^}]*min-height:44px/.test(html));
   check('焦点可见与选中态有样式',
-    /\.dnav \.dnav-tab:focus-visible/.test(html) && /\.dnav \.dnav-tab\[aria-selected="true"\]/.test(html));
-  check('主操作 affbox 与 F1 增益面板常驻，不挂 data-section',
-    /<div class="affbox" id="affbox"><\/div>/.test(html) &&
+    /\.dnav \.dnav-tab:focus-visible/.test(html) && /\.dnav \.dnav-tab\[aria-pressed="true"\]/.test(html));
+  check('相处分区保留互动和独立增益折叠状态',
+    /<section id="codex-relationship"[^>]*>[\s\S]*?<div class="affbox" id="affbox"><\/div>/.test(html) &&
     /<details class="collection-details" id="spirit-buff" hidden>/.test(html) &&
     !/id="affbox"[^>]*data-section/.test(html) && !/id="spirit-buff"[^>]*data-section/.test(html));
   check('低频详情分组正确：记忆 2 个、档案 1 个',
@@ -120,7 +121,8 @@ function harness(compact, override) {
     values.every(v => baseline.has(v)), values.filter(v => !baseline.has(v)));
   check('点击事件走 data-section 委托并调用 applySection',
     /dnav\.addEventListener\("click"/.test(inline) && /applySection\(n\.getAttribute\("data-section"\)\)/.test(inline));
-  check('初始化即应用默认分区', /applySection\("relation"\);/.test(inline));
+  check('初始化应用默认分区，视口变化重新应用当前分区',
+    /applySection\("relation"\);/.test(inline) && /compactSections\.addEventListener\("change"[\s\S]*?applySection\(dnavSection\)/.test(inline));
 }
 
 /* ---------- 3. 改前基线 ---------- */

@@ -1110,15 +1110,18 @@ Room.prototype.play = function (pi, cardId, chosenColor) {
   this.rememberAction(pi,'play',this.activeColor);
   var cardDesc = this.cardText(card, card.color === 'black' ? chosenColor : card.color);
   this.pushLog(p.name + ' 打出了 ' + cardDesc);
-  if (card.value === 'draw2' || card.value === 'wild4') sfxPlay('uno.draw');
-  else if (card.value === 'reverse') sfxPlay('uno.reverse');
-  else if (card.value === 'skip') sfxPlay('uno.skip');
-  else sfx.play();
+  var cue = {vol:p.id===this.localPid?1:.65};
+  if (card.value === 'draw2' || card.value === 'wild4') sfxPlay('uno.draw', cue);
+  else if (card.value === 'reverse') sfxPlay('uno.reverse', cue);
+  else if (card.value === 'skip') sfxPlay('uno.skip', cue);
+  else if (card.color === 'black') sfxPlay('uno.wild', cue);
+  else sfxPlay('card.play', cue);
 
   /* UNO 判定：出牌后剩 1 张且事前未声明 → 罚摸 2 张 */
   if (p.hand.length === 1) {
     if (!p.uno) {
       this.giveCards(p, 2);
+      sfxPlay('uno.penalty', {vol:cue.vol,delay:.18});
       this.toast(p.name + ' 没喊 UNO，罚摸 2 张！');
     } else {
       this.toast(p.name + ' 喊出了 UNO！');

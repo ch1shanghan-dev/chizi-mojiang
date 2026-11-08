@@ -90,14 +90,24 @@ check('六类技能齐备且触发点 / mod 分类正确', (() => {
 /* ---------- T2 助战·摸牌 ---------- */
 {
   const h = harness(ID('T2_draw_once'), 'B'), s = h.skills.t2;
-  const e = { player: h.me, targets: [{}] };
-  check('T2 首次命中 filter 通过', s.filter(e, h.me) === true);
+  const e = { player: h.me, targets: [{}], card: { name: 'sha' } };
+  let damage = [];
+  h.me.hasHistory = (kind, predicate) => kind === 'sourceDamage' && damage.some(predicate);
   await s.content({}, e, h.me);
-  check('T2 首次命中摸 1 张', h.calls.draw === 1, h.calls.draw);
-  check('T2 第二次不再摸牌', s.filter({ player: h.me, targets: [{}] }, h.me) === false);
-  await s.content({}, { player: h.me, targets: [{}] }, h.me);
-  check('T2 content 第二次不生效', h.calls.draw === 1);
-  check('T2 未命中（无目标）不触发', s.filter({ player: h.me, targets: [] }, h.me) === false);
+  check('T2 已指定目标但未造成伤害，不摸牌也不消耗次数', !s.filter(e, h.me) && h.calls.draw === 0);
+  damage = [
+    { num: 1, card: e.card, getParent: () => ({}) },
+    { num: 0, card: e.card, getParent: () => e },
+    { num: 1, card: {}, getParent: () => e }
+  ];
+  check('T2 排除其他用牌、其他技能和零伤害', !s.filter(e, h.me));
+  damage.push({ num: 1, card: e.card, getParent: name => name === 'useCard' ? e : null });
+  check('T2 首张确实造成伤害的牌可触发', s.filter(e, h.me) === true);
+  await s.content({}, e, h.me);
+  check('T2 首次用牌造成伤害后摸 1 张', h.calls.draw === 1, h.calls.draw);
+  check('T2 第二次不再摸牌', s.filter(e, h.me) === false);
+  await s.content({}, e, h.me);
+  check('T2 重复内容回调不生效', h.calls.draw === 1);
 }
 /* ---------- T3 共谋·手牌（持续型） ---------- */
 {
@@ -121,14 +131,18 @@ check('六类技能齐备且触发点 / mod 分类正确', (() => {
 /* ---------- T5 接应·响应 ---------- */
 {
   const h = harness(ID('T5_response_once'), 'B'), s = h.skills.t5;
-  const e = { player: h.me };
-  check('T5 首次需要响应 filter 通过', s.filter(e, h.me) === true);
   let finished = false;
-  e.finish = () => { finished = true; };
+  const card = {name:'wanjian'};
+  const e = { player:h.me, respondTo:[h.other,card], getParent:()=>({name:'wanjian',card,target:h.me}),
+    finish:()=>{finished=true;} };
+  const skillPrompt={...e,getParent:()=>({name:'other_skill',card,target:h.me})};
+  await s.content({},skillPrompt,h.me);
+  check('T5 不劫持要读取实体牌的技能响应', !s.filter(skillPrompt,h.me)&&!skillPrompt.result);
+  check('T5 首次应对标准锦囊 filter 通过', s.filter(e, h.me) === true);
   await s.content({}, e, h.me);
   check('T5 视为已响应 1 次且结束本次选择', e.result.bool === true && Array.isArray(e.result.cards) && finished);
   check('T5 不伪造具体牌', e.result.cards.length === 0 && h.calls.draw === 0);
-  check('T5 第二次不再触发', s.filter({ player: h.me }, h.me) === false);
+  check('T5 第二次不再触发', s.filter(e, h.me) === false);
 }
 /* ---------- T6 回护·回复 ---------- */
 {
@@ -172,13 +186,19 @@ check('六类技能齐备且触发点 / mod 分类正确', (() => {
 }
 {
   const h = harness(ID('T2_draw_once'), 'B');
-  const e = { player: h.me, targets: [{}] };
+  const e = { player: h.me, card: { name: 'sha' } };
+  h.me.hasHistory = (kind, predicate) => kind === 'sourceDamage' &&
+    predicate({ num: 1, card: e.card, getParent: () => e });
   await h.skills.t2.content({}, e, h.me);
   check('六类全程零钱包 / 零存储 / 零 CBY 调用',
     h.calls.wallet === 0 && h.calls.storage === 0 && !h.calls.log.some(t => /CBY/.test(t)), h.calls);
 }
 
 /* ---------- 助战接线静态断言 ---------- */
+const bootstrapSrc=fs.readFileSync(path.join(root,'main/bootstrap.js'),'utf8');
+check('宿主启动入口真实加载数据、运行态和技能模块',
+  ['csh_spirit_buffs.js','csh_spirit_buff_runtime.js','csh_spirit_buff_skills.js'].every(name=>
+    bootstrapSrc.includes('import "../core/'+name+'";')));
 check('六类技能经 CSHSpiritBuffSkills.create 注入并 addGlobalSkill 注册',
   /SBM\.create\(\{/.test(auxSrc) && /for\(const bk of \['t1','t2','t5','t6','t3','t4'\]\)/.test(auxSrc) &&
   /game\.addGlobalSkill\('csh_spirit_buff_'\+bk\)/.test(auxSrc));

@@ -1681,11 +1681,12 @@ function doPlay(p, cards, cls) {
   game.passCount = 0;
   game.plays[p] = (game.plays[p] || 0) + 1;
   if (p === 0) { selIds = []; hintIdx = 0; }
-  if (cls.type === 'rocket') sfxPlay('ddz.rocket');
-  else if (isBombType(cls.type)) sfx.bomb();
-  else if (cls.type.indexOf('plane') === 0) sfxPlay('ddz.plane');
-  else if (cls.type === 'straight' || cls.type === 'pairs') sfxPlay('ddz.straight');
-  else sfx.play();
+  var cue = {vol:p===0?1:.67};
+  if (cls.type === 'rocket') sfxPlay('ddz.rocket', cue);
+  else if (isBombType(cls.type)) sfxPlay('bomb', cue);
+  else if (cls.type.indexOf('plane') === 0) sfxPlay('ddz.plane', cue);
+  else if (cls.type === 'straight' || cls.type === 'pairs') sfxPlay('ddz.straight', cue);
+  else sfxPlay('card.play', cue);
   /* 倍数链（§4.4）：炸弹 / 王炸 各 ×2 */
   if (cls.type === 'bomb') bumpMult('炸弹');
   else if (cls.type === 'rocket') bumpMult('王炸');
@@ -1700,7 +1701,7 @@ function doPass(p) {
   if (!alive || game.phase !== 'play' || game.over || game.turn !== p || !game.lastPlay) return false;
   game.actions[p] = { pass: true };
   game.passCount++;
-  sfx.pass();
+  sfxPlay('card.pass', {vol:p===0?1:.55});
   logLine(game.names[p] + ' 不出');
   if (game.passCount >= 2) {
     var leader = game.lastPlay.player;

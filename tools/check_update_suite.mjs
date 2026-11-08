@@ -57,8 +57,9 @@ run('release-check', ['tools/release.js', '--check']);
 run('catalog-worktree', ['tools/catalog_git_bytes.mjs', '--worktree', '--out', path.join(out, 'worktree.json')]);
 if (rev) run('catalog-rev', ['tools/catalog_git_bytes.mjs', '--rev', rev, '--out', path.join(out, 'rev.json')]);
 
-/* ---------- 9 个更新/备份专项 ---------- */
+/* ---------- 发布元数据、更新与备份专项 ---------- */
 const probes = [
+	'probe_update_release_metadata_20261108.mjs',
 	'probe_update_transaction.mjs',
 	'probe_update_deferred_20261105.mjs',
 	'probe_update_cancel_pending_20261105.mjs',

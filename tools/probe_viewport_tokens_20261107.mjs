@@ -70,10 +70,9 @@ check('方案 §4.1 列出四档视口', /vp-desktop/.test(design) && /vp-wide/.
 /* 方案 §4.1 说「330/500/760 混用」，实测全仓原有 **24 种** max-height/max-width 断点值。
    一次性收敛会同时改动十几页布局、必须逐页比对截图，风险远大于单轮收益。
    按项目 B11 的基线策略：把现状固化成白名单，先锁住「不扩散」，逐值收敛按批推进。
-   I1（2026-11-08）已把 height:430 的 21 处 max + 1 处配对 min 整批收敛到 500，
-   白名单同步收缩一项：430 不再允许出现，新增任何基线外数值仍会判红。 */
+   height:430 与 width:899 已收敛。白名单同步收缩，新增基线外数值会判红。 */
 const BASELINE = new Set([330, 340, 350, 400, 420, 440, 450, 480, 500, 520, 540, 559, 560,
-  600, 620, 640, 720, 750, 760, 899, 1000, 1199, 599]);
+  600, 620, 640, 720, 750, 760, 1000, 1199, 599]);
 function scanBreaks(text) {
   const out = [];
   const re = /\(\s*max-(?:height|width)\s*:\s*(\d+)px/g;
@@ -105,11 +104,12 @@ const found = new Map();
 for (const f of files) for (const v of scanBreaks(f.text)) found.set(v, (found.get(v) || 0) + 1);
 check('全仓 @media 断点不越过基线（禁止新增随意数值）',
   [...found.keys()].every(v => BASELINE.has(v)), [...found.keys()].filter(v => !BASELINE.has(v)));
-check('基线恰为实测的 23 种历史断点，三档主值都在其中',
-  BASELINE.size === 23 && found.get(330) > 0 && found.get(500) > 0 && found.get(760) > 0,
+check('基线恰为实测的 22 种历史断点，三档主值都在其中',
+  BASELINE.size === 22 && found.get(330) > 0 && found.get(500) > 0 && found.get(760) > 0,
   { size: BASELINE.size, found: [...found.keys()].length });
 const minFound = new Map();
 for (const f of files) for (const v of scanMinBreaks(f.text)) minFound.set(v, (minFound.get(v) || 0) + 1);
+check('width:899 与反向 width:900 均已收敛', !found.has(899) && !files.some(f => /\(\s*min-width\s*:\s*900px/.test(f.text)));
 /* 反向规则有两种合法写法：同值重叠（min:500 / max:500）与互补不重叠
    （min:641 / max:640、min:441 / max:440）。两者都必须落到 max 侧已有值上。 */
 check('min-height 反向规则必须与 max-height 同值或互补(v-1)配对',

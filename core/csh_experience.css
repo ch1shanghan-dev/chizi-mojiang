@@ -109,3 +109,16 @@ body.csh-experience :is(.btn,.seg-btn,.aclaim):focus-visible{outline:2px solid v
 /* Header settings use static layout: their old absolute image frame must not cover the title. */
 #csh-dbg-panel.csh-art-sample[data-view] #csh-dbg-head>button.csh-art-primary::before,#csh-dbg-panel.csh-art-sample[data-view] #csh-dbg-head>button.csh-art-primary::after{display:none!important}
 #csh-dbg-panel.csh-art-sample[data-view] #csh-dbg-head>button{flex:0 0 auto!important;width:auto!important;transform:none!important}
+
+/* 妖灵助战沿用宿主的标记与弹层定位，牌桌空闲时只显示一枚「灵」。 */
+.csh-aux-status-mark:focus-visible{outline:2px solid #f1d48b;outline-offset:2px}
+.csh-aux-status-mark:is([data-csh-aux-status="dead"],[data-csh-aux-status="owner-dead"],[data-csh-aux-status="ended"]){filter:saturate(.35)}
+#window>.dialog.csh-aux-status-dialog{animation:none;transition:opacity .15s}
+.csh-aux-status-dialog .csh-aux-status-panel{position:relative;display:grid;gap:7px;padding:8px 12px 12px;text-align:left;font:calc(13px * var(--csh-aux-scale,1))/1.5 system-ui,sans-serif;color:inherit}
+.csh-aux-status-panel :is(div,strong,span,details,summary,p){position:static}
+.csh-aux-status-title{font-size:calc(15px * var(--csh-aux-scale,1))}
+.csh-aux-status-panel .csh-aux-status-counts{position:static;display:flex;gap:6px;flex-wrap:wrap}
+.csh-aux-status-counts span{padding:3px 7px;border:1px solid currentColor;border-radius:5px;white-space:nowrap}
+.csh-aux-status-counts .depleted{opacity:.65}
+.csh-aux-status-panel summary{min-height:calc(46px * var(--csh-aux-scale,1));align-content:center;cursor:pointer}
+.csh-aux-status-panel p{margin:0}

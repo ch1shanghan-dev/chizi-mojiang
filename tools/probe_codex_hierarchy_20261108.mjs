@@ -61,7 +61,8 @@ function harness(overrides) {
     el(t, c, x) { const e = node(t); if (c) e.className = c; if (x != null) e.textContent = x; return e; },
     fmt(n) { return String(Math.round(Number(n) || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, ','); },
     affOf() { return { id: 'x', v: 0, level: 'D', levelName: '陌路', toNext: 2000 }; },
-    AFF: { gifts: [{ key: 'wine', name: '一杯烈酒', cost: 6000 }] },
+    affApi() { return {}; },
+    AFF: { gifts: [{ key: 'rare', cost: 30000 }, { key: 'wine', cost: 6000 }] },
     localStorage: { getItem() { return null; }, setItem(k, v) { writes.push([k, String(v)]); } },
     Bridge: { call(...a) { bridgeCalls.push(a); } },
     lib: { cshWallet: { pc() { walletCalls.push('pc'); return 0; } } }
@@ -112,18 +113,20 @@ function harness(overrides) {
   const txt = it => h.briefFor(it).map(x => x[1]).join(' | ');
   for (const [lv, name] of [['D', '陌路'], ['C', '点头'], ['B', '亲近'], ['A', '信赖'], ['S', '羁绊']]) {
     const s = txt({ id: 'x', affState: { level: lv, levelName: name, toNext: lv === 'S' ? 0 : 8000 } });
-    check('档位 ' + lv + ' 摘要含阶段与档位', s.includes(name) && s.includes(lv) && s.includes('当前关系'), s);
+    check('档位 ' + lv + ' 摘要展示玩家可读的阶段名', s.includes(name) && !s.includes(' · ' + lv) && s.includes('当前关系'), s);
   }
   check('未满档显示距下一阶且千分位', txt({ id: 'x', affState: { level: 'B', levelName: '亲近', toNext: 8000 } }).includes('距下一阶 8,000'));
   check('满档显示羁绊圆满，不显示误导性差额', txt({ id: 'x', affState: { level: 'S', levelName: '羁绊', toNext: 0 } }).includes('羁绊圆满'));
-  check('简明成本来自 AFF.gifts 唯一真值', txt({ id: 'x', affState: { level: 'D', levelName: '陌路', toNext: 2000 } }).includes('6,000 CBY'));
+  check('已讨伐展示真实最低礼价，未讨伐显示解锁条件',
+    txt({ id: 'x', n: 1 }).includes('6,000 CBY') &&
+    txt({ id: 'x', n: 0 }).includes('讨伐后可相处') && !txt({ id: 'x', n: 0 }).includes('CBY'));
   check('缺 affState 走 affOf 兜底不抛', txt({ id: 'x' }).includes('陌路'));
   check('空档案不抛且仍给中性摘要', txt(null).includes('陌路'));
   check('每次重绘清空旧内容，不累积重复节点', (() => {
     h.briefFor({ id: 'x', affState: { level: 'D', levelName: '陌路', toNext: 2000 } });
     const a = h.brief.children.length;
     h.briefFor({ id: 'x', affState: { level: 'B', levelName: '亲近', toNext: 8000 } });
-    return a === h.brief.children.length && a === 5;
+    return a === h.brief.children.length && a === 4;
   })());
   check('恶意档位名按纯文本写入，不解析 HTML', (() => {
     const s = txt({ id: 'x', affState: { level: 'B', levelName: '<img src=x onerror=alert(1)>', toNext: 1 } });

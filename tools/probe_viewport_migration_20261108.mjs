@@ -68,19 +68,20 @@ for (const f of files) {
   }
 }
 const allValues = new Set([...found.height.keys(), ...found.width.keys()]);
-check('按轴实测：height 14 种 / width 13 种 / 合并 23 种（430 已整批收敛）',
-  found.height.size === 14 && found.width.size === 13 && allValues.size === 23,
+check('按轴实测：height 14 种 / width 12 种 / 合并 22 种（430 已整批收敛）',
+  found.height.size === 14 && found.width.size === 12 && allValues.size === 22,
   { height: found.height.size, width: found.width.size, union: allValues.size });
 const baseline = new Set(((vpProbe.match(/const BASELINE = new Set\(\[([\s\S]*?)\]\)/) || [])[1] || '')
   .split(',').map(s => Number(s.trim())).filter(Number.isFinite));
-check('与 E95X 基线 23 种逐项一致（两处口径同步收缩）',
-  baseline.size === 23 && allValues.size === baseline.size && [...allValues].every(v => baseline.has(v)),
+check('与 E95X 基线 22 种逐项一致（两处口径同步收缩）',
+  baseline.size === 22 && allValues.size === baseline.size && [...allValues].every(v => baseline.has(v)),
   { missingInBaseline: [...allValues].filter(v => !baseline.has(v)), missingInScan: [...baseline].filter(v => !allValues.has(v)) });
-check('全仓断点仍是 23 种，主值 330 / 500 / 760 仍在用',
+check('全仓断点仍是 22 种，主值 330 / 500 / 760 仍在用',
   (found.height.get(330) || []).length > 0 && (found.height.get(500) || []).length > 0 &&
   (found.width.get(760) || []).length > 0);
 check('已收敛的 430 不再出现在全仓扫描里，但仍在迁移表中留作历史依据',
   !allValues.has(430) && V.migrationOf(430, 'height').to === 500);
+check('width:899 已收敛到 1000', !found.width.has(899) && V.migrationOf(899, 'width').to === 1000);
 
 /* ---------- 3. 映射完备性与自洽 ---------- */
 {

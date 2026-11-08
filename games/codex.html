@@ -154,22 +154,6 @@ body.empty .foot{display:none}
 #empty .e2{font-size:var(--pfs-md2);letter-spacing:.08em;color:var(--ink-dim);line-height:1.9;max-width:560px}
 #empty .eline{width:150px;height:1px;background:linear-gradient(90deg,transparent,var(--line),transparent)}
 
-/* ---------- 窄屏：上下堆叠 ---------- */
-@media (max-width:720px){
-  #app{padding:8px 10px 6px 16px}
-  .topbar{padding-right:190px}
-  .brand{font-size:var(--pfs-xl)}
-  .main{flex-direction:column;gap:8px}
-  .rolodexwrap{flex:0 0 auto}
-  .rolodex{flex-direction:row;overflow-x:auto;overflow-y:hidden;gap:8px;padding:0 0 6px}
-  .gitem{flex:0 0 auto;min-width:136px}
-  .dossier{flex-direction:column}
-  .dstage{flex:0 0 40%}
-  .dstage::after{box-shadow:inset 0 -40px 60px -30px rgba(25,21,18,.95)}
-  .dname{font-size:var(--pfs-2xl)}
-  .dinfo{padding:11px 12px 10px}
-  .dfacts{padding-top:0}
-}
 @media (max-height:500px){
   .foot{display:none}
 }
@@ -408,20 +392,26 @@ body.empty .foot{display:none}
  .stats .stat:first-child{display:none}
  .dinfo{padding:10px 12px;gap:6px}
 }
-@media(max-width:1000px) and (orientation:landscape){
- .main,.dossier{flex-direction:row}
- .dstage{flex:0 0 32%}
- .dstage::after{box-shadow:inset -40px 0 60px -30px rgba(25,21,18,.95)}
+/* 横屏人物与关系栏分开成册。名录展开时只挤占立绘一侧。 */
+.dossier{gap:10px;border:0;border-radius:0;background:none;box-shadow:none}
+.dstage,.dinfo{border:1px solid var(--line);border-radius:12px}
+.dstage{flex:1 1 auto;min-width:0}
+.dinfo{flex:0 0 43%;background:linear-gradient(150deg,var(--panel2),var(--bg2))}
+.dstage::after{box-shadow:none}
+body[data-csh-collection="codex"] .dstage .dhead{position:absolute;z-index:1;inset:auto 0 0;align-items:center;justify-content:space-between;flex-wrap:nowrap;padding:26px 10px 8px;background:linear-gradient(transparent,rgba(15,12,11,.96))}
+.didentity{min-width:0}
+body[data-csh-collection="codex"] .dstage .dname{color:#fff3d5;overflow-wrap:anywhere}
+body[data-csh-collection="codex"] .dstage .dtag{color:#ead8af}
+#codex-skin-open{flex:none;min-width:62px;min-height:44px}
+@media(max-width:1000px){
+ .dossier{gap:6px}
+ .dstage{flex:0 0 39%}
+ .dinfo{flex:1 1 auto;padding:8px 10px}
+ .codex-roster-open .dstage{flex-basis:32%}
 }
 @media(max-width:600px){
  .stats{display:none}
  .topbar{gap:8px}
-}
-@media(max-width:1000px) and (orientation:portrait){
- .main{flex-direction:column}
- .codex-roster-open .rolodexwrap{flex:0 0 148px;max-width:none}
- .dossier{flex-direction:column}
- .dstage{flex:0 0 36%}
 }
 /* 助战增益（只读展示）：不新增断点，沿用 collection-details 的折叠与触控尺寸 */
 #spirit-buff-body{display:flex;flex-direction:column;gap:6px;padding:2px 0 0}
@@ -442,15 +432,16 @@ body.empty .foot{display:none}
 #bond-brief{display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px;flex:none;padding:8px 10px;border-radius:8px;border:1px solid rgba(216,189,122,.20);font-size:var(--pfs-sm,12px);line-height:1.5;color:var(--ink-dim,#c6c9bc);box-shadow:inset 0 1px 0 rgba(255,255,255,.05);background-image:linear-gradient(90deg,transparent,rgba(216,189,122,.34) 22%,rgba(216,189,122,.34) 78%,transparent),linear-gradient(180deg,rgba(216,189,122,.07),transparent);background-size:100% 1px,100% 100%;background-position:top left,top left;background-repeat:no-repeat,no-repeat}
 #bond-brief .bb-k{letter-spacing:.12em;color:var(--gold,#d9bd7d)}
 #bond-brief .bb-v{color:var(--ink,#eee6d5)}
-#bond-brief .bb-next,#bond-brief .bb-act,#bond-brief .bb-cost{font-family:var(--ff-num,"Times New Roman",serif)}
+#bond-brief .bb-next,#bond-brief .bb-cost{font-variant-numeric:tabular-nums}
 @media(max-height:340px){#bond-brief{display:none}}
-/* PF-08 第二批：分区导航只收拢低频详情，主操作 affbox 与增益面板常驻 */
-.dnav{display:flex;gap:6px;flex:none}
+/* 分区切换直接显示当前页；矮横屏沿用一栏滚动。 */
+.dnav{display:flex;gap:6px;flex:none;position:sticky;top:-1px;z-index:3;background:var(--panel2)}
 .dnav[hidden]{display:none}
-.dnav .dnav-tab{flex:0 0 auto;min-height:44px;min-width:64px;padding:6px 12px;font:inherit;font-size:var(--pfs-sm,12px);color:var(--ink-dim,#c6c9bc);border:1px solid var(--line-2,#776c52);border-radius:7px;background:rgba(0,0,0,.22);cursor:pointer}
-.dnav .dnav-tab[aria-selected="true"]{border-color:var(--gold,#d9bd7d);background:rgba(216,189,122,.16);color:#fff0bd}
+.dnav .dnav-tab{flex:1 1 0;min-height:44px;min-width:44px;padding:6px 4px;font:inherit;font-size:var(--pfs-sm,12px);color:var(--ink-dim,#c6c9bc);border:1px solid var(--line-2,#776c52);border-radius:7px;background:rgba(0,0,0,.22);cursor:pointer}
+.dnav .dnav-tab[aria-pressed="true"]{border-color:var(--gold,#d9bd7d);background:rgba(216,189,122,.16);color:#fff0bd}
 .dnav .dnav-tab:focus-visible{outline:2px solid var(--gold,#d9bd7d);outline-offset:-2px}
-.dinfo details[hidden]{display:none}
+#codex-relationship{display:flex;flex-direction:column;gap:6px}
+#codex-relationship[hidden],.dinfo details[hidden]{display:none}
 @media(max-height:340px){.dnav{display:none}}
 </style>
 <link rel="stylesheet" href="../core/csh_collection.css">
@@ -471,24 +462,22 @@ body.empty .foot{display:none}
       <div class="dstage">
         <img id="dimg" alt="">
         <div class="dph" id="dph"></div>
+        <div class="dhead">
+          <div class="didentity"><div class="dname" id="dname">—</div><div class="dtag" id="dtag"></div></div>
+          <button class="affbtn" id="codex-skin-open" type="button">装扮</button>
+        </div>
       </div>
       <div class="dinfo">
-        <div class="dhead">
-          <div class="dname" id="dname">—</div>
-          <div class="dtag" id="dtag"></div>
-          <button class="affbtn" id="codex-skin-open" type="button" style="margin-left:auto;min-width:66px;min-height:44px">装扮</button>
-        </div>
-        <!-- PF-08：首屏一条紧凑关系摘要，帮助玩家决定下一步；不新增按钮、不写存档 -->
-        <div class="bond-brief" id="bond-brief"></div>
-        <!-- PF-08 第二批：低频详情分区导航。affbox（好感/互动）与增益面板常驻，
-             导航只收拢低频 details；矮横屏隐藏导航并全部展开，保证可用性。 -->
-        <nav class="dnav" id="dnav" role="tablist" aria-label="人物档案分区">
-          <button type="button" class="affbtn dnav-tab" data-section="relation" role="tab" aria-selected="true">相处</button>
-          <button type="button" class="affbtn dnav-tab" data-section="memory" role="tab" aria-selected="false">记忆</button>
-          <button type="button" class="affbtn dnav-tab" data-section="archive" role="tab" aria-selected="false">档案</button>
+        <nav class="dnav" id="dnav" aria-label="人物档案分区">
+          <button type="button" class="affbtn dnav-tab" data-section="relation" aria-pressed="true" aria-controls="codex-relationship">相处</button>
+          <button type="button" class="affbtn dnav-tab" data-section="memory" aria-pressed="false" aria-controls="character-story character-echo">记忆</button>
+          <button type="button" class="affbtn dnav-tab" data-section="archive" aria-pressed="false" aria-controls="character-records">档案</button>
         </nav>
-        <div class="affbox" id="affbox"></div>
-        <details class="collection-details" id="spirit-buff" hidden><summary>助战增益</summary><div id="spirit-buff-body"></div></details>
+        <section id="codex-relationship" aria-label="当前关系与互动">
+          <div class="bond-brief" id="bond-brief"></div>
+          <div class="affbox" id="affbox"></div>
+          <details class="collection-details" id="spirit-buff" hidden><summary>助战增益</summary><div id="spirit-buff-body"></div></details>
+        </section>
         <details class="collection-details" id="character-story" data-section="memory"><summary>人物小传与题壁</summary>
         <!-- 花榜·魁首题壁（v2.2）：该只妖灵的魁首（累计缠头第一）留的那句话。
              样式用行内：本页 <style> 里没有稳定的插入锚点，避免为四条装饰属性去动大段 CSS。 -->
@@ -764,9 +753,7 @@ function renderSpiritBuff(it) {
   body.appendChild(el("div", "sbnote", "仅作展示，不写入存档、不产生池子币；当前好感 " + (st && st.levelName ? st.levelName : level) + "。"));
 }
 
-/* PF-08 第二批（2026-11-08）：低频详情分区导航。
-   affbox（好感/互动）与 spirit-buff（增益）常驻，不受分区影响；
-   极矮横屏隐藏导航并展开全部详情，保证关键内容始终可达。纯表现层，不写存档。 */
+/* 记忆与档案直接显示在右栏顶部。极矮横屏省去导航，沿用一栏滚动。 */
 var DNAV_SECTIONS=["relation","memory","archive"],dnavSection="relation";
 function applySection(key){
   if(DNAV_SECTIONS.indexOf(key)<0)key="relation";
@@ -774,10 +761,12 @@ function applySection(key){
   var compact=!!(window.matchMedia&&window.matchMedia("(max-height:340px)").matches);
   var nav=$("#dnav");
   if(nav)nav.hidden=compact;
+  var relation=$("#codex-relationship");
+  if(relation)relation.hidden=!compact&&key!=="relation";
   var details=document.querySelectorAll(".dinfo details[data-section]");
   for(var i=0;i<details.length;i++)details[i].hidden=!compact&&details[i].getAttribute("data-section")!==key;
   if(nav){var tabs=nav.querySelectorAll("[data-section]");
-    for(var j=0;j<tabs.length;j++)tabs[j].setAttribute("aria-selected",String(tabs[j].getAttribute("data-section")===key));}
+    for(var j=0;j<tabs.length;j++)tabs[j].setAttribute("aria-pressed",String(tabs[j].getAttribute("data-section")===key));}
   return key;
 }
 
@@ -804,11 +793,17 @@ function renderBondBrief(it){
   var st=(it&&it.affState)||affOf(it&&it.id),lv=st&&typeof st.level==="string"?st.level:"D";
   box.textContent="";
   box.appendChild(el("span","bb-k","当前关系"));
-  box.appendChild(el("span","bb-v",(st&&st.levelName?st.levelName:"陌路")+" · "+lv));
+  box.appendChild(el("span","bb-v",st&&st.levelName?st.levelName:"陌路"));
   if(lv==="S")box.appendChild(el("span","bb-next","羁绊圆满"));
   else if(st&&typeof st.toNext==="number"&&st.toNext>0)box.appendChild(el("span","bb-next","距下一阶 "+fmt(st.toNext)));
-  box.appendChild(el("span","bb-act","可行动：招呼 / 交谈 / 赠礼"));
-  if(AFF.gifts&&AFF.gifts.length)box.appendChild(el("span","bb-cost","礼自 "+fmt(AFF.gifts[0].cost)+" CBY 起"));
+  if(!it||!(it.n>0)){
+    box.appendChild(el("span","bb-act","讨伐后可相处"));
+    return;
+  }
+  var cost=(AFF.gifts||[]).reduce(function(min,g){
+    return g&&Number.isFinite(g.cost)&&g.cost>0?Math.min(min,g.cost):min;
+  },Infinity);
+  if(affApi()&&Number.isFinite(cost))box.appendChild(el("span","bb-cost","赠礼 "+fmt(cost)+" CBY 起"));
 }
 
 function refreshAff(id) {
@@ -882,6 +877,7 @@ function renderAff(it) {
   if (st.mood === "cool") meta.appendChild(el("div", "grow", "久未相见"));
   box.appendChild(meta);
 
+  var hunted = it.n > 0;
   /* ---------- 她说的话 ---------- */
   var say = el("div", "affsay");
   var sp = (AFF.say && AFF.say.id === it.id) ? AFF.say : null;
@@ -889,17 +885,16 @@ function renderAff(it) {
     say.className = "affsay " + (sp.tone || "good");
     if (sp.up) say.appendChild(el("div", "up", sp.up));
     if (sp.line) say.appendChild(el("div", "ln", "\u201C" + sp.line + "\u201D"));
-  } else {
+  } else if (hunted) {
     say.className = "affsay idle";
-    say.appendChild(el("div", "ph", "点下面的按钮，听她说话。"));
+    say.appendChild(el("div", "ph", "可以先打个招呼。"));
   }
-  box.appendChild(say);
+  if (say.childNodes.length) box.appendChild(say);
 
   /* ---------- 互动（v6.5：直接画锁定态，不再"点了才知道"） ---------- */
   /* v6.7（2026-10-16 晚 · 作者："未讨伐的妖灵不能进行互动；金鳞市仍可购买"）：
      未讨伐前互动面板整体锁定——参考成熟收集类做法：**面板不隐藏**（保留收集目标感），
      但全部按钮置灰 + 明示解锁条件；宿主侧 csh_affection.interact/gift 同锁（单一出口）。 */
-  var hunted = !!(it.n > 0);
   if (!hunted) {
     var lockRow = el("div", "afflock", "🔒 未讨伐 · 先到「挑战模式」击破她，才能开始互动");
     /* 2026-10-17 · 指定讨伐令（A 方案 · 1000 CBY）：**就地复用这条锁定行**放一颗悬赏按钮
@@ -1106,7 +1101,7 @@ function previewGift(id,key){
     if(seq!==AFF.giftQuoteSeq||!current||current.id!==id||count!==AFF.quantity||!CSHPage.saveAllowed())return;
     if(!ok||!q||q.ok!==true){giftStatus(id,q&&q.reason==="max"?"羁绊已满，无需再送礼。":"暂时无法报价，请刷新后重试。");return;}
     AFF.giftPending=Object.assign({},q,{cid:"gift-"+Date.now().toString(36)+"-"+Math.random().toString(36).slice(2,12)});
-    var it=Data.items[Data.cur];if(it&&it.id===id){renderAff(it);var button=document.getElementById("aff-gift-confirm");if(button){button.focus({preventScroll:true});button.scrollIntoView({block:"nearest"});}}
+    var it=Data.items[Data.cur];if(it&&it.id===id){renderAff(it);var button=document.getElementById("aff-gift-confirm");if(button&&button.getClientRects().length){button.focus({preventScroll:true});button.scrollIntoView({block:"nearest"});}}
   }
   if(A&&typeof A.giftQuote==="function"){try{var q=A.giftQuote(id,key,count);done(q&&q.ok===true,q);return;}catch(e){done(false,null);return;}}
   Bridge.call("shell-aff-do",{id:id,act:"gift-quote",gift:key,quantity:count},done);
@@ -1419,8 +1414,14 @@ var dnav=$("#dnav");
 if(dnav)dnav.addEventListener("click",function(e){
   var n=e.target;
   while(n&&n!==dnav&&(!n.getAttribute||!n.getAttribute("data-section")))n=n.parentNode;
-  if(n&&n!==dnav)applySection(n.getAttribute("data-section"));
+  if(n&&n!==dnav){
+    applySection(n.getAttribute("data-section"));
+    $(".dinfo").scrollTop=0;
+  }
 },false);
+var compactSections=window.matchMedia("(max-height:340px)");
+if(compactSections.addEventListener)compactSections.addEventListener("change",function(){applySection(dnavSection);});
+else if(compactSections.addListener)compactSections.addListener(function(){applySection(dnavSection);});
 applySection("relation");
 
 function select(idx) {

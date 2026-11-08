@@ -91,6 +91,7 @@
 			T(196, "sawtooth", 0.34, 0.12, 0.22, 150),     // womp ② 下坠
 			T(98, "sine", 0.40, 0.13, 0.22, 62),           // 低音垫
 		],                                                                                            // 失败（womp womp 滑落）
+		"settle.push": [T(285, "sine", 0.13, 0.075, 0, 232), N(0.07, 1900, 1.0, 0.047, 0.04)],
 		"badge": [T(660, "triangle", 0.12, 0.11, 0, 880), T(990, "triangle", 0.16, 0.10, 0.10, 1320)],
 		"sign": [T(659, "triangle", 0.10, 0.10), T(880, "triangle", 0.10, 0.10, 0.09), T(1319, "triangle", 0.22, 0.10, 0.18)], // 签到叮咚（三连上行）
 		"quota": [T(200, "square", 0.16, 0.10, 0, 150), T(160, "square", 0.18, 0.08, 0.14, 120)],
@@ -172,6 +173,8 @@
     'uno.reverse':[T(480,'sine',.14,.065,0,760),T(760,'sine',.16,.055,.10,380)],
     'uno.skip':[N(.03,1200,1,.07),T(360,'triangle',.07,.05,.04)],
     'uno.draw':[N(.05,2200,.7,.08),N(.05,2500,.7,.07,.08),T(440,'sine',.12,.045,.10)],
+    'uno.wild':[N(.085,2000,.8,.065,0,3300),T(470,'triangle',.11,.045,0,720)],
+    'uno.penalty':[T(240,'sine',.13,.065,0,150),N(.11,1550,.8,.075,.045)],
     'ddz.straight':[N(.10,1800,.8,.08,0,3400),T(440,'triangle',.10,.045),T(660,'triangle',.15,.05,.08)],
     'ddz.plane':[N(.22,650,.8,.095,0,2200),T(180,'sine',.22,.07,0,420)],
     'assist.on':[T(440,'triangle',.08,.045),T(660,'sine',.12,.045,.075)],
@@ -291,10 +294,7 @@
 
 	/* ---------- AudioContext（§4.7.1「首次用户交互解锁」，移动端必须） ---------- */
 	function ctx() {
-		if (AC) {
-			if (AC.state === "suspended") { try { AC.resume(); } catch (e) {} }
-			return AC;
-		}
+		if (AC) return AC;
 		try {
 			var C = root.AudioContext || root.webkitAudioContext;
 			if (!C) { lastError = "no-audiocontext"; return null; }
@@ -330,10 +330,18 @@
 		} catch (e) { AC = null; master = null; lastError = "ctx-fail:" + (e && e.message); }
 		return AC;
 	}
+	function resume(c) {
+		if (c.state !== "suspended" && c.state !== "interrupted") return;
+		try {
+			var pending = c.resume();
+			if (pending && typeof pending.catch === "function") pending.catch(function () {});
+		} catch (e) {}
+	}
 	function unlock() {
+		if (isMuted() || (root.document && root.document.hidden)) return false;
 		var c = ctx();
 		if (!c) return false;
-		if (c.state === "suspended") { try { c.resume(); } catch (e) {} }
+		resume(c);
 		if (c.state === "running") unbindUnlock();
 		return c.state === "running";
 	}
@@ -415,7 +423,7 @@
 		if (!layers || !layers.length) return false;
 		var c = ctx();
 		if (!c) return false;
-		if (c.state === "suspended") { try { c.resume(); } catch (e) {} }
+		resume(c);
 		if (c.state !== "running") return false;   // 未解锁先静默，不做伪播放
     var gap = key==='ui.tap'? .035 : key==='win'||key==='lose'? .30 : key.indexOf('card.')===0||key==='chip.bet'? .025 : .015;
     if(recent[key]!=null && c.currentTime-recent[key]<gap)return false;
