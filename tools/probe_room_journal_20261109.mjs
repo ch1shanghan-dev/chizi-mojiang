@@ -187,7 +187,7 @@ check('无凭据 → none', R.decide(makeStorage(), makeWallet(200000)).action =
 }
 
 /* ---------- 快照校验 ---------- */
-check('牌值越界拒绝', R.validateShot({ deck: [52] }) !== '');
+check('牌值越界拒绝', R.validateShot({ deck: [64] }) !== '');
 check('牌堆重复拒绝', R.validateShot({ deck: [3, 3] }) !== '');
 check('牌堆超长拒绝', R.validateShot({ deck: new Array(53).fill(1) }) !== '');
 check('公共牌超过 5 张拒绝', R.validateShot({ community: [1, 2, 3, 4, 5, 6] }) !== '');
@@ -201,6 +201,17 @@ check('超限体积拒绝', (() => {
 })());
 check('合法快照通过', R.validateShot(shot()) === '');
 check('空快照通过（prepare 阶段允许无快照）', R.validateShot(null) === '');
+/* ★ 真实宿主抓到的两个致命误判：牌值域写成 0..51（真值 8..59）、
+   以及对多副牌的牌靴做去重。这两条都会让真实牌局快照整批被拒。 */
+check('★ 真实牌值域 8..59 全部接受',
+  R.validateShot({ s: { shoe: [8, 59, 20], hands: [{ cards: [59, 8] }], dealer: [12] } }) === '');
+check('★ 多副牌牌靴允许重复牌值',
+  R.validateShot({ s: { shoe: [8, 8, 8, 59, 59], hands: [], dealer: [] } }) === '');
+check('牌值越界（>59）仍拒绝',
+  R.validateShot({ s: { shoe: [64], hands: [], dealer: [] } }) !== '' &&
+  R.validateShot({ deck: [64] }) !== '');
+check('德州单副牌堆仍不许重复',
+  R.validateShot({ s: { deck: [12, 12], players: [], community: [] } }) !== '');
 
 /* ---------- 静态接线：迁移排除 ---------- */
 check('新本机键已登记进 csh_migrate EXCLUDED', /\["csh_room_v1",/.test(migrate));
@@ -285,14 +296,14 @@ check('同状态不重复写（渲染频繁，避免刷盘）', /text === lastRo
     ctx.newState = () => ({ hands: [], dealer: [], shoe: [], chips: 200000, phase: 'deal', activeHand: 0 });
     ctx.state = null;
     ctx.lastRoomJson = '';
-    ctx.roomSeq = 0;
+    ctx.roomSeq = 0; ctx.roomSeqKnown = false; ctx.lastRoomError = '';
     return ctx;
   }
 
   /* 造一副「已打到一半」的真实形态：8 副牌剩 300 张、两手、庄家两张、暗牌未开。 */
   function sampleState() {
     const shoe = [];
-    for (let i = 0; i < 300; i++) shoe.push(i % 52);
+    for (let i = 0; i < 300; i++) shoe.push(8 + (i % 52)); /* 真实牌值域 8..59，多副牌必有重复 */
     /* 牌靴允许重复（真牌靴就是重复的），但不允许越界 */
     return {
       shoe: shoe.reverse(), shoeSize: 416,
@@ -301,7 +312,7 @@ check('同状态不重复写（渲染频繁，避免刷盘）', /text === lastRo
       dealerBust: false, tableTotal: 583500, streak: 2, bet: 10000,
       hands: [
         { cards: [8, 21, 33], wager: 10000, fromSplit: false, done: false },
-        { cards: [5, 44], wager: 10000, fromSplit: true, doubled: true },
+        { cards: [11, 44], wager: 10000, fromSplit: true, doubled: true },
       ],
       dealer: [17, 30], phase: 'play', activeHand: 1, insuranceBet: 0,
       holeHidden: true, roundDelta: -2500, insDelta: 0,
@@ -379,7 +390,7 @@ check('同状态不重复写（渲染频繁，避免刷盘）', /text === lastRo
     });
     ctx.Bridge = { active: true, roomSave: () => {}, roomState: () => {} };
     ctx.entryUsed = false;
-    ctx.lastRoomJson = ''; ctx.roomSeq = 0;
+    ctx.lastRoomJson = ''; ctx.roomSeq = 0; ctx.roomSeqKnown = false;
     ctx.G = null;
     /* makeSession 会去抽世界席位，恢复路径里它的产物会被白名单整体覆盖 —— 桩掉即可。 */
     ctx.makeSession = () => ({ players: [], deck: [], community: [], buyIn: 0 });
@@ -392,7 +403,7 @@ check('同状态不重复写（渲染频繁，避免刷盘）', /text === lastRo
       seats: [{ id: 'csh_a', stake: 60000 }, { id: 'csh_b', stake: 75000 }, { id: 'csh_c', stake: 40000 }],
       gamble: false, handNo: 9, dealer: 2, sb: 200, bb: 400, level: 1,
       community: [12, 25, 38], pot: 8400, currentBet: 1600, minRaise: 1600, toAct: 0,
-      street: 'turn', deck: [3, 7, 11, 19, 27, 41, 44, 49], revealAll: false, winners: [],
+      street: 'turn', deck: [12, 17, 23, 31, 39, 47, 52, 58], revealAll: false, winners: [],
       over: false, sessionOver: false, winStreak: 2, minChips: 22000, noFoldStreak: 3,
       handCount: 9, topUps: 0, topUpTotal: 0, aiStakeTotal: 175000,
       ledger: { roundId: 'texas-sim-1:9', layers: [] }, conservationFailed: false,
@@ -401,7 +412,7 @@ check('同状态不重复写（渲染频繁，避免刷盘）', /text === lastRo
           hole: [14, 31], folded: false, allin: false, acted: false, out: false, persona: null,
           tag: '', reveal: true, skill: 1 },
         { id: 1, isHuman: false, name: '甲', surname: '甲', chips: 58000, bet: 0, contrib: 1600,
-          hole: [6, 22], folded: false, allin: false, acted: true, out: false, persona: 'rock',
+          hole: [10, 22], folded: false, allin: false, acted: true, out: false, persona: 'rock',
           tag: '稳', reveal: false, skill: 0.8, worldState: { mood: 1, fatigue: 0, form: 2 },
           worldId: 'csh_a', mult: 1, seed: 'csh_a' },
         { id: 2, isHuman: false, name: '乙', surname: '乙', chips: 71000, bet: 0, contrib: 0,

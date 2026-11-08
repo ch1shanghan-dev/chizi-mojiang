@@ -176,6 +176,63 @@ async function clickElement(expression, inFrame = false, allowDisabled = false) 
    用未改动的无名杀宿主 + 真实钱包 + 真实 localStorage + 真实 Page.reload，
    证明「扣款 → 落凭据 → 进程重启 → 判定续局 → 结算凭据可自证」这条链。
    不驱动牌桌 UI，也不碰玩家档：一次性 Chromium 档案里自行注资。 */
+/* ---------- 工作包 B · 完整玩家路径（2026-11-09） ----------
+   上一批验的是事务层（直接调 CSHRoom / settleRun），中间还缺一段：
+   收费入场 → iframe 真的开一桌 → 打一手 → 进程重载 → 重进同一张桌 →
+   页面自己通过 shell-room-state 恢复，且钱包只扣过一次。
+   这条跑通，P1「房间跨进程恢复」才算闭环。 */
+async function smokeRoomPlayerPath(){
+  const BUYIN=20000;
+  const frameReady='(()=>{const f=document.getElementById("csh-shell-frame");return !!(f&&f.contentDocument&&f.contentWindow&&f.contentWindow.__BJ&&f.contentWindow.__BJ.getState&&f.contentWindow.__BJ.getState());})()';
+  const hostReady='!!window.lib?.cshWallet && !!window.lib?.cshShell && typeof window.CSHRoom === "object"';
+  const snapshotExpr='(()=>{const f=document.getElementById("csh-shell-frame");const w=f&&f.contentWindow;return {shot:w.__BJ.roomShot(),pc:lib.cshWallet.wallet.pc(),phase:w.__BJ.getState().phase};})()';
+  stage('room-player-path-start',{buyIn:BUYIN});
+
+  await page.evaluate('(()=>{lib.cshWallet.wallet.add(300000,"isolated room path funding");lib.cshWallet.flushSave();return lib.cshWallet.wallet.pc();})()');
+  const pc0=await page.evaluate('lib.cshWallet.wallet.pc()');
+  const opened=await page.evaluate(`(()=>{const r=lib.cshShell.charge("blackjack",${BUYIN});return {r,isOpen:lib.cshShell.isOpen(),current:lib.cshShell.current()};})()`);
+  check('真实收费入口开桌成功',opened.r===true&&opened.isOpen===true&&opened.current==='blackjack',opened);
+  await until(frameReady,'廿一点 iframe 启动',15000);
+  const pc1=await page.evaluate('lib.cshWallet.wallet.pc()');
+  check('★ 入场只扣一次带入',pc1===pc0-BUYIN,{pc0,pc1,buyIn:BUYIN});
+
+  /* 打一手：startHand 会发牌并走 renderAll → saveRoom → 宿主写快照。 */
+  await page.evaluate(`(()=>{const f=document.getElementById("csh-shell-frame");f.contentWindow.__BJ.startHand();return true;})()`);
+  await delay(600);
+  const before=await page.evaluate(snapshotExpr);
+  const diag=await page.evaluate(`(()=>({raw:localStorage.getItem(window.CSHRoom.KEY),pageDiag:(()=>{const f=document.getElementById("csh-shell-frame");try{return f.contentWindow.__BJ.getRoomDiag();}catch(e){return String(e.message);}})(),metaRoom:lib.cshShell.META.blackjack.room,shellCurrent:lib.cshShell.current(),roomId:lib.cshShell.roomId&&lib.cshShell.roomId(),csRoom:typeof window.CSHRoom,saveGuard:!!lib.cshWallet.saveGuard&&lib.cshWallet.saveGuard.blocked(),frameActive:(()=>{const f=document.getElementById("csh-shell-frame");try{return !!(f&&f.contentWindow&&f.contentWindow.parent!==f.contentWindow);}catch(e){return "err";}})()}))()`);
+  check('开局后快照已落盘（宿主侧有 active 凭据）',
+    (()=>{try{const d=JSON.parse(diag.raw);return !!d&&d.phase==='active'&&!!d.shot&&d.shot.s.shoe.length>0;}catch(e){return false;}})(),diag);
+  check('快照含真实牌靴与手牌',before.shot&&before.shot.s&&before.shot.s.shoe.length>0&&before.shot.s.hands.length>0,before.shot&&{shoe:before.shot.s.shoe.length,hands:before.shot.s.hands.length});
+
+  /* 进程边界：宿主整体重载，iframe 一并销毁。 */
+  await reloadHost(hostReady,'重载宿主（模拟杀进程后重开）');
+  const pc2=await page.evaluate('lib.cshWallet.wallet.pc()');
+  check('重载后余额未被二次扣款',pc2===pc1,{pc1,pc2});
+  check('重载后本机仍留有房间凭据',
+    await page.evaluate('!!localStorage.getItem(window.CSHRoom.KEY)'));
+
+  /* 玩家重进同一张桌：走同一个收费入口，doCharge 应命中「已有未完成牌局」分支，
+     跳过扣款并给页面 mode=resume。 */
+  const reopened=await page.evaluate(`(()=>{const r=lib.cshShell.charge("blackjack",${BUYIN});return {r,current:lib.cshShell.current()};})()`);
+  check('重进同一张桌成功（未被要求重复入场）',reopened.r===true&&reopened.current==='blackjack',reopened);
+  await until(frameReady,'续局 iframe 启动',15000);
+  await delay(400);
+  const pc3=await page.evaluate('lib.cshWallet.wallet.pc()');
+  check('★ 重进不二次扣款（钱没有凭空少一份）',pc3===pc1,{pc1,pc3});
+
+  const after=await page.evaluate(snapshotExpr);
+  const same=JSON.stringify(before.shot)===JSON.stringify(after.shot);
+  check('★ 续局后页面状态与重载前完全一致（牌靴/手牌/筹码/阶段逐字段相等）',same,
+    {before:{shoe:before.shot.s.shoe.length,hands:before.shot.s.hands,chips:before.shot.s.chips,phase:before.shot.s.phase},
+     after:{shoe:after.shot.s.shoe.length,hands:after.shot.s.hands,chips:after.shot.s.chips,phase:after.shot.s.phase}});
+  check('恢复走的是 view-game 而不是开局页',
+    await page.evaluate('(()=>{const d=document.getElementById("csh-shell-frame").contentDocument;const v=d.getElementById("view-game");return !!v&&getComputedStyle(v).display!=="none";})()'));
+  const boot=await state();
+  check('完整玩家路径期间宿主无脚本错误与对话框',
+    !boot.diagnostics?.errors?.length&&!boot.diagnostics?.rejections?.length&&!boot.diagnostics?.dialogs?.length,boot.diagnostics);
+  stage('room-player-path-done',{same,pc0,pc1,pc2,pc3});
+}
 async function smokeRoomRecovery(){
   const ID='room-host-smoke-0001', AMOUNT=50000;
   stage('room-recovery-start',{id:ID,amount:AMOUNT});
@@ -627,6 +684,7 @@ try {
   }
   if (!recoveryBoot && current?.arena && current?.extensionLoaded && current?.character) {
     if(process.argv.includes('--world-layout-410'))await worldLayout410();
+    else if(process.argv.includes('--room-player-path'))await smokeRoomPlayerPath();
     else if(process.argv.includes('--room-smoke'))await smokeRoomRecovery();
     else if(process.argv.includes('--noncharacter-survey'))await surveyNoncharacter({page,out,snap,until,delay,clickElement,check,stage});
     else if(process.argv.includes('--ui-recovery')){await smokeExperience();await smokeUiRecovery();}

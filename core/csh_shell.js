@@ -2575,6 +2575,8 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 		isFeeOpen: function () { return !!document.getElementById(FEE_ID); },
 		current: function () { return current; },
 		buyIn: function () { return currentBuyIn; },
+		/* 只读诊断：房间凭据编号。宿主烟测用它区分「页面没发」还是「宿主没接」。 */
+		roomId: function () { return currentRoomId; },
 		walletSnapshot: walletSnapshot,
 		stats: buildStats,
 		/* 功勋上报（§G.6.2）：统一入口，签名与 csh_wallet.addMerit 一致 */

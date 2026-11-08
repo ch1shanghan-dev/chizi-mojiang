@@ -1,7 +1,7 @@
-/* 自动生成于 2026-11-08T22:19:27.034Z by tools/release.js —— hashes 对应 Git 发布字节，发版后 git push 即生效，勿手改 files */
+/* 自动生成于 2026-11-08T22:54:02.279Z by tools/release.js —— hashes 对应 Git 发布字节，发版后 git push 即生效，勿手改 files */
 window.extension = {
 	"池子魔将": {
-		"build": "22d383f29fd3a0f45a8293b6d73ecff7332af8139a10237c723a2f20400e3572",
+		"build": "5b772d8d3289104fbd8ce96584e1f1ebde406552d52d868612fee433137626d6",
 		"hashes": {
 			"LICENSE": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
 			"README.md": "41102b34ebc984b6b84b361baa0e78aa9defe5633a4a270cde6ed0ff7bc9ae4d",
@@ -342,12 +342,12 @@ window.extension = {
 			"core/csh_pots.js": "55f9ebd7cb5b707c196359f114cf84a93e465f4183d48f69bc1b555b80a1d8e6",
 			"core/csh_records.css": "ee8fbd0a69a575b98525b85ab6145c428d268fa1ff856567376acb7bef53684d",
 			"core/csh_registry.js": "d3d429039f6470e692130d4ba8c34871e8de9dd8befee87917f10e33a4d36ee5",
-			"core/csh_room.js": "cbb83ad2a4db11babd2c389f5642fae853c51b864e5ee20ec7116bfe55147ee1",
+			"core/csh_room.js": "ddb5631b8f08f2580ff0f0992530e0955d18d30e62b2fb6de356c636c481c7fb",
 			"core/csh_rules.js": "7ac7bc8227037d4ba9e4f2423f819255dcead54a0ef75f60289bb709183a9d7e",
 			"core/csh_seat_cooldown.js": "afa2cee9c7ebae30dac38221b00e807631e24e7e53070adfd5e90283a625a91e",
 			"core/csh_selftest.js": "14e4acf537174481382c84370af8264027ea46cd0544731650bf675e20019ac4",
 			"core/csh_sfx.js": "ac00add5dde431b00bbbadc82a948db74e5b15732b2e0c157c82dd5746e30292",
-			"core/csh_shell.js": "bbbcd09b94aee9d5676e1d7f4f2de384683ce8cc1419889d9ea49aa4956fc16b",
+			"core/csh_shell.js": "84fc1e6948f1b777f1f3556b3e2867d01a3152e9ded7a8d84f19bc7a7a5b2150",
 			"core/csh_spirit_buff_runtime.js": "b8d34cb0649f3e9d5f976ecd28fe1c73afd4d3a05bb0b1606c427a189b042e9e",
 			"core/csh_spirit_buff_skills.js": "bb2287e67a23803276e57aa3d4ee36f65d3bcfaa1b1090bd0174adede82c2d83",
 			"core/csh_spirit_buffs.js": "82bb7368c113cdbd7253b43e6e2b85145a05492e31d26ee3af47441c538499a3",
@@ -386,7 +386,7 @@ window.extension = {
 			"font/csh_fx_font_2.woff2": "ad894385b4e996e5f4b237cc6f5ead035237fb4c0cceaa603081ea63ab2b1da9",
 			"font/csh_fx_font_3.woff2": "d7ab0948a09d38fc75e71968e265385a124f98223c17d32dfe85e1aa3aadf51b",
 			"games/achv.html": "56d2e20cd20e7f295daceca08dde10915e7b63e17298ea0f4790835a7801d88e",
-			"games/blackjack/blackjack.html": "c5b16b3d0c8159b64a29b438a67f990db11f42f068ac051357f997c6012c1dcc",
+			"games/blackjack/blackjack.html": "3a2d058d914333ebd3c1ddd9e2f2a05f24b7992c8e59a57c463c37fe13f2a376",
 			"games/bossbook.html": "e467279dfe5e1a17f32e21cbcc9749233b454720a380e4abe33d9b63d8723a22",
 			"games/career.html": "115f63a1a08c01257876b017649b95b98e2b19db8dc6551acaa6f1ea4e962847",
 			"games/codex.html": "fccbe04d418f903b725210f9b0053d687fa6e1ff65237dfa8f58d400a7c7bd8b",
@@ -394,7 +394,7 @@ window.extension = {
 			"games/goldfish.html": "471d2dddf25d92e58b5fa9ddc6307169227befed38f39d9f3d55d9bf05c6f6bb",
 			"games/rank.html": "ab7c1bbd1aafd9ebc30583b2eae2c7fd5f36ca795350db88bf0892b5605c220e",
 			"games/save.html": "be722c5ad7a3e11a495721fb0da497797f7612d9414d667717c6d005a7853a86",
-			"games/texas/texas.html": "290aa405f7f73900473dabaaae5ea00eb9af68f427782aba4ff780b8c03b62f8",
+			"games/texas/texas.html": "bc31ecf18287e0206a6098292223b6aee56b7c478154fbe6505042fc874cac12",
 			"games/uno/uno.html": "49371f8f3f347f624777bcfd721193c07c94c3efc618029e8c098dfbac40d564",
 			"image/card/csh_ak47.png": "fa846a4792cafd9ea362156e8db924eff59edab9ef640410b02fcf975db3bf1d",
 			"image/card/csh_daju.png": "fedfdbb00a85fe11b35fcca3bdf1cb4395f1709984a02230fc0fd6df3539f189",

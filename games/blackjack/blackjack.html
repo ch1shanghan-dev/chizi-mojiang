@@ -1362,7 +1362,7 @@ try { CRD = (typeof window !== 'undefined' && window.CSH && window.CSH.cards) ? 
      ★ 白名单序列化，不用整包 Object.assign —— 存档里塞进来的未知字段
        不该有机会覆盖 state 上的任何东西。
      ============================================================ */
-  var roomSeq = 0, lastRoomJson = '';
+  var roomSeq = 0, lastRoomJson = '', roomSeqKnown = false, lastRoomError = '';
   var ROOM_KEYS = ['shoe', 'shoeSize', 'tier', 'hand', 'chips', 'dealerBank', 'dealerBankInit',
     'dealerBust', 'tableTotal', 'streak', 'bet', 'hands', 'dealer', 'phase', 'activeHand',
     'insuranceBet', 'holeHidden', 'roundDelta', 'insDelta', 'publicShoe'];
@@ -1389,8 +1389,11 @@ try { CRD = (typeof window !== 'undefined' && window.CSH && window.CSH.cards) ? 
     try { shot = roomShot(); if (!shot) return; text = JSON.stringify(shot); } catch (eS) { return; }
     if (text === lastRoomJson) return;       // 同一状态不重复写（渲染很频繁）
     lastRoomJson = text;
-    Bridge.roomSave(shot, roomSeq, function (ok, d) {
-      if (ok && d && Number.isSafeInteger(d.saveSeq)) roomSeq = d.saveSeq;
+    /* 序号未知时**不传** expectSeq：宿主仍按自己的 saveSeq 单调推进，
+     乐观锁只是防旧页面实例；为拿不到序号就让整桌快照永远写不进去，是本末倒置。 */
+  Bridge.roomSave(shot, roomSeqKnown ? roomSeq : null, function (ok, d) {
+      if (ok && d && Number.isSafeInteger(d.saveSeq)) { roomSeq = d.saveSeq; roomSeqKnown = true; lastRoomError = ''; }
+      else if (!ok) lastRoomError = (d && d.reason) || '宿主未应答';
     });
   }
 
@@ -2225,7 +2228,7 @@ function trapDialogKey(e, modal) {
             /* 宿主会告诉我们：这桌是不是还有一局没打完。有就接着打，绝不重新发牌。 */
             Bridge.roomState(function (ok, d) {
               runSceneTask(function () {
-                if (ok && d && Number.isSafeInteger(d.saveSeq)) roomSeq = d.saveSeq;
+                if (ok && d && Number.isSafeInteger(d.saveSeq)) { roomSeq = d.saveSeq; roomSeqKnown = true; }
                 if (ok && d && d.mode === 'resume' && d.shot && applyRoomShot(d.shot)) {
                   switchView('view-game');
                   renderAll();
@@ -2259,6 +2262,7 @@ function trapDialogKey(e, modal) {
     /* 房间快照的取证面：给隔离验证复现「存一份 → 重建 → 比对」用，
        不参与任何玩法逻辑，也不改变默认渲染行为。 */
     roomShot: roomShot, applyRoomShot: applyRoomShot,
+    getRoomDiag: function () { return { seq: roomSeq, known: roomSeqKnown, error: lastRoomError }; },
     getDealerSeat: function () { return dealerSeat; },
     setShoe: function (cards, size) {
       state.shoe = cards.slice();

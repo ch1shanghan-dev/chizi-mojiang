@@ -28,7 +28,9 @@
   var TABLE_RE = /^[a-z]{3,20}$/;
   var SHOT_MAX = 48 * 1024;          // 快照 JSON 上限；德州 ~60 字段实测 < 4KB
   var DECK_MAX = 52;
-  var CARD_MAX = 51;
+  /* 牌值真源：两桌的 newDeck() 都是 (rank<<2)|suit，rank=2..14 ⇒ 8..59。
+     不是 0..51 —— 那是按数组下标想当然写出来的，真实宿主里会整批拒收。 */
+  var CARD_MAX = 63;
 
   function fail(reason, extra) {
     var out = { ok: false, reason: reason };
@@ -105,7 +107,9 @@
     var s = shot.s;
     if (s != null) {
       if (typeof s !== 'object' || Object.prototype.toString.call(s) === '[object Array]') return '牌桌状态不是对象';
-      err = cardArray(s.shoe, 416, '牌靴', Object.create(null));
+      /* 廿一点是 4~8 副牌，同一个牌值在牌靴里出现多次是**正常**的。
+         这里只校验数量与值域，绝不做去重（去重会把整副牌靴判成损坏）。 */
+      err = cardArray(s.shoe, 416, '牌靴', null);
       if (err) return err;
       if (Object.prototype.toString.call(s.hands) === '[object Array]') {
         if (s.hands.length > 4) return '手牌路数过多';
