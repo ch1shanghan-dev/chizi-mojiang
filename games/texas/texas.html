@@ -22,6 +22,10 @@
 <script src="../../core/csh_selftest.js" data-csh-selftest="auto"></script>
 <script src="../../core/csh_page.js"></script>
 <script src="../../core/csh_registry.js"></script>
+<!-- 补码报价与状态转移（§3.1）。★ 2026-11-09 修正：本文件此前**从未被加载**，
+     于是 topUpApi() 恒为 null、补码按钮永远回「补码模块未就绪」——
+     宿主侧的 shell-topup 再正确也没用。页面与宿主各需一份，缺一不可。 -->
+<script src="../../core/csh_topup.js"></script>
 <!-- 结算账本（《德州结算逻辑与 UI 重构方案 v1.0》§3）：全扩展唯一的"钱怎么算"实现。
      牌力评估 + 底池分层 + 资格判定 + 平分余数 + 玩家账本 + 守恒校验都在里面，
      本页只读它的输出（G.ledger），不再自己算一分钱。 -->

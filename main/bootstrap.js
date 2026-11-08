@@ -7,6 +7,10 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
    必须**最先**加载：csh_wallet（门票）/ csh_shell（META、回收率）/ csh_games（卡片清单）
    全部改为从它派生，杜绝「加一款游戏要改四处」的重复副本。 */
 import "../core/csh_registry.js";
+/* 视口令牌与同桌冷却：纯定义模块（零副作用、零 DOM、零存储），
+   此前只被探针引用、从未进入加载图 —— 即「测过了但功能没接」。这里补上显式依赖。 */
+import "../core/csh_viewport.js";
+import "../core/csh_seat_cooldown.js";
 import "../core/csh_online.js";
 import "../core/csh_sfx.js";
 /* BGM 音乐引擎（2026-09-30）：零 import，只把引擎挂到 window.CSH_BGM。
@@ -32,6 +36,11 @@ import { installAuxSpirit } from "../core/csh_aux_spirit.js";
 import { installUIKit } from "../core/csh_uikit.js";
 import "../core/csh_world.js";
 import "../core/csh_badge.js";
+/* ★ 补码未决事务与房间凭据（2026-11-09 修正）：这两份此前**从未进入加载图**，
+   而 csh_shell 用 window.CSHTopUpJournal / window.CSHRoom 取用 ——
+   取到 null 时补码直接回「事务未就绪」，等于功能上线即死。必须排在 csh_shell 之前。 */
+import "../core/csh_topup_journal.js";
+import "../core/csh_room.js";
 import "../core/csh_shell.js";
 import "../core/csh_migrate.js";
 /* 面板样式 token 层（阶段 4 · 2026-09-29）：调试面板/局内互动的颜色唯一真值，

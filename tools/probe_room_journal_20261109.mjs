@@ -205,6 +205,43 @@ check('空快照通过（prepare 阶段允许无快照）', R.validateShot(null)
 /* ---------- 静态接线：迁移排除 ---------- */
 check('新本机键已登记进 csh_migrate EXCLUDED', /\["csh_room_v1",/.test(migrate));
 
+/* ---------- 静态接线：模块真的进了加载图 ----------
+   这一组是补 2026-11-09 挖出来的坑：csh_topup_journal / csh_seat_cooldown / csh_viewport
+   三份模块当年都写了、都有反例、都过门禁，但**从未被任何文件加载**——
+   功能上线即死，而探针只测模块本身，测不到「有没有人引它」。
+   断言口径刻意用「被 import / 被 script 引用」，不用「文本里提到文件名」。 */
+const boot = fs.readFileSync(root + '/main/bootstrap.js', 'utf8');
+const shellSrc = fs.readFileSync(root + '/core/csh_shell.js', 'utf8');
+const texasSrc = fs.readFileSync(root + '/games/texas/texas.html', 'utf8');
+const bjSrc = fs.readFileSync(root + '/games/blackjack/blackjack.html', 'utf8');
+const bootImports = (name) => new RegExp('import\\s+"[^"]*' + name.replace('.', '\\.') + '"').test(boot);
+check('csh_room.js 已进入主宿主加载图', bootImports('csh_room.js'));
+check('csh_topup_journal.js 已进入主宿主加载图（此前从未加载，补码恒「事务未就绪」）',
+  bootImports('csh_topup_journal.js'));
+check('csh_seat_cooldown.js 已进入主宿主加载图（此前从未加载，跨桌冷却恒 null）',
+  bootImports('csh_seat_cooldown.js'));
+check('csh_viewport.js 已进入主宿主加载图（此前从未加载，零调用点）',
+  bootImports('csh_viewport.js'));
+check('csh_room 与 csh_topup_journal 排在 csh_shell 之前（shell 取用时必须已挂载）',
+  boot.indexOf('csh_room.js') < boot.indexOf('csh_shell.js') &&
+  boot.indexOf('csh_topup_journal.js') < boot.indexOf('csh_shell.js'));
+check('德州页已引 csh_topup.js（否则补码报价恒失败）',
+  /<script src="[^"]*csh_topup\.js"/.test(texasSrc));
+
+/* ---------- 静态接线：宿主侧的房间流程真的接上了 ---------- */
+check('入场扣款前会写房间凭据', /RJ\.prepare\(RS/.test(shellSrc) && shellSrc.indexOf('RJ.prepare(RS') < shellSrc.indexOf('wallet.spend(total'));
+check('入场扣款后会 activate', /RJ\.activate\(RS,\s*roomKey/.test(shellSrc));
+check('结算把房间编号作为 settleId 交给钱包', /settleId:\s*currentRoomId/.test(shellSrc));
+check('结算成功后清房间凭据', /finishRoom\(credited\)/.test(shellSrc));
+check('关壳不清凭据（关掉不等于退钱）', !/closeShell[\s\S]{0,400}?RJ\.clear/.test(shellSrc));
+check('桥命令 shell-room-save / shell-room-state 已注册',
+  /"shell-room-save"/.test(shellSrc) && /"shell-room-state"/.test(shellSrc));
+check('房间流程按 META.room 开关，未接线的桌不建凭据', /META\[key\][^\n]*\.room/.test(shellSrc));
+check('shell-room-save 计入 mutatesSave（存档阻塞时不许写快照）',
+  /"shell-room-save",/.test(shellSrc));
+check('离开确认文案按是否有房间凭据分叉（不再一律说损失带入）',
+  /currentRoomId\s*\n?\s*\?/.test(shellSrc) && /保留牌桌/.test(shellSrc));
+
 /* ---------- 自检：去掉「只有余额不变才丢弃」必须判红 ---------- */
 const anchor = "    if (pc === d.balanceBefore) return { action: 'discard', entry: d, reason: '扣款未持久化' };";
 if (!src.includes(anchor)) throw Error('negative-baseline anchor changed');

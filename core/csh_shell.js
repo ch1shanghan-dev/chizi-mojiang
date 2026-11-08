@@ -113,6 +113,9 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 				   注：神弩手已于 2026-10-03 移除，当前四款都是回合制（autoPause 全缺省 false），
 				   本派生点保留 —— 以后再加实时游戏时 registry 声明即可。 */
 				autoPause: !!g.autoPause,
+				/* 该桌页面是否会通过 shell-room-save 上报快照。只有声明了才建房间凭据，
+				   否则「扣了钱却没人回报牌面」会让入场流程变成绕圈。 */
+				room: !!g.room,
 			};
 		}
 	})();
@@ -140,6 +143,42 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 			if(r.refunded)toast('已退回一笔未完成的德州补码 '+r.refunded+' CBY');
 			return r;
 		}catch(eR){return null;}
+	}
+	/* ---------- 房间凭据（工作包 B · 2026-11-09） ----------
+	   入场扣款此前是裸扣：钱从钱包出去，世上没有任何东西记得它属于哪一桌，
+	   于是局中被杀就只能认栽。现在扣款前先落一份凭据，结算成功后按同一编号清掉。
+	   模块缺失时**拒绝入场**，不静默降级成无凭据扣款（那正是要修的病）。 */
+	var currentRoomId = "";      // 本次入场对应的房间编号（空 = 不走凭据，例如练习/免带入）
+	var resumeRoom = false;      // 本次是「续上一局」，不是新扣款
+	function roomApi(){try{var w=typeof window!=='undefined'?window:null;return w&&w.CSHRoom?w.CSHRoom:null;}catch(e){return null;}}
+	function roomStorage(){try{return typeof localStorage!=='undefined'?localStorage:null;}catch(e){return null;}}
+	function roomId(){return "room-"+(typeof Date!=='undefined'?Date.now():0).toString(36)+"-"+Math.random().toString(36).slice(2,12);}
+	/* 结算成功后收尾：先标已结算（万一中途崩溃也不会被当成未付），再清键。 */
+	function finishRoom(credit){
+		var RJ=roomApi(),RS=roomStorage();
+		if(!RJ||!RS||!currentRoomId)return false;
+		var id=currentRoomId;
+		try{ RJ.markSettled(RS,id,Math.max(0,Math.floor(Number(credit)||0))); }catch(eM){}
+		try{ RJ.clear(RS); }catch(eC){}
+		currentRoomId="";
+		return true;
+	}
+	/* 无法续局又确实扣过款时的退回：先把凭据推进到 settled（等于「已处理」，
+	   重启后不会再退一次），再按凭据金额入账，成功才清键。金额核对用 add 的返回值，
+	   不用「余额==balanceBefore」—— 若中途补过码，那个等式本来就不成立。 */
+	function refundAbandonedRoom(st, why){
+		var RJ=roomApi(),RS=roomStorage(),W=wallet();
+		if(!RJ||!RS||!W||!W.wallet||typeof W.wallet.add!=='function')return false;
+		if(!st||!st.id||!Number.isSafeInteger(st.amount)||st.amount<=0)return false;
+		var mk;
+		try{ mk=RJ.markSettled(RS,st.id,st.amount); }catch(eM){ return false; }
+		if(!mk||mk.ok===false)return false;
+		var got=0;
+		try{ got=W.wallet.add(st.amount,"未完成的牌桌退回"); }catch(eA){ return false; }
+		if(Number(got)!==st.amount){ logError("牌桌退回金额不符，凭据保留待重试："+(why||"")); return false; }
+		try{ RJ.clear(RS); }catch(eC){}
+		toast("上一局未能恢复，已退回带入 "+fmt(st.amount)+" CBY");
+		return true;
 	}
 	var paused = false;
 	var pausedAuto = false;   // 本次暂停是否自动触发（失焦/切页）。手动暂停不参与「回前台自动恢复」
@@ -806,16 +845,74 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 		}
 		if (!cshWorldTableFinish()) { toast("牌友记录尚未保存，请恢复存储后再开桌"); return false; }
 		var total = tk + buyIn;
+		/* 房间凭据只对**已接线**的牌桌启用。未接线的桌（页面还不会上报快照）若也建凭据，
+		   下次入场只会走进「无快照 → 退回」，等于把入场流程改成绕圈。宁可先不启用。
+		   用 try 包住是刻意的：本函数会被反例探针单独抽出来在沙箱里求值，
+		   那里没有 META —— 拿不到就按「未接线」处理，不制造新的未定义引用。 */
+		var roomEnabled = false;
+		try { roomEnabled = !!(META[key] && META[key].room); } catch (eRoom) { roomEnabled = false; }
+		var RJ = roomEnabled ? roomApi() : null, RS = roomEnabled ? roomStorage() : null;
+
+		/* ① 同一张桌上已有未完成的牌局：钱早就扣过，不许再扣一次，直接把牌桌交回去。 */
+		if (RJ && RS) {
+			var st = null;
+			try { st = RJ.read(RS); } catch (eR0) { try { RJ.clear(RS); } catch (eR1) {} st = null; }
+			if (st && st.phase === "settled") { try { RJ.clear(RS); } catch (eR2) {} st = null; }
+			if (st && st.table === key) {
+				/* 有快照才谈得上续局；只有凭据没有牌面（扣款后、首手前被杀）就退回。 */
+				if (st.shot && st.phase !== "preparing") {
+					currentRoomId = st.id;
+					currentBuyIn = Math.max(0, Math.floor(Number(st.shot && st.shot.buyIn) || Number(st.amount) || 0));
+					closeFee();
+					logInfo("续局 " + key + " 房间 " + st.id);
+					emit("charge", { key: key, charged: 0, resume: true });
+					openShell(key, { buyIn: currentBuyIn, resume: true, roomId: st.id });
+					return true;
+				}
+				if (!refundAbandonedRoom(st, "未开桌")) { toast("有一局牌桌尚未恢复，请稍后重试（带入不会重复扣除）"); return false; }
+			}
+		}
+
+		/* ② 扣款之前先把凭据落盘并读回：写不进去就不许扣、不许开桌。
+		      这正是此前吞钱的根 —— 扣了钱却没有任何记录能证明它属于哪一桌。 */
+		var roomKey = "";
+		if (RJ && RS && total > 0) {
+			var pcBefore = W.wallet.pc();
+			if (!Number.isSafeInteger(pcBefore) || pcBefore < total) { toast("池子币不足"); return false; }
+			roomKey = roomId();
+			var prep = RJ.prepare(RS, { id: roomKey, table: key, amount: total, balanceBefore: pcBefore, t: Date.now(), shot: null });
+			if (!prep || prep.ok === false) { toast((prep && prep.reason) || "牌桌凭据未写入，本次未扣款"); return false; }
+		}
 		if (total > 0) {
 			// spendPC 返回布尔：false = 余额不足
 			var paid = W.wallet.spend(total, "入场:" + key);
-			if (paid !== true && !(paid && paid.ok === true)) { toast("池子币不足"); return false; }
+			if (paid !== true && !(paid && paid.ok === true)) {
+				if (roomKey && RJ && RS) { try { RJ.clear(RS); } catch (eAb) {} }
+				toast("池子币不足"); return false;
+			}
+			if (roomKey && RJ && RS && W.wallet.pc() !== pcBefore - total) {
+				/* 读回不一致：宁可回补并失败，也不留「扣了钱没开桌」的半截态。 */
+				try { W.wallet.add(total, "入场读回回补"); } catch (eRb) {}
+				try { RJ.clear(RS); } catch (eCb) {}
+				toast("入场扣款读回不一致，已回补，请重试"); return false;
+			}
 		}
 		closeFee();
 		logInfo("收费 " + key + " 门票 " + tk + " 带入 " + buyIn);
 		currentBuyIn = Math.max(0, Math.floor(Number(buyIn) || 0));
+		/* ③ 钱已经在钱包里，把凭据推进到 active；失败则退回，避免钱卡在无主状态。 */
+		if (roomKey && RJ && RS) {
+			var act = RJ.activate(RS, roomKey, null);
+			if (!act || act.ok === false) {
+				var stuck = null;
+				try { stuck = RJ.read(RS); } catch (eRd) {}
+				refundAbandonedRoom(stuck, "开桌失败");
+				return false;
+			}
+			currentRoomId = roomKey;
+		}
 		emit("charge", { key: key, charged: total });
-		openShell(key, { buyIn: buyIn });
+		openShell(key, { buyIn: buyIn, roomId: roomKey });
 		return true;
 	}
 
@@ -1166,6 +1263,9 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 		if (!res || res.ok === false) return res;
 		var profit = res.profit || 0;
 		var credited = res.credited || 0;
+		/* 钱已随凭据落盘 → 清房间凭据。留着也没关系（钱包里有 roomSettledId 兜底），
+		   但清了下次入场才不会误判「还有一局没完成」。 */
+		if (currentRoomId) finishRoom(credited);
 
 		/* The wallet has committed money and the world intent together; only consume its result here. */
 		var world = lib.cshWorld;
@@ -1317,6 +1417,9 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 		   现在统一在 paintTop 之前从 opts.buyIn 取真值（doCharge 传的就是它）。 */
 		current = key;
 		currentBuyIn = Math.max(0, Math.floor(Number(opts && opts.buyIn) || 0));
+		/* 房间凭据必须在这里赋值 —— closeShell 刚把它清空，早于这行赋值等于白写。 */
+		currentRoomId = String((opts && opts.roomId) || "");
+		resumeRoom = !!(opts && opts.resume);
 		/* 新入场重置补码状态：次数是「每桌」而不是「每账号」。 */
 		topUpBaseBuyIn = currentBuyIn; topUpCount = 0; topUpTotal = 0;
 		ensureStyle();
@@ -1387,6 +1490,9 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 		try { var _W = wallet(); if (_W && typeof _W.flushSave === "function") _W.flushSave(); } catch (eFs) {}
 		if (!silent) logInfo("关壳 " + (current || "?"));
 		current = null; paused = false; currentBuyIn = 0; topUpBaseBuyIn = 0; topUpCount = 0; topUpTotal = 0; SAVE_SESSION = null;
+		/* 注意：这里**不清**房间凭据。玩家关掉壳不代表钱退回来了 ——
+		   凭据留在本机，下次进同一张桌才能续局或退回。 */
+		currentRoomId = ""; resumeRoom = false;
 		/* 【2026-09-30 修复 · 配乐叠播】退出小游戏后恢复主页面 BGM。
 		   只有当「池子休闲面板还开着」才恢复 —— 玩家会回到面板继续挑游戏；
 		   若面板已关（例如从悬浮球直接开局再退出），则不擅自起播，
@@ -1474,6 +1580,7 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 			/* 这些命令包含进度写入；先拒绝，不能让下层空结果变成成功 ACK。
 			   只读查询、关闭和行囊恢复入口仍可使用。 */
 			var mutatesSave = ["shell-settle", "shell-settle-session", "shell-topup", "shell-topup-commit", "shell-task-add", "shell-merit",
+				"shell-room-save",
 				"shell-sign", "shell-relief", "shell-career-sync", "shell-ach-claim", "shell-ach-claim-all", "shell-pool-ach-claim", "shell-pool-ach-claim-all", "shell-trade", "shell-goldfish", "shell-market-new",
 				"shell-aff-do", "shell-cheer", "shell-cheer-ack", "shell-cheer-import", "shell-bounty", "shell-seat", "shell-world-round",
 				"shell-world-result", "shell-world-finish"].indexOf(cmd) >= 0 || (cmd === "shell-open" && !(META[d.key] && META[d.key].lobby));
@@ -1793,6 +1900,35 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 				/* v6.7：记下本次同桌的妖灵（关壳 / 结算时给她们各 +1 好感） */
 				if (!cshTableRecord(seats)) { ackToGame("shell-seat", false, { seats: [] }); return; }
 				ackToGame("shell-seat", !!(seats && seats.length), { seats: seats || [], table: TABLE_WORLD.token });
+				return;
+			}
+			/* 房间快照（工作包 B）：页面只上报纯数据，校验与落盘都归宿主。
+			   宿主是唯一写者 —— 两个进程各写一份必然出现撕裂态，而钱的真值在宿主。 */
+			if (cmd === "shell-room-save") {
+				var RJs = roomApi(), RSs = roomStorage();
+				if (!RJs || !RSs) { ackToGame(cmd, false, { ok: false, reason: "房间凭据模块未就绪" }); return; }
+				if (!currentRoomId) { ackToGame(cmd, false, { ok: false, reason: "本局没有房间凭据" }); return; }
+				var sr;
+				try { sr = RJs.save(RSs, currentRoomId, d && d.shot, d && d.expectSeq); }
+				catch (eSv) { sr = { ok: false, reason: String(eSv.message || eSv) }; }
+				ackToGame(cmd, !!(sr && sr.ok), sr);
+				return;
+			}
+			/* 页面开局问一次：接着上一局打，还是这就是一局新的。 */
+			if (cmd === "shell-room-state") {
+				var RJq = roomApi(), RSq = roomStorage(), roomOut = { mode: "fresh" };
+				if (RJq && RSq && currentRoomId) {
+					try {
+						var eRoom = RJq.read(RSq);
+						if (eRoom && eRoom.id === currentRoomId) {
+							roomOut = {
+								mode: resumeRoom ? "resume" : "new", id: eRoom.id, phase: eRoom.phase,
+								saveSeq: eRoom.saveSeq, buyIn: currentBuyIn, shot: eRoom.shot || null,
+							};
+						}
+					} catch (eRq) { roomOut = { mode: "fresh" }; }
+				}
+				ackToGame(cmd, true, roomOut);
 				return;
 			}
 			/* 本场结算（2026-09-29 新增 · 德州用）：
@@ -2204,7 +2340,7 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 			var chips = Math.max(0, Math.floor(Number(data.chips) || 0));
 			var aiTotal = Math.max(0, Math.floor(Number(data.aiStakeTotal) || 0));
 			var profit = chips - buyIn;
-			r = W.wallet.settleRun(key, { buyIn: buyIn, netWin: profit, aiStakeTotal: aiTotal, prepareWorldResult: data.prepareWorldResult });
+			r = W.wallet.settleRun(key, { buyIn: buyIn, netWin: profit, aiStakeTotal: aiTotal, prepareWorldResult: data.prepareWorldResult, settleId: currentRoomId || undefined });
 			res.payout = r.payout; res.cap = r.cap; res.capped = !!r.capped;
 			res.discarded = r.discarded || 0;
 			/* ★ 2026-09-29 修复：把 wallet 算出的**真实回收率**透传给 settleSession。
@@ -2356,7 +2492,11 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 		box.className = "csh-sh-leave";
 		var txt = document.createElement("div");
 		txt.className = "csh-sh-leavetxt";
-		txt.innerHTML = "本局尚未结算<br><b>离开将损失带入 " + fmt(currentBuyIn) + " CBY</b>";
+		/* 有房间凭据时「离开」不再是丢钱：牌桌留在本机，下次进同一张桌可以接着打。
+		   文案必须跟着真实语义走 —— 否则玩家会因为怕损失而不敢离开。 */
+		txt.innerHTML = currentRoomId
+			? "本局尚未结算<br><b>离开会保留牌桌</b>，下次进入同一张桌可继续；带入仍在桌面上"
+			: ("本局尚未结算<br><b>离开将损失带入 " + fmt(currentBuyIn) + " CBY</b>");
 		var row = document.createElement("div");
 		row.className = "csh-sh-leaveacts";
 		var back = document.createElement("button");
