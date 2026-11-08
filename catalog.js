@@ -1,7 +1,7 @@
-/* 自动生成于 2026-11-08T12:23:58.945Z by tools/release.js —— hashes 对应 Git 发布字节，发版后 git push 即生效，勿手改 files */
+/* 自动生成于 2026-11-08T12:48:19.378Z by tools/release.js —— hashes 对应 Git 发布字节，发版后 git push 即生效，勿手改 files */
 window.extension = {
 	"池子魔将": {
-		"build": "e04378b5be826d5eb41d74cb4a2f41e6f78f0a178ee8b5a633baf7268256f988",
+		"build": "27a50536b963bfeebd2b989bb690824f79c2b7b32e234a09bd4f990013dccf7c",
 		"hashes": {
 			"LICENSE": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
 			"README.md": "41102b34ebc984b6b84b361baa0e78aa9defe5633a4a270cde6ed0ff7bc9ae4d",
@@ -351,7 +351,7 @@ window.extension = {
 			"core/csh_spirit_buff_skills.js": "bb2287e67a23803276e57aa3d4ee36f65d3bcfaa1b1090bd0174adede82c2d83",
 			"core/csh_spirit_buffs.js": "82bb7368c113cdbd7253b43e6e2b85145a05492e31d26ee3af47441c538499a3",
 			"core/csh_spirit_skins.js": "ab4a53b640fbcaeb2c45f64e2fdd4251ef24cf8ef2c26aec036660a046725703",
-			"core/csh_startup_recovery.js": "b601c05e3a4d8583c28966f09651d2490f633391da0bffc3d58296f56374c2d1",
+			"core/csh_startup_recovery.js": "f9cb7a121056e035734ca59f36df98d7a7a61265861c9a6116bc7c56658555ab",
 			"core/csh_svggen.js": "f19d55550094a1ae300fb60f877d37c293bdead6e280c7e75a10ed71c717e7ff",
 			"core/csh_tables.css": "23200af69ed946862614f37894b454c0937ac302cfbea92f7a9e5e0eb36be5e6",
 			"core/csh_texas_ai.js": "b45e20a751d94a087d57f2514d30069d6f128983604c6bd2ed5280d47b33147b",
@@ -361,7 +361,7 @@ window.extension = {
 			"core/csh_topup_journal.js": "dd1970c6a70d87b0ba856bbaf4710b526d47b530b133e7fed01b7fd06ed7fe30",
 			"core/csh_trick_tables.css": "2d5716939b60ed24578e96a070d4ab6797880532d11cc4a47ca65b5409344715",
 			"core/csh_uikit.js": "f1a219569b4e1e069f39268044e35ffc2d846187e54cecbfc1930fb4324c10b4",
-			"core/csh_update.js": "edbc79fadf2686f5a77b63aa18a8d98af8ad3ab0d1e74663d26d8ba35e430fcd",
+			"core/csh_update.js": "4cd83975adc40516ba5d82319fd72842ebf6a635acbaa06137d55af52a841f34",
 			"core/csh_viewport.js": "db264324ca4fad34d3e92f914615790382bf35c10eb223b1484ce181abd9c0cd",
 			"core/csh_voice.js": "4c6616186f89d559578a4fa63032daebc5c4d9223f0ecc39b68bd6831aa323c6",
 			"core/csh_wallet.js": "ceeff50a26c101a72352f04861a3519e8ac9c0b623563d9e3dcc2b7ab7a0f509",
@@ -379,7 +379,7 @@ window.extension = {
 			"effect/csh_wenyang_quedi_banner.mp4": "e5b70cf477a353da434c1bbd759b3ad31f9e61b412a7b4da5e7827a0e6a1f119",
 			"effect/csh_zhonghui_paiyi_banner.mp4": "7b8c76be1045b8fe498766957500ded34fb47ef0fc26a7d86ef73f900fb29004",
 			"effect/csh_zhugeke_duwu_banner.mp4": "80d9488be1032a8b59522b0ca6815eb93e44a6c4287deaf261a4717a412dde51",
-			"extension.js": "5b93ec10658423093a10ada33b31684986e9975955e27d221ab98157f4624676",
+			"extension.js": "10a3e530cba3bb4204e434a9b0844f6890a23df5c45f1df3c352fc189180269d",
 			"font/OFL-ZhiMangXing.txt": "e9957416b280a765ebd38da979467a5dfe0908382de04c85e9f7c0b34ed8209f",
 			"font/csh_fx_font_1.woff2": "f78752bf5f8639db8a228e2348740c6b52d7f6a33f2880011fefed7e39f58573",
 			"font/csh_fx_font_2.woff2": "ad894385b4e996e5f4b237cc6f5ead035237fb4c0cceaa603081ea63ab2b1da9",
@@ -669,6 +669,7 @@ window.extension = {
 			"main/config.js": "b38d94ce3a49835dc048102fd3cc3ee55e6dc13c5713eebab5b03c1d3898bfe8",
 			"main/content.js": "8e02f4fd32ac29fababfe5435c39f7f4fc2add91f6e8ec78096ca8d341a18377",
 			"main/dynamic-skins.js": "aa17af899cb39139916a566a73664320f7ad32c6309b00fd50b5990b39cdbd7c",
+			"main/extension-package.js": "73bd01b319cc42f6d062acb023aa72d1969e4114e8e91d443a07ecbcb16d9c0a",
 			"main/help.js": "dadfd812641748d2a27d4bc97cea6a9968e877d2d069bb4088da80640d0935eb",
 			"main/precontent.js": "ef37c0584ca1962706312ceabb4a6d8af560ab438645baa1ec68449a53350ca6",
 			"mobilefx/cshMobileFx.js": "07e81fec5bac883cd08fab605029b3673cec045d899ba275b404c4b87d58e955",
@@ -1726,6 +1727,7 @@ window.extension = {
 			"main/config.js",
 			"main/content.js",
 			"main/dynamic-skins.js",
+			"main/extension-package.js",
 			"main/help.js",
 			"main/precontent.js",
 			"mobilefx/cshMobileFx.js",

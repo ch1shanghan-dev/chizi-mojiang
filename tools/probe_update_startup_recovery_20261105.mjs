@@ -13,7 +13,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
 import { webcrypto } from 'node:crypto';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { auditTempRoot, removeAuditScratch } from './lib/audit_scratch.mjs';
 
 const argAt = process.argv.indexOf('--out');
 if (argAt < 0) throw Error('--out required');
@@ -199,19 +200,81 @@ await check('9/startup recovery clears pending on success, keeps it on failure; 
 		&& reloads === 0 && env.store.get('csh_user_save') === 'keep-me'
 		? true : JSON.stringify({ ok, bad, reloads, pendingAfterOk, pendingAfterBad });
 });
-await check('10/extension.js wires recovery before any business import', () => {
-	const src = fs.readFileSync(root + '/extension.js', 'utf8');
-	const guard = src.indexOf('core/csh_startup_recovery.js');
-	const bootstrap = src.indexOf('import "./main/bootstrap.js"');
-	const decision = src.indexOf('cshRecoveryPending()');
-	const safe = src.indexOf('cshProtectedPackage(full)');
-	return guard >= 0 && bootstrap > guard && decision > guard && safe > decision
-		? true : JSON.stringify({ guard, bootstrap, decision, safe });
+await check('10/host install requires readable recovery marker before touching game files', async () => {
+	const env = makeEnv(), h = memory(), value = enc('new');
+	h.io.requiresRecoveryMarker = true;
+	const tx = env.API.create(h.io);
+	const prepared = await tx.prepare(['a.js'], async () => value, {hashes:{'a.js':await env.API.digest(value)}});
+	env.store.delete(KEY);
+	const storage = env.ctx.localStorage, set = storage.setItem;
+	for (const drop of [() => { throw Error('quota'); }, () => {}]) {
+		storage.setItem = drop;
+		const writesBefore = h.writes.length;
+		let rejected = false;
+		try { await tx.commit(prepared); } catch (e) { rejected = /恢复标志/.test(e.message); }
+		if (!rejected || h.writes.length !== writesBefore || h.value('a.js') !== 'old-a' ||
+			JSON.parse(dec(h.data.get(JOURNAL))).phase !== 'prepared') return false;
+	}
+	storage.setItem = set;
+	return (await tx.commit(prepared)).ok && h.value('a.js') === 'new' && !env.store.has(KEY) && !h.data.has(JOURNAL);
 });
+
+await check('11/current host NOT_FOUND means empty journal, permissions still fail', async () => {
+	const env = makeEnv();
+	let code = 'NOT_FOUND';
+	const game = {
+		readFile(_file, _ok, fail) { fail(Object.assign(Error(code), {code})); },
+		writeFile() { throw Error('empty recovery must not write'); },
+		removeFile() { throw Error('empty recovery must not remove'); },
+	};
+	const tx = env.API.create(env.API.hostIO({game, lib:{}}));
+	if (!(await tx.recover()).empty) return false;
+	code = 'PERMISSION_DENIED';
+	try { await tx.recover(); } catch (e) { return /存储权限/.test(e.message); }
+	return false;
+});
+
+const bootFixture = fs.mkdtempSync(path.join(auditTempRoot(), 'csh-protected-entry-'));
+const extensionRoot = path.join(bootFixture, 'extension', 'test');
+const bootEntry = path.join(extensionRoot, 'extension.js');
+const business = path.join(extensionRoot, 'main', 'extension-package.js');
+const tracker = globalThis.__cshStartupProbe = { pending:true, recoveries:0, evaluations:0 };
+try {
+	fs.mkdirSync(path.join(extensionRoot, 'core'), { recursive: true });
+	fs.mkdirSync(path.dirname(business), { recursive: true });
+	fs.writeFileSync(path.join(bootFixture, 'package.json'), '{"type":"module"}');
+	fs.writeFileSync(path.join(bootFixture, 'noname.js'), 'export const lib={}, game={};');
+	fs.copyFileSync(path.join(root, 'extension.js'), bootEntry);
+	fs.writeFileSync(path.join(extensionRoot, 'core', 'csh_startup_recovery.js'), [
+		'export const cshRecoveryPending = () => globalThis.__cshStartupProbe.pending;',
+		'export const cshProtectedPackage = source => ({...source, protected:true});',
+		'export async function cshRecoverAtStartup(){',
+		'  globalThis.__cshStartupProbe.recoveries++; globalThis.__cshStartupProbe.pending=false;',
+		'}',
+	].join('\n'));
+	fs.writeFileSync(business, 'export const INVALID = ;');
+	const url = pathToFileURL(bootEntry).href;
+	await check('12/pending entry never imports an invalid business file and recovers once per boot', async () => {
+		const { default: open } = await import(url);
+		const protectedPack = await open();
+		const again = await open();
+		return protectedPack.protected === true && !!protectedPack.package.version &&
+			again.protected === true && tracker.recoveries === 1 && !tracker.pending;
+	});
+	await check('13/fresh clean boot imports the business package and preserves metadata', async () => {
+		fs.writeFileSync(business, 'globalThis.__cshStartupProbe.evaluations++; export const createPackage = packageData => ({ package:packageData, live:true });');
+		const { default: open } = await import(url + '?fresh');
+		const live = await open();
+		return live.live === true && !!live.package.version && tracker.evaluations === 1 && tracker.recoveries === 1;
+	});
+} finally {
+	delete globalThis.__cshStartupProbe;
+	removeAuditScratch(bootFixture);
+}
 
 const failed = checks.filter(x => !x.passed);
 const result = {
-	scope: 'Real csh_update.js transaction + startup recovery module in isolated vm; injected interruption points, controllable timers, in-memory disk. No device install.',
+	scope: 'Real update transaction in isolated VM plus the actual ESM entry with a corrupt business fixture; no device install.',
 	passed: checks.length - failed.length,
 	failed: failed.length,
 	checks,

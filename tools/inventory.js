@@ -2,7 +2,7 @@
 /**
  * 池子魔将 · 结构清单生成器（纯静态分析，只读，不执行扩展代码）
  *
- * 用途：把 extension.js 的 package 对象量化成可审核的清单，
+ * 用途：把 main/extension-package.js 的 package 对象量化成可审核的清单，
  *      为「拆分优先级」「技能审计范围」「缩进整改」提供依据。
  *
  * 用法：
@@ -30,7 +30,7 @@ import { fileURLToPath } from "url";
 /* 无名杀 app/ 根目录的 package.json 声明了 "type":"module"，
    因此 tools/ 下脚本也必须是 ESM，不能用 require / __dirname。 */
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const SRC = path.join(ROOT, "extension.js");
+const SRC = path.join(ROOT, "main/extension-package.js");
 
 const argv = process.argv.slice(2);
 const flag = (name, def) => {
@@ -44,7 +44,7 @@ const TOP_N = parseInt(flag("--top", "20"), 10) || 20;
 const OUT = flag("--out", "");
 
 if (!fs.existsSync(SRC)) {
-	console.error("[inventory] 找不到 extension.js：" + SRC);
+	console.error("[inventory] 找不到 main/extension-package.js：" + SRC);
 	process.exit(1);
 }
 
@@ -171,7 +171,7 @@ for (let i = 0; i < lines.length; i++) {
 	if (ev) { pkgNode = { name: "package", line: i + 1, depth: ev.depthAfter }; break; }
 }
 if (!pkgNode) {
-	console.error("[inventory] 未定位到 package 块，请检查 extension.js 结构");
+	console.error("[inventory] 未定位到 package 块，请检查 main/extension-package.js 结构");
 	process.exit(1);
 }
 
@@ -257,7 +257,7 @@ const mb = (x) => (x / 1024 / 1024).toFixed(2) + "MB";
 const out = [];
 const P = (s = "") => out.push(s);
 
-P("# 池子魔将 · extension.js 结构清单");
+P("# 池子魔将 · main/extension-package.js 结构清单");
 P("");
 P("> 由 `tools/inventory.js` 自动生成 · " + new Date().toISOString());
 P("> 层级判定基于**括号深度**（非缩进），纯静态解析，不代表运行时行为。");
@@ -360,7 +360,7 @@ if (OUT) {
 } else if (WANT_MD) {
 	console.log(text);
 } else {
-	console.log("=== 池子魔将 · extension.js 结构摘要 ===");
+	console.log("=== 池子魔将 · main/extension-package.js 结构摘要 ===");
 	console.log("总行数      : " + total + "（" + mb(bytes) + "）");
 	console.log("package起点 : 第 " + pkgNode.line + " 行，括号深度 " + PKG_DEPTH);
 	console.log("括号平衡    : " + (finalDepth === 0 ? "OK" : "不平衡 finalDepth=" + finalDepth));

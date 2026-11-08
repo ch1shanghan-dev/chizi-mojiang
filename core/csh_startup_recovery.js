@@ -1,9 +1,8 @@
 /* 池子魔将 · U3 启动恢复（2026-11-05）
  *
- * 必须是 extension.js 的**第一个业务 import**：ESM 静态依赖图会先执行它，
- * 才轮到 bootstrap / character / card / skills 等模块。
- * import "./csh_update.js" 保证事务 IIFE 已把 window.CSHUpdate 挂好，
- * 因此这里可以在任何异步 IO 之前**同步**读到恢复标志。
+ * 这是扩展入口唯一的项目内静态依赖。入口先同步读取恢复标志，
+ * 正常启动才动态载入 bootstrap、武将、卡牌和技能。
+ * csh_update.js 提供恢复事务，读取标志不依赖任何文件 IO。
  *
  * 中断后的三种结局，本模块负责第三种：
  *   ① 完整旧版（journal=prepared，recover 判定 untouched）；
@@ -62,7 +61,12 @@ export function cshProtectedPackage(full) {
 			characterSubstitute: {},
 			card: {},
 			skill: {},
-			intro: "<font color=#c9a84c>更新恢复中</font> 暂不启用扩展内容，请重启游戏后继续；本机存档、资格、收据与素材未改动。",
+			get intro() {
+				const result = hostRoot().__cshStartupRecovery;
+				if (result?.ok) return "扩展文件已恢复，请重启游戏后继续。";
+				if (result?.ok === false) return "扩展文件恢复未完成，请重启游戏后重试。";
+				return "正在恢复扩展文件，完成后请重启游戏。";
+			},
 			author: pkg.author || "",
 			diskURL: "",
 			forumURL: "",

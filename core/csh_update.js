@@ -8,7 +8,7 @@
  const LOCKS=new Set(),META='backup.json';
  const PENDING='csh_update_recovery_pending_v1';
  function isRecoveryPending(){try{return !!(root.localStorage&&root.localStorage.getItem(PENDING));}catch(e){return false;}}
- function markRecoveryPending(){try{if(root.localStorage)root.localStorage.setItem(PENDING,'1');}catch(e){}}
+ function markRecoveryPending(){try{if(root.localStorage)root.localStorage.setItem(PENDING,'1');}catch(e){}return isRecoveryPending();}
  function clearRecoveryPending(){try{if(root.localStorage)root.localStorage.removeItem(PENDING);}catch(e){}}
  const lockKey=io=>io.scope||io;
  function acquire(io){const key=lockKey(io);if(LOCKS.has(key))throw Error('更新或备份任务正在进行，请稍后再试');LOCKS.add(key);return ()=>LOCKS.delete(key);}
@@ -170,6 +170,8 @@ async function prepare(files,download,{hashes={},signal,progress,fromVersion='',
     const saved=validate(JSON.parse(decode(raw)));
     /* 先核对再赋值：token 不匹配时保留有效暂存，不能顺手把 prepared 凭据清掉。 */
     if(saved.id!==prepared.id||saved.phase!=='prepared')throw Error('待安装内容与更新凭据不一致，请重新检查更新');
+    /* 安装文件落盘前必须读回启动恢复标志。失败时保留已核验的下载和凭据。 */
+    if(io.requiresRecoveryMarker&&!markRecoveryPending())throw Error('无法保存更新恢复标志，安装文件尚未修改，请恢复本机存储后重试');
     state=saved;const records=state.files;
     state.phase='committing';await journal(state);committing=true;
     /* New modules first, entry metadata last. The persistent backups remain available throughout commit. */
@@ -200,7 +202,7 @@ async function prepare(files,download,{hashes={},signal,progress,fromVersion='',
  function fileError(value){let e=value,seen=new Set();while(e&&typeof e==='object'&&!seen.has(e)){seen.add(e);let next=e.error||(e.target&&e.target.error);if(!next)break;e=next;}return e;}
  function errorText(value){
   const e=fileError(value),code=e&&e.code;
-  const names={1:'文件或目录不存在',2:'文件访问受限，请检查存储权限',3:'操作已取消',4:'文件暂时无法读取',6:'文件不可修改，请检查存储权限',7:'文件当前状态不可写',9:'文件操作不被允许',10:'存储空间或配额不足',11:'文件路径类型不符',12:'同名文件或目录冲突',ENOENT:'文件或目录不存在',EACCES:'文件访问受限，请检查存储权限',EPERM:'文件操作权限不足',ENOSPC:'存储空间不足'};
+  const names={1:'文件或目录不存在',2:'文件访问受限，请检查存储权限',3:'操作已取消',4:'文件暂时无法读取',6:'文件不可修改，请检查存储权限',7:'文件当前状态不可写',9:'文件操作不被允许',10:'存储空间或配额不足',11:'文件路径类型不符',12:'同名文件或目录冲突',ENOENT:'文件或目录不存在',EACCES:'文件访问受限，请检查存储权限',EPERM:'文件操作权限不足',PERMISSION_DENIED:'文件访问受限，请检查存储权限',NOT_FOUND:'文件或目录不存在',ENOSPC:'存储空间不足'};
   if(code!=null&&names[code])return names[code];
   if(e&&e.name==='NotFoundError')return names[1];
   if(e&&e.name==='AbortError')return '请求已取消或超时';
@@ -211,7 +213,7 @@ async function prepare(files,download,{hashes={},signal,progress,fromVersion='',
  }
  function hostIO({game,lib}){
   if(!game||typeof game.readFile!=='function'||typeof game.writeFile!=='function'||typeof game.removeFile!=='function')throw Error('当前环境缺少安全更新所需的文件接口');
-  const read=rel=>new Promise((resolve,reject)=>{try{safe(rel);if(lib.node&&lib.node.fs)nodePath(rel);}catch(e){reject(e);return;}game.readFile(rel,v=>resolve(bytes(v)),e=>{const cause=fileError(e);if(cause&&(cause.code==='ENOENT'||cause.code===1||cause.name==='NotFoundError'))resolve(null);else reject(Object.assign(Error('文件读取失败：'+errorText(e)),{cause:e}));});});
+  const read=rel=>new Promise((resolve,reject)=>{try{safe(rel);if(lib.node&&lib.node.fs)nodePath(rel);}catch(e){reject(e);return;}game.readFile(rel,v=>resolve(bytes(v)),e=>{const cause=fileError(e);if(cause&&(cause.code==='ENOENT'||cause.code==='NOT_FOUND'||cause.code===1||cause.name==='NotFoundError'))resolve(null);else reject(Object.assign(Error('文件读取失败：'+errorText(e)),{cause:e}));});});
   const remove=async rel=>{if(await read(rel)===null)return;const base=root.localStorage&&root.localStorage.getItem('noname_inited');if(!(lib.node&&lib.node.fs)&&base&&typeof root.resolveLocalFileSystemURL==='function'){await new Promise((resolve,reject)=>root.resolveLocalFileSystemURL(base+rel,entry=>entry.remove(resolve,reject),e=>e&&e.code===1?resolve():reject(e)));return;}await new Promise((resolve,reject)=>game.removeFile(rel,e=>e&&(e.code||e instanceof Error)?reject(e):resolve()));};
   const write=async(rel,data)=>{
    const i=rel.lastIndexOf('/'),dir=rel.slice(0,i),name=rel.slice(i+1);safe(rel);
@@ -251,7 +253,7 @@ async function prepare(files,download,{hashes={},signal,progress,fromVersion='',
    const entry=await cordovaEntry(rel);if(!entry)return;if(!entry.isDirectory)throw Error('备份目录类型异常');await new Promise((resolve,reject)=>entry.remove(resolve,reject));
   }
 
-  return {read,write,remove,list,stat,removeEmptyDirectory,scope:'host-update:'+String(root.__dirname||'cordova')};
+  return {read,write,remove,list,stat,removeEmptyDirectory,requiresRecoveryMarker:true,scope:'host-update:'+String(root.__dirname||'cordova')};
  }
  root.CSHUpdate={create,backups:createBackups,hostIO,digest,safe,errorText,isRecoveryPending,clearRecoveryPending,recoveryJournal:JOURNAL};
 })(typeof window!=='undefined'?window:globalThis);

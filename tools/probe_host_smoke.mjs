@@ -17,6 +17,8 @@ const rewardOnly = process.argv.includes('--reward-only');
 const spiritMode=process.argv.includes('--spirit');
 const spiritSeats=Number(opt('--spirit-seats','2'));
 const challengeMode=process.argv.includes('--challenge-smoke');
+const recoveryBoot=process.argv.includes('--recovery-boot');
+const brokenPackage='/extension/池子魔将/main/extension-package.js';
 const matchConfig = {identity:{player_number_mode_config_identity:'2'},versus:{versus_mode_mode_config_versus:'two'},doudizhu:{doudizhu_mode_mode_config_doudizhu:'normal'}};
 if(spiritMode)matchConfig.identity.player_number_mode_config_identity=String(spiritSeats);
 if(matchUntilOver && !Object.hasOwn(matchConfig,matchMode))throw Error('Natural-mode probe currently supports identity/versus/doudizhu only; no guessed host configuration');
@@ -56,6 +58,11 @@ const server = http.createServer((req, res) => {
   const json = (status, data) => { item.status = status; res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' }); res.end(JSON.stringify(data)); };
   try {
     if (!['GET', 'HEAD'].includes(req.method)) return json(405, { success: false, errorMsg: 'Read-only smoke server' });
+    if (recoveryBoot && item.path === brokenPackage) {
+      item.status = 200;
+      res.writeHead(200, {'Content-Type':'text/javascript; charset=utf-8'});
+      return res.end('export const INTERRUPTED_WRITE = ;');
+    }
     if (url.pathname === '/__probe_init.html') { item.status = 200; res.writeHead(200, { 'Content-Type': 'text/html' }); return res.end('<!doctype html><title>Isolated host smoke initialization</title>'); }
     if (['/checkFile', '/getFileList', '/readFile'].includes(url.pathname)) {
       const target = resolveReadOnly(url.searchParams.get('fileName') || url.searchParams.get('dir') || '');
@@ -134,7 +141,7 @@ async function snap(name) {
   const filename = name + '.png'; fs.writeFileSync(path.join(out, filename), Buffer.from(shot.data, 'base64')); return filename;
 }
 async function state() {
-  return page.evaluate(`(()=>({url:location.href,title:document.title,readyState:document.readyState,serviceWorker:!!navigator.serviceWorker.controller,globals:{lib:!!window.lib,game:!!window.game,CSH:!!window.CSH},aux:window.lib?.cshAuxSpirit?{enabled:lib.config.extension_池子魔将_csh_aux_spirit,reason:lib.cshAuxSpirit.eligibility(),submode:_status.mode,started:!!_status.gameStarted,role:game.me?.identity,run:!!lib.cshAuxSpirit.current()}:null,arena:!!document.getElementById('arena'),extensionLoaded:!!window.lib?.cshWallet,character:!!window.lib?.character?.csh_haozhao,body:document.body?.innerText?.slice(0,1800),diagnostics:window.__hostSmoke||null}))()`);
+  return page.evaluate(`(()=>({url:location.href,title:document.title,readyState:document.readyState,serviceWorker:!!navigator.serviceWorker.controller,globals:{lib:!!window.lib,game:!!window.game,CSH:!!window.CSH},aux:window.lib?.cshAuxSpirit?{enabled:lib.config.extension_池子魔将_csh_aux_spirit,reason:lib.cshAuxSpirit.eligibility(),submode:_status.mode,started:!!_status.gameStarted,role:game.me?.identity,run:!!lib.cshAuxSpirit.current()}:null,arena:!!document.getElementById('arena'),protectedBoot:!!window.__cshStartupRecovery?.needRestart&&typeof _status!=='undefined'&&!!_status.extensionLoaded?.includes('池子魔将'),extensionLoaded:!!window.lib?.cshWallet,character:!!window.lib?.character?.csh_haozhao,body:document.body?.innerText?.slice(0,1800),diagnostics:window.__hostSmoke||null}))()`);
 }
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 async function until(expression, description, ms = 8000) {
@@ -546,6 +553,9 @@ try {
   await page.send('Page.navigate', { url: origin + '/__probe_init.html' });
   for (let i = 0; i < 120 && !(await page.evaluate('location.origin === ' + JSON.stringify(origin) + ' && document.readyState === "complete"')); i++) await new Promise(r => setTimeout(r, 20));
   await page.evaluate(`(async()=>{localStorage.setItem('noname_0.9_loadtime','60000');localStorage.setItem('gplv3_noname_alerted','true');const request=indexedDB.open('noname_0.9_data',4);request.onupgradeneeded=()=>{for(const name of ['video','image','audio','config','data'])request.result.createObjectStore(name,name==='video'?{keyPath:'time'}:undefined);};const db=await new Promise((resolve,reject)=>{request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});const values={extensions:['池子魔将'],extensionInfo:{'池子魔将':{}},'extension_池子魔将_enable':true,'extension_池子魔将_csh_debug_menu':true,extension_auto_import:false,mode:${JSON.stringify(challengeMode?'boss':matchUntilOver?matchMode:'identity')},'extension_池子魔将_csh_aux_spirit':${JSON.stringify(spiritMode)},show_splash:'off',...${JSON.stringify(spiritMode?{ban_identity_mode_config_identity:'nei'}:{})},dev:true,debug:false,totouched:true,touchscreen:false,new_tutorial:true,show_time:false,...${JSON.stringify(matchUntilOver ? {game_speed:'vvfast',...matchConfig[matchMode]} : {})}};const tx=db.transaction(['config'],'readwrite');for(const [key,value]of Object.entries(values))tx.objectStore('config').put(value,key);await new Promise((resolve,reject)=>{tx.oncomplete=resolve;tx.onabort=()=>reject(tx.error);});db.close();return true;})()`);
+  if(recoveryBoot){
+    await page.evaluate('localStorage.setItem("csh_update_recovery_pending_v1","1");localStorage.setItem("csh_wallet","recovery-probe-sentinel");');
+  }
   stage('test-only-idb-seeded');
   await page.send('Page.navigate', { url: origin + '/index.html' });
   stage('unmodified-host-navigation-sent');
@@ -554,12 +564,23 @@ try {
     await new Promise(r => setTimeout(r, 200));
     try { current = await state(); } catch (error) { journal('boot-observation-error', { message: error.message }); if (/timed out|disconnected/.test(error.message)) throw error; continue; }
     if (i % 25 === 0) journal('boot-observation', { state: current });
-    if (current.arena && current.extensionLoaded && current.character) break;
+    if (current.arena && (recoveryBoot ? current.protectedBoot : current.extensionLoaded && current.character)) break;
   }
   stage('full-host-boot', { state: current, screenshot: await snap('host-boot') });
   check('unmodified host entry is controlled by real service worker', current?.serviceWorker);
-  check('actual engine created arena and loaded extension/registered Haozhao', current?.arena && current?.extensionLoaded && current?.character);
-  if (current?.arena && current?.extensionLoaded && current?.character) {
+  if(recoveryBoot){
+    const recovery=await page.evaluate('(()=>({result:window.__cshStartupRecovery,pending:localStorage.getItem("csh_update_recovery_pending_v1"), wallet:localStorage.getItem("csh_wallet"), label:window.lib?.extensionMenu?.["extension_池子魔将"]?.intro?.name,buffLoaded:!!window.CSHSpiritBuffs}))()');
+    check('native loader registers a protected extension and can open the base game',current?.arena&&current?.protectedBoot,recovery);
+    check('protected boot does not request the deliberately corrupt business module',!requests.some(r=>r.path===brokenPackage));
+    check('protected boot never installs wallet, characters or guardian scripts',!current?.extensionLoaded&&!current?.character&&!recovery.buffLoaded);
+    check('protected boot preserves existing local data and presents restart guidance',recovery.wallet==='recovery-probe-sentinel'&&/重启/.test(recovery.label||''),recovery);
+    check('native adapter treats a missing journal as empty and clears the marker',
+      recovery.result?.ok&&recovery.result.result?.empty&&!recovery.pending&&/已恢复/.test(recovery.label||''),recovery);
+    check('protected native boot has no script errors or dialogs',!current?.diagnostics?.errors?.length&&!current?.diagnostics?.rejections?.length&&!current?.diagnostics?.dialogs?.length);
+  }else{
+    check('actual engine created arena and loaded extension/registered Haozhao', current?.arena && current?.extensionLoaded && current?.character);
+  }
+  if (!recoveryBoot && current?.arena && current?.extensionLoaded && current?.character) {
     if(process.argv.includes('--world-layout-410'))await worldLayout410();
     else if(process.argv.includes('--noncharacter-survey'))await surveyNoncharacter({page,out,snap,until,delay,clickElement,check,stage});
     else if(process.argv.includes('--ui-recovery')){await smokeExperience();await smokeUiRecovery();}

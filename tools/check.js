@@ -442,7 +442,9 @@ function freeVarsOf(file) {
 			let m2;
 			while ((m2 = re2.exec(code))) {
 				if (isPropertyAccess(code, m2.index)) continue;
-				if (/^\s*:/.test(code.slice(m2.index + nb.length, m2.index + nb.length + 3))) continue;
+				const afterName = code.slice(m2.index + nb.length);
+				if (/^\s*:/.test(afterName)) continue;
+				if (nb === "get" && /^\s+[\w$]+\s*\(\s*\)\s*\{/.test(afterName)) continue; // JS getter declaration
 				hits.add(nb);
 				break;
 			}
