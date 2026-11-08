@@ -646,6 +646,9 @@ var Bridge = (function () {
       T.settle('shell-settle', { data: { buyIn: buyIn, chips: Math.max(0, Math.floor(chips)) } }, cb, 4000);
     },
     isSettled: T.isSettled,
+    /* 房间快照（工作包 B）：宿主唯一写者，本页只上报纯数据。 */
+    roomState: function (cb) { call('shell-room-state', null, cb, 1500); },
+    roomSave: function (shot, seq, cb) { call('shell-room-save', { shot: shot, expectSeq: seq }, cb, 1500); },
   };
 })();
 
@@ -2065,6 +2068,76 @@ function renderAll(dealAnim) {
   renderHand(dealAnim);
   renderActions();
   updateSelInfo();
+  /* 状态出口即快照点：动作 / 叫分 / 出牌后的状态在这里已定稿。 */
+  saveRoom();
+}
+
+/* ============================================================
+   房间快照（工作包 B · 2026-11-09）
+   ------------------------------------------------------------
+   斗地主的牌是对象 {id,rank,suit}，和三张真钱桌口径一致：
+   整手牌原样保存，不重发、不重抽；同桌席位一并写进快照，
+   宿主续局时用同一份席位重建 TABLE_WORLD，结算阵营校验才对得上。
+   ============================================================ */
+var ROOM_KEYS = ['names','personas','seeds','hands','bottom','bottomShown','landlord','turn',
+  'phase','lastPlay','centerLast','actions','passCount','plays','bid','redeal','winner','over',
+  'auto','stake','mult','multLog','aiStakes','chips','actionEpoch','practice','freeRound'];
+var roomSeq = 0, lastRoomJson = '', roomSeqKnown = false, bootDone = false;
+
+function roomShot() {
+  var s = {};
+  for (var i = 0; i < ROOM_KEYS.length; i++) {
+    var k = ROOM_KEYS[i];
+    if (game[k] !== undefined) s[k] = game[k];
+  }
+  s.seats = Bridge.opponents().map(function (o) {
+    return { id: o.id, name: o.name, stake: o.stake, persona: o.persona || null, skill: o.skill, seed: o.seed || o.id };
+  });
+  s.selIds = (selIds || []).slice();
+  return { v: 1, buyIn: Bridge.buyIn(), dealer: null, s: s };
+}
+
+function saveRoom() {
+  if (!Bridge.active || typeof Bridge.roomSave !== 'function' || !bootDone) return;
+  if (game.over || game.phase === 'idle') return;   // 开局页/已收工不写
+  var shot, text;
+  try { shot = roomShot(); if (!shot) return; text = JSON.stringify(shot); } catch (eS) { return; }
+  if (text === lastRoomJson) return;
+  lastRoomJson = text;
+  Bridge.roomSave(shot, roomSeqKnown ? roomSeq : null, function (ok, d) {
+    if (ok && d && Number.isSafeInteger(d.saveSeq)) { roomSeq = d.saveSeq; roomSeqKnown = true; }
+  });
+}
+
+/* 只接受白名单字段；失败就当没恢复，继续走开局页。 */
+function applyRoomShot(shot) {
+  if (!shot || !shot.s || typeof shot.s !== 'object') return false;
+  try {
+    for (var i = 0; i < ROOM_KEYS.length; i++) {
+      var k = ROOM_KEYS[i];
+      if (shot.s[k] !== undefined) game[k] = shot.s[k];
+    }
+    if (!(game.hands instanceof Array) || game.hands.length !== 3) return false;
+    selIds = shot.s.selIds instanceof Array ? shot.s.selIds.slice() : [];
+    return true;
+  } catch (eR) { return false; }
+}
+
+function roomResume(cb) {
+  if (typeof Bridge.roomState !== 'function') { bootDone = true; cb(false); return; }
+  Bridge.roomState(function (ok, d) {
+    if (ok && d && Number.isSafeInteger(d.saveSeq)) { roomSeq = d.saveSeq; roomSeqKnown = true; }
+    if (ok && d && d.mode === 'resume' && d.shot && applyRoomShot(d.shot)) {
+      bootDone = true;
+      switchView('view-game');
+      renderAll();
+      toast('已恢复上次未打完的牌桌');
+      cb(true);
+      return;
+    }
+    bootDone = true;
+    cb(false);
+  });
 }
 
 /* ============================================================
@@ -2429,7 +2502,7 @@ switchView('view-start');
 /* shell 内：先向宿主拉钱包快照并抽取同桌 AI，再让玩家进开始页 */
 /* ★ 2026-09-29：壳内右上角重复关闭按钮已整体移除（壳顶带自有关闭） */
 if (Bridge.active) {
-  var booted = false;
+  var booted = false, roomBootStarted = false;
   function boot() {
     if (booted) return;
     booted = true;
@@ -2448,9 +2521,21 @@ if (Bridge.active) {
     }
     switchView('view-start');
   }
-  Bridge.pull(function () { boot(); });
-  setTimeout(function () { if (!booted) boot(); }, 1800);
+  function afterBoot() {
+    if (roomBootStarted) return;
+    roomBootStarted = true;
+    roomResume(function () {});
+  }
+  Bridge.pull(function () { boot(); afterBoot(); });
+  setTimeout(function () { if (!booted) boot(); afterBoot(); }, 1800);
 }
+/* 宿主烟测取证面（只读状态 + 真实开局函数），不参与玩法逻辑。 */
+window.__DDZ = {
+  getGame: function () { return game; },
+  roomShot: roomShot,
+  startGame: startGame,
+  getRoomDiag: function () { return { seq: roomSeq, known: roomSeqKnown, bootDone: bootDone }; },
+};
 </script>
 </body>
 </html>

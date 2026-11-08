@@ -68,6 +68,9 @@
 			   却挂着"门票"的名字，导致收费屏"还可玩 N 局"的说法不成立。
 			   现与德州 / 廿一点统一为带入制（免门票 + 必选带入）。 */
 			landscape: true, settle: "chips", needBuyIn: true, ticket: 0, decay: 0.90,
+			/* 工作包 B：第三张真钱桌。快照里一并保存同桌席位，宿主续局时按原席位重建
+			   TABLE_WORLD，否则阵营结算校验会对不上原桌。 */
+			room: true,
 		},
 		blackjack: {
 			key: "blackjack", title: "廿一点", dir: "blackjack", file: "blackjack.html",

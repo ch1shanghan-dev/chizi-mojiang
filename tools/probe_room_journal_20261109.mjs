@@ -225,6 +225,7 @@ const boot = fs.readFileSync(root + '/main/bootstrap.js', 'utf8');
 const shellSrc = fs.readFileSync(root + '/core/csh_shell.js', 'utf8');
 const texasSrc = fs.readFileSync(root + '/games/texas/texas.html', 'utf8');
 const bjSrc = fs.readFileSync(root + '/games/blackjack/blackjack.html', 'utf8');
+const ddzSrc = fs.readFileSync(root + '/games/doudizhu/doudizhu.html', 'utf8');
 const bootImports = (name) => new RegExp('import\\s+"[^"]*' + name.replace('.', '\\.') + '"').test(boot);
 check('csh_room.js 已进入主宿主加载图', bootImports('csh_room.js'));
 check('csh_topup_journal.js 已进入主宿主加载图（此前从未加载，补码恒「事务未就绪」）',
@@ -275,6 +276,17 @@ check('两桌都有 bootDone 闸门（探针必须等启动回调跑完再开一
   /bootDone = true/.test(bjSrc) && /bootDone = true/.test(texasSrc) &&
   /bootDone: bootDone/.test(bjSrc) && /bootDone: bootDone/.test(texasSrc));
 check('德州已声明 room:true', /key: "texas"[\s\S]{0,400}?room: true/.test(reg));
+check('斗地主已声明 room:true', /key: "doudizhu"[\s\S]{0,800}?room: true/.test(reg));
+check('斗地主已暴露 __DDZ 取证面与 bootDone',
+  /window\.__DDZ\s*=/.test(ddzSrc) && /bootDone: bootDone/.test(ddzSrc));
+check('斗地主渲染出口调用 saveRoom', /function renderAll\(dealAnim\)[\s\S]{0,400}?saveRoom\(\)/.test(ddzSrc));
+check('斗地主快照保存同桌席位（结算阵营校验要对照原桌）', /s\.seats = Bridge\.opponents\(\)/.test(ddzSrc));
+check('宿主续局时按快照席位重建 TABLE_WORLD，不重新抽人',
+  /roomResumeSeats/.test(shellSrc) && /roomResumeSeats\.map\(/.test(shellSrc));
+/* 斗地主的牌是对象 {id,rank,suit}，不是整数；快照校验必须放行这种形态。 */
+check('★ 斗地主形态（牌对象 + 同桌席位）通过快照校验',
+  R.validateShot({ s: { hands: [[{ id: 1, rank: 3, suit: 0 }], [], []], bottom: [{ id: 53, rank: 16, suit: -1 }],
+    seats: [{ id: 'csh_ddz_a', stake: 600, persona: 'rock' }], selIds: [1, 2] } }) === '');
 
 /* ---------- 廿一点快照往返：抽取真实页面函数在 vm 里跑 ----------
    这是整套恢复里最容易出静默错的一环：白名单少一个字段，续局就少一张牌/少一段筹码，

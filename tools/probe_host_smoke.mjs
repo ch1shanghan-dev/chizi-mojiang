@@ -183,13 +183,13 @@ async function clickElement(expression, inFrame = false, allowDisabled = false) 
    这条跑通，P1「房间跨进程恢复」才算闭环。 */
 async function smokeRoomPlayerPath(table){
   table=table||'blackjack';
-  const API=table==='texas'?'__TX':'__BJ';
+  const API=table==='texas'?'__TX':table==='doudizhu'?'__DDZ':'__BJ';
   const BUYIN=20000;
   const win='(()=>{const f=document.getElementById("csh-shell-frame");return f&&f.contentWindow;})()';
   const frameReady=`(()=>{const w=${win};return !!(w&&w.${API}&&typeof w.${API}.roomShot==="function"&&w.${API}.getRoomDiag&&w.${API}.getRoomDiag().bootDone);})()`;
   const hostReady='!!window.lib?.cshWallet && !!window.lib?.cshShell && typeof window.CSHRoom === "object"';
   const snapshotExpr=`(()=>{const w=${win};return {shot:w.${API}.roomShot(),pc:lib.cshWallet.wallet.pc()};})()`;
-  const cardField=table==='texas'?'deck':'shoe';
+  const cardField=table==='texas'?'deck':table==='doudizhu'?'hands':'shoe';
   stage('room-player-path-start',{table,buyIn:BUYIN});
 
   await page.evaluate('(()=>{lib.cshWallet.wallet.add(300000,"isolated room path funding");lib.cshWallet.flushSave();return lib.cshWallet.wallet.pc();})()');
@@ -202,7 +202,7 @@ async function smokeRoomPlayerPath(table){
 
   /* 真实开一手：廿一点用 startHand，德州用 startGame（内部建 G 并发牌），
      两条路径都会走 render/renderAll → saveRoom → 宿主写快照。 */
-  const deal=table==='texas'?`${win}.__TX.startGame()`:`${win}.__BJ.startHand()`;
+  const deal=table==='texas'?`${win}.__TX.startGame()`:table==='doudizhu'?`${win}.__DDZ.startGame()`:`${win}.__BJ.startHand()`;
   await page.evaluate(`(()=>{const w=${win};${deal};return true;})()`);
   await delay(700);
   const before=await page.evaluate(snapshotExpr);

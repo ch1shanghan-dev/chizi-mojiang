@@ -150,6 +150,24 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 	   模块缺失时**拒绝入场**，不静默降级成无凭据扣款（那正是要修的病）。 */
 	var currentRoomId = "";      // 本次入场对应的房间编号（空 = 不走凭据，例如练习/免带入）
 	var resumeRoom = false;      // 本次是「续上一局」，不是新扣款
+	/* 续局时把快照里的原同桌交回页面：斗地主的结算要拿 TABLE_WORLD.seats 对照阵营，
+	   重新抽人会让「原桌的钱」和「新抽的人」对不上。 */
+	var roomResumeSeats = null;
+	function roomSeatsOfSnapshot(id){
+		var RJ=roomApi(),RS=roomStorage();
+		if(!RJ||!RS||!id)return null;
+		try{
+			var e=RJ.read(RS);
+			if(!e||e.id!==id||!e.shot||!e.shot.s)return null;
+			var s=e.shot.s.seats;
+			if(!(s instanceof Array)||!s.length||s.length>5)return null;
+			for(var i=0;i<s.length;i++){
+				var x=s[i];
+				if(!x||typeof x.id!=="string"||!Number.isSafeInteger(x.stake)||x.stake<0)return null;
+			}
+			return s;
+		}catch(eR){return null;}
+	}
 	function roomApi(){try{var w=typeof window!=='undefined'?window:null;return w&&w.CSHRoom?w.CSHRoom:null;}catch(e){return null;}}
 	function roomStorage(){try{return typeof localStorage!=='undefined'?localStorage:null;}catch(e){return null;}}
 	function roomId(){return "room-"+(typeof Date!=='undefined'?Date.now():0).toString(36)+"-"+Math.random().toString(36).slice(2,12);}
@@ -1420,6 +1438,7 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 		/* 房间凭据必须在这里赋值 —— closeShell 刚把它清空，早于这行赋值等于白写。 */
 		currentRoomId = String((opts && opts.roomId) || "");
 		resumeRoom = !!(opts && opts.resume);
+		roomResumeSeats = resumeRoom ? roomSeatsOfSnapshot(currentRoomId) : null;
 		/* 新入场重置补码状态：次数是「每桌」而不是「每账号」。 */
 		topUpBaseBuyIn = currentBuyIn; topUpCount = 0; topUpTotal = 0;
 		ensureStyle();
@@ -1492,7 +1511,7 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 		current = null; paused = false; currentBuyIn = 0; topUpBaseBuyIn = 0; topUpCount = 0; topUpTotal = 0; SAVE_SESSION = null;
 		/* 注意：这里**不清**房间凭据。玩家关掉壳不代表钱退回来了 ——
 		   凭据留在本机，下次进同一张桌才能续局或退回。 */
-		currentRoomId = ""; resumeRoom = false;
+		currentRoomId = ""; resumeRoom = false; roomResumeSeats = null;
 		/* 【2026-09-30 修复 · 配乐叠播】退出小游戏后恢复主页面 BGM。
 		   只有当「池子休闲面板还开着」才恢复 —— 玩家会回到面板继续挑游戏；
 		   若面板已关（例如从悬浮球直接开局再退出），则不擅自起播，
@@ -1894,10 +1913,11 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 			if (cmd === "shell-seat") {
 				var WSe = lib.cshWorld;
 				var seats = null;
-				try {
-					seats = (WSe && WSe.seat) ? WSe.seat(d.n, d.buyIn, { tier: d.tier }) : null;
-				} catch (eSe) {}
-				/* v6.7：记下本次同桌的妖灵（关壳 / 结算时给她们各 +1 好感） */
+				/* 续局不重新抽人：返回快照里的原同桌，结算阵营校验才有同一个真值。 */
+				if (roomResumeSeats) seats = roomResumeSeats.map(function (x) { return { id: x.id, stake: x.stake, name: x.name || "", persona: x.persona || null, skill: x.skill, seed: x.seed || x.id }; });
+				else {
+					try { seats = (WSe && WSe.seat) ? WSe.seat(d.n, d.buyIn, { tier: d.tier }) : null; } catch (eSe) {}
+				}
 				if (!cshTableRecord(seats)) { ackToGame("shell-seat", false, { seats: [] }); return; }
 				ackToGame("shell-seat", !!(seats && seats.length), { seats: seats || [], table: TABLE_WORLD.token });
 				return;

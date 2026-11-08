@@ -1,7 +1,7 @@
-/* 自动生成于 2026-11-08T23:18:40.293Z by tools/release.js —— hashes 对应 Git 发布字节，发版后 git push 即生效，勿手改 files */
+/* 自动生成于 2026-11-08T23:27:34.716Z by tools/release.js —— hashes 对应 Git 发布字节，发版后 git push 即生效，勿手改 files */
 window.extension = {
 	"池子魔将": {
-		"build": "38ec2eafbc96d1876c162cc1d3fc18759bcc376cdee4f69400827339ee91e974",
+		"build": "2c66ce7094b82a9f568f8f964c4611f86fc549370446cf96ac9a611449d0d8e3",
 		"hashes": {
 			"LICENSE": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
 			"README.md": "41102b34ebc984b6b84b361baa0e78aa9defe5633a4a270cde6ed0ff7bc9ae4d",
@@ -341,13 +341,13 @@ window.extension = {
 			"core/csh_pool_achv.js": "948a81ff225822d24d24607662fdeef1924a992148afaeb4e95a42769f564ab1",
 			"core/csh_pots.js": "55f9ebd7cb5b707c196359f114cf84a93e465f4183d48f69bc1b555b80a1d8e6",
 			"core/csh_records.css": "ee8fbd0a69a575b98525b85ab6145c428d268fa1ff856567376acb7bef53684d",
-			"core/csh_registry.js": "d3d429039f6470e692130d4ba8c34871e8de9dd8befee87917f10e33a4d36ee5",
+			"core/csh_registry.js": "97d0d13ea301f458fe1278f27f408279152c5779200b5282957e4dc62ce5c81d",
 			"core/csh_room.js": "ddb5631b8f08f2580ff0f0992530e0955d18d30e62b2fb6de356c636c481c7fb",
 			"core/csh_rules.js": "7ac7bc8227037d4ba9e4f2423f819255dcead54a0ef75f60289bb709183a9d7e",
 			"core/csh_seat_cooldown.js": "afa2cee9c7ebae30dac38221b00e807631e24e7e53070adfd5e90283a625a91e",
 			"core/csh_selftest.js": "14e4acf537174481382c84370af8264027ea46cd0544731650bf675e20019ac4",
 			"core/csh_sfx.js": "ac00add5dde431b00bbbadc82a948db74e5b15732b2e0c157c82dd5746e30292",
-			"core/csh_shell.js": "84fc1e6948f1b777f1f3556b3e2867d01a3152e9ded7a8d84f19bc7a7a5b2150",
+			"core/csh_shell.js": "5c9a86236bfc89535436c725b6a1d859f34cd69f3c853becb58b08fa6cd00882",
 			"core/csh_spirit_buff_runtime.js": "b8d34cb0649f3e9d5f976ecd28fe1c73afd4d3a05bb0b1606c427a189b042e9e",
 			"core/csh_spirit_buff_skills.js": "bb2287e67a23803276e57aa3d4ee36f65d3bcfaa1b1090bd0174adede82c2d83",
 			"core/csh_spirit_buffs.js": "82bb7368c113cdbd7253b43e6e2b85145a05492e31d26ee3af47441c538499a3",
@@ -390,7 +390,7 @@ window.extension = {
 			"games/bossbook.html": "e467279dfe5e1a17f32e21cbcc9749233b454720a380e4abe33d9b63d8723a22",
 			"games/career.html": "115f63a1a08c01257876b017649b95b98e2b19db8dc6551acaa6f1ea4e962847",
 			"games/codex.html": "fccbe04d418f903b725210f9b0053d687fa6e1ff65237dfa8f58d400a7c7bd8b",
-			"games/doudizhu/doudizhu.html": "bef769f512a3f31e3120f07ff74fe58bd755270da9cd3c7ae41d0eca030236d5",
+			"games/doudizhu/doudizhu.html": "bca73a355531e99de66ac8ae915f13d5cda3fa3bc9fa022ac915b0c41815c7f7",
 			"games/goldfish.html": "471d2dddf25d92e58b5fa9ddc6307169227befed38f39d9f3d55d9bf05c6f6bb",
 			"games/rank.html": "ab7c1bbd1aafd9ebc30583b2eae2c7fd5f36ca795350db88bf0892b5605c220e",
 			"games/save.html": "be722c5ad7a3e11a495721fb0da497797f7612d9414d667717c6d005a7853a86",

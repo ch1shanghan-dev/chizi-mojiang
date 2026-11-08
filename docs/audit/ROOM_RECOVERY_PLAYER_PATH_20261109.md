@@ -109,3 +109,36 @@ E95AH 新增 3 条静态断言锁住 `__TX` 面与两桌的 `bootDone`。
 
 至此 P1「进行中房间跨进程恢复」在两张真钱牌桌上都有完整玩家路径闭环。
 仍未覆盖：斗地主 / UNO 未接 room、提交中途断电时点、安卓 U5 实机、自然长局。
+
+---
+
+## 追加 2：第三张真钱桌 · 斗地主（2026-11-09 同日）
+
+**斗地主不是照抄就能接。** 它的 `Bridge.pull` 每次启动都会调 `shell-seat` 重新抽同桌，
+而 `shell-settle-session` 的阵营分支要拿 `TABLE_WORLD.seats` 与页面上报的 `seats` 逐一对照：
+
+```js
+seats.length === 2 && TABLE_WORLD && TABLE_WORLD.seats.length === 2 &&
+seats[i].id === TABLE_WORLD.seats[i].id && seats[i].stake === TABLE_WORLD.seats[i].stake
+```
+
+续局若重新抽人，「原桌的钱」和「新抽的人」就对不上，结算会被拒。
+
+**解法**：房间快照里一并保存 `Bridge.opponents()` 的席位（`id/name/stake/persona/skill/seed`）；
+宿主 `doCharge` 走续局分支时把这份席位读进 `roomResumeSeats`，`shell-seat` 命中续局就
+**原样返回快照席位**而不是重新抽人，再由 `cshTableRecord()` 重建 `TABLE_WORLD`。
+页面无需跳过 `Bridge.pull`，契约保持不变。
+
+页面侧：斗地主牌是对象 `{id,rank,suit}`（不是整数），`csh_room.validateShot` 的通用形态扫描
+可以放行，新增一条断言锁死。新增 `__DDZ` 取证面、`renderAll` 快照钩子、`bootDone` 闸门。
+
+| 桌 | 结果 | 证据 |
+| --- | --- | --- |
+| 廿一点 | **13/0** | `work/ddz-20261109/blackjack/host-smoke.json` |
+| 德州 | **13/0** | `work/ddz-20261109/texas/host-smoke.json` |
+| 斗地主 | **13/0** | `work/ddz-20261109/host/host-smoke.json` |
+
+E95AH 124 → **130/0**（+6 条斗地主接线与形态断言）；整仓 exit=0。
+
+UNO 是名次制、无带入、门票不返还，**不应该接 room**；注册表约束已禁止非带入制桌声明 room。
+至此三张真钱桌全部有完整玩家路径闭环。剩余边界仍是：提交中途断电时点、安卓 U5 实机、自然长局。
