@@ -269,6 +269,12 @@ check('快照字段含牌靴/手牌/庄家/筹码/阶段（缺一项就不是同
 check('牌靴整副保存（不许截断：截断等于允许重抽）',
   !/shot\.s\.shoe\s*=.*slice|shoe:\s*state\.shoe\.slice\(-/.test(bjSrc));
 check('同状态不重复写（渲染频繁，避免刷盘）', /text === lastRoomJson/.test(bjSrc));
+check('德州已暴露 __TX 取证面（roomShot/startGame/getRoomDiag）',
+  /window\.__TX\s*=/.test(texasSrc) && /roomShot: roomShot/.test(texasSrc) && /startGame: startGame/.test(texasSrc));
+check('两桌都有 bootDone 闸门（探针必须等启动回调跑完再开一手）',
+  /bootDone = true/.test(bjSrc) && /bootDone = true/.test(texasSrc) &&
+  /bootDone: bootDone/.test(bjSrc) && /bootDone: bootDone/.test(texasSrc));
+check('德州已声明 room:true', /key: "texas"[\s\S]{0,400}?room: true/.test(reg));
 
 /* ---------- 廿一点快照往返：抽取真实页面函数在 vm 里跑 ----------
    这是整套恢复里最容易出静默错的一环：白名单少一个字段，续局就少一张牌/少一段筹码，

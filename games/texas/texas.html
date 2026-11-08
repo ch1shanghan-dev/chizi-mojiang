@@ -1694,7 +1694,7 @@ var ROOM_KEYS = ['n', 'aiCount', 'buyIn', 'sessionId', 'rake', 'seats', 'gamble'
   'dealer', 'sb', 'bb', 'level', 'community', 'pot', 'currentBet', 'minRaise', 'toAct',
   'street', 'deck', 'revealAll', 'winners', 'over', 'sessionOver', 'winStreak', 'minChips',
   'noFoldStreak', 'handCount', 'topUps', 'topUpTotal', 'aiStakeTotal', 'ledger', 'conservationFailed'];
-var roomSeq = 0, lastRoomJson = '', roomSeqKnown = false;
+var roomSeq = 0, lastRoomJson = '', roomSeqKnown = false, bootDone = false;
 
 function roomShotPlayer(p) {
   return {
@@ -1754,16 +1754,18 @@ function applyRoomShot(shot) {
 
 /* 启动时问一次宿主：这桌是不是还有一局没打完。 */
 function roomResume(cb) {
-  if (typeof Bridge.roomState !== 'function') { cb(false); return; }
+  if (typeof Bridge.roomState !== 'function') { bootDone = true; cb(false); return; }
   Bridge.roomState(function (ok, d) {
     if (ok && d && Number.isSafeInteger(d.saveSeq)) { roomSeq = d.saveSeq; roomSeqKnown = true; }
     if (ok && d && d.mode === 'resume' && d.shot && applyRoomShot(d.shot)) {
+      bootDone = true;
       switchView('view-game');
       render();
       toast('已恢复上次未打完的牌桌');
       cb(true);
       return;
     }
+    bootDone = true;
     cb(false);
   });
 }
@@ -3687,6 +3689,14 @@ window.addEventListener('beforeunload', onTeardown);
 window.addEventListener('unload', onTeardown);
 
 /* ---------- 启动 ---------- */
+/* 宿主烟测取证面（只读状态 + 真实开局函数），不参与玩法逻辑。
+   廿一点已有 __BJ，德州对齐同一套口径，供完整玩家路径夹具逐字段比对。 */
+window.__TX = {
+  getG: function () { return G; },
+  roomShot: roomShot,
+  startGame: startGame,
+  getRoomDiag: function () { return { seq: roomSeq, known: roomSeqKnown, bootDone: bootDone }; },
+};
 if (Bridge.active) {
   /* §4.1.1：先向宿主统一钱包同步本金与带入，再进开局页 */
   Bridge.pull(function () {

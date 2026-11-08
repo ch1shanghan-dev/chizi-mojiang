@@ -83,5 +83,29 @@ P1「进行中房间跨进程恢复」的**首个可结算闭环**成立。
 
 ## 门禁
 
-E95AH 117 → **121/0**；整仓 `node tools/check.js` **exit=0**；
+E95AH 117 → **124/0**；整仓 `node tools/check.js` **exit=0**；
 `release --check` 0 不符；`catalog_git_bytes --rev HEAD` 1044 文件 0 错。
+
+---
+
+## 追加：两桌拉平（2026-11-09 同日）
+
+`--room-player-path` 已参数化为 `--room-table blackjack|texas`，德州补上与 `__BJ`
+同口径的 `window.__TX` 取证面（`getG / roomShot / startGame / getRoomDiag`）。
+
+| 桌 | 结果 | 证据 |
+| --- | --- | --- |
+| 廿一点 | **13/0** | `D:/CodexWork/chizi-mojiang/work/room-both-20261109/blackjack-final/host-smoke.json` |
+| 德州 | **13/0** | `D:/CodexWork/chizi-mojiang/work/room-both-20261109/texas-final/host-smoke.json` |
+
+德州首跑 12/1，差异字段是 `sessionOver`（实时 `true`、恢复后 `false`）。定位后确认
+**不是产品缺陷，是探针抢跑**：德州 `Bridge.pull` 的回调是异步的，夹具在 `roomResume`
+完成之前就调了 `startGame()`，随后 `showStart()` 又把 `G.sessionOver` 置回 `true`，
+于是「实时读到的状态」和「先前已落盘的快照」不是同一帧。
+
+修法：两桌各加 `bootDone` 闸门，只在启动回调真正收尾后置位；宿主夹具的
+`frameReady` 必须等到 `getRoomDiag().bootDone === true` 才允许开一手。
+E95AH 新增 3 条静态断言锁住 `__TX` 面与两桌的 `bootDone`。
+
+至此 P1「进行中房间跨进程恢复」在两张真钱牌桌上都有完整玩家路径闭环。
+仍未覆盖：斗地主 / UNO 未接 room、提交中途断电时点、安卓 U5 实机、自然长局。

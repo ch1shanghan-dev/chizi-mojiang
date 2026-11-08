@@ -1362,7 +1362,7 @@ try { CRD = (typeof window !== 'undefined' && window.CSH && window.CSH.cards) ? 
      ★ 白名单序列化，不用整包 Object.assign —— 存档里塞进来的未知字段
        不该有机会覆盖 state 上的任何东西。
      ============================================================ */
-  var roomSeq = 0, lastRoomJson = '', roomSeqKnown = false, lastRoomError = '';
+  var roomSeq = 0, lastRoomJson = '', roomSeqKnown = false, lastRoomError = '', bootDone = false;
   var ROOM_KEYS = ['shoe', 'shoeSize', 'tier', 'hand', 'chips', 'dealerBank', 'dealerBankInit',
     'dealerBust', 'tableTotal', 'streak', 'bet', 'hands', 'dealer', 'phase', 'activeHand',
     'insuranceBet', 'holeHidden', 'roundDelta', 'insDelta', 'publicShoe'];
@@ -2223,13 +2223,14 @@ function trapDialogKey(e, modal) {
       runSceneTask(function () {
         prefetchDealer(function () {
           runSceneTask(function () {
-            var startFresh = function () { state = newState(); newShoe(); showStart(); };
+            var startFresh = function () { state = newState(); newShoe(); showStart(); bootDone = true; };
             if (typeof Bridge.roomState !== 'function') { startFresh(); return; }
             /* 宿主会告诉我们：这桌是不是还有一局没打完。有就接着打，绝不重新发牌。 */
             Bridge.roomState(function (ok, d) {
               runSceneTask(function () {
                 if (ok && d && Number.isSafeInteger(d.saveSeq)) { roomSeq = d.saveSeq; roomSeqKnown = true; }
                 if (ok && d && d.mode === 'resume' && d.shot && applyRoomShot(d.shot)) {
+                  bootDone = true;
                   switchView('view-game');
                   renderAll();
                   toast('已恢复上次未打完的牌桌');
@@ -2262,7 +2263,7 @@ function trapDialogKey(e, modal) {
     /* 房间快照的取证面：给隔离验证复现「存一份 → 重建 → 比对」用，
        不参与任何玩法逻辑，也不改变默认渲染行为。 */
     roomShot: roomShot, applyRoomShot: applyRoomShot,
-    getRoomDiag: function () { return { seq: roomSeq, known: roomSeqKnown, error: lastRoomError }; },
+    getRoomDiag: function () { return { seq: roomSeq, known: roomSeqKnown, error: lastRoomError, bootDone: bootDone }; },
     getDealerSeat: function () { return dealerSeat; },
     setShoe: function (cards, size) {
       state.shoe = cards.slice();

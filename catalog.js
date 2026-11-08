@@ -1,7 +1,7 @@
-/* 自动生成于 2026-11-08T22:54:02.279Z by tools/release.js —— hashes 对应 Git 发布字节，发版后 git push 即生效，勿手改 files */
+/* 自动生成于 2026-11-08T23:18:40.293Z by tools/release.js —— hashes 对应 Git 发布字节，发版后 git push 即生效，勿手改 files */
 window.extension = {
 	"池子魔将": {
-		"build": "5b772d8d3289104fbd8ce96584e1f1ebde406552d52d868612fee433137626d6",
+		"build": "38ec2eafbc96d1876c162cc1d3fc18759bcc376cdee4f69400827339ee91e974",
 		"hashes": {
 			"LICENSE": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
 			"README.md": "41102b34ebc984b6b84b361baa0e78aa9defe5633a4a270cde6ed0ff7bc9ae4d",
@@ -386,7 +386,7 @@ window.extension = {
 			"font/csh_fx_font_2.woff2": "ad894385b4e996e5f4b237cc6f5ead035237fb4c0cceaa603081ea63ab2b1da9",
 			"font/csh_fx_font_3.woff2": "d7ab0948a09d38fc75e71968e265385a124f98223c17d32dfe85e1aa3aadf51b",
 			"games/achv.html": "56d2e20cd20e7f295daceca08dde10915e7b63e17298ea0f4790835a7801d88e",
-			"games/blackjack/blackjack.html": "3a2d058d914333ebd3c1ddd9e2f2a05f24b7992c8e59a57c463c37fe13f2a376",
+			"games/blackjack/blackjack.html": "8bbe706e4e632977da30bd715003fc64899fc6f9f3a6ab165da6090ddb033aec",
 			"games/bossbook.html": "e467279dfe5e1a17f32e21cbcc9749233b454720a380e4abe33d9b63d8723a22",
 			"games/career.html": "115f63a1a08c01257876b017649b95b98e2b19db8dc6551acaa6f1ea4e962847",
 			"games/codex.html": "fccbe04d418f903b725210f9b0053d687fa6e1ff65237dfa8f58d400a7c7bd8b",
@@ -394,7 +394,7 @@ window.extension = {
 			"games/goldfish.html": "471d2dddf25d92e58b5fa9ddc6307169227befed38f39d9f3d55d9bf05c6f6bb",
 			"games/rank.html": "ab7c1bbd1aafd9ebc30583b2eae2c7fd5f36ca795350db88bf0892b5605c220e",
 			"games/save.html": "be722c5ad7a3e11a495721fb0da497797f7612d9414d667717c6d005a7853a86",
-			"games/texas/texas.html": "bc31ecf18287e0206a6098292223b6aee56b7c478154fbe6505042fc874cac12",
+			"games/texas/texas.html": "603dae8365efc0eef9b3469291a6ba1e526021a164e78bc3568468ce02618d27",
 			"games/uno/uno.html": "49371f8f3f347f624777bcfd721193c07c94c3efc618029e8c098dfbac40d564",
 			"image/card/csh_ak47.png": "fa846a4792cafd9ea362156e8db924eff59edab9ef640410b02fcf975db3bf1d",
 			"image/card/csh_daju.png": "fedfdbb00a85fe11b35fcca3bdf1cb4395f1709984a02230fc0fd6df3539f189",
