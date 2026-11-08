@@ -57,6 +57,8 @@
 			key: "texas", title: "德州扑克", dir: "texas", file: "texas.html",
 			tag: "牌桌", desc: "真实 AI 同桌 · 带入制",
 			landscape: true, settle: "chips", needBuyIn: true, ticket: 0, decay: 1,
+			/* 工作包 B：德州同样上报局内快照（牌堆/底牌/公共牌/行动权），可跨进程续局。 */
+			room: true,
 		},
 		doudizhu: {
 			key: "doudizhu", title: "斗地主", dir: "doudizhu", file: "doudizhu.html",

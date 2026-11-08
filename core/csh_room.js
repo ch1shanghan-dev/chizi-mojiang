@@ -116,6 +116,24 @@
           if (err) return err;
         }
       }
+      /* 德州形态：剩余牌堆 + 公共牌 + 各家底牌。牌堆必须无重复（52 张一副，翻完可为空）。 */
+      if (s.deck != null) {
+        err = cardArray(s.deck, 52, '牌堆', Object.create(null));
+        if (err) return err;
+      }
+      if (s.community != null) {
+        err = cardArray(s.community, 5, '公共牌', null);
+        if (err) return err;
+      }
+      if (Object.prototype.toString.call(s.players) === '[object Array]') {
+        if (s.players.length > 6) return '座位过多';
+        for (var q = 0; q < s.players.length; q++) {
+          var pl = s.players[q];
+          if (!pl || typeof pl !== 'object') return '座位记录非法';
+          err = cardArray(pl.hole, 2, '底牌', null);
+          if (err) return err;
+        }
+      }
     }
     return '';
   }

@@ -1,7 +1,7 @@
-/* 自动生成于 2026-11-08T21:59:52.893Z by tools/release.js —— hashes 对应 Git 发布字节，发版后 git push 即生效，勿手改 files */
+/* 自动生成于 2026-11-08T22:19:27.034Z by tools/release.js —— hashes 对应 Git 发布字节，发版后 git push 即生效，勿手改 files */
 window.extension = {
 	"池子魔将": {
-		"build": "35febf5a3023fff79e895e19edf47e4c5d54aa525db82ce744abbda6526b6bc5",
+		"build": "22d383f29fd3a0f45a8293b6d73ecff7332af8139a10237c723a2f20400e3572",
 		"hashes": {
 			"LICENSE": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
 			"README.md": "41102b34ebc984b6b84b361baa0e78aa9defe5633a4a270cde6ed0ff7bc9ae4d",
@@ -341,8 +341,8 @@ window.extension = {
 			"core/csh_pool_achv.js": "948a81ff225822d24d24607662fdeef1924a992148afaeb4e95a42769f564ab1",
 			"core/csh_pots.js": "55f9ebd7cb5b707c196359f114cf84a93e465f4183d48f69bc1b555b80a1d8e6",
 			"core/csh_records.css": "ee8fbd0a69a575b98525b85ab6145c428d268fa1ff856567376acb7bef53684d",
-			"core/csh_registry.js": "30c37066722425f8a57cb62c5c99dcfa7c2ff53a1b635ab65ef721c80c053291",
-			"core/csh_room.js": "23491db9e4d2dd3e826fa4b3178b75cf475026800c558dc1c237e6dec138c848",
+			"core/csh_registry.js": "d3d429039f6470e692130d4ba8c34871e8de9dd8befee87917f10e33a4d36ee5",
+			"core/csh_room.js": "cbb83ad2a4db11babd2c389f5642fae853c51b864e5ee20ec7116bfe55147ee1",
 			"core/csh_rules.js": "7ac7bc8227037d4ba9e4f2423f819255dcead54a0ef75f60289bb709183a9d7e",
 			"core/csh_seat_cooldown.js": "afa2cee9c7ebae30dac38221b00e807631e24e7e53070adfd5e90283a625a91e",
 			"core/csh_selftest.js": "14e4acf537174481382c84370af8264027ea46cd0544731650bf675e20019ac4",
@@ -394,7 +394,7 @@ window.extension = {
 			"games/goldfish.html": "471d2dddf25d92e58b5fa9ddc6307169227befed38f39d9f3d55d9bf05c6f6bb",
 			"games/rank.html": "ab7c1bbd1aafd9ebc30583b2eae2c7fd5f36ca795350db88bf0892b5605c220e",
 			"games/save.html": "be722c5ad7a3e11a495721fb0da497797f7612d9414d667717c6d005a7853a86",
-			"games/texas/texas.html": "ef4fcc9ed5da3b3992581ac791eb3b513f5319958c5611b5785068dc1d4d4526",
+			"games/texas/texas.html": "290aa405f7f73900473dabaaae5ea00eb9af68f427782aba4ff780b8c03b62f8",
 			"games/uno/uno.html": "49371f8f3f347f624777bcfd721193c07c94c3efc618029e8c098dfbac40d564",
 			"image/card/csh_ak47.png": "fa846a4792cafd9ea362156e8db924eff59edab9ef640410b02fcf975db3bf1d",
 			"image/card/csh_daju.png": "fedfdbb00a85fe11b35fcca3bdf1cb4395f1709984a02230fc0fd6df3539f189",

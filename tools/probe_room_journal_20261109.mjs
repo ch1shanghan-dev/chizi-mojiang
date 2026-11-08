@@ -356,6 +356,104 @@ check('同状态不重复写（渲染频繁，避免刷盘）', /text === lastRo
   check('状态真变了才再上报', saves === 2, saves);
 }
 
+/* ---------- 德州快照往返 ----------
+   德州比廿一点多一层风险：底牌分属各家，牌堆必须无重复，且**恢复后绝不能变成免费重开**
+   （entryUsed 必须置位，否则同一次带入可以无限续命）。 */
+{
+  const { parse, walk } = await import(pathToFileURL(root + '/tools/lib/skill_audit.mjs').href);
+  const txInline = (texasSrc.match(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/) || [])[1];
+  check('德州内联脚本可抽取', !!txInline && txInline.length > 1000);
+  const txKeys = (texasSrc.match(/var ROOM_KEYS = \[([\s\S]*?)\];/) || [])[1];
+  check('德州 ROOM_KEYS 可抽取', !!txKeys);
+
+  function txHarness() {
+    const ctx = vm.createContext({
+      window: {}, Object, Array, JSON, Math, Number, String, Error, Date, isFinite,
+      console: { log() {}, warn() {}, error() {} },
+    });
+    vm.runInContext('var ROOM_KEYS = [' + txKeys + '];', ctx);
+    const names = ['roomShotPlayer', 'roomShot', 'saveRoom', 'applyRoomShot'];
+    walk(parse(txInline), n => {
+      if (n.type === 'FunctionDeclaration' && names.indexOf(n.id.name) >= 0)
+        vm.runInContext(txInline.slice(n.range[0], n.range[1]), ctx);
+    });
+    ctx.Bridge = { active: true, roomSave: () => {}, roomState: () => {} };
+    ctx.entryUsed = false;
+    ctx.lastRoomJson = ''; ctx.roomSeq = 0;
+    ctx.G = null;
+    /* makeSession 会去抽世界席位，恢复路径里它的产物会被白名单整体覆盖 —— 桩掉即可。 */
+    ctx.makeSession = () => ({ players: [], deck: [], community: [], buyIn: 0 });
+    return ctx;
+  }
+
+  function sampleG() {
+    return {
+      n: 4, aiCount: 3, buyIn: 50000, sessionId: 'texas-sim-1', rake: 0.005,
+      seats: [{ id: 'csh_a', stake: 60000 }, { id: 'csh_b', stake: 75000 }, { id: 'csh_c', stake: 40000 }],
+      gamble: false, handNo: 9, dealer: 2, sb: 200, bb: 400, level: 1,
+      community: [12, 25, 38], pot: 8400, currentBet: 1600, minRaise: 1600, toAct: 0,
+      street: 'turn', deck: [3, 7, 11, 19, 27, 41, 44, 49], revealAll: false, winners: [],
+      over: false, sessionOver: false, winStreak: 2, minChips: 22000, noFoldStreak: 3,
+      handCount: 9, topUps: 0, topUpTotal: 0, aiStakeTotal: 175000,
+      ledger: { roundId: 'texas-sim-1:9', layers: [] }, conservationFailed: false,
+      players: [
+        { id: 0, isHuman: true, name: '池子', surname: '池', chips: 43600, bet: 0, contrib: 800,
+          hole: [14, 31], folded: false, allin: false, acted: false, out: false, persona: null,
+          tag: '', reveal: true, skill: 1 },
+        { id: 1, isHuman: false, name: '甲', surname: '甲', chips: 58000, bet: 0, contrib: 1600,
+          hole: [6, 22], folded: false, allin: false, acted: true, out: false, persona: 'rock',
+          tag: '稳', reveal: false, skill: 0.8, worldState: { mood: 1, fatigue: 0, form: 2 },
+          worldId: 'csh_a', mult: 1, seed: 'csh_a' },
+        { id: 2, isHuman: false, name: '乙', surname: '乙', chips: 71000, bet: 0, contrib: 0,
+          hole: [9, 45], folded: true, allin: false, acted: true, out: false, persona: 'trapper',
+          tag: '诈', reveal: false, skill: 0.7, worldState: null, worldId: 'csh_b', mult: 1, seed: 'csh_b' },
+        { id: 3, isHuman: false, name: '丙', surname: '丙', chips: 38000, bet: 0, contrib: 0,
+          hole: [], folded: true, allin: false, acted: true, out: false, persona: 'maniac',
+          tag: '莽', reveal: false, skill: 0.6, worldState: null, worldId: 'csh_c', mult: 1, seed: 'csh_c' },
+      ],
+    };
+  }
+
+  const t1 = txHarness();
+  t1.G = sampleG();
+  const shot = t1.roomShot();
+  check('德州快照生成且带牌桌标记', !!shot && shot.v === 1 && shot.s && shot.buyIn === 50000);
+  check('快照只含白名单字段（players 单独映射）',
+    Object.keys(shot.s).every(k => t1.ROOM_KEYS.indexOf(k) >= 0 || k === 'players'), Object.keys(shot.s));
+
+  const wire = JSON.parse(JSON.stringify(shot));
+  const t2 = txHarness();
+  check('德州重建成功', t2.applyRoomShot(wire) === true);
+  check('★ 恢复后 entryUsed 置位（否则同一次带入可以无限续命）', t2.entryUsed === true);
+  const diff = t2.ROOM_KEYS.filter(k => JSON.stringify(t1.G[k]) !== JSON.stringify(t2.G[k]));
+  check('★ 往返后全部字段相等（含牌堆/公共牌/行动权/盲注档）', diff.length === 0, diff);
+  check('牌堆整副往返、无重复',
+    t2.G.deck.length === 8 && new Set(t2.G.deck).size === 8 &&
+    JSON.stringify(t2.G.deck) === JSON.stringify(t1.G.deck));
+  check('各家底牌往返，弃牌者的空底牌保留为空',
+    t2.G.players[0].hole.length === 2 && t2.G.players[3].hole.length === 0);
+  check('世界身份随座位往返（结算要按原 AI 记账）',
+    t2.G.players[1].worldId === 'csh_a' && t2.G.players[1].skill === 0.8);
+  check('玩家筹码与底池往返（差一分就是吞钱/造钱）',
+    t2.G.players[0].chips === 43600 && t2.G.pot === 8400 && t2.G.currentBet === 1600);
+
+  const t3 = txHarness();
+  check('无 s 拒绝', t3.applyRoomShot({ v: 1 }) === false);
+  check('底牌不是数组拒绝', t3.applyRoomShot({ v: 1, s: { players: 'x', deck: [], community: [] } }) === false);
+  check('座位少于 2 拒绝', t3.applyRoomShot({ v: 1, s: { players: [], deck: [], community: [] } }) === false);
+  check('牌堆不是数组拒绝', t3.applyRoomShot({ v: 1, s: { players: [{}, {}], deck: null, community: [] } }) === false);
+
+  const t4 = txHarness();
+  let saves = 0;
+  t4.Bridge.roomSave = () => { saves++; };
+  t4.G = sampleG();
+  t4.saveRoom(); t4.saveRoom();
+  check('德州同状态只上报一次', saves === 1, saves);
+  t4.G.sessionOver = true;
+  t4.saveRoom();
+  check('收工后不再上报（等结算清凭据）', saves === 1, saves);
+}
+
 /* ---------- 自检：去掉「只有余额不变才丢弃」必须判红 ---------- */
 const anchor = "    if (pc === d.balanceBefore) return { action: 'discard', entry: d, reason: '扣款未持久化' };";
 if (!src.includes(anchor)) throw Error('negative-baseline anchor changed');

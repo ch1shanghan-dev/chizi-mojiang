@@ -1262,6 +1262,9 @@ var Bridge = (function () {
     topUp: function (amount, cb) { call('shell-topup', { key: 'texas', amount: amount }, cb, 3000); },
     /* 上桌确认：清掉宿主的未决凭据。失败不清不影响本局，下次启动恢复会兜底退款。 */
     topUpCommit: function (txId, cb) { call('shell-topup-commit', { txId: txId }, cb, 2000); },
+    /* 房间快照（工作包 B）：宿主是唯一写者，本页只上报纯数据。 */
+    roomState: function (cb) { call('shell-room-state', null, cb, 1500); },
+    roomSave: function (shot, seq, cb) { call('shell-room-save', { shot: shot, expectSeq: seq }, cb, 1500); },
     /* 每日任务上报（唯一真值在 csh_wallet，生涯大厅读同一份） */
     taskAdd: function (kind, n, cb) { call('shell-task-add', { kind: kind, n: n }, cb); },
   };
@@ -1677,6 +1680,91 @@ function makeSession() {
     /* 台下可赢总额 = 同桌 AI 实际带入合计（自然封顶，§H.1） */
     aiStakeTotal: seats.reduce(function (s, x) { return s + (x.stake || 0); }, 0),
   };
+}
+
+/* ============================================================
+   房间快照（工作包 B · 2026-11-09）
+   ------------------------------------------------------------
+   进程被杀后要能接着打：牌堆、各家底牌、公共牌、底池、行动权、盲注档位缺一不可。
+   ★ 牌堆必须原样保存 —— 重洗或补发等于换了一局，玩家会看到自己的牌变了。
+   ★ 座位只是数据，不重抽：重抽会换人、换身家，结算就跟原桌对不上。
+   ★ 恢复后 entryUsed 直接置位：钱在入场时已经扣过，不许变成免费重开。
+   ============================================================ */
+var ROOM_KEYS = ['n', 'aiCount', 'buyIn', 'sessionId', 'rake', 'seats', 'gamble', 'handNo',
+  'dealer', 'sb', 'bb', 'level', 'community', 'pot', 'currentBet', 'minRaise', 'toAct',
+  'street', 'deck', 'revealAll', 'winners', 'over', 'sessionOver', 'winStreak', 'minChips',
+  'noFoldStreak', 'handCount', 'topUps', 'topUpTotal', 'aiStakeTotal', 'ledger', 'conservationFailed'];
+var roomSeq = 0, lastRoomJson = '';
+
+function roomShotPlayer(p) {
+  return {
+    id: p.id, isHuman: !!p.isHuman, name: p.name, surname: p.surname,
+    chips: p.chips, bet: p.bet, contrib: p.contrib, hole: (p.hole || []).slice(),
+    folded: !!p.folded, allin: !!p.allin, acted: !!p.acted, out: !!p.out,
+    persona: p.persona || null, tag: p.tag || '', reveal: !!p.reveal,
+    skill: p.skill, worldState: p.worldState || null, worldId: p.worldId || 0,
+    mult: p.mult || 1, seed: p.seed || 0,
+  };
+}
+
+function roomShot() {
+  if (!G) return null;
+  var s = {};
+  for (var i = 0; i < ROOM_KEYS.length; i++) {
+    var k = ROOM_KEYS[i];
+    if (G[k] !== undefined) s[k] = G[k];
+  }
+  s.players = (G.players || []).map(roomShotPlayer);
+  return { v: 1, buyIn: G.buyIn, dealer: null, s: s };
+}
+
+function saveRoom() {
+  if (!Bridge.active || !G || typeof Bridge.roomSave !== 'function') return;
+  if (G.sessionOver) return;                 // 已收工，等结算清凭据
+  var shot, text;
+  try { shot = roomShot(); if (!shot) return; text = JSON.stringify(shot); } catch (eS) { return; }
+  if (text === lastRoomJson) return;          // 同一状态不重复写
+  lastRoomJson = text;
+  Bridge.roomSave(shot, roomSeq, function (ok, d) {
+    if (ok && d && Number.isSafeInteger(d.saveSeq)) roomSeq = d.saveSeq;
+  });
+}
+
+/* 恢复：只接受白名单字段。失败就当没恢复，走新局（新局会重新扣款，由宿主判定）。 */
+function applyRoomShot(shot) {
+  if (!shot || !shot.s || typeof shot.s !== 'object') return false;
+  try {
+    var base = makeSession();
+    for (var i = 0; i < ROOM_KEYS.length; i++) {
+      var k = ROOM_KEYS[i];
+      if (shot.s[k] !== undefined) base[k] = shot.s[k];
+    }
+    /* players 不在 ROOM_KEYS 里（它是逐人映射的），必须单独搬 ——
+       少这一行，续局回来就是一张空桌（往返测试当场抓到过）。 */
+    if (shot.s.players instanceof Array) base.players = shot.s.players;
+    if (!(base.players instanceof Array) || base.players.length < 2) return false;
+    if (!(base.deck instanceof Array)) return false;
+    if (!(base.community instanceof Array)) return false;
+    G = base;
+    entryUsed = true;                          /* 已扣款：不可免费重开（E31：行尾注释不被剥离，避免指责性字样） */
+    return true;
+  } catch (eR) { return false; }
+}
+
+/* 启动时问一次宿主：这桌是不是还有一局没打完。 */
+function roomResume(cb) {
+  if (typeof Bridge.roomState !== 'function') { cb(false); return; }
+  Bridge.roomState(function (ok, d) {
+    if (ok && d && Number.isSafeInteger(d.saveSeq)) roomSeq = d.saveSeq;
+    if (ok && d && d.mode === 'resume' && d.shot && applyRoomShot(d.shot)) {
+      switchView('view-game');
+      render();
+      toast('已恢复上次未打完的牌桌');
+      cb(true);
+      return;
+    }
+    cb(false);
+  });
 }
 
 function livePlayers() {
@@ -2478,6 +2566,8 @@ function render() {
   renderMyArea();
   renderActions();
   syncToastAnchor();
+  /* 状态出口即快照点：这里之后台上任何一处都已是新状态。 */
+  saveRoom();
 }
 
 /* 把玩家区的实时高度写进 --myarea-h（toast 在矮屏走底部锚定，需要让位高度）。
@@ -3598,7 +3688,12 @@ window.addEventListener('unload', onTeardown);
 /* ---------- 启动 ---------- */
 if (Bridge.active) {
   /* §4.1.1：先向宿主统一钱包同步本金与带入，再进开局页 */
-  Bridge.pull(function () { syncBankFromWallet(function () { showStart(); }); });
+  Bridge.pull(function () {
+    syncBankFromWallet(function () {
+      /* 先问有没有没打完的牌桌：有就直接回牌桌，没有才进开局页。 */
+      roomResume(function (resumed) { if (!resumed) showStart(); });
+    });
+  });
 } else {
   showStart();
 }
