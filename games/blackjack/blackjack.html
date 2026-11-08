@@ -381,8 +381,8 @@
   @keyframes toastIn { from { transform: translateY(-12px); opacity: 0; } }
 
   /* ---------- 断点：方向 + 可用高度（规范 §19，不再用 max-width 判"手机"） ---------- */
-  /* L-NORMAL：横屏且高 ≥ 430px（PC / 大平板）—— 牌放大，主战区吃满剩余高度 */
-  @media (orientation: landscape) and (min-height: 430px) {
+  /* L-NORMAL：横屏且高 ≥ 500px（PC / 大平板）—— 牌放大，主战区吃满剩余高度 */
+  @media (orientation: landscape) and (min-height: 500px) {
     :root { --cw: clamp(46px, 8.4vh, 104px); }
   }
   /* L-SHORT：手机横屏（915×412 档）—— 压字号、保触摸目标 44px */
@@ -434,7 +434,7 @@
 <style id="readable-ui-410">
 :root{--ui-readable:12px;--fs-xs:clamp(12px,1.3vh,15px);--fs-sm:clamp(12px,1.5vh,17px)}
 .start-card>.subtitle,.field .lab,.start-card label,.start-card .hint{font-size:var(--ui-readable)!important;line-height:1.4}
-@media(max-height:430px){:root{--fs-xs:12px;--fs-sm:12px}}
+@media(max-height:500px){:root{--fs-xs:12px;--fs-sm:12px}}
 </style>
 <link rel="stylesheet" href="../../core/csh_tables.css">
 <link rel="stylesheet" href="../../core/csh_duel_tables.css">
@@ -452,7 +452,7 @@
 .rules-card{overflow:hidden}
 .rules-title{flex-shrink:0}
 .rules-body{min-height:0;overflow-y:auto;overscroll-behavior:contain}
-@media(orientation:landscape) and (max-height:430px){#view-game .bj-side{min-width:150px;padding:0 6px}#banner .rs-body{gap:6px}.rules-card{max-height:calc(100% - 8px);padding:12px 16px;gap:8px}.rules-mask{padding:8px}}
+@media(orientation:landscape) and (max-height:500px){#view-game .bj-side{min-width:150px;padding:0 6px}#banner .rs-body{gap:6px}.rules-card{max-height:calc(100% - 8px);padding:12px 16px;gap:8px}.rules-mask{padding:8px}}
 @media(prefers-reduced-motion:reduce){#view-game .bj-side{transition:none}}
 </style>
 </head>

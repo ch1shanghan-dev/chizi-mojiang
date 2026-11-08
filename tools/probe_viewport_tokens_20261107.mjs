@@ -67,15 +67,26 @@ check('公共样式写明 330/500 不可合并的理由',
 check('art-direction §4.3 定则仍在文档里', /4\.3/.test(art) && /横屏/.test(art));
 check('方案 §4.1 列出四档视口', /vp-desktop/.test(design) && /vp-wide/.test(design) && /vp-tiny/.test(design) && /vp-portrait/.test(design));
 
-/* 方案 §4.1 说「330/500/760 混用」，实测全仓有 **24 种** max-height/max-width 断点值。
-   一次性收敛会同时改动十几页布局、必须逐页比对截图，风险远大于本轮收益。
-   按项目 B11 的基线策略：把现状固化成白名单，先锁住「不扩散」，逐值收敛列为后续待办。
-   新增任何基线外数值都会判红，提示先走视口令牌与截图验证。 */
-const BASELINE = new Set([330, 340, 350, 400, 420, 430, 440, 450, 480, 500, 520, 540, 559, 560,
+/* 方案 §4.1 说「330/500/760 混用」，实测全仓原有 **24 种** max-height/max-width 断点值。
+   一次性收敛会同时改动十几页布局、必须逐页比对截图，风险远大于单轮收益。
+   按项目 B11 的基线策略：把现状固化成白名单，先锁住「不扩散」，逐值收敛按批推进。
+   I1（2026-11-08）已把 height:430 的 21 处 max + 1 处配对 min 整批收敛到 500，
+   白名单同步收缩一项：430 不再允许出现，新增任何基线外数值仍会判红。 */
+const BASELINE = new Set([330, 340, 350, 400, 420, 440, 450, 480, 500, 520, 540, 559, 560,
   600, 620, 640, 720, 750, 760, 899, 1000, 1199, 599]);
 function scanBreaks(text) {
   const out = [];
   const re = /\(\s*max-(?:height|width)\s*:\s*(\d+)px/g;
+  let m;
+  while ((m = re.exec(text))) out.push(Number(m[1]));
+  return out;
+}
+/* I1 盲区：max-height 断点常有配对的 min-height 反向规则（L-NORMAL）。
+   只改 max 不改 min，会让 431–499 高度同时命中「放大牌」与「压缩间距」两套样式。
+   E2/G1 的扫描口径只看 max-*，漏掉了这类配对，这里单独扫并做同值校验。 */
+function scanMinBreaks(text) {
+  const out = [];
+  const re = /\(\s*min-height\s*:\s*(\d+)px/g;
   let m;
   while ((m = re.exec(text))) out.push(Number(m[1]));
   return out;
@@ -94,9 +105,20 @@ const found = new Map();
 for (const f of files) for (const v of scanBreaks(f.text)) found.set(v, (found.get(v) || 0) + 1);
 check('全仓 @media 断点不越过基线（禁止新增随意数值）',
   [...found.keys()].every(v => BASELINE.has(v)), [...found.keys()].filter(v => !BASELINE.has(v)));
-check('基线恰为实测的 24 种历史断点，三档主值都在其中',
-  BASELINE.size === 24 && found.get(330) > 0 && found.get(500) > 0 && found.get(760) > 0,
+check('基线恰为实测的 23 种历史断点，三档主值都在其中',
+  BASELINE.size === 23 && found.get(330) > 0 && found.get(500) > 0 && found.get(760) > 0,
   { size: BASELINE.size, found: [...found.keys()].length });
+const minFound = new Map();
+for (const f of files) for (const v of scanMinBreaks(f.text)) minFound.set(v, (minFound.get(v) || 0) + 1);
+/* 反向规则有两种合法写法：同值重叠（min:500 / max:500）与互补不重叠
+   （min:641 / max:640、min:441 / max:440）。两者都必须落到 max 侧已有值上。 */
+check('min-height 反向规则必须与 max-height 同值或互补(v-1)配对',
+  minFound.size > 0 && [...minFound.keys()].every(v => found.has(v) || found.has(v - 1)),
+  { min: [...minFound.keys()], max: [...found.keys()] });
+check('I1：height:430 已整批收敛，max / min 两侧都零残留',
+  !found.has(430) && !minFound.has(430) && !files.some(f => /\(\s*(?:max|min)-height\s*:\s*430px/.test(f.text)));
+check('改前基线：只改 max 不改 min（残留 min:430）会被配对断言检出',
+  (() => { const stale = [430]; return !stale.every(v => found.has(v) || found.has(v - 1)); })());
 check('扫描器能抓出新增的随意断点',
   (() => { const bad = scanBreaks('@media(max-height:777px){.x{color:red}}'); return bad.length === 1 && bad[0] === 777; })());
 check('视口模块源码无 DOM / 存档 / 钱包依赖',

@@ -82,7 +82,7 @@
 **骨架** `core/csh_layout.css`（五页共用）：
 - `.csh-game` = grid `[ topbar | stage | dock ]`；`.csh-stage` = grid `[ HUD? | board | player ]`
   —— 三行几何上不可能重叠（不靠 z-index 补救）。
-- `L-SHORT`（横屏 ≤430px）/ `L-TINY`（≤350px）优先精简间距与装饰；关键决策/风险保持可见，低频设置和次要信息可以折叠。正文不低于12px、主要触控目标不低于44px。
+- `L-SHORT`（横屏 ≤500px）/ `L-TINY`（≤350px）优先精简间距与装饰；关键决策/风险保持可见，低频设置和次要信息可以折叠。正文不低于12px、主要触控目标不低于44px。
 - `.csh-topbar` 右侧预留壳悬浮件的空白带（`padding-right: clamp(148px,19vw,186px)`），
   保证任何页面数据都不被悬浮件压住 —— 单点预留，五页通用。
 

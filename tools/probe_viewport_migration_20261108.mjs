@@ -1,7 +1,9 @@
 /* G1：断点逐值收敛的迁移真值（2026-11-08）
    真实 core/csh_viewport.js 在 VM 里加载；按 E95X 同款口径扫描全仓 core/games 的 css/html，
-   验证 24 种历史断点（按 max-height / max-width 分轴）都有可映射目标、方向/风险自洽、
-   目标集合闭合、单调不逆序，并输出逐页迁移清单。**本轮不改任何 @media 数值。**
+   验证历史断点（按 max-height / max-width 分轴）都有可映射目标、方向/风险自洽、
+   目标集合闭合、单调不逆序，并输出逐页迁移清单。
+   I1（2026-11-08）已按本表把 height:430 整批收敛到 500，故实测值集合随每批收敛动态变小；
+   迁移表本身保留 430 作为历史依据，已收敛的值不再出现在扫描里。
    内置改前基线：缺映射 / 目标越界 / 破坏单调 都必须被检出。 */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -66,17 +68,19 @@ for (const f of files) {
   }
 }
 const allValues = new Set([...found.height.keys(), ...found.width.keys()]);
-check('按轴实测：height 15 种 / width 13 种 / 合并 24 种',
-  found.height.size === 15 && found.width.size === 13 && allValues.size === 24,
+check('按轴实测：height 14 种 / width 13 种 / 合并 23 种（430 已整批收敛）',
+  found.height.size === 14 && found.width.size === 13 && allValues.size === 23,
   { height: found.height.size, width: found.width.size, union: allValues.size });
 const baseline = new Set(((vpProbe.match(/const BASELINE = new Set\(\[([\s\S]*?)\]\)/) || [])[1] || '')
   .split(',').map(s => Number(s.trim())).filter(Number.isFinite));
-check('与 E95X 基线 24 种完全一致（零 CSS 改动）',
-  baseline.size === 24 && allValues.size === baseline.size && [...allValues].every(v => baseline.has(v)),
+check('与 E95X 基线 23 种逐项一致（两处口径同步收缩）',
+  baseline.size === 23 && allValues.size === baseline.size && [...allValues].every(v => baseline.has(v)),
   { missingInBaseline: [...allValues].filter(v => !baseline.has(v)), missingInScan: [...baseline].filter(v => !allValues.has(v)) });
-check('全仓断点仍是 24 种，主值 330 / 500 / 760 仍在用',
+check('全仓断点仍是 23 种，主值 330 / 500 / 760 仍在用',
   (found.height.get(330) || []).length > 0 && (found.height.get(500) || []).length > 0 &&
   (found.width.get(760) || []).length > 0);
+check('已收敛的 430 不再出现在全仓扫描里，但仍在迁移表中留作历史依据',
+  !allValues.has(430) && V.migrationOf(430, 'height').to === 500);
 
 /* ---------- 3. 映射完备性与自洽 ---------- */
 {
@@ -84,7 +88,7 @@ check('全仓断点仍是 24 种，主值 330 / 500 / 760 仍在用',
   for (const axis of ['height', 'width'])
     for (const v of found[axis].keys())
       if (!V.migrationOf(v, axis)) gaps.push(axis + ':' + v);
-  check('全仓 28 个 (轴,值) 组合都有迁移目标', gaps.length === 0, gaps);
+  check('全仓每个 (轴,值) 组合都有迁移目标', gaps.length === 0, gaps);
 }
 for (const axis of ['height', 'width']) {
   const target = V.TARGETS[axis];
@@ -148,7 +152,7 @@ check('未知 axis 返回 null', V.migrationOf(430, 'min-height') === null && V.
 }
 
 const result = {
-  scope: 'real CSHViewport v2 migration table + whole-repo css/html breakpoint scan by axis; zero CSS changes',
+  scope: 'real CSHViewport v2 migration table + whole-repo css/html breakpoint scan by axis; 430 batch converged to 500',
   passed: rows.filter(r => r.passed).length,
   failed: rows.filter(r => !r.passed).length,
   failures: rows.filter(r => !r.passed),

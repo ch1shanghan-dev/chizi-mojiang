@@ -50,7 +50,7 @@ body[data-csh-records="bossbook"] .fchip{min-height:44px;padding:5px 10px;font-s
 body[data-csh-records="bossbook"] .vgrid{grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px}
 body[data-csh-records="bossbook"] .cback{overflow-y:auto;overscroll-behavior:contain}
 body[data-csh-records="bossbook"] .ribbon{right:18px;top:50px;height:42px;opacity:.8}
-@media(orientation:landscape) and (max-height:430px){
+@media(orientation:landscape) and (max-height:500px){
  body[data-csh-records="bossbook"] .vgrid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}
  body[data-csh-records="bossbook"] .bcard{aspect-ratio:3/3.4}
  body[data-csh-records="bossbook"] .pre-wrap{gap:8px 18px}

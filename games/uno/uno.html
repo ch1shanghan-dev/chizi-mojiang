@@ -394,13 +394,13 @@
   /* ---------- 响应式：只用「方向 + 可用高度」（规范 §19） ----------
      不再有 `max-width: X = 手机` 这类断点：小游戏跑在横屏 iframe 里，
      瓶颈从来是高度不是宽度（915×412 有 915px 宽却只有 412px 高）。
-       L-NORMAL  横屏且高 > 430px：PC / 大平板，靠 clamp 上限自然放大，无额外规则
-       L-SHORT   横屏且高 ≤ 430px：手机横屏主场景（915×412 档）
+       L-NORMAL  横屏且高 > 500px：PC / 大平板，靠 clamp 上限自然放大，无额外规则
+       L-SHORT   横屏且高 ≤ 500px：手机横屏主场景（915×412 档）
        L-TINY    横屏且高 ≤ 350px：极矮屏（分屏 / 老旧机型），再砍装饰
      空间压缩顺序（§7）：先收紧间距与字号 → 再砍次级标签 → 最后才是隐藏内容。 */
 
   /* L-SHORT：手机横屏主场景 */
-  @media (orientation: landscape) and (max-height: 430px) {
+  @media (orientation: landscape) and (max-height: 500px) {
     :root {
       --card-w: clamp(44px, 13.4vh, 66px);  /* 手牌宽：矮屏反而要更大 —— 屏幕小，牌得自己抢眼 */
       --fs-xs: 10px; --fs-sm: 12px; --fs-md: 12.5px; --fs-lg: 15px;
@@ -440,7 +440,7 @@
 <style id="readable-ui-410">
 :root{--ui-readable:12px}
 .start-card>.subtitle,.field .lab,.start-card label,.start-card .hint{font-size:var(--ui-readable)!important;line-height:1.4}
-@media(max-height:430px){:root{--fs-xs:12px;--fs-sm:12px}}
+@media(max-height:500px){:root{--fs-xs:12px;--fs-sm:12px}}
 </style>
 <link rel="stylesheet" href="../../core/csh_tables.css">
 <link rel="stylesheet" href="../../core/csh_trick_tables.css">

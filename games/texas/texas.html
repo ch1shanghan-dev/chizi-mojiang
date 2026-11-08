@@ -302,7 +302,7 @@
      与下方「横屏 + 矮」那条几乎重复 —— 同一个效果按两条不同轴各写了一遍：
      宽而矮的手机走高度那条、窄而高的走宽度那条、PC 两条都不走。
      这正是"PC 和安卓分成两套"的来源。已删除，压缩只保留在**高度**那一条
-     （见下方 max-height:430px 档），并且把这里独有的两项（--fs-xs:10px / 间距 3px）并过去。 */
+     （见下方 max-height:500px 档），并且把这里独有的两项（--fs-xs:10px / 间距 3px）并过去。 */
   /* 行动中：底部 2px 金线脉冲（唯一强调金角色之一） */
   .seat.acting .seat-box { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold-soft), 0 0 18px rgba(216, 180, 106, .28); }
   .seat.acting .seat-box::after {
@@ -398,7 +398,7 @@
   .eq-bar > i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #4f7d6d, var(--ok)); transition: width .4s ease-out; }
   .eq-bar.low > i { background: linear-gradient(90deg, #7d4f57, var(--danger)); }
   /* 胜率条只在空间允许时显示（规范 §8.2）：矮屏隐藏，数字仍然保留 */
-  @media (orientation: landscape) and (max-height: 430px) {
+  @media (orientation: landscape) and (max-height: 500px) {
     .eq-bar { display: none; }
   }
 
@@ -441,13 +441,13 @@
     padding: 0 5px; white-space: nowrap; max-width: 10em; overflow: hidden; text-overflow: ellipsis;
   }
   .seat.reveal .seat-box { border-color: var(--gold-soft); }
-  /* !important 是刻意的：要在矮屏（max-height:430px）那条媒体查询的 display:none
+  /* !important 是刻意的：要在矮屏（max-height:500px）那条媒体查询的 display:none
      之上生效 —— 摊牌是唯一必须看到所有手牌的时刻。 */
   .reveal-all .seat-cards { display: flex !important; }
   .reveal-all .seat-hand { display: block !important; }
 
   /* ---------- 矮屏结算层紧凑化（规范 §13：紧凑面板 + 不遮死牌桌） ---------- */
-  @media (orientation: landscape) and (max-height: 430px) {
+  @media (orientation: landscape) and (max-height: 500px) {
     .banner-title { font-size: clamp(15px, 4.2vh, 20px); letter-spacing: 2px; }
     .banner-sub { line-height: 1.45; }
     .banner-row .btn { min-height: 40px; }
@@ -522,7 +522,7 @@
     .seat-box { min-width: 74px; }
   }
   /* ---------- 矮屏兜底（手机横屏）：靠 clamp 下限保证占比 ---------- */
-  @media (orientation: landscape) and (max-height: 430px) {
+  @media (orientation: landscape) and (max-height: 500px) {
     :root { --cw: clamp(34px, 7.6vh, 56px); }
     /* 座位卡压缩：从已删除的 (max-width:620px) 档并过来的两项
        （--fs-xs:10px / 间距 3px），让名字·筹码·下注·标签同步缩小，
@@ -658,7 +658,7 @@
   #view-game .seat-tag { flex:0 0 auto; }
   #view-game .seat-cards { flex:0 0 auto; }
   #view-game .seat-line { min-height:16px; }
-@media (orientation:landscape) and (max-height:430px) {
+@media (orientation:landscape) and (max-height:500px) {
     #view-game .seat[data-band="upper-right"] { top:80px!important; }
     #view-game .seat[data-band="side"] { top:calc(100% - 32px)!important; }
     #view-game .reveal-all .seat-av { display:none; }
@@ -697,7 +697,7 @@
 #banner .tx-extra[open] summary::after{content:"收起"}
 #banner .tx-extra summary:focus-visible{outline:2px solid var(--gold);outline-offset:2px;border-radius:3px}
 #banner .rs-row .rs-hand{white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere}
-@media(orientation:landscape) and (max-height:430px){#banner .rs-head .rs-net{font-size:var(--pfs-xl,20px)}#banner .rs-head{gap:2px 10px}#banner .rs-foot .btn{min-height:44px}}
+@media(orientation:landscape) and (max-height:500px){#banner .rs-head .rs-net{font-size:var(--pfs-xl,20px)}#banner .rs-head{gap:2px 10px}#banner .rs-foot .btn{min-height:44px}}
 </style>
 </head>
 <body class="csh-experience" data-csh-table="texas">

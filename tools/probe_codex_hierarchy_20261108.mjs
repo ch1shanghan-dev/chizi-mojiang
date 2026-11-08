@@ -155,7 +155,9 @@ function harness(overrides) {
   const vpSource = fs.readFileSync(path.join(root, 'tools/probe_viewport_tokens_20261107.mjs'), 'utf8');
   const baseline = new Set(((vpSource.match(/const BASELINE = new Set\(\[([\s\S]*?)\]\)/) || [])[1] || '')
     .split(',').map(s => Number(s.trim())).filter(Number.isFinite));
-  check('断点基线可从 E95X 解析且为 24 种', baseline.size === 24, baseline.size);
+  /* I1 起基线逐值收缩，不写死种数；只要求仍能解析且已收敛的 430 不再被允许。 */
+  check('断点基线可从 E95X 解析且已随逐值收敛收缩（430 消失）',
+    baseline.size > 0 && !baseline.has(430), baseline.size);
   check('新增规则不改动任何既有 @media 数值',
     (() => {
       const values = [...html.matchAll(/@media[^{]*?(\d{3,4})px/g)].map(m => Number(m[1]));

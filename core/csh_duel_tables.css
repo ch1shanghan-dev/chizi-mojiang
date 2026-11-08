@@ -63,7 +63,7 @@ body[data-csh-table="blackjack"] #view-start #btn-rules{grid-area:how}
 body[data-csh-table="blackjack"] #view-start .sc-note{grid-area:note}
 body[data-csh-table="blackjack"] #view-start #dealer-records{grid-area:records}
 body[data-csh-table="blackjack"] #view-start .sc-best{font-size:var(--table-note);line-height:1.65;text-align:left;margin:4px 0}
-@media(orientation:landscape) and (max-height:430px){
+@media(orientation:landscape) and (max-height:500px){
  body:is([data-csh-table="texas"],[data-csh-table="blackjack"]) #view-start{padding:6px 12px!important}
  body:is([data-csh-table="texas"],[data-csh-table="blackjack"]) #view-start .start-card{padding:10px 12px!important;gap:6px 12px!important}
  body[data-csh-table="blackjack"] #view-game .opp-av{width:22px;height:22px}

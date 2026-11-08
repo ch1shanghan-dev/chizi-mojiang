@@ -249,6 +249,8 @@
 >
 > **2026-11-06 三条验证入口，别混用**（2026-11-07 E1 校正数量与范围）：
 > ① 日常门禁 `node tools/check.js`（E95A–Z + AA–AG 注册区共 33 个执行级专项，含注册自检 E95L/M）；
+>   断点逐值收敛按批推进（I1 已完成 `height:430→500`），每批同步收缩 E95X 基线与 E95AD 断言，
+>   新增基线外数值、`min-height` 未与 `max-height` 同值/互补配对都会判红；
 > ② 更新链路一键复核 `node tools/check_update_suite.mjs --out <D盘目录>`（15/0）；
 > ③ **慢速通道** `node tools/check_slow_suite.mjs --out <D盘目录> [--only <探针名>]`
 > —— 8 个 >30s 的 Chromium 探针，整条约 8 分钟，**不进日常门禁**，发布前或怀疑回归时手动跑。

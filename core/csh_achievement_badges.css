@@ -23,7 +23,7 @@
 .csh-achv-badge--rare-3 .csh-achv-badge__plate { stroke-width: 1.9; stroke-opacity: 1; }
 .csh-achv-badge--rare-3 .csh-achv-badge__rim { stroke-opacity: .65; }
 .csh-achv-badge .csh-achv-badge__grade { stroke-opacity: .95; }
-@media (orientation: landscape) and (max-height: 430px) {
+@media (orientation: landscape) and (max-height: 500px) {
     .csh-achv-badge { width: 28px; height: 32px; }
 }
 @media (forced-colors: active) {

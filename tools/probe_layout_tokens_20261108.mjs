@@ -1,6 +1,6 @@
 /* H1：CSS 侧视口令牌与 JS 迁移真值双向对账（2026-11-08）
    csh_layout.css :root 补齐 6 档变量，逐项对齐 CSHViewport.TARGETS；
-   同时锁住「本批零 @media 数值改动」。不改产品源码，内置改前基线。 */
+   H1 本批零 @media 改动；I1 起按批收敛，基线随 E95X 同步收缩（不写死种数）。内置改前基线。 */
 import fs from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
@@ -68,9 +68,10 @@ for (const t of texts) {
 }
 const baseline = new Set(((vpProbe.match(/const BASELINE = new Set\(\[([\s\S]*?)\]\)/) || [])[1] || '')
   .split(',').map(s => Number(s.trim())).filter(Number.isFinite));
-check('全仓断点仍是基线 24 种（零 @media 数值改动）',
-  baseline.size === 24 && found.size === baseline.size && [...found].every(v => baseline.has(v)),
-  { found: [...found].sort((a, b) => a - b), extra: [...found].filter(v => !baseline.has(v)) });
+/* H1 本批零 @media 改动；I1 起按批收敛，基线随 E95X 同步收缩，此处不写死种数。 */
+check('全仓断点不越过 E95X 基线（逐值收敛后同步收缩，430 已消失）',
+  baseline.size > 0 && found.size === baseline.size && [...found].every(v => baseline.has(v)) && !found.has(430),
+  { baseline: baseline.size, found: [...found].sort((a, b) => a - b), extra: [...found].filter(v => !baseline.has(v)) });
 /* media query 不能用 var()：只查真正的 max-* 条件里有没有误用变量，
    不去匹配说明文字（注释里同时出现 @media 与 --csh-vp- 是正常的） */
 check('媒体查询没有误用 var() 视口令牌',
@@ -87,7 +88,7 @@ check('媒体查询没有误用 var() 视口令牌',
 }
 
 const result = {
-  scope: 'csh_layout.css :root viewport tokens vs CSHViewport.TARGETS + whole-repo breakpoint baseline; zero @media changes',
+  scope: 'csh_layout.css :root viewport tokens vs CSHViewport.TARGETS + whole-repo breakpoint baseline; per-batch convergence',
   passed: rows.filter(r => r.passed).length,
   failed: rows.filter(r => !r.passed).length,
   failures: rows.filter(r => !r.passed)

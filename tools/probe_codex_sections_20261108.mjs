@@ -116,7 +116,8 @@ function harness(compact, override) {
   const baseline = new Set(((vpProbe.match(/const BASELINE = new Set\(\[([\s\S]*?)\]\)/) || [])[1] || '')
     .split(',').map(s => Number(s.trim())).filter(Number.isFinite));
   const values = [...html.matchAll(/\(\s*max-(?:height|width)\s*:\s*(\d+)px/g)].map(m => Number(m[1]));
-  check('本页 @media 数值全部仍在 24 种基线内', values.every(v => baseline.has(v)), values.filter(v => !baseline.has(v)));
+  check('本页 @media 数值全部仍在 E95X 基线内（基线随逐值收敛同步收缩）',
+    values.every(v => baseline.has(v)), values.filter(v => !baseline.has(v)));
   check('点击事件走 data-section 委托并调用 applySection',
     /dnav\.addEventListener\("click"/.test(inline) && /applySection\(n\.getAttribute\("data-section"\)\)/.test(inline));
   check('初始化即应用默认分区', /applySection\("relation"\);/.test(inline));

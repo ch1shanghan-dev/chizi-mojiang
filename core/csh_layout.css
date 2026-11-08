@@ -22,8 +22,8 @@
      决定不了「两者占不占同一块空间」，所以规范明确禁止只靠 z-index。
 
    响应式（规范 §19）：只用「方向 + 可用高度」，不用「宽度 < X = 手机」：
-     L-NORMAL  横屏且高 ≥ 430px（PC / 大平板）
-     L-SHORT   横屏且高  < 430px（手机横屏，主场景 915×412）
+     L-NORMAL  横屏且高 ≥ 500px（PC / 大平板）
+     L-SHORT   横屏且高  < 500px（手机横屏，主场景 915×412）
      L-TINY    横屏且高  < 350px（极矮，如分屏 / 老旧机型）
      竖屏不再为小游戏做专门布局（游戏本身要求横屏，壳有旋转引导）
 
@@ -342,7 +342,7 @@
 /* ---------- 8. 响应式：方向 + 可用高度（规范 §19） ---------- */
 
 /* L-SHORT：手机横屏主场景（915×412 档）—— 压缩间距，HUD 行保留但收紧行距 */
-@media (orientation: landscape) and (max-height: 430px) {
+@media (orientation: landscape) and (max-height: 500px) {
   :root {
     --stage-player-min: 15%;
     --gap-md: 8px;

@@ -356,7 +356,7 @@
      省掉两行小标题（地主是谁在各行的角标里已有、倍数链在下方经济行里也有），
      再把 max-height 放宽一档 —— 否则内容比 88% 高，面板内部会出现滚动、
      「再来一局 / 收工结算」被挤到折叠线以下。 */
-  @media (orientation: landscape) and (max-height: 430px) {
+  @media (orientation: landscape) and (max-height: 500px) {
     .csh-result .rs-cap { display: none; }
     .csh-result .rs-panel { max-height: 96%; padding: 8px 10px; gap: 5px; }
     .csh-result .rs-row { padding: 3px 8px; }
@@ -390,7 +390,7 @@
      手牌只能用 overflow-x 横滑（§9.2 明确禁止）。 */
 
   /* L-SHORT：手机横屏主场景（915×412 档）—— 牌与按钮的尺寸下限重新标定 */
-  @media (orientation: landscape) and (max-height: 430px) {
+  @media (orientation: landscape) and (max-height: 500px) {
     :root { --cw: clamp(38px, 8vh, 52px); }
     .btn { min-height: 44px; padding: 5px 14px; }       /* 触摸红线 44px（叫分/出牌是主路径） */
     .btn.small { min-height: 40px; padding: 4px 10px; }
@@ -419,7 +419,7 @@
   /* ---------- 开局页：横屏收紧（2026-10-03） ----------
      主场景是手机横屏（915×412 只有 412px 高），开局卡按竖屏调的内距会把
      「开始游戏」推出首屏。这里按方向 + 高度收紧间距，不改任何交互。 */
-  @media (orientation: landscape) and (max-height: 430px) {
+  @media (orientation: landscape) and (max-height: 500px) {
     #view-start { padding: 6px 14px; }
     .start-card { gap: 8px; padding: 10px 14px; border-radius: 14px; }
     .start-card > .title { font-size: clamp(16px, 4.4vh, 22px); letter-spacing: 2px; }
@@ -448,7 +448,7 @@
 #banner .rs-body{display:flex;flex-direction:column;gap:8px;min-height:0;overflow-y:auto;overscroll-behavior:contain;width:100%}
 #banner .rs-head,#banner .rs-foot{flex:0 0 auto;width:100%}
 #banner .rs-foot .btn{min-height:44px;flex-shrink:0}
-@media(orientation:landscape) and (max-height:430px){#banner .rs-body{gap:5px}}
+@media(orientation:landscape) and (max-height:500px){#banner .rs-body{gap:5px}}
 </style>
 </head>
 <body class="csh-experience" data-csh-table="doudizhu">
