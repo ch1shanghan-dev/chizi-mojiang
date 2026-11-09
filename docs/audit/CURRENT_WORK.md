@@ -21,6 +21,8 @@
 > **本批修的是我自己上一批引入的回归**：给 `addGrudge` 加严格写入事务后引用了模块级 `heartbeatDraft` / `K_WORLD` / `logError`，而孤儿探针 `probe_interact_audit.mjs` 把该函数抽进隔离 VM 时桩里没有这些名字，直接 `ReferenceError` 崩溃；它从未进任何门禁，所以上一批整仓 `exit=0` 完全没发现。补齐桩执行真实独立写入路径后 **124/0**，注册 **E95AL** 纳管 —— 以后再动 `addGrudge` 引入新依赖会立刻判红。
 > 剩余边界（不新增待办）：4 支人物互动探针全绿但未进门禁；`world_memoir_host` / `world_invitation_host` / `career_interaction_host` 未转发 `--host`，属上批已记录的同类基础设施债。
 
+> **开放巡检 · 非牌桌软保存其它写入口（2026-11-09）**：按手册 §9「每次先找一个真实拒写造成假成功」逐项核实，**未发现可复现缺陷，零产品代码改动**。已严格：`csh_affection.writeStore` 优先走钱包联合检查点 `commitAffection`（旧钱包混装带费用直接拒绝）、`csh_pool_achv.save` 写失败返回 `false` 且 `load()` 返回解析出的新对象不污染内存、`csh_achievement_feedback.setPreferences` 有读回确认并返回 `{ok:false}`。非缺陷：`K_TASK` 只是钱包 `dailyTaskSaved` 的冗余镜像（真值已在 `commitCheckpoint` 严格落盘）；`importRaw` 仅测试夹具调用，玩家导入走 `csh_migrate`；两处忽略 `writeStore` 返回值的是台词去重记录与旧钱包混装的统计字段，不涉钱或资格。验收面：affection_recovery 97/0、affection_transactions 33/0、gift_quantity 41/0、11-04 诊断 7 条全不复现。顺带把 **97/0 却未纳管的 `probe_affection_recovery` 注册 E95AM**，防止绿灯再次失真。
+
 > **已核实收口 · 行囊 / 官阶反馈（2026-11-09）**：`games/save.html` 已实装首屏一键打包、输出区按需显隐、待保存结果/错误/恢复态区分、导入前 `dryRun` + 二次确认；`games/career.html` 官阶焦点已实装累计功勋、进度、下一阶权益与完整名录按需折叠 —— 手册 §9 要求的内容都在，**无需改产品代码**。
 > 真正的缺口是验收从未执行：三支派生 `probe_host_smoke` runner 的探针没传 `--host` / `--extension-source`，`/index.html` 404、`lib/game/CSH` 全 false。补上参数转发后真实宿主 **27/0 + 16/0 + 44/0 = 87/0、0 错误**；VM 侧另有 32/0、21/0、29/0。E40 加静态断言锁住这三支的转发（宿主探针启 Chromium，按既有先例保持按需运行、不挂整仓门禁）；`probe_bag_flow_rebuild` 标为 10-22 历史基线（10-29 设计变更后 2/3 过时），现行验收是 `probe_bag_content_host`。
 > **已知基础设施债，本批不铺开**：`probe_host_smoke.mjs:12` 默认 host 是 `path.resolve(root,'../..')`，本机不指向真实无名杀宿主；50 支派生 runner 的探针里仅少数显式转发。其余需单独核实，不因此新增待办。
