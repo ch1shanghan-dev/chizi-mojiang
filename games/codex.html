@@ -351,7 +351,7 @@ body.empty .foot{display:none}
 #codex-skin-dialog button{font:var(--pfs-sm,12px)/1.4 var(--ff-body);min-height:44px;flex:none}
 #codex-skin-dialog .skin-option{text-align:left;padding:10px 12px}
 #codex-skin-dialog .skin-option[aria-pressed=true]{border-color:var(--gold);background:#d8bd7a20}
-@media(max-height:340px){#codex-skin-dialog .skin-panel{padding:10px}#codex-skin-dialog .skin-body{margin-top:6px;gap:10px}}
+@media(max-height:330px){#codex-skin-dialog .skin-panel{padding:10px}#codex-skin-dialog .skin-body{margin-top:6px;gap:10px}}
 
 </style>
 <link rel="stylesheet" href="../core/csh_experience.css">
@@ -433,7 +433,7 @@ body[data-csh-collection="codex"] .dstage .dtag{color:#ead8af}
 #bond-brief .bb-k{letter-spacing:.12em;color:var(--gold,#d9bd7d)}
 #bond-brief .bb-v{color:var(--ink,#eee6d5)}
 #bond-brief .bb-next,#bond-brief .bb-cost{font-variant-numeric:tabular-nums}
-@media(max-height:340px){#bond-brief{display:none}}
+@media(max-height:330px){#bond-brief{display:none}}
 /* 分区切换直接显示当前页；矮横屏沿用一栏滚动。 */
 .dnav{display:flex;gap:6px;flex:none;position:sticky;top:-1px;z-index:3;background:var(--panel2)}
 .dnav[hidden]{display:none}
@@ -442,7 +442,7 @@ body[data-csh-collection="codex"] .dstage .dtag{color:#ead8af}
 .dnav .dnav-tab:focus-visible{outline:2px solid var(--gold,#d9bd7d);outline-offset:-2px}
 #codex-relationship{display:flex;flex-direction:column;gap:6px}
 #codex-relationship[hidden],.dinfo details[hidden]{display:none}
-@media(max-height:340px){.dnav{display:none}}
+@media(max-height:330px){.dnav{display:none}}
 </style>
 <link rel="stylesheet" href="../core/csh_collection.css">
 </head>
@@ -758,7 +758,7 @@ var DNAV_SECTIONS=["relation","memory","archive"],dnavSection="relation";
 function applySection(key){
   if(DNAV_SECTIONS.indexOf(key)<0)key="relation";
   dnavSection=key;
-  var compact=!!(window.matchMedia&&window.matchMedia("(max-height:340px)").matches);
+  var compact=!!(window.matchMedia&&window.matchMedia("(max-height:330px)").matches);
   var nav=$("#dnav");
   if(nav)nav.hidden=compact;
   var relation=$("#codex-relationship");
@@ -1419,7 +1419,7 @@ if(dnav)dnav.addEventListener("click",function(e){
     $(".dinfo").scrollTop=0;
   }
 },false);
-var compactSections=window.matchMedia("(max-height:340px)");
+var compactSections=window.matchMedia("(max-height:330px)");
 if(compactSections.addEventListener)compactSections.addEventListener("change",function(){applySection(dnavSection);});
 else if(compactSections.addListener)compactSections.addListener(function(){applySection(dnavSection);});
 applySection("relation");

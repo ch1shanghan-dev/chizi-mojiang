@@ -111,9 +111,9 @@ function harness(compact, override) {
     /id="character-echo" data-section="memory"/.test(html) &&
     /id="character-records" data-section="archive"/.test(html));
   check('隐藏态用高优先级规则真实不占位', /\.dinfo details\[hidden\]\{display:none\}/.test(html));
-  check('矮横屏复用既有 340px 断点，不新增 @media 数值',
-    /@media\(max-height:340px\)\{\.dnav\{display:none\}\}/.test(html) &&
-    !/@media\(max-height:3(?!40)\d+px\)\{\.dnav/.test(html));
+  check('矮横屏复用既有 330px 断点，不新增 @media 数值',
+    /@media\(max-height:330px\)\{\.dnav\{display:none\}\}/.test(html) &&
+    !/@media\(max-height:3(?!30)\d+px\)\{\.dnav/.test(html));
   const baseline = new Set(((vpProbe.match(/const BASELINE = new Set\(\[([\s\S]*?)\]\)/) || [])[1] || '')
     .split(',').map(s => Number(s.trim())).filter(Number.isFinite));
   const values = [...html.matchAll(/\(\s*max-(?:height|width)\s*:\s*(\d+)px/g)].map(m => Number(m[1]));

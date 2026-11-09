@@ -1,7 +1,7 @@
-/* 自动生成于 2026-11-09T00:13:25.418Z by tools/release.js —— hashes 对应 Git 发布字节，发版后 git push 即生效，勿手改 files */
+/* 自动生成于 2026-11-09T00:39:07.419Z by tools/release.js —— hashes 对应 Git 发布字节，发版后 git push 即生效，勿手改 files */
 window.extension = {
 	"池子魔将": {
-		"build": "8ee832e68c084b7e02ceb729e5dd6cacd68710c9928d609f835409c75f357a5b",
+		"build": "ac9bdfb68e1705611fcdad57bf4dc690b87fe8732d48ac48e7bd9f174500d4b6",
 		"hashes": {
 			"LICENSE": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
 			"README.md": "41102b34ebc984b6b84b361baa0e78aa9defe5633a4a270cde6ed0ff7bc9ae4d",
@@ -389,7 +389,7 @@ window.extension = {
 			"games/blackjack/blackjack.html": "8bbe706e4e632977da30bd715003fc64899fc6f9f3a6ab165da6090ddb033aec",
 			"games/bossbook.html": "e467279dfe5e1a17f32e21cbcc9749233b454720a380e4abe33d9b63d8723a22",
 			"games/career.html": "115f63a1a08c01257876b017649b95b98e2b19db8dc6551acaa6f1ea4e962847",
-			"games/codex.html": "fccbe04d418f903b725210f9b0053d687fa6e1ff65237dfa8f58d400a7c7bd8b",
+			"games/codex.html": "f3bdd6947afee5f6413172379589f2c790dc5f9f62a537c8e91336137f7f8103",
 			"games/doudizhu/doudizhu.html": "bca73a355531e99de66ac8ae915f13d5cda3fa3bc9fa022ac915b0c41815c7f7",
 			"games/goldfish.html": "471d2dddf25d92e58b5fa9ddc6307169227befed38f39d9f3d55d9bf05c6f6bb",
 			"games/rank.html": "ab7c1bbd1aafd9ebc30583b2eae2c7fd5f36ca795350db88bf0892b5605c220e",

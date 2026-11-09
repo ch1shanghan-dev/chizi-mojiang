@@ -147,9 +147,9 @@ function harness(overrides) {
     /<details class="collection-details" id="character-echo" data-section="memory"><summary>共同经历与回响<\/summary><div class="dlines" id="dlines"><\/div><\/details>/.test(html));
   check('人物小传 / 增益 / 讨伐记录仍各自按需折叠',
     (html.match(/<details class="collection-details"/g) || []).length >= 4);
-  check('摘要在极矮横屏收起，复用既有 340px 断点不新增数值',
-    /@media\(max-height:340px\)\{#bond-brief\{display:none\}\}/.test(html) &&
-    (html.match(/@media\(max-height:340px\)/g) || []).length >= 1);
+  check('摘要在极矮横屏收起，复用既有 330px 断点不新增数值',
+    /@media\(max-height:330px\)\{#bond-brief\{display:none\}\}/.test(html) &&
+    (html.match(/@media\(max-height:330px\)/g) || []).length >= 1);
   const briefRule = (html.match(/#bond-brief\{[^}]*\}/) || [''])[0];
   check('材质只用渐隐金线与极淡内高光，不堆发光面积',
     /linear-gradient\(90deg,transparent,rgba\(216,189,122,\.34\)/.test(briefRule) &&
@@ -179,7 +179,7 @@ function harness(overrides) {
   check('去掉 renderList 过滤接线会被静态断言检出',
     !inline.replace('applyRosterFilter();   /* 名录重建后保留当前查找条件，不改 Data.items 顺序 */', '').includes('applyRosterFilter();   /* 名录重建后保留当前查找条件'));
   check('去掉矮屏收起会被静态断言检出',
-    !html.replace('@media(max-height:340px){#bond-brief{display:none}}', '').includes('@media(max-height:340px){#bond-brief{display:none}}'));
+    !html.replace('@media(max-height:330px){#bond-brief{display:none}}', '').includes('@media(max-height:330px){#bond-brief{display:none}}'));
   const real = harness();
   real.setNames(['伊芙', '艾达王']);
   check('当前实现同场景正确过滤', real.filter('伊芙') === 1 && real.rolodex.children[1].hidden === true);
