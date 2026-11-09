@@ -3435,6 +3435,7 @@ if (spawnOk && execFileSync && !ONLY_SYNTAX && !ONLY_VERSIONS) {
          改前基线内嵌，零溢出 / 44px 触控目标 / 不受影响视口几何完全一致。 */
       ['E95AJ','probe_viewport_340_convergence_20261109.mjs',['--out',path.join(tmp95,'viewport-340'),'--expect-migrated'],17,'横屏340断点收敛（真实CSS/5视口/改前基线几何比对）',60000],
       ['E95AK','probe_world_grudge_softsave_20261109.mjs',['--out',path.join(tmp95,'world-grudge')],28,'非牌桌软保存addGrudge严格事务（拒写/静默丢写/读回/基线变化，改前诊断第7条复现）',20000],
+      ['E95AL','probe_interact_audit.mjs',['--out',path.join(tmp95,'interact-audit')],124,'人物互动全量审计（回应队列/记忆检索/恩怨方向/终局；addGrudge严格事务桩补齐后纳管）',20000],
     ];
     for (const [tag95, script95, args95, min95, label95, timeout95] of reg95) {
       const r95 = runProbeJson(script95, args95, { timeout: timeout95 });

@@ -46,7 +46,11 @@ function harness() {
   vm.runInContext('var world={ai:["speaker","other","friend","me"].map(id=>({id,name:id,grudges:{}}))};'+
     'var PLAYER_GRUDGE_KEY="player";function byId(id){return world.ai.find(a=>a.id===id);}' +
     'function idInRoster(id){return !!byId(id);}function clampNum(n,a,b){return Math.max(a,Math.min(b,Number(n)||0));}' +
-    'var tableCommitTime=null,heartbeatPending=false,heartbeatActive=true;function saveWorld(){}function pushHistory(){}'+
+    /* addGrudge 自 2026-11-09 起是严格写入事务：独立路径需要 heartbeatDraft /
+       K_WORLD / logError 三个模块级名字，缺一个就会 ReferenceError（本探针此前
+       未进门禁，整仓 exit=0 也没发现）。补齐桩以执行真实代码路径。 */
+    'var tableCommitTime=null,heartbeatDraft=null,heartbeatPending=false,heartbeatActive=true;'+
+    'var K_WORLD="csh_world";function logError(){}function saveWorld(){}function pushHistory(){}'+
     ['saveBlocked','idOfPlayer','grudgeValue','addGrudge','grudge'].map(n=>extract(worldSource,n)).join('\n')+
     ';lib.cshWorld={idOfPlayer,addGrudge,grudge,PLAYER_GRUDGE_KEY};globalThis.grudgeWorld=world;',ctx);
   return { api: ctx.probe, interaction: lib.cshInteract, world: ctx.grudgeWorld, get: ctx.get, lib, game, status, speaker, other, friend, me, tasks, cancelled, chats, throws, stickers, storage,

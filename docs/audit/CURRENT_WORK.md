@@ -15,7 +15,11 @@
 
 ### A. 我能独立关掉（一批一个，按顺序，不并行铺开）
 
-1. **人物事件与回应的剩余项** — F1 已落地 `probe_interact_reply`（E95Y 63/0），先核对还剩什么。
+**A 类已清空（2026-11-09）**，以下只留结论与边界。
+
+> **已核实收口 · 人物事件与回应（2026-11-09）**：手册 §9 的事件口吻都已接线 —— 重逢 `returning`（`onGameStart` 按世界档案挑熟人）、受挫 `hurtSelf` / `dying` / `emptyHand`、关系变化（宿敌开场 / `situCat` 连砸升级 / 恩怨 ≥8 狠话档），按真实赢家、对手与阵营由 `fire` / `pickTarget` / `relation` 选词；F1 的队列悬挂缺陷已修（E95Y 63/0）。回忆与邀约验收全绿：memoir_talk 203/0、memoir_talk_ui 134/0、world_memoir_facts 40/0、world_memoir_ui 92/0、career_interaction_unlocks 48/0、interact_recovery 100/0、interaction_context 12/0、player_interactions 34/0。**无需改产品代码**。
+> **本批修的是我自己上一批引入的回归**：给 `addGrudge` 加严格写入事务后引用了模块级 `heartbeatDraft` / `K_WORLD` / `logError`，而孤儿探针 `probe_interact_audit.mjs` 把该函数抽进隔离 VM 时桩里没有这些名字，直接 `ReferenceError` 崩溃；它从未进任何门禁，所以上一批整仓 `exit=0` 完全没发现。补齐桩执行真实独立写入路径后 **124/0**，注册 **E95AL** 纳管 —— 以后再动 `addGrudge` 引入新依赖会立刻判红。
+> 剩余边界（不新增待办）：4 支人物互动探针全绿但未进门禁；`world_memoir_host` / `world_invitation_host` / `career_interaction_host` 未转发 `--host`，属上批已记录的同类基础设施债。
 
 > **已核实收口 · 行囊 / 官阶反馈（2026-11-09）**：`games/save.html` 已实装首屏一键打包、输出区按需显隐、待保存结果/错误/恢复态区分、导入前 `dryRun` + 二次确认；`games/career.html` 官阶焦点已实装累计功勋、进度、下一阶权益与完整名录按需折叠 —— 手册 §9 要求的内容都在，**无需改产品代码**。
 > 真正的缺口是验收从未执行：三支派生 `probe_host_smoke` runner 的探针没传 `--host` / `--extension-source`，`/index.html` 404、`lib/game/CSH` 全 false。补上参数转发后真实宿主 **27/0 + 16/0 + 44/0 = 87/0、0 错误**；VM 侧另有 32/0、21/0、29/0。E40 加静态断言锁住这三支的转发（宿主探针启 Chromium，按既有先例保持按需运行、不挂整仓门禁）；`probe_bag_flow_rebuild` 标为 10-22 历史基线（10-29 设计变更后 2/3 过时），现行验收是 `probe_bag_content_host`。
