@@ -1,6 +1,11 @@
 import fs from 'node:fs';import path from 'node:path';import vm from 'node:vm';import {fileURLToPath,pathToFileURL} from 'node:url';
 const arg=(k,d)=>{let i=process.argv.indexOf(k);return i<0?d:process.argv[i+1];},root=arg('--root',path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..')),sourceRoot=arg('--source',root),out=arg('--out');if(!out)throw Error('External --out required');
 const {parse,walk}=await import(pathToFileURL(root+'/tools/lib/skill_audit.mjs'));const rows=[],check=(name,ok,detail)=>rows.push({name,passed:!!ok,...(!ok?{detail}: {})}),noop=()=>{};
+/* 姊妹探针 probe_minigame_control_host 原先 spawn 不带 --host，runner 直接 404，
+   「托管开关切换」其实一次都没在真实宿主里跑过。锁住参数转发防复发。 */
+const controlSrc=fs.readFileSync(root+'/tools/probe_minigame_control_host.mjs','utf8');
+check('托管控制宿主探针转发 --host 与 --extension-source（否则 runner 404 根本没跑）',
+  /runnerArgs=\[runner,[^\]]*'--host'/.test(controlSrc)&&/'--extension-source'/.test(controlSrc));
 let seed=20261028;const random=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;},math=Object.create(Math);math.random=random;
 const code=key=>fs.readFileSync(sourceRoot+'/games/'+key+'/'+key+'.html','utf8').match(/<script>\s*([\s\S]*?)<\/script>/)[1],ctx=()=>vm.createContext({console,Math:math,alive:true,Bridge:{active:false},sfx:new Proxy({},{get:()=>noop}),sfxPlay:noop,clearTimeout:noop,Date,setTimeout:noop});
 function functions(c,s,names){walk(parse(s),n=>{if(n.type==='FunctionDeclaration'&&names.includes(n.id.name))vm.runInContext(s.slice(...n.range),c);});}
@@ -20,7 +25,17 @@ let fuzz=0;for(let n=0;n<300;n++){let h=dd.shuffle(dd.buildDeck()).slice(0,5+Mat
 let uno=ctx(),us=code('uno');uno.window={};uno.later=f=>{queued.push(f);return queued.length;};vm.runInContext(us.split('/* ==UNO-ENGINE-START== */')[1].split('/* ==UNO-ENGINE-END== */')[0],uno);functions(uno,us,['setAuto','genId']);
 const room=new uno.Room('test',null);room.players=[{id:'me',hand:[{id:'r1',color:'red',value:'1'},{id:'r2',color:'red',value:'2'},{id:'r3',color:'red',value:'3'},{id:'b9',color:'blue',value:'9'}]},{id:'bot',isBot:true,hand:[{}, {},{}]},{id:'prev',isBot:true,hand:[{}]}];room.current=0;room.direction=1;room.activeColor='blue';room.state='playing';room.round=1;room.localPid='me';room.autoPlay=true;
 chosen=room.botChooseCard(room.players[0],[room.players[0].hand[0],room.players[0].hand[3]]);check('UNO favors own color continuation over isolated high number',chosen.id==='r1',chosen);
-const reverse={id:'rev',color:'red',value:'reverse'},skip={id:'skip',color:'red',value:'skip'};chosen=room.botChooseCard(room.players[0],[skip,reverse]);check('UNO reverse assesses actual previous-seat target',chosen.id==='rev',chosen);
+const reverse={id:'rev',color:'red',value:'reverse'},skip={id:'skip',color:'red',value:'skip'},plainSix={id:'six',color:'red',value:'6'};
+/* 2026-11-09 纠正过时断言：2026-11-04 反转修复后，多人局的 reverse 会把回合交给
+   **前一席**，而不是跳过他。本夹具的前一席（players[2]）只剩 1 张牌，
+   正确策略是避开 reverse；E89 专项（45/0）锁的就是这个口径。
+   原断言写「应选 rev」，是修复前的旧语义，且本探针从未进门禁，所以一直没被发现。 */
+chosen=room.botChooseCard(room.players[0],[plainSix,reverse]);
+check('UNO 反转不把回合交给前一席的一张牌对手',chosen.id==='six',chosen);
+room.players[2].hand=[{},{},{},{}];room.players[1].hand=[{}];
+chosen=room.botChooseCard(room.players[0],[plainSix,reverse]);
+check('UNO 反转可绕开下家的一张牌威胁',chosen.id==='rev',chosen);
+room.players[2].hand=[{}];room.players[1].hand=[{},{},{}];
 queued=[];let acts=0;room.botAct=()=>acts++;room.scheduleBot();room.autoPlay=false;room.scheduleBot();queued.splice(0).forEach(f=>f());check('UNO cancel auto invalidates queued callback',acts===0);
 room.autoPlay=true;queued=[];room.scheduleBot();room.round++;queued.shift()();check('UNO callback cannot cross round',acts===0);
 room.round=1;room.current=0;queued=[];room.scheduleBot();room.current=1;queued.shift()();check('UNO callback cannot act for another seat',acts===0);

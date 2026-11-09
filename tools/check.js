@@ -3418,6 +3418,10 @@ if (spawnOk && execFileSync && !ONLY_SYNTAX && !ONLY_VERSIONS) {
       /* 工作包 B：房间跨进程恢复的事务骨架。头号不变量是「只有余额与扣款前完全一致才可判
          扣款未落盘」，其余一律不许当没扣过 —— 改前基线（无条件丢弃）能判红。 */
       ['E95AH','probe_room_journal_20261109.mjs',['--out',path.join(tmp95,'room-journal')],130,'房间凭据与快照（四态机/乐观锁/恢复判定/加载图接线，改前自检2红）',20000],
+      /* 孤儿探针归位：probe_minigame_ai 长期没有门禁入口，里面一条「多人局应选反转」
+         的断言停留在 2026-11-04 反转修复之前，实跑 22/1 却没人看见。按现行语义改成
+         「避开前一席一张牌 / 绕开下家一张牌」两条，再挂进日常门禁防复发。 */
+      ['E95AI','probe_minigame_ai.mjs',['--out',path.join(tmp95,'minigame-ai')],25,'四桌AI与托管（反转方向/迟到回调/隐藏信息隔离/合法牌型）',20000],
     ];
     for (const [tag95, script95, args95, min95, label95, timeout95] of reg95) {
       const r95 = runProbeJson(script95, args95, { timeout: timeout95 });
