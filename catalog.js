@@ -1,7 +1,7 @@
-/* 自动生成于 2026-11-09T00:39:07.419Z by tools/release.js —— hashes 对应 Git 发布字节，发版后 git push 即生效，勿手改 files */
+/* 自动生成于 2026-11-09T01:10:52.272Z by tools/release.js —— hashes 对应 Git 发布字节，发版后 git push 即生效，勿手改 files */
 window.extension = {
 	"池子魔将": {
-		"build": "ac9bdfb68e1705611fcdad57bf4dc690b87fe8732d48ac48e7bd9f174500d4b6",
+		"build": "fd54d5d57a3eda86f202d3bc775102a56c9c7240a77275db2c3a23f23f7fc924",
 		"hashes": {
 			"LICENSE": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
 			"README.md": "41102b34ebc984b6b84b361baa0e78aa9defe5633a4a270cde6ed0ff7bc9ae4d",
@@ -367,7 +367,7 @@ window.extension = {
 			"core/csh_voice.js": "4c6616186f89d559578a4fa63032daebc5c4d9223f0ecc39b68bd6831aa323c6",
 			"core/csh_wallet.js": "b973f2c2ce52414cd72e1abd439ac79e2dc6f063f8d76e0ed1f64ae4b66707e1",
 			"core/csh_winrate.js": "38483631a3121ac6b7a084142d8d9fe90b164c009743207def9ec0c89a2dcc2c",
-			"core/csh_world.js": "851f130183ff7adf278a09093d84b70d0e8ec5bb8fddeb5dedbb8089ae67db9e",
+			"core/csh_world.js": "88b7d57594dded6131b7dbf6b650d99df7b54d27f4fec88821be77fb584092a1",
 			"core/csh_world_view.js": "44117e771251457435093a35da02e99a679d6aff94a136af8cc91b067dfd11f6",
 			"core/lines_final_pool.json": "2c0931248f24398f37e6f343d6e28ad0ab93d5bb45eb814d703a08757b98c5a4",
 			"core/voices.js": "e88f29b031dee14946a96fa715cb67bf75dfa7b4d0e9e781f3ff95fe3c4447f3",

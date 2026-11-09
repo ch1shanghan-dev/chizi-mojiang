@@ -1963,18 +1963,56 @@ import { MINIONS } from "./csh_bossdata.js";
 		if (saveBlocked()) return null;
 		var a = byId(id);
 		if (!a) return null;
-		if (!a.grudges || typeof a.grudges !== "object") a.grudges = {};
 		var key = targetKey || PLAYER_GRUDGE_KEY;
-		var before = a.grudges[key] || 0;
-		a.grudges[key] = clampNum(before + (Number(n) || 0), 0, 999);
-		/* 对玩家的仇怨跨过 5 / 8（互动台词换档的阈值）时记一条世界动态 */
-		if (key === PLAYER_GRUDGE_KEY && before < 8 && a.grudges[key] >= 8) {
-			pushHistory({ kind: "grudge", n: a.name, c: a.grudges[key] });
-		} else if (key === PLAYER_GRUDGE_KEY && before < 5 && a.grudges[key] >= 5) {
-			pushHistory({ kind: "grudge", n: a.name, c: a.grudges[key] });
+		var before = (a.grudges && typeof a.grudges === "object") ? (a.grudges[key] || 0) : 0;
+		var next = clampNum(before + (Number(n) || 0), 0, 999);
+		/* 四桌事务与心跳草稿期间由外层统一落盘；此处保留原有内存语义，不独立写盘。 */
+		if (tableCommitTime !== null || heartbeatDraft) {
+			if (!a.grudges || typeof a.grudges !== "object") a.grudges = {};
+			a.grudges[key] = next;
+			/* 对玩家的仇怨跨过 5 / 8（互动台词换档的阈值）时记一条世界动态 */
+			if (key === PLAYER_GRUDGE_KEY && before < 8 && next >= 8) pushHistory({ kind: "grudge", n: a.name, c: next });
+			else if (key === PLAYER_GRUDGE_KEY && before < 5 && next >= 5) pushHistory({ kind: "grudge", n: a.name, c: next });
+			saveWorld();
+			return next;
 		}
-		saveWorld();
-		return a.grudges[key];
+		/* 独立写入的严格事务（2026-11-09，WORLD_SOFTSAVE_RESEARCH_20261104 第 7 条）：
+		   此前先改内存、saveWorld 吞掉 setItem 异常，却返回已增加的值 —— 拒写时
+		   内存已变、磁盘未变，玩家侧和后续任何落盘都会拿到不存在的恩怨值。
+		   本函数无随机事件，采用诊断 §5 允许的严格原子回滚，不做候选暂存重试。 */
+		var base = world, baseRaw = JSON.stringify(world), stored = null, nextRaw = "";
+		try { stored = localStorage.getItem(K_WORLD); }
+		catch (e) { logError("恩怨记录待保存", e); return null; }
+		/* 磁盘基线已变（导入 / 重置 / 外部有效更新）时不拿旧代次覆盖新档。 */
+		if (stored !== null && stored !== baseRaw) { logError("恩怨记录待保存", Error("世界基线已变化")); return null; }
+		try {
+			var draft = JSON.parse(baseRaw), d = null;
+			for (var gi = 0; gi < draft.ai.length; gi++) {
+				if (draft.ai[gi].id === id) { d = draft.ai[gi]; break; }
+			}
+			if (!d) return null;
+			if (!d.grudges || typeof d.grudges !== "object") d.grudges = {};
+			d.grudges[key] = next;
+			world = draft;
+			if (key === PLAYER_GRUDGE_KEY && before < 8 && next >= 8) pushHistory({ kind: "grudge", n: d.name, c: next });
+			else if (key === PLAYER_GRUDGE_KEY && before < 5 && next >= 5) pushHistory({ kind: "grudge", n: d.name, c: next });
+			nextRaw = JSON.stringify(world);
+		} catch (e) {
+			logError("恩怨记录待保存", e);
+			return null;
+		} finally {
+			world = base; /* 严格成功前公开内存保持基线 */
+		}
+		try {
+			localStorage.setItem(K_WORLD, nextRaw);
+			if (localStorage.getItem(K_WORLD) !== nextRaw) throw Error("世界记录尚未读回确认");
+			world = JSON.parse(nextRaw);
+			return next;
+		} catch (e) {
+			world = base;
+			logError("恩怨记录待保存", e);
+			return null;
+		}
 	}
 	function grudge(id, targetKey) {
 		var a = byId(id);
