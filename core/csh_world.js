@@ -1651,7 +1651,29 @@ import { MINIONS } from "./csh_bossdata.js";
         if (_status.connectMode || _status.video || game.online || game.observe) return '当前模式暂不支持牌友邀约';
         return '';
     }
-    function normalStake(a, buyIn) { return Math.min(buyIn, Math.floor(a.fund * 0.3)); }
+    /* 邀约资格只看客观资金能力，不受人物全额带入策略影响：
+       「凑不凑得齐最低带入」是能力问题，不是敢不敢的问题（保持既有邀约行为）。 */
+    function stakeCapability(a) {
+        return Math.min(AI_MIN_STAKE, Math.floor((Number(a && a.fund) || 0) * 0.3));
+    }
+    /* AI 自主带入（手册 §7，2026-11-09）：普通桌不再是人人 30% 短码。
+       全额意愿由人物牌风 + 近期手感 + 真实资金安全垫共同决定，全程无随机、可解释。
+       硬约束：带入永不超过玩家带入、不超过自己资金；且最多亏到仍留 AI_MIN_STAKE，
+       避免一局全额带入把 AI 直接打进退隐（补码与退隐不冲突）。
+       stake 只是本局风险额度，结算仍由 settleWin/settleLose 从 a.fund 真扣真加，
+       不新增任何资金写入路径。 */
+    function normalStake(a, buyIn) {
+        var want = Math.max(AI_MIN_STAKE, Math.floor(Number(buyIn) || AI_MIN_STAKE));
+        var fund = Math.max(0, Math.floor(Number(a && a.fund) || 0));
+        var short = Math.floor(fund * 0.3);
+        var form = Number(a && a.form);
+        if (!Number.isFinite(form)) form = 0.5;
+        var p = a && PERSONAS[a.persona];
+        var bold = !!p && (p.raiseThreshold <= 0.50 || p.bluffRate >= 0.26 || p.variance >= 0.36);
+        var healthy = form >= 0.5 && (Number(a && a.retireCount) || 0) === 0 && fund >= want * 2;
+        var stake = (bold && healthy) ? want : short;
+        return Math.max(0, Math.min(stake, want, fund, Math.max(0, fund - AI_MIN_STAKE)));
+    }
     function invitationReply(a) {
         var p = playerTable(a.withPlayer), lines = INVITE_LINES[a.persona] || INVITE_LINES.math;
         var greeting = p.hands >= 10 ? '老牌友，又见面了。' : p.hands ? '又见面了。' : '初次同桌，多关照。';
@@ -1665,7 +1687,7 @@ import { MINIONS } from "./csh_bossdata.js";
         var blocked = invitationBlocked(); if (blocked) return { ok: false, reason: blocked };
         var a = activeList().find(function (p) { return String(p.id) === String(id); });
         if (!a) return { ok: false, reason: '这位牌友暂未在场' };
-        if (normalStake(a, AI_MIN_STAKE) < AI_MIN_STAKE) return { ok: false, reason: a.name + '暂时凑不齐带入，稍后再邀或换位牌友吧' };
+        if (stakeCapability(a) < AI_MIN_STAKE) return { ok: false, reason: a.name + '暂时凑不齐带入，稍后再邀或换位牌友吧' };
         return {ok:true,id:a.id,name:a.name};
     }
     function inviteNext(id) {
@@ -1683,7 +1705,7 @@ import { MINIONS } from "./csh_bossdata.js";
     }
     function pruneInvitation() {
         var a = invitedId === null ? null : byId(invitedId);
-        if (invitedId !== null && (!a || a.retired || normalStake(a, AI_MIN_STAKE) < AI_MIN_STAKE)) { invitedId = null; invitedReply = ''; }
+        if (invitedId !== null && (!a || a.retired || stakeCapability(a) < AI_MIN_STAKE)) { invitedId = null; invitedReply = ''; }
     }
     function storylines(limit) {
         pruneInvitation();
@@ -1748,7 +1770,7 @@ import { MINIONS } from "./csh_bossdata.js";
 		if (SC) recentSeats = SC.push(recentSeats, chosen.map(function (a) { return String(a.id); }), 2);
 		return chosen.map(function (a) {
 			var g = gamble ? gambleStakeOf(a, buyIn) : null;
-			var stake = gamble ? g.stake : Math.min(buyIn, Math.floor(a.fund * 0.3));
+			var stake = gamble ? g.stake : normalStake(a, buyIn);
 			return {
 				id: a.id, name: a.name, surname: a.surname,
 				/* v6.1：来源标记（"citizen" 武将 / "minion" 妖灵）——游戏页可据此打「妖」标签 */

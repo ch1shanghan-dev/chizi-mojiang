@@ -3437,6 +3437,7 @@ if (spawnOk && execFileSync && !ONLY_SYNTAX && !ONLY_VERSIONS) {
       ['E95AK','probe_world_grudge_softsave_20261109.mjs',['--out',path.join(tmp95,'world-grudge')],28,'非牌桌软保存addGrudge严格事务（拒写/静默丢写/读回/基线变化，改前诊断第7条复现）',20000],
       ['E95AL','probe_interact_audit.mjs',['--out',path.join(tmp95,'interact-audit')],124,'人物互动全量审计（回应队列/记忆检索/恩怨方向/终局；addGrudge严格事务桩补齐后纳管）',20000],
       ['E95AM','probe_affection_recovery.mjs',['--out',path.join(tmp95,'affection-recovery')],97,'好感/赠礼恢复事务（拒写回滚/联合检查点/重试，开放巡检时发现未纳管）',20000],
+      ['E95AN','probe_texas_ai_autostake_20261109.mjs',['--out',path.join(tmp95,'texas-ai-autostake')],19,'德州AI自主全额带入（人物策略/资金硬约束/退隐保护/豪赌隔离，改前基线2红）',20000],
     ];
     for (const [tag95, script95, args95, min95, label95, timeout95] of reg95) {
       const r95 = runProbeJson(script95, args95, { timeout: timeout95 });
