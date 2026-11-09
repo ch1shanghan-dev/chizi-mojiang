@@ -1739,7 +1739,12 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
                     var careerEngine=window.CSH_ACHV,careerBank=wallet();
                     if(current!=="career")careerSync.reason="请从生涯大厅查看达成记录";
                     else if(careerStats.careerStatsReliable===false)careerSync.reason="统计暂未完整读取，本次未记录新达成";
-                    else if(careerEngine&&careerBank&&careerBank.wallet.syncCareerUnlocks){careerSync=careerBank.wallet.syncCareerUnlocks(careerEngine.evalAll(careerStats).filter(function(row){return row.conditionMet;}).map(function(row){return row.key;}));if(careerSync.ok)careerStats.careerUnlocks=careerSync.record;}
+                    else if(careerEngine&&careerBank&&careerBank.wallet.syncCareerUnlocks){
+                        var careerKeys=careerEngine.evalAll(careerStats).filter(function(row){return row.conditionMet;}).map(function(row){return row.key;});
+                        /* 实时路径同样按口径 A 分流：有来源的写真实时刻，无来源的只记未知。 */
+                        var careerUnknown=(typeof careerEngine.byId==="function"&&typeof careerEngine.hasFirstCaptureSource==="function")?careerKeys.filter(function(k){var d=careerEngine.byId(k);return !d||!careerEngine.hasFirstCaptureSource(d);}):[];
+                        careerSync=careerBank.wallet.syncCareerUnlocks(careerKeys,{unknownKeys:careerUnknown});if(careerSync.ok)careerStats.careerUnlocks=careerSync.record;
+                    }
                 }catch(eCareerSync){careerSync={ok:false,reason:"生涯达成记录暂不可用，请稍后重试"};}
                 ackToGame(cmd,careerSync.ok,{stats:careerStats,ok:careerSync.ok,reason:careerSync.reason||""});
                 if(careerSync.ok&&careerSync.fresh&&careerSync.fresh.length)try{if(lib.cshUI&&lib.cshUI.achievement)lib.cshUI.achievement(careerSync.fresh.map(function(key){var def=careerEngine.byId(key);return {id:key,source:"career",title:def.label,description:def.desc,pc:def.reward};}),{kind:"unlock"});}catch(eCareerFeedback){}

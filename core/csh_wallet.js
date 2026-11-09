@@ -854,14 +854,19 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
             var historical=options&&options.historicalKeys||[];
             if(!Array.isArray(historical)||historical.length>16384||historical.some(function(k){return typeof k!=="string"||!validCareerKey(k)||["__proto__","prototype","constructor"].includes(k);}))throw Error("历史生涯候选无效");
             var source=options&&options.sourceRecord?validateCareerUnlocks(options.sourceRecord):null;
-            var history=Object.create(null);historical.forEach(function(k){history[k]=true;});
+            var unknown=options&&options.unknownKeys||[];
+            if(!Array.isArray(unknown)||unknown.length>16384||unknown.some(function(k){return typeof k!=="string"||!validCareerKey(k)||["__proto__","prototype","constructor"].includes(k);}))throw Error("无来源生涯候选无效");
+            /* 口径 A（2026-11-09 定案）：没有可靠首次来源的达成项只能记未知 0，
+               不写挂钟、不弹达成通知；有来源的仍由 sourceRecord / 实时结算给真实时刻。 */
+            var history=Object.create(null),noSource=Object.create(null);
+            historical.forEach(function(k){history[k]=true;});unknown.forEach(function(k){noSource[k]=true;});
             var record=careerUnlocks(),initial=!record;record=record||{v:1,baseline:true,entries:{}};
             var raw=localStorage.getItem("csh_career_achv"),legacy=raw?JSON.parse(raw):{};
             if(!legacy||typeof legacy!=="object"||Array.isArray(legacy))throw Error("旧生涯领奖记录无法读取");
             var claims=wallet.careerClaims||{};if(typeof claims!=="object"||Array.isArray(claims))throw Error("生涯领奖凭据格式异常");
             var paid=Object.create(null),fresh=[],changed=initial,stamp=Date.now();[legacy,claims].forEach(function(source){Object.keys(source).forEach(function(k){if(source[k])paid[k]=1;});});
             Object.keys(paid).forEach(function(k){if(!paid[k])return;if(!validCareerKey(k)||["__proto__","prototype","constructor"].includes(k))throw Error("旧生涯领奖条目无效");if(!Object.prototype.hasOwnProperty.call(record.entries,k)){record.entries[k]={observedAt:0};changed=true;}});
-            keys.forEach(function(k){if(!Object.prototype.hasOwnProperty.call(record.entries,k)){record.entries[k]={observedAt:source&&source.entries[k]?source.entries[k].observedAt:initial||history[k]?0:stamp};if(record.entries[k].observedAt>0)fresh.push(k);changed=true;}});
+            keys.forEach(function(k){if(!Object.prototype.hasOwnProperty.call(record.entries,k)){record.entries[k]={observedAt:source&&source.entries[k]?source.entries[k].observedAt:(initial||history[k]||noSource[k])?0:stamp};if(record.entries[k].observedAt>0)fresh.push(k);changed=true;}});
             record=validateCareerUnlocks(record);
             if(!changed)return {ok:true,record:record,fresh:[],baseline:false};
             var next=JSON.parse(JSON.stringify(before));next.careerUnlocks=record;next._sig=sigOf(next);

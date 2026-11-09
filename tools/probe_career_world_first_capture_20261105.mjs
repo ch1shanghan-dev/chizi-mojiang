@@ -19,7 +19,7 @@ const gambleCombos=defs.filter(d=>ctx.gambleComboRule(d)),crossCombos=defs.filte
 const worldOwnedSet=new Set(worldOwned.map(d=>d.key)),gambleDefsSet=new Set(defs.filter(d=>ctx.gambleRule(d)).map(d=>d.key));
 const crossComboSet=new Set(crossCombos.map(d=>d.key)),retiredSet=new Set(retired.map(d=>d.key)),comboKeys=defs.filter(d=>d.cat==='组合').map(d=>d.key);
 
-const make=fixture('probe_career_gamble_unlocks.mjs'),checks=[],check=(name,x)=>checks.push({name,passed:!!x}),tick=async()=>{for(let i=0;i<16;i++)await Promise.resolve()},entry=(h,k)=>h.W.careerUnlocks()?.entries[k],W=h=>h.W.careerUnlocks()?.entries||{},stamp=1700000999000;
+const make=fixture('probe_career_gamble_unlocks.mjs'),checks=[],check=(name,x,detail)=>checks.push({name,passed:!!x,...(!x&&detail!==undefined?{detail}:{})}),tick=async()=>{for(let i=0;i<16;i++)await Promise.resolve()},entry=(h,k)=>h.W.careerUnlocks()?.entries[k],W=h=>h.W.careerUnlocks()?.entries||{},stamp=1700000999000;
 const observations=[];
 
 // ---- G1 边界：真实源码谓词 + 真实 2000 条定义，把交接文档的「仍待」变成可复跑断言 ----
@@ -96,12 +96,51 @@ const table=(h,n=1)=>({id:'fc-first-capture-'+String(n).padStart(5,'0'),t:stamp+
  check('first adoption of 150-retired legacy world keeps all 26 retired dates unknown (0)',vals.length===26&&vals.every(v=>v===0)&&fresh.feedback.length===0);
 }
 
-// ---- 实测残余（记录，不冒充通过）：非首次钱包上，未接来源的当前事实定义仍由通用被动路径给挂钟时间 ----
+// ---- G5 口径 A（2026-11-09 定案）：无可靠来源不伪造时间、不弹通知、日期显示未知 ----
+// 分区真源在 csh_achv.hasFirstCaptureSource；这里用 observer 谓词独立双算，2000 条逐条一致才算过。
 {
+ const achvSrc=fs.readFileSync(root+'/core/csh_achv.js','utf8');
+ const achvCtx=vm.createContext({window:{},console});vm.runInContext(achvSrc,achvCtx);
+ const P=achvCtx.window.CSH_ACHV;
+ check('csh_achv 导出唯一分区真源且 2000 条与独立谓词逐条一致',
+   typeof P.hasFirstCaptureSource==='function'&&P.defs.length===2000&&P.defs.every(d=>P.hasFirstCaptureSource(d)===routed(d)));
+ check('分区真源仍切出 872 有来源 / 1128 无来源',P.defs.filter(d=>P.hasFirstCaptureSource(d)).length===872);
+ const walletSrc=fs.readFileSync(root+'/core/csh_wallet.js','utf8');
+ const syncBody=walletSrc.slice(walletSrc.indexOf('function syncCareerUnlocks'),walletSrc.indexOf('function claimCareer'));
+ const observerSrc2=fs.readFileSync(root+'/core/csh_career_observer.js','utf8');
+ const shellSrc=fs.readFileSync(root+'/core/csh_shell.js','utf8');
+ const careerHtml=fs.readFileSync(root+'/games/career.html','utf8');
+ const hasFallback=s=>/noSource\[k\]/.test(s)&&/unknownKeys/.test(s);
+ check('wallet 按 unknownKeys 把无来源达成记为未知 0',hasFallback(syncBody));
+ check('改前基线可判红：移除兜底换回挂钟会被静态检查检出',
+   hasFallback(syncBody)&&!hasFallback(syncBody.replace(/noSource\[k\]/g,'false')));
+ check('被动 start() 传入 unknownKeys（不是只在文本里提到）',/unknownKeys:unknownKeys/.test(observerSrc2));
+ check('实时 shell-career-sync 同样按口径 A 分流',/careerUnknown/.test(shellSrc)&&/unknownKeys:careerUnknown/.test(shellSrc));
+ check('生涯大厅对 observedAt=0 如实显示时间未记录',/历史达成[ ·，]时间未记录/.test(careerHtml));
+}
+{
+ // 非首次钱包 + 旧高统计世界：26 条退隐是既成事实，没有首次时刻，只能留 0。
  const h=make(),raw=h.G.raw();raw.ai.forEach(a=>a.retired=true);delete raw.careerUnlocks;h.data.set('csh_world',JSON.stringify(raw));
  const w=JSON.parse(h.data.get('csh_wallet'));w.careerUnlocks={v:1,baseline:true,entries:{gmplay_1:{observedAt:1}}};w._sig=h.bank._sig.sign(w);h.data.set('csh_wallet',JSON.stringify(w));
  const h2=make({data:h.data});await tick();
- observations.push({scenario:'non-initial wallet, 150-retired legacy world, general passive start()',retired_1_observedAt:entry(h2,'retired_1')?.observedAt??null,note:'wall-clock Date.now(), not a source-exact first-capture time and not unknown; this is the remaining backlog gap, deliberately not fixed here'});
+ const retireVals=retired.map(d=>entry(h2,d.key)?.observedAt);
+ check('非首次钱包旧退隐事实不再拿挂钟时间（26 条全为未知 0）',retireVals.length===26&&retireVals.every(v=>v===0));
+ check('无来源达成不弹达成通知',!h2.feedback.flatMap(x=>x.rows||[]).some(r=>retiredSet.has(r.id)));
+ const h3=make({data:h2.data});await tick();
+ check('换档重载仍保持未知且静默，不串成另一份首次时间',retired.every(d=>entry(h3,d.key)?.observedAt===0)&&h3.feedback.length===0);
 }
-const failures=checks.filter(x=>!x.passed),r={scope:'Real csh_career_observer route predicates (AST-extracted function bodies) + real csh_world/achv/wallet/migrate/shell VM fixture. Counterexample-style negative assertions on actual checkpoints; not natural long-term play, no product code changed.',passed:checks.length-failures.length,failed:failures.length,checks,observations,partition:{total:defs.length,routed:defs.filter(routed).length,unrouted:defs.filter(d=>!routed(d)).length,worldOwned:worldOwned.length,retired:retired.length,gambleCombos:gambleCombos.length,crossCombos:crossCombos.length}};
+{
+ // 高统计让 1072 条跨来源组合真正达成，验证它们同样不拿挂钟时间。
+ const h=make(),raw=h.G.raw();
+ raw.ai.forEach(a=>{a.retired=true;a.hands=100000;a.wins=100000;a.withPlayer={hands:5000,wins:2500,losses:2500,draws:0,skillTop:0,revenge:false,lowestFund:null}});
+ raw.gambles={plays:10000,wins:7000,bust:0,push:3000,streak:500,bestStreak:500,net:100000000000,best:100000000};
+ delete raw.careerUnlocks;h.data.set('csh_world',JSON.stringify(raw));
+ const w=JSON.parse(h.data.get('csh_wallet'));w.careerUnlocks={v:1,baseline:true,entries:{gmplay_1:{observedAt:1}}};w._sig=h.bank._sig.sign(w);h.data.set('csh_wallet',JSON.stringify(w));
+ const hc=make({data:h.data});await tick();
+ const comboVals=[...crossComboSet].filter(k=>entry(hc,k)).map(k=>entry(hc,k).observedAt);
+ check('高统计下确有跨来源组合达成',comboVals.length>0,{len:comboVals.length});
+ check('跨来源组合按口径 A 不伪造时间（任一来源未知则未知）',comboVals.length>0&&comboVals.every(v=>v===0),{len:comboVals.length,bad:comboVals.filter(v=>v!==0).slice(0,5)});
+ check('组合达成不弹伪造首次通知',!hc.feedback.flatMap(x=>x.rows||[]).some(r=>crossComboSet.has(r.id)));
+}
+const failures=checks.filter(x=>!x.passed),r={scope:'Real csh_career_observer route predicates (AST-extracted), real csh_achv.hasFirstCaptureSource partition source, and real csh_world/achv/wallet/migrate/shell VM fixture. G5 locks the 2026-11-09 decision A: no reliable first-capture source => observedAt=0, no unlock toast, UI shows unknown date. Counterexample-style negative assertions on actual checkpoints; not natural long-term play.',passed:checks.length-failures.length,failed:failures.length,checks,observations,partition:{total:defs.length,routed:defs.filter(routed).length,unrouted:defs.filter(d=>!routed(d)).length,worldOwned:worldOwned.length,retired:retired.length,gambleCombos:gambleCombos.length,crossCombos:crossCombos.length}};
 fs.writeFileSync(out+'/results.json',JSON.stringify(r,null,2));console.log(JSON.stringify({...r,checks:failures,observations:undefined},null,2));process.exitCode=failures.length?1:0;

@@ -1,7 +1,7 @@
-/* 自动生成于 2026-11-09T04:09:31.745Z by tools/release.js —— hashes 对应 Git 发布字节，发版后 git push 即生效，勿手改 files */
+/* 自动生成于 2026-11-09T23:39:55.260Z by tools/release.js —— hashes 对应 Git 发布字节，发版后 git push 即生效，勿手改 files */
 window.extension = {
 	"池子魔将": {
-		"build": "8f1c11b1438ac47314a40947a88e0c9f7dcd8e6f70c24ba22337c3d3f285a9a4",
+		"build": "dbd228ac490c38238930e9181cab2556328ef258361d0106eaa9681efa1ad972",
 		"hashes": {
 			"LICENSE": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
 			"README.md": "41102b34ebc984b6b84b361baa0e78aa9defe5633a4a270cde6ed0ff7bc9ae4d",
@@ -306,7 +306,7 @@ window.extension = {
 			"core/csh_achievement_badges.css": "f9dab4c9b219a55c3106fe3f70a413db1c905b236568e37bd548397e5bc473c9",
 			"core/csh_achievement_badges.js": "b0cb763d8b3735624f63d5b978af4a5ed076c32889c0e131b556e4214f42a394",
 			"core/csh_achievement_feedback.js": "07a50297d9a183f193d884af2a6e3f4fcf14d4abbc90ec7962c2a34a2e1aac9f",
-			"core/csh_achv.js": "4d10418e8131fc446cea2a21eeeb12ce151a94eca82c8225519e4108a6d8554a",
+			"core/csh_achv.js": "acbb19a210f1c93e0d8ac5de773c99a9a6836abaed6d4eea15463e9473c7e229",
 			"core/csh_aff_lines.js": "a08e3a944e845310c47e035385d6db12668e79cbed2026a3ac9576183630f1ab",
 			"core/csh_affection.js": "b57c1bbab04f325e5d5658f69c2c85e4f8050f200dcc66513e0842edadb8bdf3",
 			"core/csh_art.js": "0618ccdeb6e9a78b688ec9369908b43c22e4378e82ac93de4dc62e991b081520",
@@ -317,7 +317,7 @@ window.extension = {
 			"core/csh_bossdata.js": "2cb188431cc9ed193ab6a1ed142160a6ff9d757e1fb73c20c1641ff015438bd7",
 			"core/csh_bossrecord.js": "4e1409bcb3d9107086aff60814666ea13927a5ae281950f340f26122512fe68d",
 			"core/csh_cards.js": "dee169f850089f25ab740542722ab76fbbc468f19935a63dc4a3ebe0ea8be8b9",
-			"core/csh_career_observer.js": "8926514bf9bb996094d58f463d804e7888d5c3baf6d4474fe0c6dfe41dfab7e2",
+			"core/csh_career_observer.js": "928d39ff9c553386becb7dcd9937caa81db78ce9aee6ff120048504b00044565",
 			"core/csh_challenge.js": "c3af4da3b81a7f965e29f3dd09a0bc151b7ab80afe026a5254d5773efeed027a",
 			"core/csh_cheer.js": "045d407326d29d2b052b4c26609094c23e6d9a6c76f0b2311003b3163ed54340",
 			"core/csh_collection.css": "269502d7e72c988f6de10b624e7d86dcd3c1c10df8889e0d23dcafbfa1e7a41a",
@@ -347,7 +347,7 @@ window.extension = {
 			"core/csh_seat_cooldown.js": "afa2cee9c7ebae30dac38221b00e807631e24e7e53070adfd5e90283a625a91e",
 			"core/csh_selftest.js": "14e4acf537174481382c84370af8264027ea46cd0544731650bf675e20019ac4",
 			"core/csh_sfx.js": "ac00add5dde431b00bbbadc82a948db74e5b15732b2e0c157c82dd5746e30292",
-			"core/csh_shell.js": "5c9a86236bfc89535436c725b6a1d859f34cd69f3c853becb58b08fa6cd00882",
+			"core/csh_shell.js": "b0b725e72d7ad6f2d2a9cc3f626e274b2e5ca3e09eaca3d9fa7cb0849a57ee90",
 			"core/csh_spirit_buff_runtime.js": "b8d34cb0649f3e9d5f976ecd28fe1c73afd4d3a05bb0b1606c427a189b042e9e",
 			"core/csh_spirit_buff_skills.js": "bb2287e67a23803276e57aa3d4ee36f65d3bcfaa1b1090bd0174adede82c2d83",
 			"core/csh_spirit_buffs.js": "82bb7368c113cdbd7253b43e6e2b85145a05492e31d26ee3af47441c538499a3",
@@ -366,7 +366,7 @@ window.extension = {
 			"core/csh_update.js": "4cd83975adc40516ba5d82319fd72842ebf6a635acbaa06137d55af52a841f34",
 			"core/csh_viewport.js": "c48ac5718f70f941897495231dd66a0ef05e4b1165f43559f58a6c1e369ab1ca",
 			"core/csh_voice.js": "4c6616186f89d559578a4fa63032daebc5c4d9223f0ecc39b68bd6831aa323c6",
-			"core/csh_wallet.js": "b973f2c2ce52414cd72e1abd439ac79e2dc6f063f8d76e0ed1f64ae4b66707e1",
+			"core/csh_wallet.js": "1be0d5a947348b12500d07178b16be9f5d47dff8a7d0ba5b82ec50a1a8476f95",
 			"core/csh_winrate.js": "38483631a3121ac6b7a084142d8d9fe90b164c009743207def9ec0c89a2dcc2c",
 			"core/csh_world.js": "fa0a082a74070c7f3bd1c83672bcc16fef11d63f9d202740e2accdda8fc14111",
 			"core/csh_world_view.js": "44117e771251457435093a35da02e99a679d6aff94a136af8cc91b067dfd11f6",

@@ -272,7 +272,11 @@ import { careerSnapshot as projectBossCareer } from "./csh_bossrecord.js";
             Object.keys(ranks.entries).forEach(function(key){if(keys.indexOf(key)<0)keys.push(key);});
             Object.keys(historicalWallet || {}).forEach(function (key) { if (keys.indexOf(key) < 0) keys.push(key); });
             keys = keys.filter(function (key) { return !pending[key] || !witnessed(durable, pending[key]); });
-            var result = W.wallet.syncCareerUnlocks(keys, {historicalKeys:Object.keys(historicalWallet||{}).filter(function(key){return keys.indexOf(key)>=0;}), sourceRecord:ranks});
+            /* 无可靠首次来源的定义（1128 条）在被动采集里只能记未知 0，
+               否则会被写成「第一次打开生涯页」的挂钟时间。分区真源在 csh_achv。 */
+            var unknownKeys = (A && typeof A.byId === "function" && typeof A.hasFirstCaptureSource === "function")
+                ? keys.filter(function(key){var def=A.byId(key);return !def||!A.hasFirstCaptureSource(def);}) : [];
+            var result = W.wallet.syncCareerUnlocks(keys, {historicalKeys:Object.keys(historicalWallet||{}).filter(function(key){return keys.indexOf(key)>=0;}), sourceRecord:ranks, unknownKeys:unknownKeys});
             if (!result.ok || epoch() !== stamp) return false;
             readyEpoch = stamp;
             Object.keys(pending).forEach(function (key) { if (result.record.entries[key]) delete pending[key]; });

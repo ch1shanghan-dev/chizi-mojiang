@@ -2147,6 +2147,28 @@
 		for (var b = 0; b < defs.length; b++) byKey[defs[b].key] = defs[b];
 	})();
 /* ===== END APPEND:career-expand ===== */
+	/* 是否存在可靠的「首次达成」时间来源（口径 A · 2026-11-09 定案）。
+	   有来源：由对应 checkpoint / 实时结算给出真实时刻；
+	   无来源：只能记 observedAt=0（未知），绝不写 Date.now() 冒充首次时间。
+	   这里是唯一真源：csh_career_observer 的被动 start()、csh_shell 的实时
+	   shell-career-sync 都读它，B6 反例逐条双算校验，避免三处各算一套。 */
+	var FIRST_SOURCE_TASK_KEYS = ['task_1','task_2','task_3','task_4','task_5','task_6','task_7','task_8','task_9','task_10','task_12','task_15','egg_task_full','egg_full_house'];
+	var FIRST_SOURCE_EGG_KEYS = ['egg_signed_first','egg_hungry','egg_rich_first','egg_seg_rise','egg_rank_master','egg_gamble_first'];
+	function hasFirstCaptureSource(def) {
+		if (!def || typeof def !== "object") return false;
+		var k = String(def.key || ""), c = def.cat;
+		if (c === "挑战" || c === "资产" || c === "签到" || c === "互动" ||
+		    c === "官阶" || c === "功勋" || c === "胜负" || c === "豪赌桌") return true;
+		if (FIRST_SOURCE_TASK_KEYS.indexOf(k) >= 0 || FIRST_SOURCE_EGG_KEYS.indexOf(k) >= 0) return true;
+		return /^cx_task_\d+$/.test(k) ||
+			/^cx_combo_merit_meritday_\d+$/.test(k) ||
+			/^cx_ratio_(gmret|gmwinrate|winrate|killper)_/.test(k) ||
+			/^cx_combo_(gmplay_gmwin|gmplay_gmnet|gmplay_gmstreak|gmwin_gmnet|gmwin_gmstreak|gmnet_gmstreak)_\d+$/.test(k) ||
+			/^cx_combo_(wins_games|wins_kills|wins_chars|games_kills|games_chars|kills_chars)_\d+$/.test(k) ||
+			/^cx_combo_(rich_peak|rich_sign|peak_sign)_\d+$/.test(k) ||
+			/^(hands|cx_hands|tablefriends|oldfriend|revengefriend|balancedfriend|poorai|topdown|topfund|billionaires|broke)_\d+$/.test(k) ||
+			/^skilltop_(?:1|0\.(?:7|8|85|9|95|98|99))$/.test(k);
+	}
 	root.CSH_ACHV = {
 		version: "2.0.0",
 		MIN_DEFS: MIN_DEFS,
@@ -2155,6 +2177,7 @@
 		byKey: function (k) { return byKey[k] || null; },
 		RETIRED: RETIRED,
 		isRetired: isRetired,
+		hasFirstCaptureSource: hasFirstCaptureSource,
 		evalAll: evalAll,
 		test: test,
 		claimed: claimed,

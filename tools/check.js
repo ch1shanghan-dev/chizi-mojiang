@@ -3269,7 +3269,7 @@ async function runBossChecks() {
       if(career58.failed!==0||career58.passed<40)fail('执行级 E58：生涯首次达成与永久资格未通过');else ok('执行级 E58：生涯首次达成/旧档/失败/迁移/资格（'+career58.passed+'/0）');
       /* B6：退隐/世界首次采集与跨来源组合的真实源码反例，防止「没有证据」被当成兼容。 */
       const firstCaptureB6=runProbeJson('probe_career_world_first_capture_20261105.mjs',['--out',path.join(tmp57,'first-capture')],{timeout:20000});
-      if(firstCaptureB6.failed!==0||firstCaptureB6.passed<24)fail('执行级 E58G：退隐/世界首次采集与跨来源组合反例未通过');else ok('执行级 E58G：首次采集/跨来源组合/真实谓词分区（'+firstCaptureB6.passed+'/0）');
+      if(firstCaptureB6.failed!==0||firstCaptureB6.passed<37)fail('执行级 E58G：退隐/世界首次采集与跨来源组合反例未通过');else ok('执行级 E58G：首次采集/跨来源组合/口径A不伪造时间/分区真源（'+firstCaptureB6.passed+'/0）');
       const taskLife58=runProbeJson('probe_task_lifetime.mjs',['--out',path.join(tmp57,'task-lifetime.json')],{timeout:20000});
       if(taskLife58.failed!==0)fail('执行级 E58B：累计日课事实与新档拒绝未通过');else ok('执行级 E58B：累计日课同写/跨日/旧档/失败/采用预检（'+taskLife58.passed+'/0）');
       const bossCareer58=runProbeJson('probe_career_boss_unlocks.mjs',['--out',path.join(tmp57,'boss-career.json')],{timeout:20000});
