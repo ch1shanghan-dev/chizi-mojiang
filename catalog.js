@@ -1,7 +1,7 @@
-/* 自动生成于 2026-11-09T02:38:46.482Z by tools/release.js —— hashes 对应 Git 发布字节，发版后 git push 即生效，勿手改 files */
+/* 自动生成于 2026-11-09T03:00:07.078Z by tools/release.js —— hashes 对应 Git 发布字节，发版后 git push 即生效，勿手改 files */
 window.extension = {
 	"池子魔将": {
-		"build": "7d163570212282575bfe3e6ed6d1cb391299dcbcc48d50d8408fd2b36263bb85",
+		"build": "10679329047b823886ead689507c92bb39730a4f62fb888751ae875c03e157dd",
 		"hashes": {
 			"LICENSE": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
 			"README.md": "41102b34ebc984b6b84b361baa0e78aa9defe5633a4a270cde6ed0ff7bc9ae4d",
@@ -367,7 +367,7 @@ window.extension = {
 			"core/csh_voice.js": "4c6616186f89d559578a4fa63032daebc5c4d9223f0ecc39b68bd6831aa323c6",
 			"core/csh_wallet.js": "b973f2c2ce52414cd72e1abd439ac79e2dc6f063f8d76e0ed1f64ae4b66707e1",
 			"core/csh_winrate.js": "38483631a3121ac6b7a084142d8d9fe90b164c009743207def9ec0c89a2dcc2c",
-			"core/csh_world.js": "6994c5017d6671737da4f541acf1a19303a575ca6ef63fc577379a7abfbd3f00",
+			"core/csh_world.js": "fa0a082a74070c7f3bd1c83672bcc16fef11d63f9d202740e2accdda8fc14111",
 			"core/csh_world_view.js": "44117e771251457435093a35da02e99a679d6aff94a136af8cc91b067dfd11f6",
 			"core/lines_final_pool.json": "2c0931248f24398f37e6f343d6e28ad0ab93d5bb45eb814d703a08757b98c5a4",
 			"core/voices.js": "e88f29b031dee14946a96fa715cb67bf75dfa7b4d0e9e781f3ff95fe3c4447f3",
@@ -394,7 +394,7 @@ window.extension = {
 			"games/goldfish.html": "471d2dddf25d92e58b5fa9ddc6307169227befed38f39d9f3d55d9bf05c6f6bb",
 			"games/rank.html": "ab7c1bbd1aafd9ebc30583b2eae2c7fd5f36ca795350db88bf0892b5605c220e",
 			"games/save.html": "be722c5ad7a3e11a495721fb0da497797f7612d9414d667717c6d005a7853a86",
-			"games/texas/texas.html": "603dae8365efc0eef9b3469291a6ba1e526021a164e78bc3568468ce02618d27",
+			"games/texas/texas.html": "3a6289009d73ac57f154c722d3a7e92fec2f3fd639118abdd5922b48a6b94837",
 			"games/uno/uno.html": "49371f8f3f347f624777bcfd721193c07c94c3efc618029e8c098dfbac40d564",
 			"image/card/csh_ak47.png": "fa846a4792cafd9ea362156e8db924eff59edab9ef640410b02fcf975db3bf1d",
 			"image/card/csh_daju.png": "fedfdbb00a85fe11b35fcca3bdf1cb4395f1709984a02230fc0fd6df3539f189",

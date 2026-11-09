@@ -1651,6 +1651,7 @@ function makeSession() {
       out: false, persona: pk, tag: displayTag(pk), reveal: false,
       worldState: ws ? { mood: ws.mood, fatigue: ws.fatigue, form: ws.form } : {},
       skill: skill, worldId: wid, mult: mult, seed: ws ? (ws.seed || ws.id) : nm[1],       /* ★ 牌技 + 世界身份 */
+      rebuy: ws ? Math.max(0, Math.floor(Number(ws.rebuy) || 0)) : 0,   /* 打空后一次性自主补码额度（宿主按真实资金算好） */
     };
     players.push(p);
     seats.push({ id: wid, name: nm[1], stake: chips, skill: skill, mult: mult });
@@ -1704,6 +1705,7 @@ function roomShotPlayer(p) {
     persona: p.persona || null, tag: p.tag || '', reveal: !!p.reveal,
     skill: p.skill, worldState: p.worldState || null, worldId: p.worldId || 0,
     mult: p.mult || 1, seed: p.seed || 0,
+    rebuy: Math.max(0, Math.floor(Number(p.rebuy) || 0)),   /* 续局必须保留未用额度 */
   };
 }
 
@@ -1842,8 +1844,35 @@ function postBlind(idx, amount) {
 }
 
 /* ---------- 开手 ---------- */
+/* 打空后重上桌（手册 §7 子项）：额度在入座时由宿主按 AI 真实世界资金算好，
+   只在一手结算完成、下一手发牌前用一次；保守 / 手感差 / 刚复出的 AI 没有额度，打空即出局。
+   本函数不写钱包、不写世界资金 —— 整场唯一结算事务仍在 commitTableResult。
+   ★ 资金守恒：补码额必须同步计入 G.aiStakeTotal 与 G.seats[].stake，
+     否则玩家赢走的分摊基数偏小，等于凭空造钱。 */
+function reviveBustedAI() {
+  if (!G || G.sessionOver || !(G.seats instanceof Array)) return;
+  var total = 0;
+  for (var i = 1; i < G.players.length; i++) {
+    var p = G.players[i];
+    if (!p.out || p.chips > 0) continue;              /* 没打空，额度留到那一手 */
+    var amount = Math.max(0, Math.floor(Number(p.rebuy) || 0));
+    if (!amount) continue;
+    var seat = null;
+    for (var s = 0; s < G.seats.length; s++) {
+      if (G.seats[s] && String(G.seats[s].id) === String(p.worldId)) { seat = G.seats[s]; break; }
+    }
+    if (!seat) continue;                             /* 无可核对的资金来源，绝不凭空补码 */
+    p.rebuy = 0;                                     /* 一次性，绝不无限重买 */
+    p.chips = amount;
+    seat.stake = Math.max(0, Math.floor(Number(seat.stake) || 0)) + amount;
+    total += amount;
+  }
+  if (total > 0) G.aiStakeTotal = Math.max(0, Math.floor(Number(G.aiStakeTotal) || 0)) + total;
+}
+
 function startHand() {
   if (!G || G.sessionOver) return;
+  reviveBustedAI();                                  /* 下一手发牌前的唯一合法补码时点 */
   /* 只剩一人有筹码（对手全被打光）→ 本场通吃收工，否则会出现无人可行动的死锁 */
   var aliveCnt = 0;
   for (var z = 0; z < G.n; z++) if (G.players[z].chips > 0) aliveCnt++;

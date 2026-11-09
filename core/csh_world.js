@@ -1656,8 +1656,17 @@ import { MINIONS } from "./csh_bossdata.js";
     function stakeCapability(a) {
         return Math.min(AI_MIN_STAKE, Math.floor((Number(a && a.fund) || 0) * 0.3));
     }
+    /* 人物是否敢加大风险：牌风 + 手感 + 退隐史共同决定，无随机、可解释。
+       全额带入与打空后补码共用同一口径。 */
+    function boldStance(a) {
+        if (!a) return false;
+        var p = PERSONAS[a.persona];
+        var form = Number(a.form);
+        if (!Number.isFinite(form)) form = 0.5;
+        return !!p && (p.raiseThreshold <= 0.50 || p.bluffRate >= 0.26 || p.variance >= 0.36)
+            && form >= 0.5 && (Number(a.retireCount) || 0) === 0;
+    }
     /* AI 自主带入（手册 §7，2026-11-09）：普通桌不再是人人 30% 短码。
-       全额意愿由人物牌风 + 近期手感 + 真实资金安全垫共同决定，全程无随机、可解释。
        硬约束：带入永不超过玩家带入、不超过自己资金；且最多亏到仍留 AI_MIN_STAKE，
        避免一局全额带入把 AI 直接打进退隐（补码与退隐不冲突）。
        stake 只是本局风险额度，结算仍由 settleWin/settleLose 从 a.fund 真扣真加，
@@ -1666,13 +1675,21 @@ import { MINIONS } from "./csh_bossdata.js";
         var want = Math.max(AI_MIN_STAKE, Math.floor(Number(buyIn) || AI_MIN_STAKE));
         var fund = Math.max(0, Math.floor(Number(a && a.fund) || 0));
         var short = Math.floor(fund * 0.3);
-        var form = Number(a && a.form);
-        if (!Number.isFinite(form)) form = 0.5;
-        var p = a && PERSONAS[a.persona];
-        var bold = !!p && (p.raiseThreshold <= 0.50 || p.bluffRate >= 0.26 || p.variance >= 0.36);
-        var healthy = form >= 0.5 && (Number(a && a.retireCount) || 0) === 0 && fund >= want * 2;
-        var stake = (bold && healthy) ? want : short;
+        var stake = (boldStance(a) && fund >= want * 2) ? want : short;
         return Math.max(0, Math.min(stake, want, fund, Math.max(0, fund - AI_MIN_STAKE)));
+    }
+    /* 打空后重上桌（手册 §7 子项）：补码额度在入座时按当时真实资金预先算好，
+       一手结算完成、下一手发牌前由牌桌一次用完。不是独立扣款事务 ——
+       世界资金仍由整场唯一结算 commitTableResult 真扣真加，因此不存在
+       「钱扣了页面没加筹码」的跨进程窗口，也不新增任何资金写入路径。
+       硬约束：初始带入 + 补码合计 ≤ 自有资金 - AI_MIN_STAKE，
+       补码额 ≤ 初始带入；保守 / 手感差 / 刚复出的 AI 打空即出局。 */
+    function aiRebuyOf(a, stake) {
+        if (!a || a.retired || !boldStance(a)) return 0;
+        var fund = Math.max(0, Math.floor(Number(a.fund) || 0));
+        var s = Math.max(0, Math.floor(Number(stake) || 0));
+        var room = Math.max(0, fund - AI_MIN_STAKE - s);
+        return Math.max(0, Math.min(s, room));
     }
     function invitationReply(a) {
         var p = playerTable(a.withPlayer), lines = INVITE_LINES[a.persona] || INVITE_LINES.math;
@@ -1806,6 +1823,8 @@ import { MINIONS } from "./csh_bossdata.js";
 				mult: g ? g.mult : 1,                 // 豪赌桌带入倍数 2~5
 				multCapped: g ? g.capped : false,
 				stake: stake,                          // §I.3 带入公式 / 豪赌桌倍数带入
+				/* 打空后一次性自主补码额度（普通桌才有；豪赌桌保持零，不额外放大风险） */
+				rebuy: gamble ? 0 : aiRebuyOf(a, stake),
 			};
 		});
 	}

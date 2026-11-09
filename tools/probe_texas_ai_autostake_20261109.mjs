@@ -88,7 +88,83 @@ ck('seat() 实际返回调用 normalStake(a, buyIn)',/g\.stake : normalStake\(a,
 ck('候选池过滤同样走 normalStake',/return normalStake\(a, buyIn\) >= AI_MIN_STAKE/.test(worldSrc));
 ck('不再有重复写死的 30% 短码表达式',!/Math\.min\(buyIn, Math\.floor\(a\.fund \* 0\.3\)\)/.test(worldSrc));
 
-/* 5. 改前基线：旧实现对激进 AI 无法全额，也没有任何策略差异 */
+/* 5. 打空后重上桌：额度由真实世界资金决定，且初始带入 + 补码不突破自有资金 */
+{
+  const h=harness();seed(h,'aggro',BUYIN*10,0.8,0);
+  const seats=h.W.seat(5,BUYIN)||[];
+  ck('激进 AI 入座时获得打空后补码额度',seats.length>0&&seats.every(s=>s.rebuy>0),seats.map(s=>s.rebuy));
+  ck('★ 初始带入 + 补码 ≤ 自有资金 - 最低带入（零和不被突破）',
+    seats.every(s=>s.stake+s.rebuy<=BUYIN*10-MIN),seats.map(s=>({stake:s.stake,rebuy:s.rebuy})));
+  ck('补码额不超过初始带入',seats.every(s=>s.rebuy<=s.stake));
+}
+{
+  const h=harness();seed(h,'tight',BUYIN*10,0.8,0);
+  ck('保守 AI 打空即出局，无补码额度',(h.W.seat(5,BUYIN)||[]).every(s=>s.rebuy===0));
+}
+{
+  const h=harness();seed(h,'aggro',BUYIN*10,0.2,0);
+  ck('手感差的 AI 不补码',(h.W.seat(5,BUYIN)||[]).every(s=>s.rebuy===0));
+}
+{
+  const h=harness();seed(h,'aggro',BUYIN*10,0.8,1);
+  ck('刚复出的 AI 不补码',(h.W.seat(5,BUYIN)||[]).every(s=>s.rebuy===0));
+}
+{
+  const h=harness();seed(h,'aggro',3000000,0.8,0);
+  ck('豪赌桌不额外放大风险（rebuy=0）',(h.W.seat(5,200000)||[]).every(s=>s.rebuy===0));
+}
+{
+  const bad=[];
+  for(const persona of ['aggro','tight','bluff','math','wild','chaser','trapper']){
+    for(const fund of [BUYIN*1.1,BUYIN*2,BUYIN*3,BUYIN*10]){
+      const h=harness();seed(h,persona,fund,0.8,0);
+      for(const s of (h.W.seat(5,BUYIN)||[])){
+        if(s.rebuy<0||s.rebuy>s.stake||s.stake+s.rebuy>fund-MIN)bad.push({persona,fund,stake:s.stake,rebuy:s.rebuy});
+      }
+    }
+  }
+  ck('7 牌风 × 4 档资金：补码额恒满足零和与桌规上限',bad.length===0,bad.slice(0,4));
+}
+
+/* 6. 页面侧：把真实 reviveBustedAI 抽进 VM 跑，锁住同步 / 一次性 / 席位来源 */
+const html=fs.readFileSync(root+'/games/texas/texas.html','utf8');
+const reviveFn=(html.match(/function reviveBustedAI\(\) \{[\s\S]*?\n\}/)||[])[0];
+const P=(id,chips,out,rebuy,worldId)=>({id,isHuman:false,chips,out,rebuy,worldId});
+function runRevive(players,seats,total){
+  /* 数据必须在 vm realm 内构造：函数里的 G.seats instanceof Array 会拒绝
+     从 Node 侧传入的跨 realm 数组（真实页面同 realm 不会遇到）。 */
+  const ctx={};vm.createContext(ctx);
+  vm.runInContext('var G='+JSON.stringify({sessionOver:false,players,seats,aiStakeTotal:total})+';',ctx);
+  vm.runInContext(reviveFn+'\nreviveBustedAI();',ctx);
+  return vm.runInContext('G',ctx);
+}
+{
+  const g=runRevive(
+    [P(0,1000,false,0,'human'),P(1,0,true,400,'ai1'),P(2,500,false,400,'ai2')],
+    [{id:'ai1',stake:600},{id:'ai2',stake:800}],1400);
+  ck('打空 AI 补码复活，未打空的保留额度',
+    g.players[1].chips===400&&g.players[1].rebuy===0&&g.players[2].chips===500&&g.players[2].rebuy===400,g.players);
+  ck('★ 补码额同步计入 aiStakeTotal 与 seats[].stake',
+    g.aiStakeTotal===1800&&g.seats[0].stake===1000&&g.seats[1].stake===800,{total:g.aiStakeTotal,seats:g.seats});
+  const again=runRevive(g.players,g.seats,g.aiStakeTotal);
+  ck('一次性额度用完不再补码（堵死无限重买）',again.players[1].chips===400&&again.aiStakeTotal===1800);
+}
+{
+  const g=runRevive([P(0,1000,false,0,'human'),P(1,0,true,400,'missing')],[{id:'ai1',stake:600}],600);
+  ck('找不到可核对席位时绝不凭空补码',g.players[1].chips===0&&g.aiStakeTotal===600&&g.seats[0].stake===600);
+}
+{
+  const g=runRevive([P(0,1000,false,0,'human'),P(1,0,true,0,'ai1')],[{id:'ai1',stake:600}],600);
+  ck('无额度的 AI 打空即出局',g.players[1].chips===0&&g.aiStakeTotal===600);
+}
+ck('补码只在下一手发牌前触发',/function startHand\(\) \{[\s\S]{0,220}reviveBustedAI\(\);/.test(html));
+ck('快照保留未用补码额度',/rebuy: Math\.max\(0, Math\.floor\(Number\(p\.rebuy\) \|\| 0\)\)/.test(html));
+ck('入座信息带补码额度',/rebuy: gamble \? 0 : aiRebuyOf\(a, stake\)/.test(worldSrc));
+ck('补码前必须找到可核对席位',/if \(!seat\) continue;/.test(html));
+const legacySeat=(a,stake)=>({id:a.id,stake:stake});
+ck('改前基线：入座信息根本没有补码额度概念',legacySeat({id:'x'},200).rebuy===undefined);
+
+/* 7. 改前基线：旧实现对激进 AI 无法全额，也没有任何策略差异 */
 const legacy=(persona,fund,buyIn)=>Math.min(buyIn,Math.floor(fund*0.3));
 ck('改前基线：人人 30% 短码，激进 AI 拿不到全额',legacy('aggro',BUYIN*3,BUYIN)!==BUYIN,{legacy:legacy('aggro',BUYIN*3,BUYIN)});
 ck('改前基线：激进与保守完全同额（零策略）',legacy('aggro',BUYIN*3,BUYIN)===legacy('tight',BUYIN*3,BUYIN));
