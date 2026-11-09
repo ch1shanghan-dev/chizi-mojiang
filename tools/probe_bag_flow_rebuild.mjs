@@ -1,3 +1,8 @@
+// HISTORICAL BASELINE (2026-10-22), superseded — do not use as acceptance.
+// The 2026-10-29 "行囊主体优先增量" made the output/copy/file area hidden until a real
+// pack, so 3 assertions here (one-click pack visibility, size/copy actions, pending preview
+// timing) describe the older design and fail 2/3 against current games/save.html.
+// Current acceptance is tools/probe_bag_content_host.mjs (real Noname host, 27/0).
 // Real Chromium pointer input, real page/transport/migration/wallet/UIKit and native LS.
 // Disposable browser profile and localhost origin; never attaches to Noname/player saves.
 import fs from 'node:fs';

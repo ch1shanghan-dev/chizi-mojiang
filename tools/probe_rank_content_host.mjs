@@ -65,4 +65,7 @@ source=source.replace("if(process.argv.includes('--world-layout-410'))","if(proc
 
 if(arg('--page-source')){const route="    const target = resolveReadOnly(decodeURIComponent(url.pathname === '/' ? '/index.html' : url.pathname));";source=source.replace(route,'    if(decodeURIComponent(url.pathname)==="/extension/池子魔将/games/rank.html"){item.status=200;res.writeHead(200,{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-cache"});return res.end(fs.readFileSync('+JSON.stringify(path.resolve(arg('--page-source')))+'));}\n'+route);}
 
-const runner=path.join(out,'isolated-online-runner.mjs');fs.writeFileSync(runner,tests+'\n'+source);const child=spawn(process.execPath,[runner,'--offline-host','--out',out],{stdio:'inherit',windowsHide:true});await new Promise((resolve,reject)=>{child.once('error',reject);child.once('exit',code=>{process.exitCode=code||0;resolve();});});
+const runner=path.join(out,'isolated-online-runner.mjs');fs.writeFileSync(runner,tests+'\n'+source);/* 派生 runner 必须显式带 --host / --extension-source：probe_host_smoke 的默认 host 是
+   path.resolve(root,'../..')，本机并不指向真实无名杀宿主，不传就会 /index.html 404。 */
+const runnerArgs=[runner,'--offline-host','--out',out,'--host',arg('--host','D:/noname/resources/app'),'--extension-source',root];
+const child=spawn(process.execPath,runnerArgs,{stdio:'inherit',windowsHide:true});await new Promise((resolve,reject)=>{child.once('error',reject);child.once('exit',code=>{process.exitCode=code||0;resolve();});});

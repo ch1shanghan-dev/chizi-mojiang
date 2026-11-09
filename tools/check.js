@@ -2375,6 +2375,14 @@ async function runBossChecks() {
 		if (db40.indexOf("导入 / 导出") < 0 && db40.indexOf("导入（合并）") < 0) e40.push("调试面板的技能方案导入导出被误删（应保留）");
 		const wr40 = fs.readFileSync(path.join(ROOT, "core", "csh_winrate.js"), "utf8");
 		if (wr40.indexOf("exportData") < 0 || wr40.indexOf("导入") < 0) e40.push("胜负统计自带的导入导出被误删（应保留）");
+		/* 行囊 / 官阶的三支真实宿主验收（2026-11-09 修）：派生 probe_host_smoke runner
+		   必须显式转发 --host / --extension-source。默认 host 是 path.resolve(root,'../..')，
+		   本机并不指向无名杀宿主，不传就会 /index.html 404 —— 验收「写了但从没跑过」。 */
+		for (const hp of ["probe_bag_content_host.mjs", "probe_career_rank_host.mjs", "probe_rank_content_host.mjs"]) {
+			const ht = fs.readFileSync(path.join(ROOT, "tools", hp), "utf8");
+			if (!/'--host'/.test(ht) || !/'--extension-source'/.test(ht))
+				e40.push(hp + " 派生宿主 runner 未转发 --host/--extension-source（index.html 会 404）");
+		}
 		if (e40.length) fail("执行级 E40：行囊存档总口（" + e40.slice(0, 4).join("；") + "）");
 		else ok("执行级 E40：行囊在册且大厅平级（桥六件齐 · 先预检后覆盖 · 生涯大厅已搬净 · 其余导入导出保留）");
 	}
