@@ -21,7 +21,7 @@
    **设计取舍待作者确认**：AI 补码刻意**不新增独立扣款事务**，世界资金仍由整场唯一 `commitTableResult` 结算，因此不存在「钱扣了页面没加筹码」的跨进程窗口，也不新增资金写入路径；若作者要的是独立跨进程事务，需另行设计。
 2. **P1 四桌 AI / 托管与听感** — 决策与托管代码侧巡检无缺陷；音效节奏与辨识度升级未做，需实听。
 3. **P2 横屏美术 / 牌桌呈现 / 人物事件** — 断点已收敛 `340`、配对边界纠偏；牌桌呈现与美术未做，剩余断点低频按需。
-4. **P2 生涯采集 / 既有成就质量 / 官阶挑战** — 静态未匹配 1128 条待按「待接真实源 / 派生源 / 组合 / 取舍」分类；首次采集口径仍需作者定（B 类）。
+4. **P2 生涯采集 / 既有成就质量 / 官阶挑战** — **分类子项已完成（E95AO 3/0）**：1128 条未路由按四类归因 = 已有派生源 41 + 组合 1084 + 设计取舍 3 + 待接真实源 **0**。核实 AI世界成就的事实源由 `buildStats` 真实注入（`worldChars` / `worldRetired` / `recordsSeen` / `tierDown` / `comebacks` / `rivals` / `grudge8`，源为 `world.feats`），条件全部可达；`unrouted` 只是「不走 observer 独立记录链」的口径，**不等于不可达**。契约固化在 `audit_career_coverage_20261105.mjs`：`pendingSource` 非空或事实源字段被删即判红。**剩余**：首次采集口径需作者定（B 类，不擅自接入 observer）；本轮按手册查重复/蕴含条件与不可达阈值，运行时全拉满复现未发现恒不可达定义，没有凭空造缺陷来修。
 5. **P3 平台 / 长期离线 / 国内服务** — 只读核实已完成；真实网络写入、国内受控服务、设备矩阵仍需环境授权。
 
 > **已核实收口 · 人物事件与回应（2026-11-09）**：手册 §9 的事件口吻都已接线 —— 重逢 `returning`（`onGameStart` 按世界档案挑熟人）、受挫 `hurtSelf` / `dying` / `emptyHand`、关系变化（宿敌开场 / `situCat` 连砸升级 / 恩怨 ≥8 狠话档），按真实赢家、对手与阵营由 `fire` / `pickTarget` / `relation` 选词；F1 的队列悬挂缺陷已修（E95Y 63/0）。回忆与邀约验收全绿：memoir_talk 203/0、memoir_talk_ui 134/0、world_memoir_facts 40/0、world_memoir_ui 92/0、career_interaction_unlocks 48/0、interact_recovery 100/0、interaction_context 12/0、player_interactions 34/0。**无需改产品代码**。
