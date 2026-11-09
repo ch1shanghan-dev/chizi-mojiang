@@ -95,12 +95,16 @@ for (const axis of ['height', 'width']) {
   const target = V.TARGETS[axis];
   const keys = Object.keys(V.MIGRATIONS[axis]).map(Number).sort((a, b) => a - b);
   const rs = keys.map(k => V.migrationOf(k, axis));
-  check(axis + '：每个目标都在目标集合内', rs.every(r => target.includes(r.to)), rs.filter(r => !target.includes(r.to)));
+  check(axis + '：非配对行目标在集合内；配对行保持自身且为 same/low',
+    rs.every(r => r.paired ? (r.to === r.from && r.direction === 'same' && r.risk === 'low') : target.includes(r.to)),
+    rs.filter(r => r.paired ? !(r.to === r.from && r.direction === 'same' && r.risk === 'low') : !target.includes(r.to)));
   check(axis + '：direction / risk 由 from→to 机械推导，不手写第二份',
     rs.every(r => r.direction === (r.to > r.from ? 'expand' : r.to < r.from ? 'shrink' : 'same') &&
       r.risk === (r.direction === 'same' ? 'low' : 'high')));
+  /* 配对边界不是迁移目标，不参与「按 from 升序 to 单调不逆序」的机械推导。 */
+  const mono = rs.filter(r => !r.paired);
   check(axis + '：按 from 升序，to 单调不逆序',
-    rs.every((r, i) => i === 0 || r.to >= rs[i - 1].to), rs.map(r => r.from + '→' + r.to));
+    mono.every((r, i) => i === 0 || r.to >= mono[i - 1].to), mono.map(r => r.from + '→' + r.to));
   check(axis + '：newTier 只标记新增中间档',
     rs.every(r => r.newTier === (axis === 'height' ? r.to === 640 : (r.to === 1000 || r.to === 1200))));
 }
@@ -108,6 +112,22 @@ check('三档主值映射到自身且为低风险（无需截图的唯一三类�
   [[330, 'height'], [500, 'height'], [760, 'width']].every(([v, a]) => {
     const r = V.migrationOf(v, a); return r.to === v && r.direction === 'same' && r.risk === 'low';
   }));
+/* ---------- 配对边界（2026-11-09 纠偏） ----------
+   1199 / 599 不是「待收敛的旧值」，而是已经和 min-* 成对的正确边界。
+   机械按 TARGETS 放宽会让 1200px 与 600–639px 同时命中两套规则。 */
+const journalCss = fs.readFileSync(path.join(root, 'core/csh_journal.css'), 'utf8');
+const achvHtml = fs.readFileSync(path.join(root, 'games/achv.html'), 'utf8');
+check('配对边界表存在且冻结', Object.isFrozen(V.PAIRED) &&
+  JSON.stringify(V.PAIRED.width) === '[1199]' && JSON.stringify(V.PAIRED.height) === '[599]');
+check('width:1199 判为配对/同值/低风险，不许机械放宽到 1200',
+  (() => { const r = V.migrationOf(1199, 'width'); return r.paired && r.to === 1199 && r.direction === 'same' && r.risk === 'low'; })());
+check('height:599 判为配对/同值/低风险，不许机械放宽到 640',
+  (() => { const r = V.migrationOf(599, 'height'); return r.paired && r.to === 599 && r.direction === 'same' && r.risk === 'low'; })());
+check('静态接线：min-width:1200px / min-height:600px 的配对规则真实存在',
+  /min-width:1200px/.test(journalCss) && /min-width:1200px/.test(achvHtml) && /min-height:600px/.test(achvHtml));
+check('改前基线：把配对边界放宽会被同值自检检出',
+  (() => { const bad = load(src.replace('599: [599, \'vp-mid-h\']', '599: [640, \'vp-mid-h\']'));
+    const r = bad.migrationOf(599, 'height'); return r.paired && r.to === 640 && r.direction !== 'same'; })());
 check('max-height / max-width 两种 axis 写法等价',
   JSON.stringify(V.migrationOf(430, 'height')) === JSON.stringify(V.migrationOf(430, 'max-height')) &&
   JSON.stringify(V.migrationOf(1000, 'width')) === JSON.stringify(V.migrationOf(1000, 'max-width')));
@@ -141,7 +161,7 @@ check('未知 axis 返回 null', V.migrationOf(430, 'min-height') === null && V.
   const badV = load(noMap);
   check('改前基线：缺一条映射会被完备性断言检出', badV.migrationOf(430, 'height') === null);
 
-  const badTarget = src.replace('1199: [1200, \'vp-wide-w\']', '1199: [1300, \'vp-wide-w\']');
+  const badTarget = src.replace('1199: [1199, \'vp-wide-w\']', '1199: [1300, \'vp-wide-w\']');
   const badT = load(badTarget);
   check('改前基线：目标越出 TARGETS 会被检出',
     badT.migrationOf(1199, 'width').to === 1300 && !badT.TARGETS.width.includes(1300));

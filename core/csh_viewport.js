@@ -52,7 +52,7 @@
       330: [330, 'vp-tiny'], 340: [330, 'vp-tiny'], 350: [330, 'vp-tiny'],
       400: [500, 'vp-wide'], 430: [500, 'vp-wide'], 440: [500, 'vp-wide'],
       450: [500, 'vp-wide'], 480: [500, 'vp-wide'], 500: [500, 'vp-wide'],
-      520: [500, 'vp-wide'], 560: [640, 'vp-mid-h'], 599: [640, 'vp-mid-h'],
+      520: [500, 'vp-wide'], 560: [640, 'vp-mid-h'], 599: [599, 'vp-mid-h'],
       600: [640, 'vp-mid-h'], 620: [640, 'vp-mid-h'], 640: [640, 'vp-mid-h']
     }),
     width: Object.freeze({
@@ -60,8 +60,18 @@
       559: [760, 'vp-narrow'], 600: [760, 'vp-narrow'], 620: [760, 'vp-narrow'],
       640: [760, 'vp-narrow'], 720: [760, 'vp-narrow'], 750: [760, 'vp-narrow'],
       760: [760, 'vp-narrow'], 899: [1000, 'vp-mid-w'], 1000: [1000, 'vp-mid-w'],
-      1199: [1200, 'vp-wide-w']
+      1199: [1199, 'vp-wide-w']
     })
+  });
+  /* ★ 2026-11-09 纠偏：这两个值**不是待迁移的旧断点**，而是已经和 min-* 成对的正确边界。
+       · max-width:1199px ⟷ min-width:1200px（csh_journal.css / achv.html 的 matchMedia）
+       · max-height:599px ⟷ min-height:600px（achv.html 的 matchMedia 同一条件）
+     把它们「放宽」成 1200 / 640 会让 1200px 与 600–639px 同时命中两套规则，
+     和 I1 那次 blackjack 的配对 min-height:430 是同一类事故。
+     机械按 TARGETS 收敛之前，必须先看有没有配对的 min-* 与脚本 matchMedia。 */
+  var PAIRED = Object.freeze({
+    height: Object.freeze([599]),
+    width: Object.freeze([1199])
   });
   /* 冻结每一行，避免外部改写迁移表绕过门禁 */
   Object.keys(MIGRATIONS).forEach(function (a) {
@@ -78,6 +88,7 @@
     return Object.freeze({
       from: v, to: to, axis: a, token: row[1], direction: direction,
       risk: direction === 'same' ? 'low' : 'high',
+      paired: PAIRED[a].indexOf(v) >= 0,
       newTier: a === 'height' ? to === 640 : (to === 1000 || to === 1200)
     });
   }
@@ -105,7 +116,7 @@
 
   root.CSHViewport = Object.freeze({
     VERSION: VERSION, TOKENS: TOKENS, PROFILES: PROFILES,
-    TARGETS: TARGETS, MIGRATIONS: MIGRATIONS, migrationOf: migrationOf,
+    TARGETS: TARGETS, MIGRATIONS: MIGRATIONS, PAIRED: PAIRED, migrationOf: migrationOf,
     classify: classify, profile: profile, isDesktopLayout: isDesktopLayout, isLandscapePhone: isLandscapePhone
   });
 })(typeof window !== 'undefined' ? window : this);

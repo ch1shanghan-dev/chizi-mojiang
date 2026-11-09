@@ -1,7 +1,7 @@
-/* 自动生成于 2026-11-08T23:27:34.716Z by tools/release.js —— hashes 对应 Git 发布字节，发版后 git push 即生效，勿手改 files */
+/* 自动生成于 2026-11-09T00:13:25.418Z by tools/release.js —— hashes 对应 Git 发布字节，发版后 git push 即生效，勿手改 files */
 window.extension = {
 	"池子魔将": {
-		"build": "2c66ce7094b82a9f568f8f964c4611f86fc549370446cf96ac9a611449d0d8e3",
+		"build": "8ee832e68c084b7e02ceb729e5dd6cacd68710c9928d609f835409c75f357a5b",
 		"hashes": {
 			"LICENSE": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
 			"README.md": "41102b34ebc984b6b84b361baa0e78aa9defe5633a4a270cde6ed0ff7bc9ae4d",
@@ -363,7 +363,7 @@ window.extension = {
 			"core/csh_trick_tables.css": "2d5716939b60ed24578e96a070d4ab6797880532d11cc4a47ca65b5409344715",
 			"core/csh_uikit.js": "f1a219569b4e1e069f39268044e35ffc2d846187e54cecbfc1930fb4324c10b4",
 			"core/csh_update.js": "4cd83975adc40516ba5d82319fd72842ebf6a635acbaa06137d55af52a841f34",
-			"core/csh_viewport.js": "db264324ca4fad34d3e92f914615790382bf35c10eb223b1484ce181abd9c0cd",
+			"core/csh_viewport.js": "c48ac5718f70f941897495231dd66a0ef05e4b1165f43559f58a6c1e369ab1ca",
 			"core/csh_voice.js": "4c6616186f89d559578a4fa63032daebc5c4d9223f0ecc39b68bd6831aa323c6",
 			"core/csh_wallet.js": "b973f2c2ce52414cd72e1abd439ac79e2dc6f063f8d76e0ed1f64ae4b66707e1",
 			"core/csh_winrate.js": "38483631a3121ac6b7a084142d8d9fe90b164c009743207def9ec0c89a2dcc2c",
@@ -1052,7 +1052,7 @@ window.extension = {
 		"author": "池上寒",
 		"intro": "<font color=#c9a84c>版本</font> <font color=#00FFFF>4.0.16</font>",
 		"version": "4.0.16",
-		"date": "2026-11-08",
+		"date": "2026-11-09",
 		"size": "137.6MB",
 		"limits": {
 			"textBytes": 524288,

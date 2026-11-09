@@ -3408,7 +3408,7 @@ if (spawnOk && execFileSync && !ONLY_SYNTAX && !ONLY_VERSIONS) {
       /* B1 归档探针长期无入口（B13 差集里的孤儿）：实测仅 4.4s，不该塞 >30s 慢速通道，直接进日常门禁。 */
       ['E95AC','probe_feedback_archive_20261105.mjs',['--out',path.join(tmp95,'feedback-archive')],18,'成就通知归档（跨重启/分页/容量/写失败，Chromium 实测4.4s）',60000],
       /* G1：断点逐值收敛的迁移真值。只给依据、零 CSS 改动；完备性/方向/单调/基线对账。 */
-      ['E95AD','probe_viewport_migration_20261108.mjs',['--out',path.join(tmp95,'viewport-migration')],39,'断点迁移真值（22种/6档目标，430与899已收敛）',20000],
+      ['E95AD','probe_viewport_migration_20261108.mjs',['--out',path.join(tmp95,'viewport-migration')],44,'断点迁移真值（22种/6档目标，430与899已收敛）',20000],
       /* H1：CSS 侧 6 档令牌与 JS 真值双向对账，零 @media 改动。 */
       ['E95AE','probe_layout_tokens_20261108.mjs',['--out',path.join(tmp95,'layout-tokens')],9,'CSS视口令牌对账（6档/基线逐值同步收缩，改前自检2红）',20000],
       /* art-direction §4.7 收尾：Chromium 实测 13.5 与 13 几何一致后才并档。 */
