@@ -58,6 +58,7 @@ const measure = `(()=>{
   return {vw:innerWidth,vh:innerHeight,
     card:card?R(card):null, rec:rec?R(rec):null, btn:btn?R(btn):null,
     cardPad:card?getComputedStyle(card).padding:null,
+    cardBg:card?getComputedStyle(card).backgroundImage.slice(0,400):null,
     cardGap:card?getComputedStyle(card).rowGap:null,
     vsScrolls:v.scrollHeight>v.clientHeight+1, vsSh:v.scrollHeight, vsCh:v.clientHeight,
     recHidden:rec?getComputedStyle(rec).display==='none':null};
@@ -90,6 +91,7 @@ for (const [label, page] of [['德州', 'games/texas/texas.html'], ['廿一点',
     !!t && t.rec && t.rec.b <= t.vh && t.rec.b - t.rec.t >= 40, t && t.rec);
   check(`640×286 ${label}：开局页不再出现纵向滚动条`, !!t && !t.vsScrolls, t && { sh: t.vsSh, ch: t.vsCh });
   check(`640×286 ${label}：开始按钮仍是 ≥44px 且可点`, !!t && t.btn && t.btn.h >= 44 && t.btn.b <= t.vh, t && t.btn);
+  check(`640×286 ${label}：开局卡吃的是美术层的皮革材质`, !!t && /art-v2\/panels\/panel-leather\.webp/.test(t.cardBg || ''), t && t.cardBg);
 
   const b = await open({ width: 915, height: 412 }, page);
   check(`915×412 ${label}：卡内边距仍是 10px 12px（极矮屏规则没有外溢）`, !!b && b.cardPad === '10px 12px', b && b.cardPad);

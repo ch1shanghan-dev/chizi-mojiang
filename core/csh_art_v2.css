@@ -81,3 +81,23 @@ body[data-csh-table] .csh-result .rs-panel {
 	background-repeat: no-repeat !important;
 	border-color: rgba(216, 180, 106, .40) !important;
 }
+
+/* ---------- 开局卡：暖色皮革 ----------
+   结算层是冷色漆面，开局卡给一块暖色皮革，形成"面板材质层次"（同深、异温）。
+   高通颗粒，任意尺寸均匀；原 --ink-1 底色作为缺图回退。 */
+body[data-csh-table] #view-start .start-card {
+	background-image: url("../image/ui/art-v2/panels/panel-leather.webp") !important;
+	background-size: cover !important;
+	background-position: center !important;
+	background-repeat: no-repeat !important;
+}
+
+/* ---------- 开局卡：暖色皮革 ----------
+   结算层是冷色漆面，开局卡给一块暖色皮革，形成"面板材质层次"（同深、异温）。
+   高通颗粒，任意尺寸均匀；原 --ink-1 底色作为缺图回退。 */
+body[data-csh-table] #view-start .start-card {
+	background-image: url("../image/ui/art-v2/panels/panel-leather.webp") !important;
+	background-size: cover !important;
+	background-position: center !important;
+	background-repeat: no-repeat !important;
+}
