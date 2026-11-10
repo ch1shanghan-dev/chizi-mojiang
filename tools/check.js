@@ -3449,6 +3449,10 @@ if (spawnOk && execFileSync && !ONLY_SYNTAX && !ONLY_VERSIONS) {
       /* P2 牌桌呈现续：极矮屏开局卡。640×286 实测德州卡底 307、廿一点 316（视口 286），
          折叠条只露半截；压内边距与栅格行距后 267/274 全落地。改前基线同一夹具 8/10。 */
       ['E95AT','probe_start_tiny_20261110.mjs',['--out',path.join(tmp95,'start-tiny')],18,'极矮屏开局卡收进首屏（真实两页/折叠条完整/零滚动/对照视口内边距不变）',60000],
+      /* P2 牌桌呈现续：极矮屏斗地主「身份 + 剩余张数」被省略号吞掉（身份待…/剩 1…）。
+         给 .pl-brief 确定宽度 + 允许状态行换行兜底，手牌让位由 fitHand() 重算。
+         改前基线同一夹具 48/6；亚像素判据（盒宽 ≥ 字形宽）是这次的关键，整数 scrollWidth 会假绿。 */
+      ['E95AU','probe_doudizhu_brief_tiny_20261110.mjs',['--out',path.join(tmp95,'ddz-brief-tiny')],54,'极矮屏斗地主身份与剩张可读（亚像素/手牌让位/按钮44px/对照视口几何不变）',60000],
     ];
     for (const [tag95, script95, args95, min95, label95, timeout95] of reg95) {
       const r95 = runProbeJson(script95, args95, { timeout: timeout95 });

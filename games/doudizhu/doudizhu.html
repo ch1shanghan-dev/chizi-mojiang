@@ -410,6 +410,16 @@
     .avatar { width: 24px; height: 24px; font-size: var(--fs-sm); }
     .seat-box { padding: 3px 6px; gap: 4px; }
     .dz-cap { display: none; }        /* 「底牌」标签收起，牌面本身保留 */
+
+    /* 【2026-11-10】身份 + 剩余张数在这一档必须可读。
+       640×286 实测：.pl-brief 被 17 张手牌的内容宽度挤到 103px（连 30% 的上限都够不着），
+       再叠加共享表 .pl-line > * 的逐子项 ellipsis，「身份待定」「17」分别退化成
+       「身份待…」「1…」，两个决定胜负的关键值同时读不出来。
+       这里给 .pl-brief 一个不被压缩的确定宽度（11px 字号下这一行自然宽约 110px），
+       手牌拿走剩余宽度并由 fitHand() 加重叠 —— 单行 nowrap 不变、不产生横向滚动。
+       .pl-line 允许换行只是兜底：宁可掉到第二行，也不许把数值切成省略号。 */
+    .csh-player .pl-brief { flex: 0 0 auto; width: min(34%, 132px); }
+    .csh-player .pl-line { flex-wrap: wrap; white-space: normal; row-gap: 0; }
   }
 
   /* 竖屏：小游戏要求横屏（壳有旋转引导），这里只保证不出现滚动条 */
