@@ -1856,6 +1856,14 @@ function onlineLocalFetch(url,options){return window.CSHOnline.local(url,options
                    auto-fill + minmax(230px,1fr)：列数由宽度自己算 ——
                    桌面 3~4 列、手机 1~2 列，一套规则两端成立（无需断点媒体查询）。 */
                 ".csh-dbg-gamelist{display:grid!important;grid-template-columns:repeat(auto-fill,minmax(230px,1fr))!important;gap:12px!important;width:100%!important;align-items:stretch!important;}",
+                /* 引擎全局 div{position:absolute;display:inline-block} 必须显式复位（同 #csh-dbg-panel * 表）。 */
+                ".csh-resume-card{position:static!important;display:flex!important;flex-wrap:wrap!important;align-items:center!important;",
+                "gap:10px!important;width:100%!important;box-sizing:border-box!important;padding:12px 14px!important;margin:0 0 14px!important;",
+                "border-radius:12px!important;border:1px solid rgba(var(--csh-accent-rgb),.45)!important;",
+                "background:linear-gradient(160deg,rgba(var(--csh-accent-rgb),.12),rgba(var(--csh-accent-rgb),.02))!important;}",
+                ".csh-resume-card .csh-resume-title{font-weight:700!important;font-size:var(--csh-lfs-lg2,15px)!important;letter-spacing:.05em!important;}",
+                ".csh-resume-card .csh-resume-info{flex:1 1 160px!important;min-width:0!important;opacity:.82!important;font-size:var(--csh-lfs-sm,12px)!important;}",
+                ".csh-resume-card .csh-resume-btn{flex:none!important;min-height:44px!important;padding:8px 18px!important;cursor:pointer!important;}",
                 "button.csh-dbg-gamebtn{display:flex!important;flex-direction:column!important;align-items:stretch!important;justify-content:space-between!important;gap:9px!important;",
                 "min-height:92px!important;padding:14px 16px!important;border-radius:14px!important;cursor:pointer!important;text-align:left!important;font-family:inherit!important;",
                 "background:var(--csh-fg)!important;border:1px solid rgba(var(--csh-bg-rgb),.10)!important;",
@@ -3396,6 +3404,42 @@ function onlineLocalFetch(url,options){return window.CSHOnline.local(url,options
 
             var list = document.createElement("div");
             list.className = "csh-dbg-gamelist";
+
+            /* 上次未完成牌桌：独占一整行、置于入口网格之上，玩家可点也可完全忽略。 */
+            var resumeInfo = null;
+            try { resumeInfo = resumeRoomInfo(); } catch (eResume) { resumeInfo = null; }
+            if (resumeInfo) {
+                var rc = document.createElement("div");
+                rc.className = "csh-resume-card";
+                rc.id = "csh-resume-card";
+                rc.setAttribute("role", "group");
+                rc.setAttribute("aria-label", "上次未完成的牌桌");
+                var rcTitle = document.createElement("b");
+                rcTitle.className = "csh-resume-title";
+                rcTitle.textContent = "上次未完成";
+                var rcInfo = document.createElement("span");
+                rcInfo.className = "csh-resume-info";
+                rcInfo.textContent = resumeInfo.title + " · 带入 " + fmt(resumeInfo.buyIn) + " CBY · 进度已保留";
+                var rcBtn = document.createElement("button");
+                rcBtn.type = "button";
+                rcBtn.className = "csh-dbg-btn csh-resume-btn";
+                rcBtn.id = "csh-resume-btn";
+                rcBtn.textContent = "继续本局";
+                rcBtn.addEventListener("click", function (ev) {
+                    ev.preventDefault();
+                    ev.stopPropagation();
+                    try {
+                        if (lib.cshShell && typeof lib.cshShell.charge === "function") {
+                            /* doCharge 的 resume 分支在扣款之前：不会二次扣带入。 */
+                            if (lib.cshShell.charge(resumeInfo.table, resumeInfo.buyIn) === false) toast("牌桌暂时无法恢复，请稍后重试");
+                        } else toast("游戏外壳未就绪，请重开世界");
+                    } catch (eGo) { toast("恢复失败：" + ((eGo && eGo.message) || eGo)); }
+                }, false);
+                rc.appendChild(rcTitle);
+                rc.appendChild(rcInfo);
+                rc.appendChild(rcBtn);
+                body.appendChild(rc);
+            }
 
             /* 生涯大厅（§4.1.6）：总览入口，非游戏、免门票、不开收费屏。
                文案读 registry 单源（与 registry 的 career.desc 一致，不抄第二份）。 */
@@ -6767,6 +6811,39 @@ function onlineLocalFetch(url,options){return window.CSHOnline.local(url,options
            玩家从扩展设置一步进入游戏列表，不必知道调试面板的存在。
            TAB 是本 IIFE 的模块级变量，setTab 会在面板构建时按其值选中页签，
            所以只需在 open() 之前把它设好。 */
+        /* 上次未完成牌桌（B2 定案 · 2026-11-10）：世界入口顶部一张可忽略的卡片，
+           不做放开壳前弹窗、不打断进场。只读 CSHRoom.decide 的 resume 判定：
+           不写任何状态、不新增存档键、不碰钱；点击只走既有 cshShell.charge 续局分支。
+           settle / discard / corrupt / none 一律不显示，避免把不存在的局摆到玩家面前。 */
+        function resumeRoomInfo() {
+            var R = (typeof window !== "undefined" && window.CSHRoom) || null;
+            var W = lib.cshWallet && lib.cshWallet.wallet;
+            if (!R || !W || typeof R.decide !== "function" || typeof W.pc !== "function") return null;
+            var receipt = null;
+            try {
+                if (typeof W.roomReceipt === "function") receipt = W.roomReceipt();
+                else if (lib.cshWallet && typeof lib.cshWallet.roomReceipt === "function") receipt = lib.cshWallet.roomReceipt();
+            } catch (eRc) { receipt = null; }
+            var verdict;
+            try {
+                verdict = R.decide(window.localStorage, {
+                    pc: function () { return W.pc(); },
+                    settledId: function () { return receipt && typeof receipt.id === "string" ? receipt.id : ""; }
+                });
+            } catch (eD) { return null; }
+            if (!verdict || verdict.action !== "resume" || !verdict.entry || !verdict.entry.shot) return null;
+            var e = verdict.entry;
+            var meta = (lib.cshShell && lib.cshShell.META && lib.cshShell.META[e.table]) || null;
+            return {
+                table: String(e.table),
+                title: (meta && meta.title) ? String(meta.title) : String(e.table),
+                buyIn: Math.max(0, Math.floor(Number(e.shot && e.shot.buyIn) || Number(e.amount) || 0)),
+                id: String(e.id || ""),
+                t: Number(e.t) || 0
+            };
+        }
+        lib.cshDebug.resumeRoomInfo = resumeRoomInfo;
+
         lib.cshDebug.openLobby = function () {
             try {
                 TAB = "games";

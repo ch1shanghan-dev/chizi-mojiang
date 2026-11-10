@@ -3440,6 +3440,7 @@ if (spawnOk && execFileSync && !ONLY_SYNTAX && !ONLY_VERSIONS) {
       ['E95AN','probe_texas_ai_autostake_20261109.mjs',['--out',path.join(tmp95,'texas-ai-autostake')],37,'德州AI自主全额带入与打空后补码（人物策略/零和上限/aiStakeTotal同步/退隐保护/豪赌隔离）',20000],
       ['E95AO','audit_career_coverage_20261105.mjs',['--out',path.join(tmp95,'career-coverage')],3,'生涯未路由项四类归因（派生源/组合/设计取舍/待接真实源，不得一律判不可达）',20000],
       ['E95AP','probe_spirit_skins_catalog_20261109.mjs',['--out',path.join(tmp95,'spirit-skins-catalog')],29,'妖灵装扮生产注册表（18位/70套/140图规格/加载图/发布清单/全部开放无门槛）',20000],
+      ['E95AQ','probe_world_resume_card_20261110.mjs',['--out',path.join(tmp95,'world-resume-card')],26,'世界入口上次未完成卡片（只读判定/不写存档/不碰钱/点击走charge/加载图/改前基线）',20000],
     ];
     for (const [tag95, script95, args95, min95, label95, timeout95] of reg95) {
       const r95 = runProbeJson(script95, args95, { timeout: timeout95 });

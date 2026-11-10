@@ -9,7 +9,7 @@ import {withChromium} from './lib/chromium_audit.mjs';
 const option=(n,f)=>{const i=process.argv.indexOf(n);return i<0?f:process.argv[i+1];};
 const clean=s=>s.replace(/^import .*?;\r?\n/gm,'').replace(/^export default null;.*$/gm,'').replace(/^export /gm,'').replace(/<\/script/gi,'<\\/script');
 const source=clean(fs.readFileSync(option('--source',path.join(root,'core/csh_debug.js')),'utf8'));
-const modules=['core/csh_theme.js','core/csh_uikit.js','core/csh_registry.js','core/csh_games.js','core/csh_world_view.js'].map(f=>clean(fs.readFileSync(path.join(root,f),'utf8'))).join('\n');
+const modules=['core/csh_theme.js','core/csh_uikit.js','core/csh_registry.js','core/csh_games.js','core/csh_world_view.js','core/csh_room.js'].map(f=>clean(fs.readFileSync(path.join(root,f),'utf8'))).join('\n');
 const tmp=fs.mkdtempSync(path.join(auditTempRoot(),'csh-world-entry-'));
 process.once("exit",()=>{try{removeAuditScratch(tmp);}catch(e){console.warn("Audit cleanup:",e.message);}});
 const out=option('--out',path.join(root,'docs/audit/ui/world-entry'));fs.mkdirSync(out,{recursive:true});
@@ -18,11 +18,14 @@ const all=[];
 for(const c of cases){
   const html=`<!doctype html><meta charset="utf-8"><style>body{margin:0;transform:scale(${c.scale});transform-origin:top left}div{position:absolute}*{box-sizing:border-box;animation:none!important;transition:none!important}</style><button id="opener">进入世界</button><script>
     const checks=[],check=(name,ok,detail)=>checks.push({name,passed:!!ok,detail});
-    const opens=[];const lib={config:{'extension_池子魔将_csh_debug_menu':false},skill:{},character:{},translate:{},arenaReady:[]};
+    const opens=[],charges=[];let walletPc=100000,settledRoomId='';
+    const lib={config:{'extension_池子魔将_csh_debug_menu':false},skill:{},character:{},translate:{},arenaReady:[]};
     const game={players:[],me:null,saveConfig(k,v){lib.config[k]=v;},print(){},over(){}};
     const ui={},ai={},_status={},get={translation:v=>typeof v==='string'?v:v?.name||'',is:{online:()=>false},mode:()=> 'identity'};
-    lib.cshShell={open(key){opens.push(key);return true;}};
+    lib.cshShell={open(key){opens.push(key);return true;},charge(key,buyIn){charges.push({key,buyIn});return true;}};
     lib.cshWorld={stats(){return {chars:149,retired:0,fundSum:100000};},tick(){}};
+    lib.cshWallet={wallet:{pc(){return walletPc;},roomReceipt(){return {id:settledRoomId,credited:0,t:0};}},
+      roomReceipt(){return {id:settledRoomId,credited:0,t:0};},flushSave(){return true;}};
     ${modules}
     installUIKit();
     lib.cshShell.META=Object.fromEntries(window.CSH.registry.all().map(k=>[k,window.CSH.registry.get(k)]));
@@ -80,6 +83,38 @@ for(const c of cases){
       check('developer floating button is restored after leaving world',!floating||getComputedStyle(floating).display!=='none');
       lib.cshDebug.openLobby();
       check('reopening world keeps one BGM stylesheet',document.querySelectorAll('#csh-dbg-bgm-css').length===1);
+      /* ---- 上次未完成牌桌卡片（B2）：只读判定、不打断进场、点击不二次扣款 ---- */
+      function seedResume(){
+        localStorage.removeItem(window.CSHRoom.KEY);
+        window.CSHRoom.prepare(localStorage,{id:'room-resume-1',table:'blackjack',amount:20000,balanceBefore:120000,t:1700000000000,shot:null});
+        return window.CSHRoom.activate(localStorage,'room-resume-1',{buyIn:20000,s:{shoe:[9,13,17,21],hands:[{cards:[25,29]}]}});
+      }
+      function reopen(){
+        const c=document.getElementById('csh-dbg-close');if(c)c.click();
+        lib.cshDebug.openLobby();
+        for(const id of ['csh-dbg-panel','csh-dbg-overlay'])document.getElementById(id)?.style.setProperty('animation','none','important');
+      }
+      localStorage.removeItem(window.CSHRoom.KEY);reopen();
+      check('no pending room keeps world free of resume card',!document.getElementById('csh-resume-card'));
+      walletPc=100000;settledRoomId='';
+      const seeded=seedResume(),rawBefore=localStorage.getItem(window.CSHRoom.KEY),seededPhase=rawBefore&&JSON.parse(rawBefore).phase;
+      check('real CSHRoom fixture produces an active room',seeded.ok===true&&seededPhase==='active'&&!!rawBefore,{seeded,seededPhase});
+      reopen();
+      const card=document.getElementById('csh-resume-card');
+      check('pending room shows exactly one resume card at world entry',!!card&&document.querySelectorAll('#csh-resume-card').length===1);
+      check('card names the real table and buy-in',!!card&&card.textContent.includes('廿一点')&&card.textContent.includes('2.00 万'),card&&card.textContent);
+      check('card is read-only (room record untouched)',localStorage.getItem(window.CSHRoom.KEY)===rawBefore);
+      check('resume card does not replace any of the 11 world entries',document.querySelectorAll('button.csh-dbg-gamebtn:not(.locked)').length===11);
+      const rb=document.getElementById('csh-resume-btn'),rbox=rb&&rb.getBoundingClientRect();
+      check('resume button is touch sized and inside viewport',!!rbox&&rbox.height>=44&&rbox.left>=-1&&rbox.right<=innerWidth+1,rbox&&rbox.toJSON());
+      charges.length=0;if(rb)rb.click();
+      check('click routes to existing shell charge with no second entry fee',charges.length===1&&charges[0].key==='blackjack'&&charges[0].buyIn===20000,charges);
+      check('click never writes the room record',localStorage.getItem(window.CSHRoom.KEY)===rawBefore);
+      walletPc=120000;reopen();
+      check('unpersisted charge (discard) shows no card',!document.getElementById('csh-resume-card'));
+      walletPc=100000;settledRoomId='room-resume-1';reopen();
+      check('already settled room shows no card',!document.getElementById('csh-resume-card'));
+      settledRoomId='';localStorage.removeItem(window.CSHRoom.KEY);reopen();
       for(const id of ['csh-dbg-panel','csh-dbg-overlay'])document.getElementById(id)?.style.setProperty('animation','none','important');
       document.getElementById('csh-ui-toast-root')?.replaceChildren();
     }catch(error){check('real UI execution',false,error.stack);}
