@@ -75,11 +75,21 @@ body[data-csh-table] .pcard.back::before { background: rgba(255, 255, 255, .06) 
    把金饰烘进图里，而不是靠绝对定位去叠。 */
 body[data-csh-table] .csh-result .rs-panel {
 	position: relative;
-	background-image: url("../image/ui/art-v2/panels/panel-dark.webp") !important;
-	background-size: cover !important;
-	background-position: center !important;
-	background-repeat: no-repeat !important;
+	background-image:
+		url("../image/ui/art-v2/panels/frame.webp"),
+		url("../image/ui/art-v2/panels/panel-dark.webp") !important;
+	background-size: 100% 100%, cover !important;
+	background-position: center, center !important;
+	background-repeat: no-repeat, no-repeat !important;
 	border-color: rgba(216, 180, 106, .40) !important;
+}
+/* 金线框是按 3:2 画的，极矮屏面板会拉成 2.3:1，四角菱形会被拉扁 —— 这一档收起框，
+   只留漆面底；顺带也不占任何布局高度（E95AS 的中段零滚动不动）。 */
+@media (orientation: landscape) and (max-height: 350px) {
+	body[data-csh-table] .csh-result .rs-panel {
+		background-image: url("../image/ui/art-v2/panels/panel-dark.webp") !important;
+		background-size: cover !important;
+	}
 }
 
 /* ---------- 开局卡：暖色皮革 ----------

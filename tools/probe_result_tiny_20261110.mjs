@@ -115,6 +115,7 @@ if (tiny && !tiny.none) {
   check('640×286：结算行数仍为 2（庄家 + 你），没有为了塞下而丢行', tiny.rows === 2, tiny.rows);
   check('640×286：极矮屏规则确实生效（上限不再是 88%）', !/88%/.test(tiny.panelMaxH) && /100%/.test(tiny.panelMaxH), tiny.panelMaxH);
   check('640×286：结算面板吃的是美术层的漆面材质（不是旧渐变）', /art-v2\/panels\/panel-dark\.webp/.test(tiny.panelBg), tiny.panelBg);
+  check('640×286：金线框在这一档收起（3:2 框拉成 2.3:1 会把角花拉扁）', !/frame\.webp/.test(tiny.panelBg), tiny.panelBg);
 }
 
 /* 对照视口：不允许被这次改动碰到 */

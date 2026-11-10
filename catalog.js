@@ -1,7 +1,7 @@
-/* 自动生成于 2026-11-10T11:11:30.056Z by tools/release.js —— hashes 对应 Git 发布字节，发版后 git push 即生效，勿手改 files */
+/* 自动生成于 2026-11-10T11:51:47.128Z by tools/release.js —— hashes 对应 Git 发布字节，发版后 git push 即生效，勿手改 files */
 window.extension = {
 	"池子魔将": {
-		"build": "6bf3b320c6d044498da9b26701847fb180f4ffae10ecfa55921e73b1ea3e89bb",
+		"build": "cc31b61469620e35335f4792797d12163b759e371be9664beb017e55e0902d46",
 		"hashes": {
 			"LICENSE": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
 			"README.md": "41102b34ebc984b6b84b361baa0e78aa9defe5633a4a270cde6ed0ff7bc9ae4d",
@@ -310,7 +310,7 @@ window.extension = {
 			"core/csh_aff_lines.js": "a08e3a944e845310c47e035385d6db12668e79cbed2026a3ac9576183630f1ab",
 			"core/csh_affection.js": "b57c1bbab04f325e5d5658f69c2c85e4f8050f200dcc66513e0842edadb8bdf3",
 			"core/csh_art.js": "0618ccdeb6e9a78b688ec9369908b43c22e4378e82ac93de4dc62e991b081520",
-			"core/csh_art_v2.css": "5c019e475910e1a4abb25fdf3aff50aa64754347a90cc6fb044182a049e8c483",
+			"core/csh_art_v2.css": "836686ed9367deea7fc2a6076021b16446ff146c13aaa09cf1acde51f8eaceb8",
 			"core/csh_aux_spirit.js": "6c5c59082b83c167db8d2d4635cc85b22bb6945af44bdc8c85c8f4e24206d4c1",
 			"core/csh_badge.js": "e181a7f3d22ecf40575f0b3078e983465237b33c5835d5c7622dba24c61277e1",
 			"core/csh_bgm.js": "7fe7e9fbbf3943b2b9a7f71ee8ecc89cee20bba52fdd535234ff66d4fe5fa96c",
@@ -817,7 +817,8 @@ window.extension = {
 			"image/ui/art-v2/icons/rank.webp": "a774dd82742a73a07c6d24d91a655ac9eaadba9969d619bd95f7e52395bbc5ad",
 			"image/ui/art-v2/icons/texas.webp": "e92e88fc7cbf0ed422e5bdacd530c7ba8f24d4a1db0f45dcaf6995010fecf0f8",
 			"image/ui/art-v2/icons/uno.webp": "a753a1e7919688cf133132a2fca6849574bdb1a3bd875fb3666929cff370bcd6",
-			"image/ui/art-v2/panels/panel-dark.webp": "6296bdf68531664d46c23d7db03cc235857774fb5d546b693c32839db220844d",
+			"image/ui/art-v2/panels/frame.webp": "c6666242bd12ccf77686b45887c7640292ed777f06bf1f16a25393d226ea28e9",
+			"image/ui/art-v2/panels/panel-dark.webp": "468dedc22500ef69f19736631a0bc8932417d7f8fca44fa32f79efbb7aba8aaf",
 			"image/ui/art-v2/panels/panel-leather.webp": "b05aec3edb71697da1b614c3af00d4eae0e88307ec56596d37be8249023fbc64",
 			"image/ui/art-v2/plates/plate-bronze.webp": "37750f9c4e30865b8e89e19262b88c04b16f0b50b4d1e51bfdabba0fa7b612c1",
 			"image/ui/art-v2/tables/blackjack.webp": "83d841963dfffe28332e1da9b9f038df518558799a9074753d9cef16d5ef1ba3",
@@ -2037,6 +2038,7 @@ window.extension = {
 			"image/ui/art-v2/icons/rank.webp",
 			"image/ui/art-v2/icons/texas.webp",
 			"image/ui/art-v2/icons/uno.webp",
+			"image/ui/art-v2/panels/frame.webp",
 			"image/ui/art-v2/panels/panel-dark.webp",
 			"image/ui/art-v2/panels/panel-leather.webp",
 			"image/ui/art-v2/plates/plate-bronze.webp",

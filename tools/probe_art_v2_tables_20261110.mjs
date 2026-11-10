@@ -70,17 +70,31 @@ const dmap=read('core/csh_debug.js').match(/var art=\{[^}]*\}\[title\]/)?.[0] ||
 const artNames=(dmap.match(/"([a-z]+)\.webp"/g)||[]).map(x=>x.slice(1,-6));
 check('11 个模块各配唯一图标（不再共用 9 张旧图）', artNames.length===11 && new Set(artNames).size===11, artNames);
 
+/* ---------- 结算金线框（B2 九宫格替代方案） ---------- */
+const framePath=path.join(root,'image/ui/art-v2/panels/frame.webp');
+check('金线框资产存在且 ≤200 KB', fs.existsSync(framePath) && fs.statSync(framePath).size<=200*1024,
+  fs.existsSync(framePath)?Math.round(fs.statSync(framePath).size/1024):'missing');
+check('金线框挂在结算面板上，且极矮屏有收起规则',
+  /csh-result \.rs-panel \{[\s\S]*?frame\.webp/.test(artCss) &&
+  /@media \(orientation: landscape\) and \(max-height: 350px\)[\s\S]*?panel-dark\.webp/.test(artCss));
+
 /* ---------- 运行时 ---------- */
 const probe = `(()=>{
   const de=document.documentElement;
+  /* 溢出量必须在插入临时节点之前取，否则探针自己会造成假溢出 */
+  const overflowX0=de.scrollWidth>innerWidth+1;
   const felt=document.querySelector('#view-game .felt')||document.querySelector('#view-game');
-  const back=document.querySelector('.pcard.back');
+  /* 底牌是叫分阶段才有、摊牌后就没了：不依赖牌局状态，用临时节点查 CSS 规则本身 */
+  let back=document.querySelector('.pcard.back');
+  let tmp=null;
+  if(!back){tmp=document.createElement('div');tmp.className='pcard back';document.body.appendChild(tmp);back=tmp;}
   const cs=felt?getComputedStyle(felt):null;
   const btn=[...document.querySelectorAll('button')].filter(b=>b.getBoundingClientRect().height>0);
   return {
     bg: cs?cs.backgroundImage:'',
     backBg: back?getComputedStyle(back).backgroundImage:'',
-    overflowX: de.scrollWidth>innerWidth+1,
+    tmpUsed:!!tmp,
+    overflowX: overflowX0,
     minBtn: btn.length?Math.min(...btn.map(b=>Math.round(b.getBoundingClientRect().height))):44,
     feltFound:!!felt
   };
@@ -100,6 +114,7 @@ for (const t of TABLES) {
     await val(`(()=>{const b=document.getElementById('btn-start-game');if(b&&!b.disabled)b.click();return 1;})()`);
     await new Promise(r => setTimeout(r, 1600));
     const m = await val(probe);
+    await val(`(()=>{const t=document.querySelector('body > div.pcard.back');if(t&&t.children.length===0&&!t.textContent.trim())t.remove();return 1;})()`);
     const shot = await send('Page.captureScreenshot', { format: 'png' });
     fs.writeFileSync(path.join(out, `${t}-915x412.png`), Buffer.from(shot.data, 'base64'));
 
