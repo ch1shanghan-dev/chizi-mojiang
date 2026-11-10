@@ -1343,6 +1343,36 @@ function renderEcho(it) {
 var skinDialog=null,skinImageSeq=0;
 function skinStorage(){var storage=window.parent&&window.parent!==window?window.parent.localStorage:window.localStorage;if(!storage)throw Error("装扮偏好暂不可读取");return {getItem:function(k){return storage.getItem(k);},setItem:function(k,v){if(!CSHPage.saveAllowed())throw Error("当前存档不可写入");storage.setItem(k,v);}};}
 function skinCurrent(id,view){return !Data.disposed&&Data.viewEpoch===view&&Data.items[Data.cur]&&Data.items[Data.cur].id===id;}
+/* ---------- 装扮回应（皮肤互动第 2 层 · 2026-11-10） ----------
+   纯展示：只写内存里既有的 AFF.say 回应位，复用 renderAff 的 .affsay 展示；
+   不写好感、不改关系、不新增存档键、不新增网络请求。
+   短句按 (妖灵ID + 装扮ID) 确定性选取，同一套装扮每次换上都是同一句，可解释、无随机。 */
+var SKIN_GREETINGS = [
+  "这身「{n}」，你可还认得我？",
+  "换上「{n}」，连风都像换了方向。",
+  "今日这副模样，倒想听你说一句。",
+  "「{n}」……你盯着看了好一会儿吧。",
+  "衣裳换了，脾气还是老样子。",
+  "这一身，是特意为你挑的。"
+];
+function skinGreeting(it, skin) {
+  if (!skin || skin.id === "classic") return "还是原来这身最自在。";
+  var key = String(it.id) + "/" + String(skin.id), h = 0;
+  for (var i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0;
+  return SKIN_GREETINGS[h % SKIN_GREETINGS.length].replace("{n}", skin.name || "这身");
+}
+function showSkinGreeting(it, skin) {
+  var box = $("#affbox"); if (!box) return;
+  var up = "· 换装 · " + ((skin && skin.name) || "经典形象");
+  var line = skinGreeting(it, skin);
+  AFF.say = { id: it.id, up: up, line: line, tone: "good", msg: "" };
+  var say = box.querySelector(".affsay");
+  if (!say) { say = el("div", "affsay"); box.appendChild(say); }
+  say.className = "affsay good";
+  say.innerHTML = "";
+  say.appendChild(el("div", "up", up));
+  say.appendChild(el("div", "ln", "\u201C" + line + "\u201D"));
+}
 function paintSpiritFace(img,it,frame){
   var chosen;try{chosen=CSHSpiritSkins.resolve(it.id,it.img,skinStorage()).skin;}catch(e){chosen={id:"classic"};}
   var fallback=false;frame.classList.remove("noimg");img.onerror=function(){if(!img.isConnected)return;if(!fallback&&chosen.id!=="classic"){fallback=true;img.src=it.face;}else frame.classList.add("noimg");};img.src=chosen.id==="classic"?it.face:(chosen.face||chosen.portrait);
@@ -1362,7 +1392,7 @@ function openSkinDialog(){
   function live(){return skinDialog&&skinDialog.layer===layer&&skinCurrent(it.id,view);}
   function show(row){draft=row;loaded=false;var token=++loadSeq;apply.disabled=true;image.onload=function(){if(!live()||token!==loadSeq)return;loaded=true;apply.disabled=!!readError||draft.id===selected.requested;};image.onerror=function(){if(!live()||token!==loadSeq)return;loaded=false;apply.disabled=true;status.textContent=row.id==="classic"?"经典图片暂不可用，人物档案仍可查看。":"这套装扮图片暂不可用，已显示经典；当前装扮未更改。";if(row.id!=="classic"){image.onload=null;image.onerror=null;image.src=it.img;}};image.src=row.portrait;options.querySelectorAll(".skin-option").forEach(function(n){n.setAttribute("aria-pressed",String(n.dataset.skinId===row.id));});}
   rows.forEach(function(row){var b=el("button","affbtn skin-option",row.name+(row.id===selected.requested?" · 当前使用":""));b.type="button";b.dataset.skinId=row.id;b.onclick=function(){if(live())show(row);};options.appendChild(b);});options.appendChild(el("p","","全部装扮已开放，可自由切换，无解锁顺序；仅改变外观，不影响战斗与好感。"));options.appendChild(status);options.appendChild(apply);options.appendChild(restore);restore.disabled=!!readError||selected.requested==="classic";
-  function accept(id){if(!live()||readError||!CSHPage.requireSave())return;try{CSHSpiritSkins.select(it.id,id,skinStorage());selected=CSHSpiritSkins.resolve(it.id,it.img,skinStorage());paintSpiritImage(it);var face=document.querySelector(".gitem.on .gface");if(face)paintSpiritFace(face.querySelector("img"),it,face);status.textContent="已使用"+selected.skin.name+"，仅改变外观。";apply.disabled=draft.id===selected.requested;restore.disabled=selected.requested==="classic";options.querySelectorAll(".skin-option").forEach(function(n){var row=rows.find(function(r){return r.id===n.dataset.skinId;});n.textContent=row.name+(row.id===selected.requested?" · 当前使用":"");});}catch(e){status.textContent="装扮保存尚未确认，当前画面暂保留；恢复存储后可重试。";}}
+  function accept(id){if(!live()||readError||!CSHPage.requireSave())return;try{CSHSpiritSkins.select(it.id,id,skinStorage());selected=CSHSpiritSkins.resolve(it.id,it.img,skinStorage());paintSpiritImage(it);var face=document.querySelector(".gitem.on .gface");if(face)paintSpiritFace(face.querySelector("img"),it,face);status.textContent="已使用"+selected.skin.name+"，仅改变外观。";showSkinGreeting(it,selected.skin);apply.disabled=draft.id===selected.requested;restore.disabled=selected.requested==="classic";options.querySelectorAll(".skin-option").forEach(function(n){var row=rows.find(function(r){return r.id===n.dataset.skinId;});n.textContent=row.name+(row.id===selected.requested?" · 当前使用":"");});}catch(e){status.textContent="装扮保存尚未确认，当前画面暂保留；恢复存储后可重试。";}}
   apply.onclick=function(){if(loaded)accept(draft.id);};restore.onclick=function(){accept("classic");show(rows[0]);};body.appendChild(preview);body.appendChild(options);panel.appendChild(body);layer.appendChild(panel);
   function key(e){if(!live())return;if(e.key==="Escape"){e.preventDefault();e.stopImmediatePropagation();closeSkinDialog();}else if(e.key==="Tab"){var stops=Array.prototype.filter.call(panel.querySelectorAll("button"),function(n){return !n.disabled&&n.getClientRects().length;});var first=stops[0],last=stops[stops.length-1];if(!panel.contains(document.activeElement)||(e.shiftKey&&document.activeElement===first)||(!e.shiftKey&&document.activeElement===last)){e.preventDefault();(e.shiftKey?last:first).focus();}}else if(e.key==="ArrowLeft"||e.key==="ArrowRight")e.stopImmediatePropagation();}
   skinDialog={layer:layer,opener:$("#codex-skin-open"),key:key};document.addEventListener("keydown",key,true);layer.addEventListener("click",function(e){if(e.target===layer)closeSkinDialog();});document.body.appendChild(layer);show(draft);back.focus({preventScroll:true});

@@ -9,5 +9,16 @@
  function read(storage){const raw=storage.getItem(KEY);if(raw==null)return {v:1,selected:{}};const value=JSON.parse(raw);if(!value||value.v!==1||!value.selected||typeof value.selected!=='object'||Array.isArray(value.selected)||Object.keys(value.selected).length>1000)throw Error('装扮偏好暂不可读取');const selected={};Object.keys(value.selected).forEach(id=>{if(spiritId(id)!==id||!validSkin(value.selected[id]))throw Error('装扮偏好格式异常');selected[id]=value.selected[id];});return {v:1,selected};}
  function resolve(id,classic,storage){const normalized=spiritId(id),rows=list(id,classic),prefs=read(storage),requested=normalized&&prefs.selected[normalized]||'classic';return {skin:rows.find(row=>row.id===requested)||rows[0],requested,unavailable:!rows.some(row=>row.id===requested)};}
  function select(id,skinId,storage){id=spiritId(id);if(!id||!validSkin(skinId)||skinId!=='classic'&&!(catalogs.get(id)||[]).some(row=>row.id===skinId))throw Error('这套装扮当前不可用');const prefs=read(storage);if(skinId==='classic')delete prefs.selected[id];else prefs.selected[id]=skinId;const raw=JSON.stringify(prefs);storage.setItem(KEY,raw);if(storage.getItem(KEY)!==raw)throw Error('装扮偏好未保存');return true;}
- root.CSHSpiritSkins={KEY,spiritId,register,list,read,resolve,select};
+ /* 只读查询口（皮肤互动第 2/3 层）：按稳定 ID 取当前装扮，供台词/跨页展示取外观语境。
+    不写任何状态；偏好读失败一律回 classic，绝不阻塞互动或把异常抛到业务层。 */
+ function skinOf(id,storage){
+   const normalized=spiritId(id);
+   if(!normalized)return null;
+   try{
+     const requested=read(storage).selected[normalized]||'classic';
+     const rows=list(id,'');
+     return rows.find(row=>row.id===requested)||rows[0];
+   }catch(e){return {id:'classic',name:'经典形象',portrait:'',face:null,cover:null};}
+ }
+ root.CSHSpiritSkins={KEY,spiritId,register,list,read,resolve,select,skinOf};
 })(typeof window!=='undefined'?window:globalThis);

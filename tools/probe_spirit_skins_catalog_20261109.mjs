@@ -114,6 +114,52 @@ check('纲手（暂时不动）没有进注册表', !catalogSrc.includes('tsunad
 check('只有带素材的 18 位妖灵进表，空文件夹不占位', parsed.length === 18 && parsed.every(e => e.rows.length > 0));
 check('没有把桌面原图扩展名带进仓库', !catalogSrc.includes('.jfif') && !catalogSrc.includes('.jpg'));
 
+/* ---------- 皮肤互动第 2 层：只读查询口 + 装扮回应 ---------- */
+check('基座导出只读 skinOf 查询口', typeof S.skinOf === 'function');
+const skinMem = new Map(), skinWrites = [];
+const skinStore = {
+  getItem: k => skinMem.has(k) ? skinMem.get(k) : null,
+  setItem: (k, v) => { skinWrites.push(k); skinMem.set(k, String(v)); },
+  removeItem: k => skinMem.delete(k),
+};
+check('skinOf 未选择时回 classic', S.skinOf('csh_boss_minion_robin', skinStore).id === 'classic');
+check('skinOf 读出当前装扮且带显示名', (() => {
+  S.select('csh_boss_minion_robin', 's1a', skinStore);
+  const r = S.skinOf('csh_boss_minion_robin', skinStore);
+  return !!r && r.id === 's1a' && r.name === '花衫';
+})());
+check('skinOf 归一化助战别名到同一妖灵', S.skinOf('csh_aux_robin', skinStore).id === 's1a');
+check('skinOf 对无效 ID 返回 null 而不抛', S.skinOf('not_a_minion', skinStore) === null);
+check('skinOf 偏好损坏时回 classic，不把异常抛到业务层', (() => {
+  try { return S.skinOf('csh_boss_minion_robin', { getItem: () => '{bad json', setItem() {}, removeItem() {} }).id === 'classic'; }
+  catch (e) { return false; }
+})());
+check('skinOf 全程零写入（只读查询）', skinWrites.length === 1 && skinWrites[0] === 'csh_spirit_skin_v1', skinWrites);
+
+const greetBlock = codex.slice(codex.indexOf('var SKIN_GREETINGS'), codex.indexOf('function showSkinGreeting'));
+const gctx = vm.createContext({ console });
+vm.runInContext(greetBlock + '\nthis.greet = skinGreeting; this.pool = SKIN_GREETINGS;', gctx);
+check('装扮回应是有限确定性短句集合', Array.isArray(gctx.pool) && gctx.pool.length >= 4 && gctx.pool.length <= 12);
+check('短句含装扮名占位符', gctx.pool.some(s => s.includes('{n}')));
+const greetIt = { id: 'csh_boss_minion_eve' };
+const g1 = gctx.greet(greetIt, { id: 's1', name: '魔女' });
+const g2 = gctx.greet(greetIt, { id: 's1', name: '魔女' });
+check('同一妖灵同一装扮回应确定性一致', typeof g1 === 'string' && g1.length > 0 && g1 === g2);
+check('回应插入真实装扮名，不留占位符', !g1.includes('{n}'));
+check('不同装扮可得到不同回应（不是一句万能话）',
+  new Set(['s1', 's2', 's3', 's4', 's5'].map(s => gctx.greet(greetIt, { id: s, name: '造型' }))).size > 1);
+check('恢复经典有专属回应', gctx.greet(greetIt, { id: 'classic', name: '经典形象' }).includes('原来这身'));
+
+const showBlock = codex.slice(codex.indexOf('function showSkinGreeting'), codex.indexOf('function paintSpiritFace'));
+check('回应只写内存 AFF.say，不写存档 / 不碰好感与互动接口',
+  /AFF\.say\s*=/.test(showBlock) && !/setItem|localStorage|saveAllowed|\.interact\(|\.gift\(/.test(showBlock));
+check('回应复用既有 .affsay 行，不重建关系控件',
+  /querySelector\("\.affsay"\)/.test(showBlock) && !/box\.innerHTML/.test(showBlock));
+check('换装成功路径真的调用回应', /showSkinGreeting\(it,selected\.skin\)/.test(codex));
+check('改前基线可判红：移除调用会被接线断言检出',
+  /showSkinGreeting\(it,selected\.skin\)/.test(codex) &&
+  !/showSkinGreeting\(it,selected\.skin\)/.test(codex.replace('showSkinGreeting(it,selected.skin);', '')));
+
 /* ---------- 改前基线：把加载行去掉应当判红 ---------- */
 const stripped = codex.replace(/<script[^>]+src="[^"]*csh_spirit_skins_catalog\.js"[^>]*><\/script>/, '');
 check('改前基线可检出：移除加载行会失去注册表', !/<script[^>]+src="[^"]*csh_spirit_skins_catalog\.js"/.test(stripped));

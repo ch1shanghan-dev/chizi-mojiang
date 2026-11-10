@@ -1,7 +1,7 @@
-/* 自动生成于 2026-11-10T00:05:58.843Z by tools/release.js —— hashes 对应 Git 发布字节，发版后 git push 即生效，勿手改 files */
+/* 自动生成于 2026-11-10T00:27:36.882Z by tools/release.js —— hashes 对应 Git 发布字节，发版后 git push 即生效，勿手改 files */
 window.extension = {
 	"池子魔将": {
-		"build": "53c0f4e7e3dd0c7887990e7e318aa7bb5c4fb912f56247daad688053db429e54",
+		"build": "6290c42a7e4fd4f2ae2c1f4ca1b3a2921b1c59b72cc737981c1c39d79e0891bf",
 		"hashes": {
 			"LICENSE": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
 			"README.md": "41102b34ebc984b6b84b361baa0e78aa9defe5633a4a270cde6ed0ff7bc9ae4d",
@@ -351,7 +351,7 @@ window.extension = {
 			"core/csh_spirit_buff_runtime.js": "b8d34cb0649f3e9d5f976ecd28fe1c73afd4d3a05bb0b1606c427a189b042e9e",
 			"core/csh_spirit_buff_skills.js": "bb2287e67a23803276e57aa3d4ee36f65d3bcfaa1b1090bd0174adede82c2d83",
 			"core/csh_spirit_buffs.js": "82bb7368c113cdbd7253b43e6e2b85145a05492e31d26ee3af47441c538499a3",
-			"core/csh_spirit_skins.js": "ab4a53b640fbcaeb2c45f64e2fdd4251ef24cf8ef2c26aec036660a046725703",
+			"core/csh_spirit_skins.js": "08396484f6f2394c1edf5d11ac600ddc9d06b9e5b961d528cfef9583c2901c4c",
 			"core/csh_spirit_skins_catalog.js": "ff33d3a8fdbdc8dc5c75f3e14f0ea0b7e252f708e527b55f28c64b1b88e72d8b",
 			"core/csh_startup_recovery.js": "f9cb7a121056e035734ca59f36df98d7a7a61265861c9a6116bc7c56658555ab",
 			"core/csh_svggen.js": "f19d55550094a1ae300fb60f877d37c293bdead6e280c7e75a10ed71c717e7ff",
@@ -390,7 +390,7 @@ window.extension = {
 			"games/blackjack/blackjack.html": "8bbe706e4e632977da30bd715003fc64899fc6f9f3a6ab165da6090ddb033aec",
 			"games/bossbook.html": "e467279dfe5e1a17f32e21cbcc9749233b454720a380e4abe33d9b63d8723a22",
 			"games/career.html": "115f63a1a08c01257876b017649b95b98e2b19db8dc6551acaa6f1ea4e962847",
-			"games/codex.html": "14b7b34d82405fb1a53716d2e060138332e7fb0a2374a9d7bcf2e817a4cfa3e2",
+			"games/codex.html": "f414379334d5d2d1f22dc2104cf692b52321a75750bec6fbe00e30d560fde0c0",
 			"games/doudizhu/doudizhu.html": "bca73a355531e99de66ac8ae915f13d5cda3fa3bc9fa022ac915b0c41815c7f7",
 			"games/goldfish.html": "471d2dddf25d92e58b5fa9ddc6307169227befed38f39d9f3d55d9bf05c6f6bb",
 			"games/rank.html": "ab7c1bbd1aafd9ebc30583b2eae2c7fd5f36ca795350db88bf0892b5605c220e",
