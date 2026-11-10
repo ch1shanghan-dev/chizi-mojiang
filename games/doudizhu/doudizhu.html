@@ -629,7 +629,8 @@ var Bridge = (function () {
     opponents: function () { return opponents.slice(); },
     snapshot: function () { return lastSnap; },
     isReady: function () { return ready; },
-    merit: function (n, reason, cb) { call('shell-merit', { n: n, reason: reason }, cb); },
+    /* §10-2：走共享桥 callMerit，功勋写盘失败 / 桥超时如实提示，不再静默丢功勋。 */
+    merit: function (n, reason, cb) { return T.callMerit(n, reason, cb); },
     /* ★ 2026-09-29：AI 资金变动不再由本页逐笔上报，统一并入 settleSession
        （宿主侧双向记账，仅敌方与玩家发生资金转移），避免两条账本互相覆盖。 */
     /* 结算回账：新载荷携带公开阵营；玩家只与敌方联动资金，队友只记自身战果。

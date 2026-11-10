@@ -1,7 +1,7 @@
-/* 自动生成于 2026-11-10T00:56:38.002Z by tools/release.js —— hashes 对应 Git 发布字节，发版后 git push 即生效，勿手改 files */
+/* 自动生成于 2026-11-10T01:39:09.296Z by tools/release.js —— hashes 对应 Git 发布字节，发版后 git push 即生效，勿手改 files */
 window.extension = {
 	"池子魔将": {
-		"build": "c0146efc23f1ce072cbe70b765883ded8e18fb330bfbff672142dd34867f30b0",
+		"build": "1597f9496616efff09b7855ee42061986314ee57c403f5a1bcc801770aeb8997",
 		"hashes": {
 			"LICENSE": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
 			"README.md": "41102b34ebc984b6b84b361baa0e78aa9defe5633a4a270cde6ed0ff7bc9ae4d",
@@ -336,7 +336,7 @@ window.extension = {
 			"core/csh_migrate.js": "ffef4dece98eeac465b54c492b64d43e0025106c3f5e17498a819edef799ce7a",
 			"core/csh_net.js": "a278fa9e7137b87a669c336bdfb19e5a7a720dc82523090a07fe20c076846384",
 			"core/csh_online.js": "012ae2f14f3784f45eabaa3e1217dbd4cc0e398d22dcacadfc5a11869c19b0fb",
-			"core/csh_page.js": "ebbaa4daa63c05dec73a62770ed1e294dc73e2bb3acb185856d1cb394925bf67",
+			"core/csh_page.js": "fb49ec807c3d265061360f0d7ce636ebf753a29a8e8ae9bd83baff2b70b11f2b",
 			"core/csh_panel_window.js": "1e0233d5a2b0e8294f4a8fd7e87d0a34ec01400c944ff2b548e5605213f99ea8",
 			"core/csh_pool_achv.js": "948a81ff225822d24d24607662fdeef1924a992148afaeb4e95a42769f564ab1",
 			"core/csh_pots.js": "55f9ebd7cb5b707c196359f114cf84a93e465f4183d48f69bc1b555b80a1d8e6",
@@ -387,16 +387,16 @@ window.extension = {
 			"font/csh_fx_font_2.woff2": "ad894385b4e996e5f4b237cc6f5ead035237fb4c0cceaa603081ea63ab2b1da9",
 			"font/csh_fx_font_3.woff2": "d7ab0948a09d38fc75e71968e265385a124f98223c17d32dfe85e1aa3aadf51b",
 			"games/achv.html": "56d2e20cd20e7f295daceca08dde10915e7b63e17298ea0f4790835a7801d88e",
-			"games/blackjack/blackjack.html": "8bbe706e4e632977da30bd715003fc64899fc6f9f3a6ab165da6090ddb033aec",
+			"games/blackjack/blackjack.html": "ff0dc5e7eeac0183f04483a40d1888e1ec2b14d6304eb558a49c8ac5ff4190f8",
 			"games/bossbook.html": "e467279dfe5e1a17f32e21cbcc9749233b454720a380e4abe33d9b63d8723a22",
 			"games/career.html": "115f63a1a08c01257876b017649b95b98e2b19db8dc6551acaa6f1ea4e962847",
 			"games/codex.html": "f414379334d5d2d1f22dc2104cf692b52321a75750bec6fbe00e30d560fde0c0",
-			"games/doudizhu/doudizhu.html": "bca73a355531e99de66ac8ae915f13d5cda3fa3bc9fa022ac915b0c41815c7f7",
+			"games/doudizhu/doudizhu.html": "5d7fb75503cbb86e6fc7d794dc6d3129b0b8168344653ebb65db52aad4f5f3f3",
 			"games/goldfish.html": "2ca179c98227d87932a6e9af1609d11b425b9251f6150459c05c2eb4c0477272",
 			"games/rank.html": "ab7c1bbd1aafd9ebc30583b2eae2c7fd5f36ca795350db88bf0892b5605c220e",
 			"games/save.html": "be722c5ad7a3e11a495721fb0da497797f7612d9414d667717c6d005a7853a86",
 			"games/texas/texas.html": "3a6289009d73ac57f154c722d3a7e92fec2f3fd639118abdd5922b48a6b94837",
-			"games/uno/uno.html": "49371f8f3f347f624777bcfd721193c07c94c3efc618029e8c098dfbac40d564",
+			"games/uno/uno.html": "c384b5647ef98e3f5c003f02787dca27989ad2a138befaded7aec0e75b900d67",
 			"image/card/csh_ak47.png": "fa846a4792cafd9ea362156e8db924eff59edab9ef640410b02fcf975db3bf1d",
 			"image/card/csh_daju.png": "fedfdbb00a85fe11b35fcca3bdf1cb4395f1709984a02230fc0fd6df3539f189",
 			"image/card/csh_dan.png": "0e49da70330787de3b577361e25daedb3f47e8ef7134ee76c91cbe0b5b4b6679",

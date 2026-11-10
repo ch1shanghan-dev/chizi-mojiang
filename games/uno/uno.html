@@ -638,7 +638,9 @@ var Bridge = (function () {
     buyIn: function () { return buyIn; },
     snapshot: function () { return lastSnap; },
     isReady: function () { return ready; },
-    merit: function (n, reason, cb) { call('shell-merit', { n: n, reason: reason }, cb); },
+    /* §10-2：与 R3-2「结算回调不看 ok」同理，功勋也走共享桥 callMerit ——
+       写盘失败 / 桥超时如实提示，不谎报成功、不静默丢功勋。 */
+    merit: function (n, reason, cb) { return T.callMerit(n, reason, cb); },
     /* 结算（§G.6.3）：名次制。真值在 core/csh_registry.js（perBeat 0.6 / capMult 2）
        与 csh_wallet.settle（门票×0.6×击败对手数），本页只负责**如实上报名次与人数**：
          place   = 本局真实名次（1..N，按剩余手牌升序）

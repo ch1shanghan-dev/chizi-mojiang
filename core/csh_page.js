@@ -96,21 +96,42 @@
 		} catch (eRead) { saveReason = "暂时无法保存，请关闭后重新进入"; return false; }
 	}
 	var saveNoticeAt = 0;
-	function saveNotice() {
+	/* 页内常驻提示条（唯一节点，存档提示与功勋提示共用，避免两条叠在牌桌上）。
+	   节流由各自调用方管：存档 2 秒、功勋 6 秒；显示 5 秒后自动移除。 */
+	function pageNotice(text) {
 		try {
-			if (Date.now() - saveNoticeAt < 2000) return;
-			saveNoticeAt = Date.now();
 			var doc = root.document, node = doc.getElementById("csh-page-save-notice");
 			if (!node) {
 				node = doc.createElement("div"); node.id = "csh-page-save-notice"; node.setAttribute("role", "status");
 				node.style.cssText = "position:fixed;left:12px;right:12px;bottom:12px;z-index:var(--csh-z-toast,9999);padding:10px;background:#302a23;color:#f0e6cf;border:1px solid #bda570;font-size:var(--csh-lfs-md,13px);text-align:center;pointer-events:none";
 				(doc.body || doc.documentElement).appendChild(node);
 			}
-			node.textContent = saveReason;
+			node.textContent = text;
 			setTimeout(function () { if (node.parentNode) node.parentNode.removeChild(node); }, 5000);
-		} catch (eNotice) {}
+			return true;
+		} catch (eNotice) { return false; }
+	}
+	function saveNotice() {
+		if (Date.now() - saveNoticeAt < 2000) return;
+		saveNoticeAt = Date.now();
+		pageNotice(saveReason);
 	}
 	function requireSave() { if (saveAllowed()) return true; saveNotice(); return false; }
+
+	/* 功勋上报失败提示（2026-11-10 · 手册 §10-2「数据未保存的漏报」）。
+	   shell-merit 是写存档命令：宿主 saveRank 拒写 / 记录超范围 / 桥超时都会让
+	   功勋静默丢失。此前三张牌桌页的 Bridge.merit 直接透传 call 且不传回调，
+	   玩家打完一手一分功勋没入账、界面毫无反应 —— 与 UNO R3-2 修过的
+	   「结算回调不看 ok」是同一类。统一在共享桥层如实提示，三页不再各写一份。
+	   本地 requireSave() 短路已有 saveNotice()，用 recovery 标记跳过、不重复弹。 */
+	var meritNoticeAt = 0;
+	function meritNotice(data) {
+		if (Date.now() - meritNoticeAt < 6000) return;
+		if (Date.now() - saveNoticeAt < 2000) return;   /* 与通用存档提示错开 */
+		meritNoticeAt = Date.now();
+		var why = data && data.reason ? "：" + data.reason : "，请稍后重试";
+		pageNotice("本局功勋未入账" + why);
+	}
 	function rnd(n) { return Math.floor(Math.random() * n); }
 	function rndMs(a, b) { return a + Math.random() * (b - a); }
 
@@ -212,6 +233,15 @@
 				if (waiters[req]) { delete waiters[req]; if (cb) cb(false, null); }
 			}, timeoutMs || (opts.timeout || 1200));
 		}
+		/* 功勋上报专用通道：只看 ok，失败如实提示，成功不打扰。
+		   一局可能连报 2~3 次（play / win / bigwin），meritNotice 自带 6 秒合并。
+		   cb 原样透传，既有调用方（若有）与未来重试逻辑不受影响。 */
+		function callMerit(n, reason, cb) {
+			return call('shell-merit', { n: n, reason: reason }, function (ok, data) {
+				if (!ok && !(data && data.recovery)) meritNotice(data);
+				if (cb) cb(ok, data);
+			});
+		}
 
 		function close() {
 			if (opts.closeName) {
@@ -247,6 +277,7 @@
 		return {
 			active: hasParent,
 			call: call,
+			callMerit: callMerit,
 			close: close,
 			/* 注册「壳委托关窗」的收尾流程：游戏页传自己的 closePage（含幂等结算）。
 			   一次注册即可，壳每次关窗只发一条命令，本页跑完回发 close。 */

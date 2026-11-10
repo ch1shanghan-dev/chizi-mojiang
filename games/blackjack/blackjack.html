@@ -937,8 +937,10 @@ try { CRD = (typeof window !== 'undefined' && window.CSH && window.CSH.cards) ? 
       buyIn: function () { return buyIn; },
       snapshot: function () { return lastSnap; },
       isReady: function () { return ready; },
-      /* 功勋上报（§G.6.2）：只报 n + reason，其余交给钱包 */
-      merit: function (n, reason, cb) { call('shell-merit', { n: n, reason: reason }, cb); },
+      /* 功勋上报（§G.6.2）：只报 n + reason，其余交给钱包。
+         §10-2：走共享桥的 callMerit —— 宿主写盘失败 / 桥超时会如实提示「本局功勋未入账」，
+         不再静默丢功勋（旧写法直接 call 且不传回调）。 */
+      merit: function (n, reason, cb) { return T.callMerit(n, reason, cb); },
       /* 抽取庄家席（§I）：从 AI 世界抽 1 位**真实角色**做庄 */
       seats: function (n, bi, cb) { call('shell-seat', { n: n, buyIn: bi }, cb, 1500); },
       /* 结算回账（§H + §I.2）：统一走 shell-settle-session ——
