@@ -1,63 +1,49 @@
 /* 池子魔将 · UI 美术层 v2（2026-11-10 · 作者：UI 美术必须是画出来的图，不是 CSS）
    ============================================================
-   材质、装饰、图标全部来自 image/ui/art-v2/ 下的生成位图；本文件只负责「贴上去」，
+   材质、装饰、牌背全部来自 image/ui/art-v2/ 下的生成位图；本文件只负责「贴上去」，
    不在这里画任何形状。
 
-   ★ 加载顺序：本文件排在 csh_layout / csh_tables / csh_duel_tables 之后，
-     所以能用同权重覆盖四桌各自写死的 `background:radial-gradient(...)!important`。
-   ★ 失败回退：文件缺失或解码失败时，background-image 不生效，
-     旧实现里的 radial-gradient 立刻接管 —— 页面照常可用，不白屏。
-   ★ 位置口径：装饰环跟随牌毡中心，按百分比缩放，椭圆随视口拉伸仍是椭圆；
-     牌面、座位、按钮都在毡面之上，纹理对比度压得很低，不抢信息。 */
+   ★ 加载顺序：本文件必须是 head 内**最后一个**样式表。
+     四桌的毡面先由 csh_duel_tables.css 写过一次，斗地主/UNO 又被 csh_trick_tables.css
+     用 !important 写回渐变 —— 排在它们前面等于没写，且肉眼完全看不出差别。
+   ★ 失败回退：文件缺失或解码失败时 background-image 不生效，旧径向渐变立刻接管，
+     页面照常可用，不白屏。
+   ★ 位置口径：装饰金饰一律 absolute，不占布局高度。极矮屏（640×286）的「中段零滚动」
+     由 E95AS 盯着，任何压高度的装饰都会把它顶掉。 */
 
 /* ---------- 四桌毡面材质 ---------- */
 body[data-csh-table="texas"] #view-game .felt {
-	background-image:
-		url("../image/ui/art-v2/tables/texas.webp") !important;
+	background-image: url("../image/ui/art-v2/tables/texas.webp") !important;
 	background-size: cover !important;
 	background-position: center !important;
 	background-repeat: no-repeat !important;
 }
 
 body[data-csh-table="blackjack"] #view-game .felt {
-	background-image:
-		url("../image/ui/art-v2/tables/blackjack.webp") !important;
+	background-image: url("../image/ui/art-v2/tables/blackjack.webp") !important;
 	background-size: cover !important;
 	background-position: center !important;
 	background-repeat: no-repeat !important;
 }
 
 body[data-csh-table="doudizhu"] #view-game .felt {
-	background-image:
-		url("../image/ui/art-v2/tables/doudizhu.webp") !important;
+	background-image: url("../image/ui/art-v2/tables/doudizhu.webp") !important;
 	background-size: cover !important;
 	background-position: center !important;
 	background-repeat: no-repeat !important;
 }
 
-/* UNO 没有 .felt：它的主战区是 .csh-board（对手行 + 中央牌区）。
-   这里给整块战区铺同一套材质，并在四周轻压暗，避免与页面底色硬接。 */
+/* UNO 没有 .felt：主战区就是 #view-game（对手行 + 中央牌区 + 状态行） */
 body[data-csh-table="uno"] #view-game {
-	background-image:
-		url("../image/ui/art-v2/tables/uno.webp") !important;
+	background-image: url("../image/ui/art-v2/tables/uno.webp") !important;
 	background-size: cover !important;
 	background-position: center !important;
 	background-repeat: no-repeat !important;
 }
 
 /* ---------- 座位牌 / 底池：同一块青铜压印板 ----------
-   座位卡是屏幕上重复次数最多的元素（四人桌 4 块 + 对手行），它的材质决定了
-   「像不像一张实体桌」。图片是高通后的均匀颗粒，任意尺寸贴上去都不会出现斜光带。 */
-body[data-csh-table] #view-game :is(.seat-box, .opp, .pot) {
-	background-image: url("../image/ui/art-v2/plates/plate-bronze.webp") !important;
-	background-size: cover !important;
-	background-position: center !important;
-	background-repeat: no-repeat !important;
-}
-
-/* ---------- 座位牌 / 底池：同一块青铜压印板 ----------
-   座位卡是屏幕上重复次数最多的元素（四人桌 4 块 + 对手行），它的材质决定了
-   「像不像一张实体桌」。图片是高通后的均匀颗粒，任意尺寸贴上去都不会出现斜光带。 */
+   座位卡是屏幕上重复次数最多的元素（四人桌 4 块 + 对手行），它决定「像不像一张实体桌」。
+   图片是高通后的均匀颗粒，任意尺寸贴上去都不会出现斜光带。 */
 body[data-csh-table] #view-game :is(.seat-box, .opp, .pot) {
 	background-image: url("../image/ui/art-v2/plates/plate-bronze.webp") !important;
 	background-size: cover !important;
@@ -66,10 +52,11 @@ body[data-csh-table] #view-game :is(.seat-box, .opp, .pot) {
 }
 
 /* ---------- 牌背：四桌共用一张 ----------
-   原来 `.pcard.back` 是 repeating-linear-gradient 斜条 + 一圈细金线，缩到 38px 宽
-   就是一块棕褐色噪点；换成实体牌背后，暗牌第一次看起来像"牌"。
-   background-size:100% 100% 让它随牌宽等比铺满（牌宽由 --cw 决定，纵横比固定 1:1.4）。
-   旧的 ::after 内嵌金线在图上的金框之内会双线打架，这里关掉。 */
+   原来 `.pcard.back` 是 repeating-linear-gradient 斜条，缩到 38px 宽就是一块棕褐噪点。
+   background-size:100% 100% 让牌背随牌宽等比铺满（牌面纵横比固定 1:1.4）。
+   旧 ::after 的内嵌金线会与图上的金框双线打架，关掉。
+   牌面统一高光（csh_cards.js 注入的 .pcard::before，22% 白）是给浅色正面用的，
+   压在深色花纹牌背上是一条灰带，暗牌单独降到 6%。 */
 body[data-csh-table] .pcard.back {
 	background-image: url("../image/ui/art-v2/cards/back.webp") !important;
 	background-size: 100% 100% !important;
@@ -77,24 +64,20 @@ body[data-csh-table] .pcard.back {
 	background-repeat: no-repeat !important;
 }
 body[data-csh-table] .pcard.back::after { display: none !important; }
+body[data-csh-table] .pcard.back::before { background: rgba(255, 255, 255, .06) !important; }
 
-/* ---------- 牌背：四桌共用一张 ----------
-   原来 `.pcard.back` 是 repeating-linear-gradient 斜条 + 一圈细金线，缩到 38px 宽
-   就是一块棕褐色噪点；换成实体牌背后，暗牌第一次看起来像"牌"。
-   background-size:100% 100% 让它随牌宽等比铺满（牌宽由 --cw 决定，纵横比固定 1:1.4）。
-   旧的 ::after 内嵌金线在图上的金框之内会双线打架，这里关掉。 */
-body[data-csh-table] .pcard.back {
-	background-image: url("../image/ui/art-v2/cards/back.webp") !important;
-	background-size: 100% 100% !important;
+/* ---------- 结算面板：漆面材质 + 下缘牌匾金饰 ----------
+   结算层是每局必看的一屏，之前是纯渐变。材质用高通后的均匀漆面颗粒，
+   任意面板尺寸都不会出现斜光带；原 border-box 金线被 background 覆盖，
+   这里用一道实色金边兜底，保持"离地"的轮廓。
+   金饰横条试过挂标题下与面板下缘，两个位置都不成立：标题下压字；下缘被
+   `.rs-panel{overflow-y:auto}` 裁掉，只在边缘露出两个金点。已撤，等 B2 做面板九宫格时
+   把金饰烘进图里，而不是靠绝对定位去叠。 */
+body[data-csh-table] .csh-result .rs-panel {
+	position: relative;
+	background-image: url("../image/ui/art-v2/panels/panel-dark.webp") !important;
+	background-size: cover !important;
 	background-position: center !important;
 	background-repeat: no-repeat !important;
+	border-color: rgba(216, 180, 106, .40) !important;
 }
-body[data-csh-table] .pcard.back::after { display: none !important; }
-
-/* 牌面统一高光（csh_cards.js 注入的 .pcard::before，rgba(255,255,255,.22)）原本是给
-   浅色正面用的；压在深色花纹牌背上会变成一条灰带，把金纹洗掉。暗牌单独降到 6%。 */
-body[data-csh-table] .pcard.back::before { background: rgba(255, 255, 255, .06) !important; }
-
-/* 牌面统一高光（csh_cards.js 注入的 .pcard::before，rgba(255,255,255,.22)）原本是给
-   浅色正面用的；压在深色花纹牌背上会变成一条灰带，把金纹洗掉。暗牌单独降到 6%。 */
-body[data-csh-table] .pcard.back::before { background: rgba(255, 255, 255, .06) !important; }

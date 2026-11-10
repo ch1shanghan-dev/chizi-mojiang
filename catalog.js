@@ -1,7 +1,7 @@
-/* 自动生成于 2026-11-10T08:08:43.948Z by tools/release.js —— hashes 对应 Git 发布字节，发版后 git push 即生效，勿手改 files */
+/* 自动生成于 2026-11-10T08:56:29.728Z by tools/release.js —— hashes 对应 Git 发布字节，发版后 git push 即生效，勿手改 files */
 window.extension = {
 	"池子魔将": {
-		"build": "5d2db74bbd4fcdd5d8ba580459476024ce5062151234920c0d2b5b9c378d298c",
+		"build": "8bc442c2dfd7a8f25526fbfc9715fb21500f0dae8b15ef8c0b857efd39a8d3e6",
 		"hashes": {
 			"LICENSE": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
 			"README.md": "41102b34ebc984b6b84b361baa0e78aa9defe5633a4a270cde6ed0ff7bc9ae4d",
@@ -310,7 +310,7 @@ window.extension = {
 			"core/csh_aff_lines.js": "a08e3a944e845310c47e035385d6db12668e79cbed2026a3ac9576183630f1ab",
 			"core/csh_affection.js": "b57c1bbab04f325e5d5658f69c2c85e4f8050f200dcc66513e0842edadb8bdf3",
 			"core/csh_art.js": "0618ccdeb6e9a78b688ec9369908b43c22e4378e82ac93de4dc62e991b081520",
-			"core/csh_art_v2.css": "dfb280e2f3622f716192aee6cbcde961f3b6d9c9df9afc252cac6ef8113e94c5",
+			"core/csh_art_v2.css": "5d418f7a60db364b1baa018cf75d5e63f35250fdb98f96ba4497c3fe4c1c98bf",
 			"core/csh_aux_spirit.js": "6c5c59082b83c167db8d2d4635cc85b22bb6945af44bdc8c85c8f4e24206d4c1",
 			"core/csh_badge.js": "e181a7f3d22ecf40575f0b3078e983465237b33c5835d5c7622dba24c61277e1",
 			"core/csh_bgm.js": "7fe7e9fbbf3943b2b9a7f71ee8ecc89cee20bba52fdd535234ff66d4fe5fa96c",
@@ -806,6 +806,7 @@ window.extension = {
 			"image/ui/art-v1/transfer-chest.png": "879161c6f5d715711d2e1ddc439a061e89c97aeb08aa79437528f0e775a404c1",
 			"image/ui/art-v1/war-record.png": "4f500282106fa7fc8cc763c7a3ab2cd95797bd3211b926c20c2205514c084e30",
 			"image/ui/art-v2/cards/back.webp": "465942ba0d511978f6d6eb804fd91b641c1c892e1a9b4609de2b903dfd5ad1e7",
+			"image/ui/art-v2/panels/panel-dark.webp": "6296bdf68531664d46c23d7db03cc235857774fb5d546b693c32839db220844d",
 			"image/ui/art-v2/plates/plate-bronze.webp": "37750f9c4e30865b8e89e19262b88c04b16f0b50b4d1e51bfdabba0fa7b612c1",
 			"image/ui/art-v2/tables/blackjack.webp": "83d841963dfffe28332e1da9b9f038df518558799a9074753d9cef16d5ef1ba3",
 			"image/ui/art-v2/tables/doudizhu.webp": "c7c0c9d064e62690b5fa44045b44ea00d9a7ad7e36485be84dec447332646b1e",
@@ -1201,7 +1202,7 @@ window.extension = {
 		"intro": "<font color=#c9a84c>版本</font> <font color=#00FFFF>4.0.16</font>",
 		"version": "4.0.16",
 		"date": "2026-11-10",
-		"size": "155.4MB",
+		"size": "155.5MB",
 		"limits": {
 			"textBytes": 524288,
 			"fileBytes": 16777216,
@@ -2013,6 +2014,7 @@ window.extension = {
 			"image/ui/art-v1/transfer-chest.png",
 			"image/ui/art-v1/war-record.png",
 			"image/ui/art-v2/cards/back.webp",
+			"image/ui/art-v2/panels/panel-dark.webp",
 			"image/ui/art-v2/plates/plate-bronze.webp",
 			"image/ui/art-v2/tables/blackjack.webp",
 			"image/ui/art-v2/tables/doudizhu.webp",

@@ -68,6 +68,7 @@ const measure = `(()=>{
     meVisible:!!mr && mr.top>=br.top-0.5 && mr.bottom<=br.bottom+0.5,
     meText:me?me.textContent.replace(/\\s+/g,' ').trim().slice(0,24):'',
     capShown:cap?getComputedStyle(cap).display!=='none':null,
+    panelBg:cs.backgroundImage.slice(0,400),
     rows:r.querySelectorAll('.rs-row').length
   };
 })()`;
@@ -113,6 +114,7 @@ if (tiny && !tiny.none) {
   check('640×286：面板没有溢出视口', tiny.panelInView, tiny.panelMaxH);
   check('640×286：结算行数仍为 2（庄家 + 你），没有为了塞下而丢行', tiny.rows === 2, tiny.rows);
   check('640×286：极矮屏规则确实生效（上限不再是 88%）', !/88%/.test(tiny.panelMaxH) && /100%/.test(tiny.panelMaxH), tiny.panelMaxH);
+  check('640×286：结算面板吃的是美术层的漆面材质（不是旧渐变）', /art-v2\/panels\/panel-dark\.webp/.test(tiny.panelBg), tiny.panelBg);
 }
 
 /* 对照视口：不允许被这次改动碰到 */
