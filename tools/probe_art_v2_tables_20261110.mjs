@@ -78,6 +78,15 @@ check('金线框挂在结算面板上，且极矮屏有收起规则',
   /csh-result \.rs-panel \{[\s\S]*?frame\.webp/.test(artCss) &&
   /@media \(orientation: landscape\) and \(max-height: 350px\)[\s\S]*?panel-dark\.webp/.test(artCss));
 
+/* ---------- 结算三档辉光（B3 光效） ---------- */
+const GLOWS=['glow-neutral.webp','glow-win.webp','glow-lose.webp'];
+let glowTotal=0, glowMissing=[];
+for (const n of GLOWS) { const f=path.join(root,'image/ui/art-v2/panels',n); if(!fs.existsSync(f)){glowMissing.push(n);continue;} glowTotal+=fs.statSync(f).size; }
+check('三档辉光资产齐全且合计 ≤60 KB', glowMissing.length===0 && glowTotal<=60*1024, { missing:glowMissing, kb:Math.round(glowTotal/1024) });
+check('辉光烘进背景层且极矮屏保留（不叠绝对定位、不带金框）',
+  /B3-GLOW-V2-20261110[\s\S]*?glow-neutral\.webp[\s\S]*?rs-title\.win[\s\S]*?glow-win\.webp[\s\S]*?rs-title\.lose[\s\S]*?glow-lose\.webp/.test(artCss) &&
+  /@media \(orientation: landscape\) and \(max-height: 350px\)[\s\S]*?glow-neutral\.webp[\s\S]*?panel-dark\.webp(?![\s\S]*?frame\.webp)/.test(artCss));
+
 /* ---------- 运行时 ---------- */
 const probe = `(()=>{
   const de=document.documentElement;

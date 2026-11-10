@@ -1,7 +1,7 @@
-/* 自动生成于 2026-11-10T15:51:41.242Z by tools/release.js —— hashes 对应 Git 发布字节，发版后 git push 即生效，勿手改 files */
+/* 自动生成于 2026-11-10T16:50:37.442Z by tools/release.js —— hashes 对应 Git 发布字节，发版后 git push 即生效，勿手改 files */
 window.extension = {
 	"池子魔将": {
-		"build": "062ecef4cdcccb8e54a8e3d634e986eda52ebc99326d3037f12a8f3f1f80fd8c",
+		"build": "68b63e403a1458c09bbb11a723a1d43b2c267d6b3d4a34043fd8fbb6c1132c7f",
 		"hashes": {
 			"LICENSE": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
 			"README.md": "41102b34ebc984b6b84b361baa0e78aa9defe5633a4a270cde6ed0ff7bc9ae4d",
@@ -310,7 +310,7 @@ window.extension = {
 			"core/csh_aff_lines.js": "a08e3a944e845310c47e035385d6db12668e79cbed2026a3ac9576183630f1ab",
 			"core/csh_affection.js": "b57c1bbab04f325e5d5658f69c2c85e4f8050f200dcc66513e0842edadb8bdf3",
 			"core/csh_art.js": "0618ccdeb6e9a78b688ec9369908b43c22e4378e82ac93de4dc62e991b081520",
-			"core/csh_art_v2.css": "ff7f27ce2cefbfaf60ba850c01ac40e4f1224148b4d73e38375e3237bb091d3d",
+			"core/csh_art_v2.css": "844019a49c09b607b7f5fde763e7a76894dbc819fd2477afc052d12b3c99a36f",
 			"core/csh_aux_spirit.js": "6c5c59082b83c167db8d2d4635cc85b22bb6945af44bdc8c85c8f4e24206d4c1",
 			"core/csh_badge.js": "e181a7f3d22ecf40575f0b3078e983465237b33c5835d5c7622dba24c61277e1",
 			"core/csh_bg_v2.css": "07803fa7b17838808faa46ec13c8c637051795f8035d3da2588b879982254370",
@@ -823,6 +823,9 @@ window.extension = {
 			"image/ui/art-v2/icons/texas.webp": "e92e88fc7cbf0ed422e5bdacd530c7ba8f24d4a1db0f45dcaf6995010fecf0f8",
 			"image/ui/art-v2/icons/uno.webp": "a753a1e7919688cf133132a2fca6849574bdb1a3bd875fb3666929cff370bcd6",
 			"image/ui/art-v2/panels/frame.webp": "c6666242bd12ccf77686b45887c7640292ed777f06bf1f16a25393d226ea28e9",
+			"image/ui/art-v2/panels/glow-lose.webp": "5034cc1e7483788023a8f99c3b6253698a961f8dd6433bf298206f041c77d329",
+			"image/ui/art-v2/panels/glow-neutral.webp": "2b5144399513e29f53e4d54ebaada0d396acb05a80f0764f790cd71e8c882018",
+			"image/ui/art-v2/panels/glow-win.webp": "c674e239d82e199b752fb4470f7e5134dec5f8a993257227dc91a59eb5c3c1c2",
 			"image/ui/art-v2/panels/panel-dark.webp": "468dedc22500ef69f19736631a0bc8932417d7f8fca44fa32f79efbb7aba8aaf",
 			"image/ui/art-v2/panels/panel-leather.webp": "b05aec3edb71697da1b614c3af00d4eae0e88307ec56596d37be8249023fbc64",
 			"image/ui/art-v2/plates/plate-bronze.webp": "37750f9c4e30865b8e89e19262b88c04b16f0b50b4d1e51bfdabba0fa7b612c1",
@@ -2049,6 +2052,9 @@ window.extension = {
 			"image/ui/art-v2/icons/texas.webp",
 			"image/ui/art-v2/icons/uno.webp",
 			"image/ui/art-v2/panels/frame.webp",
+			"image/ui/art-v2/panels/glow-lose.webp",
+			"image/ui/art-v2/panels/glow-neutral.webp",
+			"image/ui/art-v2/panels/glow-win.webp",
 			"image/ui/art-v2/panels/panel-dark.webp",
 			"image/ui/art-v2/panels/panel-leather.webp",
 			"image/ui/art-v2/plates/plate-bronze.webp",

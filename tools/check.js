@@ -3445,25 +3445,27 @@ if (spawnOk && execFileSync && !ONLY_SYNTAX && !ONLY_VERSIONS) {
       /* P2 牌桌呈现：极矮屏（640×286）结算层纵向预算。加载真实 blackjack.html 打到结算，
          锁「中段不再内部滚动 / 你那一行完整可见 / 按钮仍在视口内」，并对 915×412 做对照
          （88% 上限、9px 内边距、小标题仍显示）。改前基线跑同一夹具是 12/6。 */
-      ['E95AS','probe_result_tiny_20261110.mjs',['--out',path.join(tmp95,'result-tiny')],20,'极矮屏结算层纵向预算（真实页面/中段零滚动/玩家行可见/对照视口不变）',60000],
+      ['E95AS','probe_result_tiny_20261110.mjs',['--out',path.join(tmp95,'result-tiny')],20,'极矮屏结算层纵向预算（真实页面/中段零滚动/玩家行可见/对照视口不变）',150000],
       /* P2 牌桌呈现续：极矮屏开局卡。640×286 实测德州卡底 307、廿一点 316（视口 286），
          折叠条只露半截；压内边距与栅格行距后 267/274 全落地。改前基线同一夹具 8/10。 */
-      ['E95AT','probe_start_tiny_20261110.mjs',['--out',path.join(tmp95,'start-tiny')],20,'极矮屏开局卡收进首屏（真实两页/折叠条完整/零滚动/对照视口内边距不变）',60000],
+      ['E95AT','probe_start_tiny_20261110.mjs',['--out',path.join(tmp95,'start-tiny')],20,'极矮屏开局卡收进首屏（真实两页/折叠条完整/零滚动/对照视口内边距不变）',150000],
       /* P2 牌桌呈现续：极矮屏斗地主「身份 + 剩余张数」被省略号吞掉（身份待…/剩 1…）。
          给 .pl-brief 确定宽度 + 允许状态行换行兜底，手牌让位由 fitHand() 重算。
          改前基线同一夹具 48/6；亚像素判据（盒宽 ≥ 字形宽）是这次的关键，整数 scrollWidth 会假绿。 */
-      ['E95AU','probe_doudizhu_brief_tiny_20261110.mjs',['--out',path.join(tmp95,'ddz-brief-tiny')],54,'极矮屏斗地主身份与剩张可读（亚像素/手牌让位/按钮44px/对照视口几何不变）',60000],
+      ['E95AU','probe_doudizhu_brief_tiny_20261110.mjs',['--out',path.join(tmp95,'ddz-brief-tiny')],54,'极矮屏斗地主身份与剩张可读（亚像素/手牌让位/按钮44px/对照视口几何不变）',150000],
       /* UI 美术层 v2 首批（B1）：四桌毡面 + 牌背 + 座位板材质全部是生成的位图。
          夹具管三件事：美术层必须是 head 内最后一个样式表（trick/duel 两次把它盖回去的先例）、
          资产体积、以及四桌运行时实际生效的 background-image 就是 art-v2 那张。
          改前基线（摘掉斗地主的 link）22/3，失败的正是那 3 条。 */
-      ['E95AV','probe_art_v2_tables_20261110.mjs',['--out',path.join(tmp95,'art-v2-tables')],30,'UI 美术层首批（毡面/牌背/板材质生效、体积预算、样式表顺序、缺图回退）',60000],
+      ['E95AV','probe_art_v2_tables_20261110.mjs',['--out',path.join(tmp95,'art-v2-tables')],32,'UI 美术层首批（毡面/牌背/板材质生效、体积预算、样式表顺序、缺图回退）',150000],
       /* 音效 S1：页面 sfxPlay 的每个名字都必须能解析。UNO 五个动作音与斗地主三个牌型音
          因为配方缺失，从上线起一直静默（bus 只记 lastError，页面 try/catch 吞掉）。
          改前基线同一探针 7/3，失败的正是这三条。 */
       ['E95AW','probe_sfx_names_20261110.mjs',['--out',path.join(tmp95,'sfx-names')],10,'音效名与配方表一一对应（无静默丢弃/新增参数边界/既有高频道回归）',30000],
-      ['E95AX','probe_art_v2_bg_20261110.mjs',['--out',path.join(tmp95,'art-v2-bg')],32,'功能页位图背景（七页链接顺序/冷暖分配/缺图回退/运行时生效）',60000],
-      ['E95AY','probe_art_v2_buttons_20261110.mjs',['--out',path.join(tmp95,'art-v2-buttons')],67,'按钮补板（位图生效/44px红线/文字对比度/既有规则未被覆盖）',60000],
+      /* 下面三个是 Chromium 真实页面探针：按钮补板单跑实测 63s，
+         旧的 60000ms 阈值在整仓串行环境里必然 ETIMEDOUT（2026-11-11 实跑复现）。 */
+      ['E95AX','probe_art_v2_bg_20261110.mjs',['--out',path.join(tmp95,'art-v2-bg')],32,'功能页位图背景（七页链接顺序/冷暖分配/缺图回退/运行时生效）',150000],
+      ['E95AY','probe_art_v2_buttons_20261110.mjs',['--out',path.join(tmp95,'art-v2-buttons')],67,'按钮补板（位图生效/44px红线/文字对比度/既有规则未被覆盖）',150000],
       ['E95AZ','probe_mirror_seam_20261110.mjs',['--out',path.join(tmp95,'mirror-seam')],12,'国内更新镜像接缝（空串零行为变化/配置后入白名单/默认离线与writes不变）',30000],
     ];
     for (const [tag95, script95, args95, min95, label95, timeout95] of reg95) {
