@@ -362,6 +362,15 @@
     .csh-result .rs-row { padding: 3px 8px; }
   }
 
+  /* 【2026-11-10】极矮屏（≤350）与 core/csh_layout.css 的 L-TINY 结算规则对齐。
+     本页 ≤500 那段写在页面 <style> 里，层叠顺序在共享表之后，会把共享的
+     收紧规则整段盖掉（max-height 96% / padding 8px / row 3px），
+     于是极矮屏只有本页还留着旧预算。这里补一段同样的数值。 */
+  @media (orientation: landscape) and (max-height: 350px) {
+    .csh-result .rs-panel { max-height: calc(100% - 2px); padding: 6px 10px; gap: 4px; }
+    .csh-result .rs-row { padding: 2px 6px; }
+  }
+
   /* ---------- toast ---------- */
   /* 【2026-10-03 重构】改挂主战区右上角：原先是"底部锚定在 .bottom-bar 上方"，
      那套坐标依赖旧的五段式布局（.bottom-bar 高约 139px）。新骨架里 .csh-dock(52) +

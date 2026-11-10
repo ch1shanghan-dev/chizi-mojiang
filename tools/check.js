@@ -3442,6 +3442,10 @@ if (spawnOk && execFileSync && !ONLY_SYNTAX && !ONLY_VERSIONS) {
       ['E95AP','probe_spirit_skins_catalog_20261109.mjs',['--out',path.join(tmp95,'spirit-skins-catalog')],69,'妖灵装扮注册表与互动1-3层（140图/skinOf只读/装扮回应/宿主加载图/跨页可见性）',20000],
       ['E95AQ','probe_world_resume_card_20261110.mjs',['--out',path.join(tmp95,'world-resume-card')],26,'世界入口上次未完成卡片（只读判定/不写存档/不碰钱/点击走charge/加载图/改前基线）',20000],
       ['E95AR','probe_merit_failure_notice_20261110.mjs',['--out',path.join(tmp95,'merit-notice')],23,'功勋上报失败提示（真实桥ack/超时/6秒合并/恢复期不重复/三页接线/改前基线）',20000],
+      /* P2 牌桌呈现：极矮屏（640×286）结算层纵向预算。加载真实 blackjack.html 打到结算，
+         锁「中段不再内部滚动 / 你那一行完整可见 / 按钮仍在视口内」，并对 915×412 做对照
+         （88% 上限、9px 内边距、小标题仍显示）。改前基线跑同一夹具是 12/6。 */
+      ['E95AS','probe_result_tiny_20261110.mjs',['--out',path.join(tmp95,'result-tiny')],18,'极矮屏结算层纵向预算（真实页面/中段零滚动/玩家行可见/对照视口不变）',60000],
     ];
     for (const [tag95, script95, args95, min95, label95, timeout95] of reg95) {
       const r95 = runProbeJson(script95, args95, { timeout: timeout95 });

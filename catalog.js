@@ -1,7 +1,7 @@
-/* 自动生成于 2026-11-10T01:39:09.296Z by tools/release.js —— hashes 对应 Git 发布字节，发版后 git push 即生效，勿手改 files */
+/* 自动生成于 2026-11-10T03:09:21.168Z by tools/release.js —— hashes 对应 Git 发布字节，发版后 git push 即生效，勿手改 files */
 window.extension = {
 	"池子魔将": {
-		"build": "1597f9496616efff09b7855ee42061986314ee57c403f5a1bcc801770aeb8997",
+		"build": "a0f364b5a5111bce0a551489aa6934083e02bf285b5046e86d346b61c5c12e84",
 		"hashes": {
 			"LICENSE": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
 			"README.md": "41102b34ebc984b6b84b361baa0e78aa9defe5633a4a270cde6ed0ff7bc9ae4d",
@@ -330,7 +330,7 @@ window.extension = {
 			"core/csh_interact_lines.js": "3fcb572f4c8c5d5d76f106c7f670e0ec85acb29b283d5215c25eebe36219fad3",
 			"core/csh_interact_lines_gen.js": "7f5c741c00077015e3309fe9df526d22aff5ba7c59fb0d8f0416c70330c72fcc",
 			"core/csh_journal.css": "52433ab55093a756574943dc3f8513f8e40068b884c8d29625fa18299bba3943",
-			"core/csh_layout.css": "0f97347e069cd80e7393620dc12765bd27cc094ebc0134dee32ea51dfbb1ace6",
+			"core/csh_layout.css": "13bfbbeb20807d320da21c406c5537db4763ff1190b27242ef7cb7f6cfea5166",
 			"core/csh_market.js": "e103ae31d60b89bc4994a4aa25df1e39274982e1dc47c1fcfe2fea2893617805",
 			"core/csh_match_reward.js": "af18572aff53049e3c95b6275a7a672b6ced1a815c7966e41b05b76977354b47",
 			"core/csh_migrate.js": "ffef4dece98eeac465b54c492b64d43e0025106c3f5e17498a819edef799ce7a",
@@ -391,7 +391,7 @@ window.extension = {
 			"games/bossbook.html": "e467279dfe5e1a17f32e21cbcc9749233b454720a380e4abe33d9b63d8723a22",
 			"games/career.html": "115f63a1a08c01257876b017649b95b98e2b19db8dc6551acaa6f1ea4e962847",
 			"games/codex.html": "f414379334d5d2d1f22dc2104cf692b52321a75750bec6fbe00e30d560fde0c0",
-			"games/doudizhu/doudizhu.html": "5d7fb75503cbb86e6fc7d794dc6d3129b0b8168344653ebb65db52aad4f5f3f3",
+			"games/doudizhu/doudizhu.html": "66ae10e2008f1a0d07f5aee2e63b59c9058b3fb8717cb82e7057356377c03dcd",
 			"games/goldfish.html": "2ca179c98227d87932a6e9af1609d11b425b9251f6150459c05c2eb4c0477272",
 			"games/rank.html": "ab7c1bbd1aafd9ebc30583b2eae2c7fd5f36ca795350db88bf0892b5605c220e",
 			"games/save.html": "be722c5ad7a3e11a495721fb0da497797f7612d9414d667717c6d005a7853a86",

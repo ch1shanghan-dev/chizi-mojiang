@@ -365,6 +365,22 @@
      标签是纯水平开销、不占纵向空间，砍掉只会让数值失去含义（用户实测看不懂 2,000 是什么）。 */
   .csh-player .pl-brief { font-size: var(--csh-lfs-micro); }
   .csh-first-cut { display: none !important; } /* 供各页标记"第一个该砍的装饰" */
+
+  /* 【2026-11-10 极矮屏结算层】首屏必须同时看到「双方最终牌 + 净变化 + 主按钮」。
+     实测 640×286：88% 上限只给中段 146px，廿一点两行结算实际要 184px ——
+     玩家自己那一行被挤进滚动区，最想看的牌要先滚一下才出现（德州同期 121→162px）。
+     这里把面板放到几乎满高，再压内边距/行距，让 ≤2 行的结算在首屏落地。
+     只动呈现：结算数值、按钮可达性与 rs-foot 固定位置都不变。 */
+  .csh-result .rs-panel { max-height: calc(100% - 2px); padding: 6px 10px; gap: 4px; }
+  .csh-result .rs-sub { line-height: 1.35; }
+  .csh-result .rs-rows { gap: 3px; }
+  .csh-result .rs-row { padding: 2px 6px; }
+  .csh-result .rs-cards .pcard { --cw: clamp(20px, 3.2vh, 30px); }
+  /* 只藏「清单最上面那行纯装饰说明」（如廿一点的「最终牌 · 逐手结算」、德州的
+     「玩家结果（按本手净变化）」）——它和头部的净变化重复。清单中段的分类标题
+     （「摊牌比牌」）和 <summary class="rs-cap">（底池明细 / 你的账本 / 关键手复盘）
+     都要留着：前者是理解下面几行的前提，后者藏掉就没法展开了。 */
+  .csh-result .rs-rows > div.rs-cap:first-child { display: none; }
 }
 
 /* 竖屏：小游戏要求横屏（壳有旋转引导），这里只保证不出现滚动条 */
