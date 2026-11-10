@@ -1,0 +1,48 @@
+/* 池子魔将 · 功能页位图背景 v2（B3 · 2026-11-10）
+   ============================================================
+   七张功能页（games/ 根下：achv / bossbook / career / codex / goldfish / rank / save）
+   原本是纯色 / 线性渐变底；作者口径「UI 美术必须是画出来的图，不是 CSS 画的」，
+   这里把生成的位图氛围底贴上去：冷调 cool.webp / 暖调 warm.webp。
+   本文件只负责「贴图 + 轻压暗」，不画任何形状、不写任何文字。
+
+   ★ 只用 background-image / -size / -position / -repeat 这些 longhand，
+     **绝不写 background-color**。各页 body 原有的 var(--bg) / var(--paper)
+     底色因此原样保留：位图缺失或解码失败时 background-image 不生效、
+     旧底色立刻接管，页面照常可用、不白屏 —— 这就是「缺图回退」（fallback）。
+     （若在此把 background-color 写死成不透明黑，缺图时就会黑屏，
+       且盖掉各页自己的色板。）
+   ★ 加载顺序：本文件必须是 head 内最后一个 stylesheet。这几页 head 尾部
+     还挂着 csh_journal.css / csh_collection.css / csh_records.css 等，排在它们
+     前面等于没写（同 / 更高优先级会把 background 写回渐变，且肉眼难辨）。
+   ★ 压暗：位图在生成后已统一压暗并加了暗角；这里再叠一层「轻暗角 + 中央极淡
+     压暗」渐变，保证浅色正文 / 标题在低对比纹理上仍读得清。渐变层是本地 CSS,
+     不依赖网络，缺图时也不会把回退底色弄花。
+   ★ 例外：rank.html（天下榜）是唯一的浅色纸页（--paper:#f5efe0 + 深墨字），
+     铺深色位图会让 body 级标题/页脚变成深字压深底，实测对比度崩坏。
+     它保留 link 但**不挂 data-csh-bg**，CSS 对它不生效，纸页主题原样保留。
+     这不是漏接，E95AX 专门有两条断言守着，别"顺手补上"。 */
+
+body[data-csh-bg="cool"],
+body[data-csh-bg="warm"] {
+	background-size: cover;
+	background-position: center;
+	background-repeat: no-repeat;
+}
+
+body[data-csh-bg="cool"] {
+	background-image:
+		radial-gradient(ellipse 125% 100% at 50% 42%,
+			rgba(9, 14, 16, .06) 0%,
+			rgba(9, 14, 16, .20) 58%,
+			rgba(4, 8, 10, .48) 100%),
+		url("../image/ui/art-v2/bg/cool.webp");
+}
+
+body[data-csh-bg="warm"] {
+	background-image:
+		radial-gradient(ellipse 125% 100% at 50% 42%,
+			rgba(16, 10, 5, .06) 0%,
+			rgba(16, 10, 5, .20) 58%,
+			rgba(9, 5, 2, .48) 100%),
+		url("../image/ui/art-v2/bg/warm.webp");
+}

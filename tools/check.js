@@ -3462,9 +3462,9 @@ if (spawnOk && execFileSync && !ONLY_SYNTAX && !ONLY_VERSIONS) {
          因为配方缺失，从上线起一直静默（bus 只记 lastError，页面 try/catch 吞掉）。
          改前基线同一探针 7/3，失败的正是这三条。 */
       ['E95AW','probe_sfx_names_20261110.mjs',['--out',path.join(tmp95,'sfx-names')],10,'音效名与配方表一一对应（无静默丢弃/新增参数边界/既有高频道回归）',30000],
-      /* 音效 S1：页面 sfxPlay 的每个名字都必须能解析。UNO 五个动作音与斗地主三个牌型音
-         因为配方缺失，从上线起一直静默（bus 只记 lastError，页面 try/catch 吞掉）。
-         改前基线同一探针 7/3，失败的正是这三条。 */
+      ['E95AX','probe_art_v2_bg_20261110.mjs',['--out',path.join(tmp95,'art-v2-bg')],32,'功能页位图背景（七页链接顺序/冷暖分配/缺图回退/运行时生效）',60000],
+      ['E95AY','probe_art_v2_buttons_20261110.mjs',['--out',path.join(tmp95,'art-v2-buttons')],67,'按钮补板（位图生效/44px红线/文字对比度/既有规则未被覆盖）',60000],
+      ['E95AZ','probe_mirror_seam_20261110.mjs',['--out',path.join(tmp95,'mirror-seam')],12,'国内更新镜像接缝（空串零行为变化/配置后入白名单/默认离线与writes不变）',30000],
     ];
     for (const [tag95, script95, args95, min95, label95, timeout95] of reg95) {
       const r95 = runProbeJson(script95, args95, { timeout: timeout95 });

@@ -7419,8 +7419,22 @@ function onlineLocalFetch(url,options){return window.CSHOnline.local(url,options
             { name: "ghproxy 代理", base: CSH_UPDATE_MIRRORS[2] },
             { name: "gh-proxy 代理", base: CSH_UPDATE_MIRRORS[3] },
         ];
+        /* 【2026-11-10 国内更新镜像接缝】基址由 csh_online.js 独家提供，
+           这里不硬编码域名；空串时列表与改前完全一致（5 个源一个不少）。
+           一旦配置了 HTTPS 基址，国内镜像排在最前面参与并发探测，
+           选中的基址同时交给下载器（_cshUpdBase），失败仍按既有镜像链兜底。 */
+        function cshHome() {
+            try {
+                var v = window.CSHOnline && typeof window.CSHOnline.domestic === "function"
+                    ? window.CSHOnline.domestic() : "";
+                return v.indexOf('https://') === 0 ? (v.slice(-1) === "/" ? v : v + "/") : "";
+            } catch (eHome) { return ""; }
+        }
         function cshProbeAll(msEach) {
-            return Promise.all(CSH_UPDATE_SOURCES.map(function (s) {
+            var sources = CSH_UPDATE_SOURCES.slice();
+            var home = cshHome();
+            if (home) sources.unshift({ name: "国内镜像", base: home });
+            return Promise.all(sources.map(function (s) {
                 var t0 = Date.now();
                 return cshFetchText(s.base + "info.json", msEach || 4000).then(function (txt) {
                     var v = cshVerParse(txt, s.base);

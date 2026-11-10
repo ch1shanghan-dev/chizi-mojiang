@@ -16,8 +16,16 @@
         protocol: 'legacy', label: '旧服务历史社区榜', reads: true, writes: false,
         writeReason: '在线发布与全球应援暂未接入已验证的身份和幂等接口；已付记录保留在本机'
     });
+    /* 【2026-11-10 国内更新镜像接缝】空串 = 未接入，行为与改前逐项相同。
+       拿到腾讯云 COS / 自有 Nginx 的 HTTPS 基址后只需填这一处；
+       csh_debug.js 的更新源清单会自动多出「国内镜像」一项，并进入下载白名单。
+       不在这里猜测任何域名、不写入凭据。 */
+    var DOMESTIC_MIRROR = '';
     var ORIGINS = [SERVICE.base, 'https://raw.githubusercontent.com', 'https://api.github.com',
         'https://cdn.jsdelivr.net', 'https://fastly.jsdelivr.net', 'https://ghproxy.net', 'https://gh-proxy.com'];
+    try {
+        if (DOMESTIC_MIRROR.indexOf('https://') === 0) ORIGINS.push(new URL(DOMESTIC_MIRROR).origin);
+    } catch (eMirror) { /* 非法地址就当没配，绝不放宽白名单 */ }
     function clean(value) {
         if (!value || value.v !== 1 || typeof value.enabled !== 'boolean' ||
             typeof value.publishFor !== 'string' || value.publishFor.length > 120) throw Error('联网设置格式异常');
@@ -143,5 +151,6 @@
     root.CSHOnline = {KEY: KEY, service: function () { return SERVICE; }, enabled: enabled,
         snapshot: function () { refresh(); return snapshot(); }, canPublish: canPublish,
         setEnabled: setEnabled, setPublishConsent: setPublishConsent, subscribe: subscribe, watch: watch,
-        external: external, local: local};
+        external: external, local: local,
+        domestic: function () { return DOMESTIC_MIRROR; }};
 })(typeof window !== 'undefined' ? window : globalThis);

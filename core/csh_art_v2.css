@@ -111,3 +111,60 @@ body[data-csh-table] #view-start .start-card {
 	background-position: center !important;
 	background-repeat: no-repeat !important;
 }
+
+/* B2-BUTTONS-V2-20261110 · 按钮补板（仅末尾追加，勿插入上文任何块内） */
+/* ============================================================
+   B2 · 按钮补板（2026-11-10 · 位图，不是 CSS 画的）
+   ------------------------------------------------------------
+   四桌按钮此前是纯 CSS 渐变，这里只把「画出来的位图」贴上去：
+     主按钮 → 暖金哑光底板（极细金高光边 + 四角微圆）
+     次按钮 → 深青铜漆面底板（一道细金边）
+   两张都是 512×128 的均匀材质板（9-slice 友好），纯材质、无文字。
+
+   ★ 只写 background-*，绝不写 color / padding / width / height：
+     文字颜色、44px 触摸红线、点击区域全部沿用页面既有规则，一个字都不改。
+   ★ 不写 background-color：页面原有的 background-color / 渐变留在 HTML 里，
+     缺图（或整份美术层不加载）时旧按钮外观照常接管，不白屏。
+   ★ background-size:100% 100%：按钮尺寸跨度大（44~54px 高、60~260px 宽），
+     整张铺满才不会像 cover 那样把细金边裁掉；贴图不参与布局，不改变盒子尺寸。
+   ★ 不覆盖本文件已有的 :is(.seat-box,.opp,.pot) 与 .pcard.back 规则：
+     下面选择器一律带 .btn，跟牌背 / 座位板无关。
+   ============================================================ */
+
+/* 主按钮：开局页 / 对局页里非 ghost、非 small、非语义变体、非禁用的按钮 */
+body[data-csh-table] #view-start .btn:not(.ghost):not(.small):not(.danger):not(.warn):not(.on):not(:disabled),
+body[data-csh-table] #view-game .btn:not(.ghost):not(.small):not(.danger):not(.warn):not(.on):not(:disabled),
+body[data-csh-table] .btn:not(.ghost):not(.small):not(.danger):not(.warn):not(.on):not(:disabled) {
+	background-image: url("../image/ui/art-v2/buttons/btn-gold.webp") !important;
+	background-size: 100% 100% !important;
+	background-position: center !important;
+	background-repeat: no-repeat !important;
+}
+
+/* 次按钮：ghost / small —— 深青铜漆面底板 */
+body[data-csh-table] .btn.ghost:not(:disabled),
+body[data-csh-table] .btn.small:not(.ghost):not(:disabled) {
+	background-image: url("../image/ui/art-v2/buttons/btn-bronze.webp") !important;
+	background-size: 100% 100% !important;
+	background-position: center !important;
+	background-repeat: no-repeat !important;
+}
+
+/* ---------- 极矮屏（≤350 高）保底 ----------
+   本层从上到下只贴 background-image，不碰任何尺寸 / 文字 / 点击区域，因此不会
+   把按钮压矮；页面既有 .btn{min-height:44px} 红线在 640×286 一类极矮屏下继续
+   生效，按钮仍 ≥44px。这里对主按钮再显式补一道 min-height:44px 下限，作为
+   「只准加码、不准缩水」的兜底：不改动任何既有 min-height 声明，也不涉及
+   .btn.small（页面在极矮屏刻意给次按钮留 36px）。单独成块追加在文件最后，
+   不插入上文已存在的 max-height:350px 结算面板块的作用域。 */
+@media (orientation: landscape) and (max-height: 350px) {
+	body[data-csh-table] #view-start .btn:not(.ghost):not(.small):not(.danger):not(.warn):not(.on):not(:disabled),
+	body[data-csh-table] #view-game .btn:not(.ghost):not(.small):not(.danger):not(.warn):not(.on):not(:disabled),
+	body[data-csh-table] .btn:not(.ghost):not(.small):not(.danger):not(.warn):not(.on):not(:disabled) {
+		min-height: 44px;
+	}
+}
+
+/* B2-SMALL-CONTRAST · 深青铜次按钮上的深墨文字（1.3:1，实测读不出）改金字。
+   只改 color，不动任何尺寸/点击区域；主按钮仍是暖金板 + 深字。 */
+body[data-csh-table] .btn.small:not(:disabled) { color: var(--gold-hi, #f4dfa8) !important; }
