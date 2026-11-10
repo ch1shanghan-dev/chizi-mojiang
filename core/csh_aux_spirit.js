@@ -123,7 +123,15 @@ export function installAuxSpirit(host) {
   const toast=s=>{if(lib.cshUI&&lib.cshUI.toast)lib.cshUI.toast(s);};
   for(const [id,m] of Object.entries(MINIONS)){
     const alias='csh_aux_'+id.slice('csh_boss_minion_'.length);
-    lib.character[alias]=get.convertedCharacter({sex:m.sex,group:m.group,hp:3,maxHp:3,hujia:0,skills:['csh_aux_guard','csh_aux_aid','csh_aux_rescue','csh_aux_entry'],img:m.img,dieAudios:["false"],isUnseen:true,isAiForbidden:true});
+    /* 装扮只换立绘：id / 技能 / 血量 / 资金 / AI 策略一律不动。
+       走宿主唯一只读口 lib.cshShell.skinOf（内部读宿主 localStorage），
+       读失败或经典形象都回退到 MINIONS 自带的 m.img 真源。 */
+    let skinImg=m.img;
+    try{
+      const sk=lib.cshShell&&typeof lib.cshShell.skinOf==='function'?lib.cshShell.skinOf(id):null;
+      if(sk&&sk.id!=='classic'&&sk.portrait)skinImg='extension/池子魔将/'+sk.portrait;
+    }catch(eSkin){}
+    lib.character[alias]=get.convertedCharacter({sex:m.sex,group:m.group,hp:3,maxHp:3,hujia:0,skills:['csh_aux_guard','csh_aux_aid','csh_aux_rescue','csh_aux_entry'],img:skinImg,dieAudios:["false"],isUnseen:true,isAiForbidden:true});
     lib.translate[alias]=MINION_NAMES[id];aliases.push(alias);
   }
   function active(p){return !!(run&&status.cshAssistedMatch&&p===run.spirit&&p&&p.isIn()&&run.owner===game.me&&run.owner.identity===run.ownerIdentity&&!status.over&&!status.video&&!status.connectMode&&!lib.config.connectMode&&!lib.cshWallet.saveGuard.blocked()&&lib.cshWallet.saveEpoch()===run.epoch);}

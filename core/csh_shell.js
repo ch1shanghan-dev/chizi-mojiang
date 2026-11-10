@@ -1774,6 +1774,18 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 					if (mkG.ensureDay) mkG.ensureDay();
 					var outG = mkG.snapshot ? mkG.snapshot() : null;
 					if (outG && outG.ready !== false) paintPc();
+					/* 装扮映射随同一次行情快照下发：iframe 只走桥、不直读宿主 localStorage。
+					   只带非经典项，经典由页面回退到 market 自带的 img / face 真源。 */
+					if (outG && Array.isArray(outG.list)) {
+						var skinMap = Object.create(null);
+						for (var si = 0; si < outG.list.length; si++) {
+							var srow = outG.list[si];
+							if (!srow || !srow.id) continue;
+							var sInfo = skinOf(srow.id);
+							if (sInfo && sInfo.id !== "classic" && sInfo.portrait) skinMap[srow.id] = sInfo;
+						}
+						outG = Object.assign({}, outG, { skins: skinMap });
+					}
 					goldfishReply("shell-goldfish", !!outG && outG.ready !== false, outG);
 				}, function (error) { goldfishReply("shell-goldfish", false, { ready: false, saveError: String(error.message || error) }); });
 				return;
@@ -2569,6 +2581,22 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 		return i >= 0;
 	}
 
+	/* 妖灵装扮唯一只读口（皮肤互动第 3 层）：宿主侧模块与 iframe 快照共用这一份，
+	   各 iframe 不许直读宿主 localStorage，避免多页竞态。
+	   返回裸仓库相对路径 image/...，使用方按自身层级补前缀：
+	     games/ 下 iframe → "../" + p；宿主引擎角色 → "extension/池子魔将/" + p。
+	   经典 / 未注册 / 偏好读失败一律给 classic 空路径，调用方据此回经典真源。 */
+	function skinOf(id) {
+		var S = (typeof window !== "undefined" && window.CSHSpiritSkins) || null;
+		if (!S || typeof S.skinOf !== "function") return null;
+		try {
+			var row = S.skinOf(id, window.localStorage);
+			if (!row) return null;
+			function bare(p) { return p ? String(p).replace(/^\.\.\//, "") : ""; }
+			return { id: String(row.id || "classic"), name: String(row.name || ""), portrait: bare(row.portrait), face: bare(row.face) };
+		} catch (e) { return null; }
+	}
+
 	/* ---------- 对外导出 ---------- */
 	var CSH = {
 		META: META,
@@ -2602,6 +2630,7 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 		buyIn: function () { return currentBuyIn; },
 		/* 只读诊断：房间凭据编号。宿主烟测用它区分「页面没发」还是「宿主没接」。 */
 		roomId: function () { return currentRoomId; },
+		skinOf: skinOf,
 		walletSnapshot: walletSnapshot,
 		stats: buildStats,
 		/* 功勋上报（§G.6.2）：统一入口，签名与 csh_wallet.addMerit 一致 */

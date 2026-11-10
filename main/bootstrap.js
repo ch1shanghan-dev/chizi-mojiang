@@ -41,6 +41,12 @@ import "../core/csh_badge.js";
    取到 null 时补码直接回「事务未就绪」，等于功能上线即死。必须排在 csh_shell 之前。 */
 import "../core/csh_topup_journal.js";
 import "../core/csh_room.js";
+/* ★ 妖灵装扮基座 + 生产注册表（2026-11-10 第 3 层）：此前只在 games/codex.html
+   用经典 <script> 加载，宿主侧 window.CSHSpiritSkins 恒 null —— 宿主唯一只读口
+   lib.cshShell.skinOf / 助战妖灵立绘都拿不到装扮。必须排在 csh_shell 与
+   installAuxSpirit() 之前；iframe 里的经典 <script> 是另一个 realm，双载互不干扰。 */
+import "../core/csh_spirit_skins.js";
+import "../core/csh_spirit_skins_catalog.js";
 import "../core/csh_shell.js";
 import "../core/csh_migrate.js";
 /* 面板样式 token 层（阶段 4 · 2026-09-29）：调试面板/局内互动的颜色唯一真值，

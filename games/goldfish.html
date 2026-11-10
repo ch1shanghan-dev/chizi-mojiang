@@ -381,6 +381,16 @@ function el(t, c, x) { var e = document.createElement(t); if (c) e.className = c
 function fmt(n) { return String(Math.round(Number(n) || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, ","); }
 
 var Data = { snap: null, cur: null, qty: 10, unavailable: true, reading: false, disposed: false, viewEpoch: 0, readEpoch: 0, qtyAll: false };
+/* 装扮图路径（皮肤互动第 3 层）：只从宿主同一次行情快照下发的 skins 映射读，
+   绝不直读 localStorage，避免多页竞态。映射里没有该妖灵 = 经典形象，
+   回 market 自带的 img / face 真源。路径是裸仓库相对形式 image/...，
+   本页在 games/ 下需补 "../"。 */
+function skinPath(it, which) {
+  var sk = Data.snap && Data.snap.skins && Data.snap.skins[it.id];
+  if (!sk) return null;
+  var p = which === "face" ? (sk.face || sk.portrait) : sk.portrait;
+  return p ? "../" + p : null;
+}
 function updateTradeAvailability() {
   $("#bBuy").disabled = Data.unavailable || Data.reading || !!Data.tradeBusy;
   $("#bSell").disabled = Data.unavailable || Data.reading || !!Data.tradeBusy;
@@ -533,8 +543,9 @@ function renderGrid() {
     var f = el("div", "face");
     var img = el("img");
     img.loading = "lazy"; img.alt = it.name;
-    img.src = "../image/" + String(it.face || it.img || "").split("/").pop();
-    /* 人像缺失 → 退到主立绘 → 再退到名字占位（不再显示破图图标） */
+    img.src = skinPath(it, "face") || "../image/" + String(it.face || it.img || "").split("/").pop();
+    /* 人像缺失 → 退到主立绘 → 再退到名字占位（不再显示破图图标）。
+       装扮图失效时同样落回经典主立绘：deep 是经典文件名，不在装扮 URL 里。 */
     img.addEventListener("error", function onF() {
       var deep = String(it.img || "").split("/").pop();
       if (deep && img.src.indexOf(deep) < 0) { img.src = "../image/" + deep; return; }
@@ -735,8 +746,13 @@ function openGirl(id) {
   img.alt = it.name;
   function currentPortrait() { return !Data.disposed && epoch === Data.viewEpoch && Data.cur && Data.cur.id === id && img === $("#pimg"); }
   img.onload = function () { if (currentPortrait()) { img.style.visibility = "visible"; $("#portrait-fallback").hidden = true; } };
-  img.onerror = function () { if (currentPortrait()) { img.style.visibility = "hidden"; $("#portrait-fallback").hidden = false; } };
-  img.src = "../image/" + String(it.img || "").split("/").pop();
+  img.onerror = function () {
+    if (!currentPortrait()) return;
+    var deep = String(it.img || "").split("/").pop();
+    if (deep && img.src.indexOf(deep) < 0) { img.src = "../image/" + deep; return; }  /* 装扮图失效 → 经典主立绘 */
+    img.style.visibility = "hidden"; $("#portrait-fallback").hidden = false;
+  };
+  img.src = skinPath(it, "portrait") || "../image/" + String(it.img || "").split("/").pop();
   sayLine();
   renderFacts();
   renderQty();

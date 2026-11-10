@@ -160,6 +160,98 @@ check('改前基线可判红：移除调用会被接线断言检出',
   /showSkinGreeting\(it,selected\.skin\)/.test(codex) &&
   !/showSkinGreeting\(it,selected\.skin\)/.test(codex.replace('showSkinGreeting(it,selected.skin);', '')));
 
+/* ---------- 皮肤互动第 3 层：宿主唯一只读口 + 跨页可见性 ---------- */
+function extractFn(src, name) {
+  const i = src.indexOf('function ' + name + '(');
+  if (i < 0) return '';
+  let depth = 0;
+  const j = src.indexOf('{', i);
+  for (let k = j; k < src.length; k++) {
+    if (src[k] === '{') depth++;
+    else if (src[k] === '}' && --depth === 0) return src.slice(i, k + 1);
+  }
+  return '';
+}
+const bootSrc = read('main/bootstrap.js');
+const shellSrc = read('core/csh_shell.js');
+const auxSrc = read('core/csh_aux_spirit.js');
+const goldSrc = read('games/goldfish.html');
+const pageSrc = read('core/csh_page.js');
+
+check('宿主 bootstrap 显式加载装扮基座与生产注册表',
+  /import "\.\.\/core\/csh_spirit_skins\.js"/.test(bootSrc) && /import "\.\.\/core\/csh_spirit_skins_catalog\.js"/.test(bootSrc));
+check('两者排在 csh_shell 与 installAuxSpirit() 之前', (() => {
+  const a = bootSrc.indexOf('import "../core/csh_spirit_skins.js";');
+  const b = bootSrc.indexOf('import "../core/csh_spirit_skins_catalog.js";');
+  const shell = bootSrc.indexOf('import "../core/csh_shell.js";');
+  const aux = bootSrc.indexOf('installAuxSpirit({');
+  return a >= 0 && b >= 0 && shell >= 0 && aux >= 0 && a < shell && b < shell && shell < aux;
+})());
+check('宿主导出 lib.cshShell.skinOf 唯一只读口', /skinOf: skinOf/.test(shellSrc));
+check('shell-goldfish 随同一次快照下发 skins 映射',
+  /skinMap\[srow\.id\]\s*=\s*sInfo/.test(shellSrc) && /skins: skinMap/.test(shellSrc));
+check('skins 映射只带非经典项', /sInfo\.id !== "classic"/.test(shellSrc));
+check('快照用浅拷贝，不污染 market 内部对象', /Object\.assign\(\{\}, outG, \{ skins: skinMap \}\)/.test(shellSrc));
+
+/* 真实基座 + 真实宿主 skinOf 函数体在 VM 里跑 */
+const hostMem = new Map(), hostWrites = [];
+const hostStorage = {
+  getItem: k => hostMem.has(k) ? hostMem.get(k) : null,
+  setItem: (k, v) => { hostWrites.push(k); hostMem.set(k, String(v)); },
+  removeItem: k => hostMem.delete(k),
+};
+const hostCtx = vm.createContext({ window: { localStorage: hostStorage }, console });
+hostCtx.globalThis = hostCtx;
+vm.runInContext(baseSrc, hostCtx);
+vm.runInContext(catalogSrc, hostCtx);
+vm.runInContext(extractFn(shellSrc, 'skinOf') + '\nthis.skinOf = skinOf;', hostCtx);
+check('宿主 skinOf 未选装扮时回 classic 空路径',
+  hostCtx.skinOf('csh_boss_minion_robin').id === 'classic' && hostCtx.skinOf('csh_boss_minion_robin').portrait === '');
+hostCtx.window.CSHSpiritSkins.select('csh_boss_minion_robin', 's1a', hostStorage);
+const got = hostCtx.skinOf('csh_boss_minion_robin');
+check('宿主 skinOf 返回裸仓库路径（去掉 ../ 前缀）',
+  got && got.id === 's1a' && got.portrait === 'image/spirit-skins/robin/s1a.webp' &&
+  got.face === 'image/spirit-skins/robin/s1a_face.webp', got);
+check('宿主 skinOf 归一化 csh_aux_ 助战别名', hostCtx.skinOf('csh_aux_robin').id === 's1a');
+check('宿主 skinOf 全程零写入', hostWrites.length === 1 && hostWrites[0] === 'csh_spirit_skin_v1', hostWrites);
+hostMem.set('csh_spirit_skin_v1', '{bad json');
+check('宿主 skinOf 偏好损坏回 classic 且不抛到业务层', (() => {
+  try { return hostCtx.skinOf('csh_boss_minion_robin').id === 'classic'; } catch (e) { return false; }
+})());
+const noBase = vm.createContext({ window: { localStorage: hostStorage }, console });
+noBase.globalThis = noBase;
+vm.runInContext(extractFn(shellSrc, 'skinOf') + '\nthis.skinOf = skinOf;', noBase);
+check('装扮基座未加载时返回 null，不阻塞业务', noBase.skinOf('csh_boss_minion_robin') === null);
+
+/* 金鳞市 skinPath 真实函数体 */
+const gpCtx = vm.createContext({
+  Data: { snap: { skins: { csh_boss_minion_robin: { id: 's1a', portrait: 'image/spirit-skins/robin/s1a.webp', face: 'image/spirit-skins/robin/s1a_face.webp' } } } },
+  console,
+});
+vm.runInContext(extractFn(goldSrc, 'skinPath') + '\nthis.path = skinPath;', gpCtx);
+const gIt = { id: 'csh_boss_minion_robin', img: 'extension/池子魔将/image/csh_minion_robin.webp' };
+check('金鳞市卡面取装扮头像并补 ../ 前缀', gpCtx.path(gIt, 'face') === '../image/spirit-skins/robin/s1a_face.webp');
+check('金鳞市大图取装扮立绘', gpCtx.path(gIt, 'portrait') === '../image/spirit-skins/robin/s1a.webp');
+check('未装扮妖灵返回 null，页面回退经典真源', gpCtx.path({ id: 'csh_boss_minion_eve' }, 'face') === null);
+
+/* 接线与红线：只换图，不碰 id / 资金 / AI / 存档 */
+const auxBlock = auxSrc.slice(auxSrc.indexOf('for(const [id,m] of Object.entries(MINIONS))'), auxSrc.indexOf('lib.translate[alias]'));
+check('助战妖灵只换 img，不改 id / 技能 / 血量 / 资金 / AI',
+  /img:skinImg/.test(auxBlock) && /skills:\['csh_aux_guard'/.test(auxBlock) &&
+  !/setItem|fund|stake|aiStake|persona/.test(auxBlock));
+check('助战立绘用宿主根相对路径', /'extension\/池子魔将\/'\s*\+\s*sk\.portrait/.test(auxSrc));
+check('助战读的是宿主唯一只读口', /lib\.cshShell\.skinOf\(id\)/.test(auxBlock));
+check('金鳞市卡面与大图两处都走 skinPath', (goldSrc.match(/img\.src = skinPath\(it,/g) || []).length === 2);
+check('金鳞市只从快照 skins 读，不直读 localStorage',
+  !/localStorage/.test(extractFn(goldSrc, 'skinPath')));
+check('装扮图失效回经典主立绘（卡面与大图都有回退）',
+  (goldSrc.match(/img\.src\.indexOf\(deep\)/g) || []).length >= 2);
+check('复用既有 shell-goldfish 快照，未新增桥命令 / 未改 csh_page 白名单',
+  !/shell-skin-of/.test(goldSrc) && !/shell-skin-of/.test(shellSrc) && !/shell-skin-of/.test(pageSrc));
+check('改前基线可判红：移除宿主加载行会被加载图断言检出',
+  /import "\.\.\/core\/csh_spirit_skins\.js"/.test(bootSrc) &&
+  !/import "\.\.\/core\/csh_spirit_skins\.js"/.test(bootSrc.replace('import "../core/csh_spirit_skins.js";', '')));
+
 /* ---------- 改前基线：把加载行去掉应当判红 ---------- */
 const stripped = codex.replace(/<script[^>]+src="[^"]*csh_spirit_skins_catalog\.js"[^>]*><\/script>/, '');
 check('改前基线可检出：移除加载行会失去注册表', !/<script[^>]+src="[^"]*csh_spirit_skins_catalog\.js"/.test(stripped));

@@ -1,7 +1,7 @@
-/* 自动生成于 2026-11-10T00:27:36.882Z by tools/release.js —— hashes 对应 Git 发布字节，发版后 git push 即生效，勿手改 files */
+/* 自动生成于 2026-11-10T00:56:38.002Z by tools/release.js —— hashes 对应 Git 发布字节，发版后 git push 即生效，勿手改 files */
 window.extension = {
 	"池子魔将": {
-		"build": "6290c42a7e4fd4f2ae2c1f4ca1b3a2921b1c59b72cc737981c1c39d79e0891bf",
+		"build": "c0146efc23f1ce072cbe70b765883ded8e18fb330bfbff672142dd34867f30b0",
 		"hashes": {
 			"LICENSE": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
 			"README.md": "41102b34ebc984b6b84b361baa0e78aa9defe5633a4a270cde6ed0ff7bc9ae4d",
@@ -310,7 +310,7 @@ window.extension = {
 			"core/csh_aff_lines.js": "a08e3a944e845310c47e035385d6db12668e79cbed2026a3ac9576183630f1ab",
 			"core/csh_affection.js": "b57c1bbab04f325e5d5658f69c2c85e4f8050f200dcc66513e0842edadb8bdf3",
 			"core/csh_art.js": "0618ccdeb6e9a78b688ec9369908b43c22e4378e82ac93de4dc62e991b081520",
-			"core/csh_aux_spirit.js": "d1c8dd2bed8c1cddd18242e56c63aca28bb71e0adefff8bebbcce8cee268ebd5",
+			"core/csh_aux_spirit.js": "6c5c59082b83c167db8d2d4635cc85b22bb6945af44bdc8c85c8f4e24206d4c1",
 			"core/csh_badge.js": "e181a7f3d22ecf40575f0b3078e983465237b33c5835d5c7622dba24c61277e1",
 			"core/csh_bgm.js": "7fe7e9fbbf3943b2b9a7f71ee8ecc89cee20bba52fdd535234ff66d4fe5fa96c",
 			"core/csh_bond.js": "250104a172023dae2e51e6f46d8af381fd413cdc44f30a288c011b4baac0e6ab",
@@ -347,7 +347,7 @@ window.extension = {
 			"core/csh_seat_cooldown.js": "afa2cee9c7ebae30dac38221b00e807631e24e7e53070adfd5e90283a625a91e",
 			"core/csh_selftest.js": "14e4acf537174481382c84370af8264027ea46cd0544731650bf675e20019ac4",
 			"core/csh_sfx.js": "ac00add5dde431b00bbbadc82a948db74e5b15732b2e0c157c82dd5746e30292",
-			"core/csh_shell.js": "b0b725e72d7ad6f2d2a9cc3f626e274b2e5ca3e09eaca3d9fa7cb0849a57ee90",
+			"core/csh_shell.js": "8b2d4aad08f469b0f4a826f08fe87deccaca274366ffeedc866a000c4039ed85",
 			"core/csh_spirit_buff_runtime.js": "b8d34cb0649f3e9d5f976ecd28fe1c73afd4d3a05bb0b1606c427a189b042e9e",
 			"core/csh_spirit_buff_skills.js": "bb2287e67a23803276e57aa3d4ee36f65d3bcfaa1b1090bd0174adede82c2d83",
 			"core/csh_spirit_buffs.js": "82bb7368c113cdbd7253b43e6e2b85145a05492e31d26ee3af47441c538499a3",
@@ -392,7 +392,7 @@ window.extension = {
 			"games/career.html": "115f63a1a08c01257876b017649b95b98e2b19db8dc6551acaa6f1ea4e962847",
 			"games/codex.html": "f414379334d5d2d1f22dc2104cf692b52321a75750bec6fbe00e30d560fde0c0",
 			"games/doudizhu/doudizhu.html": "bca73a355531e99de66ac8ae915f13d5cda3fa3bc9fa022ac915b0c41815c7f7",
-			"games/goldfish.html": "471d2dddf25d92e58b5fa9ddc6307169227befed38f39d9f3d55d9bf05c6f6bb",
+			"games/goldfish.html": "2ca179c98227d87932a6e9af1609d11b425b9251f6150459c05c2eb4c0477272",
 			"games/rank.html": "ab7c1bbd1aafd9ebc30583b2eae2c7fd5f36ca795350db88bf0892b5605c220e",
 			"games/save.html": "be722c5ad7a3e11a495721fb0da497797f7612d9414d667717c6d005a7853a86",
 			"games/texas/texas.html": "3a6289009d73ac57f154c722d3a7e92fec2f3fd639118abdd5922b48a6b94837",
@@ -805,7 +805,7 @@ window.extension = {
 			"image/ui/art-v1/transfer-chest.png": "879161c6f5d715711d2e1ddc439a061e89c97aeb08aa79437528f0e775a404c1",
 			"image/ui/art-v1/war-record.png": "4f500282106fa7fc8cc763c7a3ab2cd95797bd3211b926c20c2205514c084e30",
 			"info.json": "281e4cb9ac58eb683d14a02bfaed5cc334c105166b505cd9b9fa6a38040fc79a",
-			"main/bootstrap.js": "f5dbc88b2e37f4af8dda2fc67ee3106ee09c090e98519dd18a23a7278371642a",
+			"main/bootstrap.js": "21e140bcbf825c4dac3a1a24301181d9a96f59739e75cd5360749d773b90e4d5",
 			"main/bossmode.js": "fb0aee5f744f35e46dce7f79b039f998fa401d32a08c7829b280ddc4e197a8a6",
 			"main/build-flags.js": "60d491a2ac24949d6328faabccb6978d87d0590365ce2f14270f8a4f0d43c0c8",
 			"main/config.js": "b38d94ce3a49835dc048102fd3cc3ee55e6dc13c5713eebab5b03c1d3898bfe8",
