@@ -1,7 +1,7 @@
-/* 自动生成于 2026-11-10T08:56:29.728Z by tools/release.js —— hashes 对应 Git 发布字节，发版后 git push 即生效，勿手改 files */
+/* 自动生成于 2026-11-10T10:03:48.148Z by tools/release.js —— hashes 对应 Git 发布字节，发版后 git push 即生效，勿手改 files */
 window.extension = {
 	"池子魔将": {
-		"build": "8bc442c2dfd7a8f25526fbfc9715fb21500f0dae8b15ef8c0b857efd39a8d3e6",
+		"build": "06d46e2dd78d5e137fc1afac5ea9205887acb419292c872c95239f13cbde44ae",
 		"hashes": {
 			"LICENSE": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
 			"README.md": "41102b34ebc984b6b84b361baa0e78aa9defe5633a4a270cde6ed0ff7bc9ae4d",
@@ -347,7 +347,7 @@ window.extension = {
 			"core/csh_rules.js": "7ac7bc8227037d4ba9e4f2423f819255dcead54a0ef75f60289bb709183a9d7e",
 			"core/csh_seat_cooldown.js": "afa2cee9c7ebae30dac38221b00e807631e24e7e53070adfd5e90283a625a91e",
 			"core/csh_selftest.js": "14e4acf537174481382c84370af8264027ea46cd0544731650bf675e20019ac4",
-			"core/csh_sfx.js": "ac00add5dde431b00bbbadc82a948db74e5b15732b2e0c157c82dd5746e30292",
+			"core/csh_sfx.js": "11bd2b8bb0e2d4d6c577a9c2fccf0c8a004835cb4ac6350e25ec40b1f5e07c90",
 			"core/csh_shell.js": "8b2d4aad08f469b0f4a826f08fe87deccaca274366ffeedc866a000c4039ed85",
 			"core/csh_spirit_buff_runtime.js": "b8d34cb0649f3e9d5f976ecd28fe1c73afd4d3a05bb0b1606c427a189b042e9e",
 			"core/csh_spirit_buff_skills.js": "bb2287e67a23803276e57aa3d4ee36f65d3bcfaa1b1090bd0174adede82c2d83",

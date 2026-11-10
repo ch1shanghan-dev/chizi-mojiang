@@ -146,7 +146,7 @@ no text, no letters, no numbers, no watermark, centered, flat lay, orthographic
 | 装饰金线环 | ❌ 弃用：实测横穿座位卡，负收益，未入库 |
 | B2 面板底板 / 图标 / 按钮补板 | ⬜ 未做 |
 | B3 页面背景 / 光效 / 纹样 | ⬜ 未做 |
-| S1 音效 8 个静默名 | ⬜ 未做 |
+| S1 音效 8 个静默名 | ✅ 已修（8 条配方 + E95AW 10/0；实听待你） |
 | S2 听感体系 | ⬜ 未做 |
 
 美术层文件：`core/csh_art_v2.css`（唯一入口，head 内最后加载）；资产：`image/ui/art-v2/{tables,cards,plates}/`。
