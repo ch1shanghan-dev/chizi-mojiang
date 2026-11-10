@@ -73,4 +73,13 @@ body[data-csh-table="blackjack"] #view-start .sc-best{font-size:var(--table-note
  body[data-csh-table="blackjack"] #view-game .bj-side{gap:1px!important}
  body[data-csh-table="blackjack"] #view-game .hand-box{padding:0 4px;gap:1px}
  body[data-csh-table="blackjack"] #view-game .bj-div{margin:1px 0}
+ /* 【2026-11-10 P2 牌桌呈现】极矮屏开局卡收进首屏：640×286 实测德州卡底 307、
+    廿一点 316（视口 286），最后那行折叠条「记录与牌桌偏好 / 庄家档案与牌局记录」
+    被裁掉 10–19px，只露出半截圆角——虽然 #view-start 能滚，但首屏看着像坏了。
+    这里把容器内边距与栅格行距压到最小，卡高 295/310 → 267/274，两页都完整落地。
+    选择器带 :not(.hidden)：本文件上面那条基础规则就是 `#view-start:not(.hidden)`，
+    不带它的话特异性输一档，!important 也压不住（≤500 那条 padding 规则至今对德州
+    就是这么失效的）。只动间距，不动任何选项、价格、按钮尺寸与点击区域。 */
+ body:is([data-csh-table="texas"],[data-csh-table="blackjack"]) #view-start:not(.hidden){padding:4px 10px!important}
+ body:is([data-csh-table="texas"],[data-csh-table="blackjack"]) #view-start .start-card{padding:4px 10px!important;gap:2px 10px!important}
 }

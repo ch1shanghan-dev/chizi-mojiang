@@ -1,7 +1,7 @@
-/* 自动生成于 2026-11-10T03:09:21.168Z by tools/release.js —— hashes 对应 Git 发布字节，发版后 git push 即生效，勿手改 files */
+/* 自动生成于 2026-11-10T04:43:43.268Z by tools/release.js —— hashes 对应 Git 发布字节，发版后 git push 即生效，勿手改 files */
 window.extension = {
 	"池子魔将": {
-		"build": "a0f364b5a5111bce0a551489aa6934083e02bf285b5046e86d346b61c5c12e84",
+		"build": "cd20a3c2a1927c92e78b4cbb5e5dabb92cab19d7c4e9151009d7d2c46111583a",
 		"hashes": {
 			"LICENSE": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
 			"README.md": "41102b34ebc984b6b84b361baa0e78aa9defe5633a4a270cde6ed0ff7bc9ae4d",
@@ -322,7 +322,7 @@ window.extension = {
 			"core/csh_cheer.js": "045d407326d29d2b052b4c26609094c23e6d9a6c76f0b2311003b3163ed54340",
 			"core/csh_collection.css": "269502d7e72c988f6de10b624e7d86dcd3c1c10df8889e0d23dcafbfa1e7a41a",
 			"core/csh_debug.js": "643c84a3bc15f3410d8192273d8173ec57b000249d9e6b8b734b8e45079d13a4",
-			"core/csh_duel_tables.css": "8f9d95641d0ca52b4dcac2f65e693db9ef676304a73d60661e0abed29f38475c",
+			"core/csh_duel_tables.css": "791b0ae31be546d6effcc384973bcbb267a5b3e71d09bbb60cecdb868ffb0cc8",
 			"core/csh_experience.css": "f348b0d7556d88d15d885b997dbad12c7882e6eae1126422604267108dfee2ff",
 			"core/csh_games.js": "87a474c3953d21f761f9f6ed36843e55151075b80d2bfae1d4c339f415217636",
 			"core/csh_goals.js": "c23446c3f74076c446fb5d2605adf2971fcda486405a84461a06aa7bdeafaf12",
