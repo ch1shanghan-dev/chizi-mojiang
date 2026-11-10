@@ -3457,7 +3457,7 @@ if (spawnOk && execFileSync && !ONLY_SYNTAX && !ONLY_VERSIONS) {
          夹具管三件事：美术层必须是 head 内最后一个样式表（trick/duel 两次把它盖回去的先例）、
          资产体积、以及四桌运行时实际生效的 background-image 就是 art-v2 那张。
          改前基线（摘掉斗地主的 link）22/3，失败的正是那 3 条。 */
-      ['E95AV','probe_art_v2_tables_20261110.mjs',['--out',path.join(tmp95,'art-v2-tables')],25,'UI 美术层首批（毡面/牌背/板材质生效、体积预算、样式表顺序、缺图回退）',60000],
+      ['E95AV','probe_art_v2_tables_20261110.mjs',['--out',path.join(tmp95,'art-v2-tables')],28,'UI 美术层首批（毡面/牌背/板材质生效、体积预算、样式表顺序、缺图回退）',60000],
       /* 音效 S1：页面 sfxPlay 的每个名字都必须能解析。UNO 五个动作音与斗地主三个牌型音
          因为配方缺失，从上线起一直静默（bus 只记 lastError，页面 try/catch 吞掉）。
          改前基线同一探针 7/3，失败的正是这三条。 */

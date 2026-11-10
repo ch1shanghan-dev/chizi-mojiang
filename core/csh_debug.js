@@ -3373,8 +3373,8 @@ function onlineLocalFetch(url,options){return window.CSHOnline.local(url,options
                 var b = document.createElement("button");
                 b.type = "button";
                 b.className = "csh-dbg-gamebtn" + (locked ? " locked" : "");
-                var art={"生涯大厅":"war-record.png","讨伐录":"target-banner.png","天下榜":"inspect-compass.png","行囊":"transfer-chest.png","池子成就":"war-record.png","德州扑克":"interaction-strategy.png","斗地主":"target-banner.png","廿一点":"copy-scroll.png","UNO":"search-lens.png","金鳞市":"transfer-chest.png","妖灵图鉴":"interaction-strategy.png"}[title];
-                if(art){var cover=document.createElement('img');cover.className='gb-art';cover.alt='';cover.setAttribute('aria-hidden','true');cover.src=(lib.assetURL||'')+'extension/池子魔将/image/ui/art-v1/'+art;cover.onerror=function(){this.remove();};b.appendChild(cover);}if(title==='生涯大厅')b.dataset.cshModule='career';
+                var art={"生涯大厅":"career.webp","讨伐录":"boss.webp","天下榜":"rank.webp","行囊":"bag.webp","池子成就":"achievement.webp","德州扑克":"texas.webp","斗地主":"doudizhu.webp","廿一点":"blackjack.webp","UNO":"uno.webp","金鳞市":"goldfish.webp","妖灵图鉴":"codex.webp"}[title];
+                if(art){var cover=document.createElement('img');cover.className='gb-art';cover.alt='';cover.setAttribute('aria-hidden','true');cover.src=(lib.assetURL||'')+'extension/池子魔将/image/ui/art-v2/icons/'+art;cover.onerror=function(){this.remove();};b.appendChild(cover);}if(title==='生涯大厅')b.dataset.cshModule='career';
                 var top = document.createElement("span");
                 top.className = "gb-top";
                 var nm = document.createElement("b");

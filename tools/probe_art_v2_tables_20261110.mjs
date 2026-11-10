@@ -60,6 +60,16 @@ for (const t of TABLES) {
 check('旧渐变仍在（缺图回退不白屏）',
   /radial-gradient/.test(read('core/csh_duel_tables.css')) && /radial-gradient/.test(read('core/csh_trick_tables.css')));
 
+/* ---------- 大厅图标（B2） ---------- */
+const ICONS=['career','boss','rank','bag','achievement','texas','doudizhu','blackjack','uno','goldfish','codex'];
+let icoTotal=0, icoMissing=[];
+for (const n of ICONS) { const f=path.join(root,'image/ui/art-v2/icons',n+'.webp'); if(!fs.existsSync(f)){icoMissing.push(n);continue;} icoTotal+=fs.statSync(f).size; }
+check('11 枚大厅图标齐全', icoMissing.length===0, icoMissing);
+check('图标体积合理（合计 ≤120 KB）', icoTotal<=120*1024, Math.round(icoTotal/1024));
+const dmap=read('core/csh_debug.js').match(/var art=\{[^}]*\}\[title\]/)?.[0] || '';
+const artNames=(dmap.match(/"([a-z]+)\.webp"/g)||[]).map(x=>x.slice(1,-6));
+check('11 个模块各配唯一图标（不再共用 9 张旧图）', artNames.length===11 && new Set(artNames).size===11, artNames);
+
 /* ---------- 运行时 ---------- */
 const probe = `(()=>{
   const de=document.documentElement;
