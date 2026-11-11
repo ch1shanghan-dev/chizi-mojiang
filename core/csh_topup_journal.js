@@ -31,7 +31,7 @@
         typeof d.id !== 'string' || !ID_RE.test(d.id) ||
         !Number.isSafeInteger(d.amount) || d.amount <= 0 ||
         !Number.isSafeInteger(d.balanceBefore) || d.balanceBefore < d.amount ||
-        !Number.isSafeInteger(d.t) || d.t < 0) throw new Error('补码凭据损坏');
+        !Number.isSafeInteger(d.t) || d.t < 0 || (d.roomId != null && (typeof d.roomId !== "string" || !ID_RE.test(d.roomId)))) throw new Error('补码凭据损坏');
     return d;
   }
   function write(storage, entry) {
@@ -50,13 +50,13 @@
     entry = entry || {};
     if (typeof entry.id !== 'string' || !ID_RE.test(entry.id) ||
         !Number.isSafeInteger(entry.amount) || entry.amount <= 0 ||
-        !Number.isSafeInteger(entry.balanceBefore) || entry.balanceBefore < entry.amount) return fail('补码凭据参数无效');
+        !Number.isSafeInteger(entry.balanceBefore) || entry.balanceBefore < entry.amount || (entry.roomId != null && (typeof entry.roomId !== 'string' || !ID_RE.test(entry.roomId)))) return fail('补码凭据参数无效');
     var old;
     try { old = read(storage); } catch (e) { return fail(e.message); }
     if (old) return old.id === entry.id ? { ok: true, already: true } : fail('存在另一笔未决补码');
     try {
       write(storage, { v: VERSION, phase: 'prepared', id: entry.id, amount: entry.amount,
-        balanceBefore: entry.balanceBefore, t: Math.max(0, Math.floor(Number(entry.t) || 0)) });
+        balanceBefore: entry.balanceBefore, t: Math.max(0, Math.floor(Number(entry.t) || 0)), ...(entry.roomId ? {roomId: entry.roomId} : {}) });
       return { ok: true, already: false };
     } catch (e) { return fail(e.message); }
   }
@@ -88,6 +88,7 @@
       return { refunded: 0, reason: e.message + '，已清除损坏凭据' };
     }
     if (!d) return { refunded: 0, reason: '' };
+    if (d.roomId) return { refunded: 0, reason: '新版凭据由房间和钱包共同恢复' };
     var pc = Number(wallet && typeof wallet.pc === 'function' ? wallet.pc() : NaN);
     var wasCharged = pc === d.balanceBefore - d.amount;
     var alreadyRefunded = pc === d.balanceBefore;

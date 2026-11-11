@@ -5,5 +5,5 @@ extension["池子魔将"]={
 	forum:"",
 	version:"4.0.16",
 	files:["LICENSE","audio","effect","font","image","extension.js","decadeUI-compat.js","info.json","package.js","core","main","character","card","skills","games","README.md","mobilefx","store.json"],
-	size:"136.8MB"
+	size:"156.5MB"
 };

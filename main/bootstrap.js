@@ -40,6 +40,7 @@ import "../core/csh_badge.js";
    而 csh_shell 用 window.CSHTopUpJournal / window.CSHRoom 取用 ——
    取到 null 时补码直接回「事务未就绪」，等于功能上线即死。必须排在 csh_shell 之前。 */
 import "../core/csh_topup_journal.js";
+import "../core/csh_topup.js";
 import "../core/csh_room.js";
 /* ★ 妖灵装扮基座 + 生产注册表（2026-11-10 第 3 层）：此前只在 games/codex.html
    用经典 <script> 加载，宿主侧 window.CSHSpiritSkins 恒 null —— 宿主唯一只读口

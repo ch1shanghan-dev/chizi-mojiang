@@ -5,7 +5,7 @@ const arg=(key,def)=>{let i=process.argv.indexOf(key);return i<0?def:process.arg
 if(!arg('--out',null))throw Error('Use an external --out JSON path');
 const sourceRoot=arg('--source',root),html=fs.readFileSync(sourceRoot+'/games/texas/texas.html','utf8'),source=html.match(/<script>\s*([\s\S]*?)<\/script>/)[1];
 let seed=20261028;const random=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;},math=Object.create(Math);math.random=random;
-const noop=()=>{},c=vm.createContext({Math:math,console:{log:noop},window:{},sfx:{fold:noop,check:noop,chip:noop,raise:noop,deal:noop,flip:noop},sfxPlay:noop,SFX:null,CRD:null,quippedGreet:true,worldSeats:null,eqDirty:false,_eqA:Array(7),_eqB:Array(7),_eqRem:[],HE_COMBOS:null,HE_RANK_NAME:null});
+const noop=()=>{},c=vm.createContext({Math:math,console:{log:noop},window:{},settlementPending:false,sfx:{fold:noop,check:noop,chip:noop,raise:noop,deal:noop,flip:noop},sfxPlay:noop,SFX:null,CRD:null,quippedGreet:true,worldSeats:null,eqDirty:false,_eqA:Array(7),_eqB:Array(7),_eqRem:[],HE_COMBOS:null,HE_RANK_NAME:null});
 vm.runInContext(fs.readFileSync(root+'/core/csh_pots.js','utf8'),c);
 vm.runInContext(fs.readFileSync(root+'/core/csh_registry.js','utf8'),c);c.CSH=c.window.CSH;
 vm.runInContext(fs.readFileSync(root+'/core/csh_texas_ai.js','utf8'),c);

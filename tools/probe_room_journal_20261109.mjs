@@ -269,7 +269,7 @@ check('快照字段含牌靴/手牌/庄家/筹码/阶段（缺一项就不是同
   ['shoe', 'hands', 'dealer', 'chips', 'phase', 'activeHand'].every(k => new RegExp('[\'"]' + k + '[\'"]').test(bjKeys)));
 check('牌靴整副保存（不许截断：截断等于允许重抽）',
   !/shot\.s\.shoe\s*=.*slice|shoe:\s*state\.shoe\.slice\(-/.test(bjSrc));
-check('同状态不重复写（渲染频繁，避免刷盘）', /text === lastRoomJson/.test(bjSrc));
+check('三桌共用宿主确认队列', [bjSrc, texasSrc, ddzSrc].every(s => /CSHPage\.roomWriter\(Bridge\.roomSave\)/.test(s)));
 check('德州已暴露 __TX 取证面（roomShot/startGame/getRoomDiag）',
   /window\.__TX\s*=/.test(texasSrc) && /roomShot: roomShot/.test(texasSrc) && /startGame: startGame/.test(texasSrc));
 check('两桌都有 bootDone 闸门（探针必须等启动回调跑完再开一手）',
@@ -287,6 +287,35 @@ check('宿主续局时按快照席位重建 TABLE_WORLD，不重新抽人',
 check('★ 斗地主形态（牌对象 + 同桌席位）通过快照校验',
   R.validateShot({ s: { hands: [[{ id: 1, rank: 3, suit: 0 }], [], []], bottom: [{ id: 53, rank: 16, suit: -1 }],
     seats: [{ id: 'csh_ddz_a', stake: 600, persona: 'rock' }], selIds: [1, 2] } }) === '');
+
+const pageBridge = vm.createContext({ window: {} });
+vm.runInContext(fs.readFileSync(path.join(root, 'core/csh_page.js'), 'utf8'), pageBridge);
+const makeWriter = send => pageBridge.window.CSHPage.roomWriter(send);
+{
+  const calls = [], writer = makeWriter((shot, seq, ack) => calls.push({ shot, seq, ack }));
+  writer.seed({ saveSeq: 4, shot: { phase: 'deal' } });
+  writer.push({ phase: 'play' });
+  writer.push({ phase: 'dealer', holeHidden: false });
+  check('快照待确认时不发送下一笔', calls.length === 1 && calls[0].seq === 4);
+  calls[0].ack(true, { saveSeq: 5 });
+  check('确认后使用新序号保存庄家阶段', calls.length === 2 && calls[1].seq === 5 && calls[1].shot.holeHidden === false);
+  calls[1].ack(false, null);
+  check('超时仅重发同一快照和序号', calls.length === 3 && calls[2].seq === 5 && calls[2].shot.phase === 'dealer');
+  calls[2].ack(true, { saveSeq: 6 });
+  writer.push({ phase: 'dealer', holeHidden: false });
+  check('已确认快照重复渲染不会刷盘', calls.length === 3);
+  writer.push({ phase: 'over', chips: 100 });
+  calls[3].ack(false, { reason: 'write denied' });
+  writer.push({ phase: 'over', chips: 100 });
+  check('显式拒写后可再次保存相同状态', calls.length === 5 && calls[4].seq === 6);
+}
+{
+  const s = putActive(), seq = R.read(s).saveSeq;
+  const payload = Object.assign(shot(), { pot: 91 });
+  const first = R.save(s, ID, payload, seq), repeated = R.save(s, ID, payload, seq);
+  check('确认丢失时重发不递增已保存序号', first.ok && repeated.ok && first.saveSeq === repeated.saveSeq && R.read(s).saveSeq === seq + 1);
+  check('相同旧序号的不同内容仍拒绝', !R.save(s, ID, Object.assign(shot(), { pot: 99 }), seq).ok && R.read(s).shot.pot === 91);
+}
 
 /* ---------- 廿一点快照往返：抽取真实页面函数在 vm 里跑 ----------
    这是整套恢复里最容易出静默错的一环：白名单少一个字段，续局就少一张牌/少一段筹码，
@@ -313,8 +342,8 @@ check('★ 斗地主形态（牌对象 + 同桌席位）通过快照校验',
     ctx.dealerSeat = { id: 'csh_testdealer', name: '测试庄', stake: 400000, mult: 2 };
     ctx.newState = () => ({ hands: [], dealer: [], shoe: [], chips: 200000, phase: 'deal', activeHand: 0 });
     ctx.state = null;
-    ctx.lastRoomJson = '';
-    ctx.roomSeq = 0; ctx.roomSeqKnown = false; ctx.lastRoomError = '';
+    ctx.bootDone = true;
+    ctx.roomWriter = makeWriter((...args) => ctx.Bridge.roomSave(...args));
     return ctx;
   }
 
@@ -376,7 +405,7 @@ check('★ 斗地主形态（牌对象 + 同桌席位）通过快照校验',
   /* 去重：同状态第二次 saveRoom 不再上报 */
   const c5 = bjHarness();
   let saves = 0;
-  c5.Bridge.roomSave = () => { saves++; };
+  c5.Bridge.roomSave = (_shot, _seq, ack) => { saves++; ack(true, { saveSeq: saves }); };
   c5.state = sampleState();
   c5.saveRoom(); c5.saveRoom(); c5.saveRoom();
   check('同状态只上报一次（渲染频繁也不刷盘）', saves === 1, saves);
@@ -408,7 +437,8 @@ check('★ 斗地主形态（牌对象 + 同桌席位）通过快照校验',
     });
     ctx.Bridge = { active: true, roomSave: () => {}, roomState: () => {} };
     ctx.entryUsed = false;
-    ctx.lastRoomJson = ''; ctx.roomSeq = 0; ctx.roomSeqKnown = false;
+    ctx.bootDone = true;
+    ctx.roomWriter = makeWriter((...args) => ctx.Bridge.roomSave(...args));
     ctx.G = null;
     /* makeSession 会去抽世界席位，恢复路径里它的产物会被白名单整体覆盖 —— 桩掉即可。 */
     ctx.makeSession = () => ({ players: [], deck: [], community: [], buyIn: 0 });

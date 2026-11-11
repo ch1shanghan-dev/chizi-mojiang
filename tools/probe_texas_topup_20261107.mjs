@@ -81,16 +81,17 @@ function pageHarness(pureSource, opts) {
   const ctx = vm.createContext({ window: {}, Object, Array, Math, Number, String, JSON, Error, Date,
     setTimeout(fn) { return 0; }, console: { log() {}, warn() {}, error() {} } });
   vm.runInContext(pureSource, ctx);
-  const names = ['topUpApi', 'topUpQuote', 'requestTopUp'];
+  const names = ['topUpApi', 'topUpQuote', 'requestTopUp', 'sessionCashOutData'];
   walk(parse(inline), n => {
     if (n.type === 'FunctionDeclaration' && names.indexOf(n.id.name) >= 0)
       vm.runInContext(inline.slice(n.range[0], n.range[1]), ctx);
   });
   const toasts = [], commits = []; let bannerRedraws = 0;
+  ctx.settlementPending = false;
   ctx.toast = (msg) => toasts.push(String(msg));
   ctx.fmt = n => String(n);
   ctx.renderHud = () => {};
-  ctx.showHandBanner = () => { bannerRedraws++; };
+  ctx.showHandBanner = silent => { if (silent) bannerRedraws++; };
   ctx.syncBankFromWallet = () => {};
   ctx.career = { bank: { bank: 0 } };
   ctx.G = {
@@ -179,19 +180,26 @@ function pageHarness(pureSource, opts) {
 check('Bridge 暴露 shell-topup 通道', /topUp: function \(amount, cb\) \{ call\('shell-topup'/.test(htmlSource));
 check('页面把本金基数与筹码一起写回 G', /me\.chips=next\.chips;G\.buyIn=next\.buyIn;G\.topUpTotal=next\.topUpTotal;G\.topUps=next\.topUps;/.test(htmlSource));
 check('迟到回调按会话 / 手数 / 结算状态隔离', /G!==session\|\|G\.sessionOver\|\|G\.handNo!==hand\|\|!G\.over/.test(htmlSource));
-check('endSession 仍用 G.buyIn 作本金基数', /var buyIn = G\.buyIn \|\| 0;/.test(htmlSource) && /Bridge\.settleSession\(\{\s*key: 'texas', buyIn: buyIn, chips: chips/.test(htmlSource));
+{
+  const h = pageHarness(modSource);
+  h.ctx.requestTopUp({ disabled: false });
+  const data = h.ctx.sessionCashOutData();
+  check('实际收工载荷采用补码后的本金和筹码', data.buyIn === 240 && data.chips === 215, data);
+  h.ctx.settlementPending = true;
+  check('结算尚未确认时不接受补码', !h.ctx.topUpQuote().ok);
+}
 check('补码按钮由玩家点击触发，不自动补码', /function \(\) \{ requestTopUp\(topBtn\); \}/.test(htmlSource) && !/requestTopUp\(\);/.test(htmlSource));
 check('收工按钮保留（随时可拒绝并离桌）', /mkBtn\('收工'/.test(htmlSource));
 check('shell 注册 shell-topup 且列入 mutatesSave 写保护', /"shell-topup"/.test(shellSource) && /"shell-settle-session", "shell-topup"/.test(shellSource));
-check('宿主走与开局带入同一条 spend 出账路径', /WT\.wallet\.spend\(amt, "德州补码"\)/.test(shellSource));
-check('宿主读回确认，不一致时回补且不 ACK 成功', /WT\.wallet\.pc\(\) !== pcBefore - amt/.test(shellSource) && /WT\.wallet\.add\(amt, "补码读回回补"\)/.test(shellSource));
+check('宿主严格持久化扣款编号和余额', /WT\.wallet\.commitTopUp\(txId,amt,false\)/.test(shellSource));
+check('扣款和房间快照均确认后才发成功应答', shellSource.indexOf('var debit=WT.wallet.commitTopUp') < shellSource.indexOf('var saved=RJ.save(RS,currentRoomId,shot,entry.saveSeq)') && /if\(!saved\.ok\)\{[\s\S]{0,150}roomTopUpReady\(\);refuseTopUp/.test(shellSource));
 check('宿主独立校验次数 / 额度 / 单位，不信任页面金额',
-  /topUpCount >= 2/.test(shellSource) && /amt % topUnit !== 0 \|\| amt > topUpBaseBuyIn/.test(shellSource));
+  /A\.quote\(\{minBuyIn:topUpBaseBuyIn/.test(shellSource) && /!q\.ok\|\|amt!==q\.amount/.test(shellSource));
 check('页面暴露上桌确认通道且成功后调用', /topUpCommit: function \(txId, cb\) \{ call\('shell-topup-commit'/.test(htmlSource) && /Bridge\.topUpCommit\(data\.txId,function\(\)\{\}\)/.test(htmlSource));
 check('页面要求宿主回包带事务编号', /!data\.txId/.test(htmlSource));
 check('宿主有 shell-topup-commit 命令与写保护', /cmd === "shell-topup-commit"/.test(shellSource) && /"shell-topup", "shell-topup-commit"/.test(shellSource));
 check('宿主扣款前 prepare 凭据、失败 abort、启动恢复',
-  /TJ\.prepare\(TS, \{ id: txId/.test(shellSource) && /TJ\.abort\(TS, txId\)/.test(shellSource) &&
+  /TJ\.prepare\(TS,\{id:txId,roomId:currentRoomId/.test(shellSource) && /TJ\.abort\(TS,\s*txId\)/.test(shellSource) &&
   /setTimeout\(function \(\) \{ recoverTopUp\(\); \}, 0\)/.test(shellSource));
 check('入场重置补码状态（次数是每桌不是每账号）',
   /topUpBaseBuyIn = currentBuyIn; topUpCount = 0; topUpTotal = 0;/.test(shellSource) &&

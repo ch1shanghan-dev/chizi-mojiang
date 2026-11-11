@@ -202,15 +202,20 @@ for (const raw of ['{broken', '{}', JSON.stringify({ v: 2, phase: 'prepared', id
   check('中断链：钱包没扣款时重启不退款', J.recover(s, w).refunded === 0 && w.pc() === 1000 && w.calls.length === 0 && !s.raw());
 }
 
+{
+  const s=makeStorage(), w=makeWallet(960);
+  J.prepare(s,{id:ID,roomId:'room-topup-0001',amount:40,balanceBefore:1000,t:1});
+  check('新版凭据关联原房间，旧余额推断不能代替房间恢复',J.read(s).roomId==='room-topup-0001' && J.recover(s,w).refunded===0 && !!s.raw() && w.calls.length===0);
+}
 /* ---------- 静态接线断言 ---------- */
 check('宿主扣款前 prepare、失败 abort、启动 setTimeout 恢复',
-  /TJ\.prepare\(TS, \{ id: txId, amount: amt, balanceBefore: pcBefore/.test(shell) &&
-  /TJ\.abort\(TS, txId\)/.test(shell) && /setTimeout\(function \(\) \{ recoverTopUp\(\); \}, 0\)/.test(shell));
+  /TJ\.prepare\(TS,\{id:txId,roomId:currentRoomId,amount:amt,balanceBefore:pcBefore/.test(shell) &&
+  /TJ\.abort\(TS,\s*txId\)/.test(shell) && /setTimeout\(function \(\) \{ recoverTopUp\(\); \}, 0\)/.test(shell));
 check('宿主 ACK 带 txId、提供 commit 命令且列入写保护',
-  /txId: txId, balance/.test(shell) && /cmd === "shell-topup-commit"/.test(shell) &&
+  /txId:txId,balance:WT\.wallet\.pc/.test(shell) && /cmd === "shell-topup-commit"/.test(shell) &&
   /"shell-topup", "shell-topup-commit"/.test(shell));
-check('凭据模块缺失时宿主拒绝补码（不静默降级）', /补码事务未就绪，桌面筹码未变/.test(shell));
-check('启动恢复只跑一次（topUpRecovered 标志）', /if\(topUpRecovered\)return null;topUpRecovered=true;/.test(shell));
+check('凭据模块缺失时宿主拒绝补码（不静默降级）', /!TJ\|\|!TS\|\|!RJ\|\|!RS\|\|!A/.test(shell));
+check('启动恢复只跑一次（topUpRecovered 标志）', /if\(topUpRecovered&&!force\)return null;topUpRecovered=true;/.test(shell));
 check('页面要求 txId、上桌后发 commit', /!data\.txId/.test(html) && /Bridge\.topUpCommit\(data\.txId,function\(\)\{\}\)/.test(html));
 check('新本机键已登记进 csh_migrate EXCLUDED', /\["csh_topup_pending_v1",/.test(migrate));
 

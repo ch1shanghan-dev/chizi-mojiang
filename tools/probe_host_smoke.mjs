@@ -149,7 +149,7 @@ async function until(expression, description, ms = 8000) {
   while (Date.now() - started < ms) { const result = await page.evaluate(expression); if (result) return result; await delay(100); }
   throw Error(description + ' did not become ready within ' + ms + ' ms');
 }
-async function reloadHost(ready, description, ms = 15000) {
+async function reloadHost(ready, description, ms = Number(opt("--reload-timeout-ms", "15000"))) {
   const marker = 'reload-' + Date.now() + '-' + Math.random();
   await page.evaluate('window.__cshSmokeReloadMarker='+JSON.stringify(marker));
   await page.send('Page.reload',{ignoreCache:true});
@@ -205,6 +205,26 @@ async function smokeRoomPlayerPath(table){
   const deal=table==='texas'?`${win}.__TX.startGame()`:table==='doudizhu'?`${win}.__DDZ.startGame()`:`${win}.__BJ.startHand()`;
   await page.evaluate(`(()=>{const w=${win};${deal};return true;})()`);
   await delay(700);
+  const actionPath=process.argv.includes("--room-action-path");
+  const actor = s => table==="blackjack" ? s.phase : table==="texas" ? s.toAct : s.phase==="bid" ? s.bid.order[s.bid.idx] : s.turn;
+  let initial=await page.evaluate(snapshotExpr);
+  if (actionPath) {
+    if (table==="blackjack") {
+      for (let hand=0; hand<4 && initial.shot.s.phase!=="play"; hand++) {
+        await page.evaluate("(()=>{const d="+win+".document;if(d.getElementById('btn-ins-no').getClientRects().length)d.getElementById('btn-ins-no').click();})()");
+        await delay(500);
+        initial=await page.evaluate(snapshotExpr);
+        if (initial.shot.s.phase==="over") { await page.evaluate(deal); await delay(700); initial=await page.evaluate(snapshotExpr); }
+      }
+      await page.evaluate("(()=>{const b="+win+".document.getElementById('btn-stand');if(!b||b.disabled)throw Error('停牌不可用');b.click();})()");
+    } else if (actor(initial.shot.s)===0) {
+      const label = table==="texas" ? "弃牌" : "不叫";
+      await page.evaluate("(()=>{const b=[..."+win+".document.querySelectorAll('button')].find(b=>!b.disabled&&b.offsetWidth>0&&b.textContent.trim()==="+JSON.stringify(label)+");if(!b)throw Error('找不到合法的玩家动作');b.click();})()");
+    }
+    await until("(()=>{const s=JSON.parse(localStorage.getItem(CSHRoom.KEY))?.shot?.s;if(!s)return false;return "+
+      (table==="blackjack" ? "s.phase==='dealer'" : table==="texas" ? "s.toAct>0" : "(s.phase==='bid'?s.bid.order[s.bid.idx]:s.turn)>0") + "})()",
+      "宿主已保存庄家或 AI 回合", 1700);
+  }
   const before=await page.evaluate(snapshotExpr);
   const diag=await page.evaluate(`(()=>({raw:localStorage.getItem(window.CSHRoom.KEY),pageDiag:(()=>{const w=${win};try{return w.${API}.getRoomDiag();}catch(e){return String(e.message);}})(),metaRoom:lib.cshShell.META["${table}"].room,shellCurrent:lib.cshShell.current(),roomId:lib.cshShell.roomId&&lib.cshShell.roomId(),csRoom:typeof window.CSHRoom,saveGuard:!!lib.cshWallet.saveGuard&&lib.cshWallet.saveGuard.blocked()}))()`);
   check('开局后快照已落盘（宿主侧有 active 凭据）',
@@ -224,7 +244,7 @@ async function smokeRoomPlayerPath(table){
   const reopened=await page.evaluate(`(()=>{const r=lib.cshShell.charge("${table}",${BUYIN});return {r,current:lib.cshShell.current()};})()`);
   check('重进同一张桌成功（未被要求重复入场）',reopened.r===true&&reopened.current===table,reopened);
   await until(frameReady,'续局 iframe 启动',15000);
-  await delay(400);
+  if (!actionPath) await delay(400);
   const pc3=await page.evaluate('lib.cshWallet.wallet.pc()');
   check('★ 重进不二次扣款（钱没有凭空少一份）',pc3===pc1,{pc1,pc3});
 
@@ -243,8 +263,86 @@ async function smokeRoomPlayerPath(table){
   const boot=await state();
   check('完整玩家路径期间宿主无脚本错误与对话框',
     !boot.diagnostics?.errors?.length&&!boot.diagnostics?.rejections?.length&&!boot.diagnostics?.dialogs?.length,boot.diagnostics);
+  if (actionPath) {
+    const stored=JSON.parse(diag.raw).shot.s;
+    const machine=table==="blackjack" ? actor(stored)==="dealer" : actor(stored)>0;
+    check("重载前持久化的状态已在自动行动阶段",machine,{ actor:actor(stored) });
+    await delay(3000);
+    const advanced=await page.evaluate(snapshotExpr);
+    check("续局后自动行动实际推进", machine && JSON.stringify(stored)!==JSON.stringify(advanced.shot.s),
+      { before:actor(stored), after:actor(advanced.shot.s) });
+    const roomId=await page.evaluate("lib.cshShell.roomId()");
+    if (table==="texas" && process.argv.includes("--room-settle-refusal")) {
+      await page.evaluate("(()=>{const w=lib.cshWallet.wallet, original=w.settleRun;w.settleRun=function(){w.settleRun=original;return {ok:false,reason:'fixture: first settlement refused'};};})()");
+      await clickElement("document.getElementById('csh-shell-close')");
+      await until("document.getElementById('csh-shell-frame')?.contentDocument?.body?.innerText.includes('结算尚未确认')", "德州拒写时保留页面和重试提示");
+      check("德州第一次结算被拒后余额、活动房间保留",await page.evaluate("lib.cshWallet.wallet.pc()==="+pc3+" && !!localStorage.getItem(CSHRoom.KEY)"));
+    }
+    await clickElement("document.getElementById('csh-shell-close')");
+    await until("!lib.cshShell.isOpen()", "续局后从右上角结算并关闭", 14000);
+    const result = "(()=>{const w=lib.cshWallet.wallet;return {balance:w.pc(),receipt:w.roomReceipt(),room:localStorage.getItem(CSHRoom.KEY),entries:w.ledger().length};})()";
+    const paid=await page.evaluate(result);
+    check("关闭续局后钱包实际回账并清房间凭据", paid.receipt.id===roomId && paid.balance===pc3+paid.receipt.credited && paid.room===null, {roomId,pc3,paid});
+    await page.evaluate("lib.cshShell.close('user')");
+    const repeated=await page.evaluate(result);
+    check("再次关闭不会重复回账", paid.balance===repeated.balance && paid.entries===repeated.entries);
+  }
   stage('room-player-path-done',{table,same,pc0,pc1,pc2,pc3});
 }
+async function smokeRoomRefundPath(){
+  const r=await page.evaluate("(()=>{const R=CSHRoom,W=lib.cshWallet,w=W.wallet,amount=20000,id='room-refund-check-0001';"+
+    "w.add(300000,'isolated refund fixture');W.flushSave();const pc=w.pc();R.prepare(localStorage,{id,table:'blackjack',amount,balanceBefore:pc,t:Date.now()});"+
+    "w.spend(amount,'fixture for abandoned room');W.flushSave();const spent=w.pc();"+
+    "const put=Storage.prototype.setItem;Storage.prototype.setItem=function(k,v){if(k==='csh_wallet'){Storage.prototype.setItem=put;throw Error('fixture refuses wallet write');}return put.call(this,k,v);};"+
+    "const refused=lib.cshShell.charge('blackjack',amount);const after=w.pc(),saved=R.read(localStorage);"+
+    "const retried=lib.cshShell.charge('blackjack',amount);return {pc,spent,refused,after,saved:saved?.phase,retried,final:w.pc(),receipt:w.roomReceipt(),old:id,room:R.read(localStorage)?.id};})()");
+  check("回账拒写保留原待退凭据和余额",r.refused===false&&r.after===r.spent&&r.saved==="preparing",r);
+  check("重试只退一次，随后按正常流程为新牌桌扣款",r.retried&&r.final===r.pc-20000&&r.receipt.id===r.old&&r.receipt.credited===20000&&r.room!==r.old,r);
+}
+
+async function smokeRoomTopUpPath(){
+  const BUY=20000, START_CHIPS=15000, TOPUP=6000;
+  const win="document.getElementById('csh-shell-frame')?.contentWindow";
+  const ready="!!window.lib?.cshWallet && !!window.lib?.cshShell && typeof window.CSHRoom === 'object'";
+  const frame=win+"?.__TX?.getRoomDiag()?.bootDone";
+  await page.evaluate("lib.cshWallet.wallet.add(300000,'isolated top-up fixture');lib.cshWallet.flushSave();lib.cshShell.charge('texas',"+BUY+")");
+  await until(frame,"德州真实入场");
+  await page.evaluate(win+".__TX.startGame()");
+  await until("!!CSHRoom.read(localStorage)?.shot","首手宿主快照");
+  const seed=await page.evaluate("(()=>{const w="+win+";const e=CSHRoom.read(localStorage);const s=e.shot.s;w.__TX.getG().over=true;s.over=true;s.toAct=-1;s.players[0].chips="+START_CHIPS+";s.ledger={roundId:s.sessionId+':'+s.handNo,ledger:[],pots:[]};return CSHRoom.save(localStorage,e.id,e.shot,e.saveSeq).ok;})()");
+  check("真实房间保存一手结束且需补码的测试状态",seed);
+  await reloadHost(ready,"重载已结束这一手的德州房间");
+  await page.evaluate("lib.cshShell.charge('texas',"+BUY+")");
+  await until(frame,"德州恢复结算画面");
+  const button=win+".document.querySelectorAll('#banner-row button')";
+  const clickTopUp="Array.from("+button+").find(b=>b.textContent.startsWith('补码 +'))";
+  await until("!!("+clickTopUp+")","已恢复牌桌有补码按钮");
+  const read="(()=>{const w=lib.cshWallet.wallet,e=CSHRoom.read(localStorage);return {pc:w.pc(),shot:e?.shot,shell:lib.cshShell.buyIn(),pending:CSHTopUpJournal.read(localStorage),debit:w.topUpDebitId()};})()";
+  const before=await page.evaluate(read);
+  await page.evaluate("(()=>{const put=Storage.prototype.setItem;Storage.prototype.setItem=function(k,v){if(k===CSHRoom.KEY){Storage.prototype.setItem=put;throw Error('fixture refuses one room write');}return put.call(this,k,v);};})()");
+  await clickElement(clickTopUp,true);
+  await until("!!("+clickTopUp+") && !("+clickTopUp+").disabled && !CSHTopUpJournal.read(localStorage)","快照拒写后扣款退回、补码按钮可重试");
+  const rejected=await page.evaluate(read);
+  check("快照拒写时不留扣款或筹码变化",rejected.pc===before.pc && rejected.shot.buyIn===BUY && rejected.shot.s.players[0].chips===START_CHIPS && rejected.debit.startsWith("refund-"),{before:before.pc,after:rejected.pc,debit:rejected.debit});
+  await page.evaluate("(()=>{const remove=Storage.prototype.removeItem;Storage.prototype.removeItem=function(k){if(k===CSHTopUpJournal.KEY)throw Error('fixture preserves journal until reload');return remove.call(this,k);};})()");
+  await clickElement(clickTopUp,true);
+  await until("CSHRoom.read(localStorage)?.shot?.buyIn==="+(BUY+TOPUP),"补码后快照已持久化");
+  const written=await page.evaluate(read);
+  check("钱包和房间已写入同一补码编号，凭据清理尚未发生",written.pc===before.pc-TOPUP && written.shot.s.players[0].chips===START_CHIPS+TOPUP && written.shot.s.topUps===1 && written.pending?.id===written.shot.s.topUpTxId && written.debit===written.pending.id);
+  await reloadHost(ready,"重载未清补码凭据的宿主");
+  await until("!CSHTopUpJournal.read(localStorage)","启动恢复已清同一补码凭据");
+  await page.evaluate("lib.cshShell.charge('texas',"+BUY+")");
+  await until(frame,"补码后的房间可续局");
+  const resumed=await page.evaluate(read);
+  check("重开保留补码后的本金、筹码与次数，余额未被退款或再扣",resumed.pc===written.pc&&resumed.shot.s.players[0].chips===START_CHIPS+TOPUP&&resumed.shell===BUY+TOPUP&&resumed.shot.s.topUps===1,{pc:resumed.pc,table:resumed.shell,chips:resumed.shot.s.players[0].chips});
+  await page.evaluate("(()=>{const trace=window.__topUpCloseWire=[]; const w="+win+"; const record=e=>{const d=e.data;if(d&&/settle|close/.test(d.__csh||''))trace.push(d);};window.addEventListener('message',record);w.addEventListener('message',record);})()");
+  await clickElement("document.getElementById('csh-shell-close')");
+  await delay(600);
+  stage("top-up-cash-out",await page.evaluate("(()=>({wire:window.__topUpCloseWire,pc:lib.cshWallet.wallet.pc(),body:document.getElementById('csh-shell-frame')?.contentDocument?.body?.innerText.slice(-900)}))()"));
+  await until("!lib.cshShell.isOpen()","补码后的德州退出回账",12000);
+  check("续局结算使用补码后的筹码",await page.evaluate("lib.cshWallet.wallet.roomReceipt().credited==="+(START_CHIPS+TOPUP)));
+}
+
 async function smokeRoomRecovery(){
   const ID='room-host-smoke-0001', AMOUNT=50000;
   stage('room-recovery-start',{id:ID,amount:AMOUNT});
@@ -697,6 +795,8 @@ try {
   if (!recoveryBoot && current?.arena && current?.extensionLoaded && current?.character) {
     if(process.argv.includes('--world-layout-410'))await worldLayout410();
     else if(process.argv.includes('--room-player-path'))await smokeRoomPlayerPath(opt('--room-table','blackjack'));
+    else if(process.argv.includes('--room-topup-path'))await smokeRoomTopUpPath();
+    else if(process.argv.includes('--room-refund-path'))await smokeRoomRefundPath();
     else if(process.argv.includes('--room-smoke'))await smokeRoomRecovery();
     else if(process.argv.includes('--noncharacter-survey'))await surveyNoncharacter({page,out,snap,until,delay,clickElement,check,stage});
     else if(process.argv.includes('--ui-recovery')){await smokeExperience();await smokeUiRecovery();}

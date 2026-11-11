@@ -3439,7 +3439,7 @@ if (spawnOk && execFileSync && !ONLY_SYNTAX && !ONLY_VERSIONS) {
       ['E95AM','probe_affection_recovery.mjs',['--out',path.join(tmp95,'affection-recovery')],97,'好感/赠礼恢复事务（拒写回滚/联合检查点/重试，开放巡检时发现未纳管）',20000],
       ['E95AN','probe_texas_ai_autostake_20261109.mjs',['--out',path.join(tmp95,'texas-ai-autostake')],37,'德州AI自主全额带入与打空后补码（人物策略/零和上限/aiStakeTotal同步/退隐保护/豪赌隔离）',20000],
       ['E95AO','audit_career_coverage_20261105.mjs',['--out',path.join(tmp95,'career-coverage')],3,'生涯未路由项四类归因（派生源/组合/设计取舍/待接真实源，不得一律判不可达）',20000],
-      ['E95AP','probe_spirit_skins_catalog_20261109.mjs',['--out',path.join(tmp95,'spirit-skins-catalog')],69,'妖灵装扮注册表与互动1-3层（140图/skinOf只读/装扮回应/宿主加载图/跨页可见性）',20000],
+      ['E95AP','probe_spirit_skins_catalog_20261109.mjs',['--out',path.join(tmp95,'spirit-skins-catalog')],70,'妖灵装扮注册表与互动1-3层（148图/74套/skinOf只读/装扮回应/宿主加载图/跨页可见性）',20000],
       ['E95AQ','probe_world_resume_card_20261110.mjs',['--out',path.join(tmp95,'world-resume-card')],26,'世界入口上次未完成卡片（只读判定/不写存档/不碰钱/点击走charge/加载图/改前基线）',20000],
       ['E95AR','probe_merit_failure_notice_20261110.mjs',['--out',path.join(tmp95,'merit-notice')],23,'功勋上报失败提示（真实桥ack/超时/6秒合并/恢复期不重复/三页接线/改前基线）',20000],
       /* P2 牌桌呈现：极矮屏（640×286）结算层纵向预算。加载真实 blackjack.html 打到结算，
@@ -3458,15 +3458,20 @@ if (spawnOk && execFileSync && !ONLY_SYNTAX && !ONLY_VERSIONS) {
          资产体积、以及四桌运行时实际生效的 background-image 就是 art-v2 那张。
          改前基线（摘掉斗地主的 link）22/3，失败的正是那 3 条。 */
       ['E95AV','probe_art_v2_tables_20261110.mjs',['--out',path.join(tmp95,'art-v2-tables')],32,'UI 美术层首批（毡面/牌背/板材质生效、体积预算、样式表顺序、缺图回退）',150000],
-      /* 音效 S1：页面 sfxPlay 的每个名字都必须能解析。UNO 五个动作音与斗地主三个牌型音
-         因为配方缺失，从上线起一直静默（bus 只记 lastError，页面 try/catch 吞掉）。
-         改前基线同一探针 7/3，失败的正是这三条。 */
-      ['E95AW','probe_sfx_names_20261110.mjs',['--out',path.join(tmp95,'sfx-names')],10,'音效名与配方表一一对应（无静默丢弃/新增参数边界/既有高频道回归）',30000],
+      /* 音效探针（2026-11-11 口径纠偏）：旧版静态正则只扫主 RECIPES 的双引号键，
+         漏看后置 Object.assign 第二版表的单引号键，误报「8 个音效静默」并补了死配方。
+         现改为 node:vm 加载真实模块问 bus.has()/recipe() 的运行时真值，
+         并把「注入一条死键能检出」的红基线内置进探针（22 条断言）。 */
+      ['E95AW','probe_sfx_names_20261110.mjs',['--out',path.join(tmp95,'sfx-names')],22,'音效名↔运行时配方真值（VM加载/8名解析/参数边界/死键检测含红基线）',30000],
       /* 下面三个是 Chromium 真实页面探针：按钮补板单跑实测 63s，
          旧的 60000ms 阈值在整仓串行环境里必然 ETIMEDOUT（2026-11-11 实跑复现）。 */
       ['E95AX','probe_art_v2_bg_20261110.mjs',['--out',path.join(tmp95,'art-v2-bg')],32,'功能页位图背景（七页链接顺序/冷暖分配/缺图回退/运行时生效）',150000],
       ['E95AY','probe_art_v2_buttons_20261110.mjs',['--out',path.join(tmp95,'art-v2-buttons')],67,'按钮补板（位图生效/44px红线/文字对比度/既有规则未被覆盖）',150000],
       ['E95AZ','probe_mirror_seam_20261110.mjs',['--out',path.join(tmp95,'mirror-seam')],12,'国内更新镜像接缝（空串零行为变化/配置后入白名单/默认离线与writes不变）',30000],
+      /* 2026-11-11：股价波动放大 + 极端行情，纯计算仿真 20000 天×2 种子，不启浏览器。 */
+      ['E95BA','probe_market_volatility_20261111.mjs',['--out',path.join(tmp95,'market-volatility')],17,'金鳞市股价波动（常规放大/极端稀有/单日截断/价格护栏/长局趋势封顶/分布对称）',30000],
+      /* 真实浏览器逐页巡检：15 次 Chromium 启动，必须给足超时 */
+      ['E95BB','probe_ui_smoke_20261111.mjs',['--out',path.join(tmp95,'ui-smoke')],62,'UI全局巡检（四桌×2视口+七功能页：JS报错/缺图/溢出/44px）',300000],
     ];
     for (const [tag95, script95, args95, min95, label95, timeout95] of reg95) {
       const r95 = runProbeJson(script95, args95, { timeout: timeout95 });

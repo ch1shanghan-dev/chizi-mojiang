@@ -1256,11 +1256,12 @@ var Bridge = (function () {
     /* 本场结算：一次完成「玩家入账」+「AI 世界双向记账」，两侧严格零和。
        走 CSHPage 的结算通道（T.settle）：成功应答才置"已结算"，失败释放认领
        （壳侧同会话重复请求幂等 → 重试安全，不会重复入账）。 */
+    isSettled: T.isSettled,
     settleSession: function (payload, cb) {
       T.settle('shell-settle-session', payload, cb, 4000);
     },
     /* 补码（§3.1）：宿主扣款成功且读回确认后才应答，页面收到应答才加桌面筹码。 */
-    topUp: function (amount, cb) { call('shell-topup', { key: 'texas', amount: amount }, cb, 3000); },
+    topUp: function (amount, cb) { call('shell-topup', { key: 'texas', amount: amount, expectSeq: roomWriter.state().seq }, cb, 3000); },
     /* 上桌确认：清掉宿主的未决凭据。失败不清不影响本局，下次启动恢复会兜底退款。 */
     topUpCommit: function (txId, cb) { call('shell-topup-commit', { txId: txId }, cb, 2000); },
     /* 房间快照（工作包 B）：宿主是唯一写者，本页只上报纯数据。 */
@@ -1288,7 +1289,7 @@ var bankSynced = false;
    此前「再来一场」在同一入场内重开发牌，makeSession 直接按 Bridge.buyIn()
    重新给满筹码而**不再扣款** → 输光重开 = 无限免费重买（恶性经济漏洞）。
    现在：本场结算（endSession）即视为带入已消费，想再玩必须回大厅重新入场缴费。 */
-var entryUsed = false;
+var entryUsed = false, settlementPending = false;
 /* 世界 AI 同桌缓存（2026-09-29）：showStart 时异步预取，makeSession 同步使用 */
 var worldSeats = null;
 
@@ -1693,10 +1694,10 @@ function makeSession() {
    ★ 恢复后 entryUsed 直接置位：钱在入场时已经扣过，不许变成免费重开。
    ============================================================ */
 var ROOM_KEYS = ['n', 'aiCount', 'buyIn', 'sessionId', 'rake', 'seats', 'gamble', 'handNo',
-  'dealer', 'sb', 'bb', 'level', 'community', 'pot', 'currentBet', 'minRaise', 'toAct',
+  'dealer', 'sb', 'bb', 'level', 'community', 'pot', 'currentBet', 'minRaise', 'lastAggressor', 'toAct',
   'street', 'deck', 'revealAll', 'winners', 'over', 'sessionOver', 'winStreak', 'minChips',
-  'noFoldStreak', 'handCount', 'topUps', 'topUpTotal', 'aiStakeTotal', 'ledger', 'conservationFailed'];
-var roomSeq = 0, lastRoomJson = '', roomSeqKnown = false, bootDone = false;
+  'noFoldStreak', 'handCount', 'topUps', 'topUpTotal', 'topUpTxId', 'aiStakeTotal', 'ledger', 'conservationFailed'];
+var roomWriter = CSHPage.roomWriter(Bridge.roomSave), bootDone = false;
 
 function roomShotPlayer(p) {
   return {
@@ -1722,16 +1723,8 @@ function roomShot() {
 }
 
 function saveRoom() {
-  if (!Bridge.active || !G || typeof Bridge.roomSave !== 'function') return;
-  if (G.sessionOver) return;                 // 已收工，等结算清凭据
-  var shot, text;
-  try { shot = roomShot(); if (!shot) return; text = JSON.stringify(shot); } catch (eS) { return; }
-  if (text === lastRoomJson) return;          // 同一状态不重复写
-  lastRoomJson = text;
-  /* 序号未知时不传 expectSeq（理由同廿一点）：宿主的单调序号本身就是防旧实例的锁。 */
-  Bridge.roomSave(shot, roomSeqKnown ? roomSeq : null, function (ok, d) {
-    if (ok && d && Number.isSafeInteger(d.saveSeq)) { roomSeq = d.saveSeq; roomSeqKnown = true; }
-  });
+  if (!Bridge.active || !bootDone || !G || G.sessionOver) return;
+  roomWriter.push(roomShot());
 }
 
 /* 恢复：只接受白名单字段。失败就当没恢复，走新局（新局会重新扣款，由宿主判定）。 */
@@ -1759,12 +1752,13 @@ function applyRoomShot(shot) {
 function roomResume(cb) {
   if (typeof Bridge.roomState !== 'function') { bootDone = true; cb(false); return; }
   Bridge.roomState(function (ok, d) {
-    if (ok && d && Number.isSafeInteger(d.saveSeq)) { roomSeq = d.saveSeq; roomSeqKnown = true; }
+    if (ok) roomWriter.seed(d);
     if (ok && d && d.mode === 'resume' && d.shot && applyRoomShot(d.shot)) {
       bootDone = true;
       switchView('view-game');
       render();
       toast('已恢复上次未打完的牌桌');
+      resumeTable();
       cb(true);
       return;
     }
@@ -1872,7 +1866,7 @@ function reviveBustedAI() {
 }
 
 function startHand() {
-  if (!G || G.sessionOver) return;
+  if (!G || G.sessionOver || settlementPending || G.topUpPending) return;
   reviveBustedAI();                                  /* 下一手发牌前的唯一合法补码时点 */
   /* 只剩一人有筹码（对手全被打光）→ 本场通吃收工，否则会出现无人可行动的死锁 */
   var aliveCnt = 0;
@@ -1973,6 +1967,7 @@ function roundDone() {
    行动与推进（四轮下注）
    ============================================================ */
 function applyAction(idx, act, amount) {
+  if (settlementPending) return;
   if (!G || G.over || G.sessionOver) return;
   var p = G.players[idx];
   if (!p || p.out || p.folded || p.allin) return;
@@ -2053,17 +2048,16 @@ function nextStreet() {
   for (var k = 0; k < need; k++) G.community.push(G.deck.pop());
   eqDirty = true;
   sfx.flip();
+  G.toAct = actablePlayers().length <= 1 ? -1 : firstToActPostflop();
   render();
-  if (actablePlayers().length <= 1) { later(runOut, 640); return; }
-  G.toAct = firstToActPostflop();
   if (G.toAct < 0) { later(runOut, 640); return; }
-  render();
   scheduleAI();
 }
 
 /* 全下后一路发完公共牌 */
 function runOut() {
   if (!G || G.over || G.sessionOver) return;
+  G.toAct = -1;
   if (G.community.length >= 5) { showdown(); return; }
   var need = G.community.length === 0 ? 3 : 1;
   for (var k = 0; k < need; k++) G.community.push(G.deck.pop());
@@ -2395,6 +2389,17 @@ function aiObservation(idx) {
 function aiEquityOf(idx) { return aiObservation(idx).equity; }
 function aiDecide(idx) { return window.CSHTexasAI.decide(aiObservation(idx), Math.random); }
 
+function resumeTable() {
+  if (!alive || !G || G.sessionOver || settlementPending) return;
+  if (G.over) { showHandBanner(true); return; }
+  if (actablePlayers().length <= 1 && (G.toAct < 0 || roundDone())) { later(runOut, 640); return; }
+  if (G.toAct < 0 || !G.players[G.toAct] || G.players[G.toAct].folded || G.players[G.toAct].allin || G.players[G.toAct].out) {
+    advance();
+    return;
+  }
+  scheduleAI();
+}
+
 function scheduleAI() {
   if (!G || G.over || G.sessionOver) return;
   if (G.toAct < 0) return;
@@ -2472,7 +2477,7 @@ function topUpQuote(){
   return A.quote({
     minBuyIn:base,tableChips:me.chips,walletBalance:snap&&Number(snap.pc)||0,
     used:G.topUps||0,handOver:!!G.over,sessionOver:!!G.sessionOver,settled:settled,
-    conservationFailed:!!G.conservationFailed,pending:!!G.topUpPending
+    conservationFailed:!!G.conservationFailed,pending:!!G.topUpPending||settlementPending
   });
 }
 function requestTopUp(btn){
@@ -2481,7 +2486,7 @@ function requestTopUp(btn){
   var session=G,hand=G.handNo,amount=q.amount;
   var base=Math.max(0,(Number(G.buyIn)||0)-(Number(G.topUpTotal)||0));
   G.topUpPending=true;if(btn)btn.disabled=true;
-  Bridge.topUp(amount,function(ok,data){
+  function finish(ok,data){
     /* 迟到回调隔离：会话 / 手数 / 结算状态变了，绝不把钱写进旧桌。 */
     if(G!==session||G.sessionOver||G.handNo!==hand||!G.over){if(btn)btn.disabled=false;return;}
     G.topUpPending=false;
@@ -2493,11 +2498,24 @@ function requestTopUp(btn){
     var next=A.apply({chips:me.chips,buyIn:G.buyIn,topUpTotal:G.topUpTotal,topUps:G.topUps},amount,base);
     if(!next){if(btn)btn.disabled=false;toast('补码状态校验失败，桌面筹码未变','bad');return;}
     me.chips=next.chips;G.buyIn=next.buyIn;G.topUpTotal=next.topUpTotal;G.topUps=next.topUps;
+    if(data.shot){G.topUpTxId=data.txId;roomWriter.seed(data);}
     if(Bridge.active&&typeof syncBankFromWallet==='function')syncBankFromWallet();
     Bridge.topUpCommit(data.txId,function(){});   /* 清未决凭据；失败由启动恢复兜底 */
     renderHud();
     toast('补码 +'+fmt(amount)+' CBY 已上桌，本金同步计入');
-    showHandBanner();   /* 重绘按钮区：额度/次数刷新，输光分支变回「下一手」 */
+    showHandBanner(true);   /* 仅刷新补码后的按钮，不重复统计这一手。 */
+  }
+  Bridge.topUp(amount,function(ok,data){
+    if(!ok&&!data&&typeof Bridge.roomState==='function'){
+      Bridge.roomState(function(read,state){
+        var saved=state?.shot?.s;
+        if(read&&saved?.topUpTxId&&saved.buyIn===session.buyIn+amount&&saved.topUps===session.topUps+1&&saved.players?.[0]?.chips===session.players[0].chips+amount){
+          finish(true,{ok:true,amount:amount,txId:saved.topUpTxId,shot:state.shot,saveSeq:state.saveSeq});
+        }else finish(false,null);
+      });
+      return;
+    }
+    finish(ok,data);
   });
 }
 
@@ -2506,58 +2524,53 @@ function requestTopUp(btn){
    ============================================================ */
 var DECAY_TEXAS = 1;    /* 盈利回收率（§4.1.1） */
 var CAP_MULT = 25;         /* §H：单局净收益上限 = 带入 × 25%… 实际按 capOf 由钱包给出 */
+function sessionCashOutData() {
+  var session = G && !G.sessionOver ? G : null;
+  var buyIn = session ? session.buyIn : Bridge.buyIn();
+  return {
+    key: 'texas', buyIn: buyIn,
+    chips: session ? Math.max(0, Math.floor(session.players[0].chips)) : buyIn,
+    seats: session ? session.seats : [],
+    gamble: !!(session && session.gamble),
+  };
+}
+
 function endSession(reason) {
-  if (!G || G.sessionOver) return;
-  G.sessionOver = true;
-  var chips = Math.max(0, G.players[0].chips);
-  var buyIn = G.buyIn || 0;
-  var profit = chips - buyIn;
-  /* 负收益：只带回剩余筹码；正收益：带入 + 净赢×0.90 */
+  if (!G || G.sessionOver || settlementPending) return;
+  if (G.topUpPending) {
+    toast("补码尚未确认，请稍后结算");
+    if (G.over) showHandBanner(true);
+    return;
+  }
+  var data = sessionCashOutData();
+  var buyIn = data.buyIn, chips = data.chips, profit = chips - buyIn;
   var payout = profit >= 0 ? buyIn + Math.floor(profit * DECAY_TEXAS) : chips;
-  var netRaw = Math.max(0, payout - buyIn);
-  var capped = false;
 
-  G.players[0].chips = 0;
-
-  function finish(realPayout, wasCapped, discarded) {
-    /* ★ 2026-09-29：本次入场带入已消费（结算成功与否都一样）——
-       再想上桌必须回大厅重新入场缴费，堵死「输光免费重买」漏洞。 */
+  function finish(realPayout, capped, discarded) {
+    G.sessionOver = true;
+    G.players[0].chips = 0;
     entryUsed = true;
     if (realPayout > 0) sfx.quota();
-    /* ★ 2026-09-29 P0-B：横幅必须在**余额同步完成后**再渲染 ——
-       此前 showSessionBanner 同步执行，读到的 career.bank.bank 还是结算前的旧镜像
-       （用户实测：顶栏 1,500、横幅却写 500）。现在桥内先拉真值再画横幅。 */
-    var paint = function () { showSessionBanner(reason, realPayout, wasCapped, buyIn, chips, discarded || 0); };
-    if (Bridge.active) { syncBankFromWallet(function () { paint(); }); }
+    var paint = function () { showSessionBanner(reason, realPayout, capped, buyIn, chips, discarded || 0); };
+    if (Bridge.active) syncBankFromWallet(paint);
     else { career.bank.bank = Math.min(CAP, career.bank.bank + realPayout); saveBank(); renderHud(); paint(); }
   }
 
   if (Bridge.active) {
-    /* ★ 2026-09-29：一次调用完成「玩家入账」+「AI 世界双向记账」——
-       玩家赢走的钱按带入比例从各 AI 真实扣除，玩家输的钱按比例真实记入各 AI。
-       两侧严格零和，世界不再只减不增（此前 settleWin 零调用导致长期枯竭）。 */
-    Bridge.settleSession({
-      key: 'texas', buyIn: buyIn, chips: chips,
-      seats: (G && G.seats) || [],
-      gamble: !!(G && G.gamble),
-    }, function (ok, data) {
-      /* ★ 2026-09-29 P0-A：壳应答此前没有 ok 字段 ⇒ data.ok 恒 undefined ⇒
-         每次成功结算都被当失败（横幅谎报「实得 0」、toast 谎报「未入账」，
-         而钱包其实已正确入账）。现在壳补发 ok:true，这里改为 data.ok !== false 双保险。 */
-      if (ok && data && data.ok !== false) {
-        finish(data.gained != null ? data.gained : data.payout, !!data.capped, data.discarded || 0);
+    settlementPending = true;
+    clearAllTimers();
+    Bridge.settleSession(data, function (ok, result) {
+      settlementPending = false;
+      if (ok && result && result.ok !== false) {
+        finish(result.gained != null ? result.gained : result.payout, !!result.capped, result.discarded || 0);
       } else {
-        /* ★ 失败路径不落账（§0-9）：此前超时也按满额 payout 弹"结算 +X"，
-           属于幻觉结算（玩家看到 +8,200 但钱包没动）。现在如实告知。 */
-        toast('结算未成功，本局未入账（可退出后重查余额）', 'bad');
-        finish(0, false, 0);
+        toast('结算尚未确认，筹码已保留，可再次收工或关闭重试', 'bad');
+        resumeTable();
       }
     });
   } else {
     var before = career.bank.bank;
-    capped = before + payout > CAP;
-    saveBank();
-    finish(payout, capped);
+    finish(payout, before + payout > CAP, 0);
   }
 }
 
@@ -2955,37 +2968,39 @@ function toast(msg, cls) {
 var resultEpoch = 0;
 function hideBanner() { resultEpoch++; $('#banner').classList.add('hidden'); }
 
-function showHandBanner() {
+function showHandBanner(silent) {
   if (!G) return;
   resultEpoch++;
   ["banner-pots-section", "banner-ledger-section", "banner-review"].forEach(function(id){var d=document.getElementById(id);if(d)d.open=false;});
   document.getElementById("banner-review").hidden=!(G.review&&G.review.length);
   var me = G.players[0];
-  var won = G.winners.indexOf(me) >= 0;
-  if (!won) G.winStreak = 0;
-  career.best.hands++;
-  /* §4.1.5 统计：本场手数 / 连续未弃牌手数 */
-  G.handCount = (G.handCount || 0) + 1;
-  if (me.folded) G.noFoldStreak = 0; else G.noFoldStreak = (G.noFoldStreak || 0) + 1;
-  checkSessionAch();
-  saveBest();
-  /* §4.1.4 每日任务：手数进度 +1；若本手赢下则计胜场与大池 */
-  Task.ensureDay(todayStr());
-  var taskDone = Task.add('hands', 1);
-  if (won) {
-    taskDone = taskDone.concat(Task.add('wins', 1));
-    var myPot = 0;
-    if (G.lastResults && G.lastResults.length) {
-      for (var ti = 0; ti < G.lastResults.length; ti++) {
-        var tr = G.lastResults[ti];
-        for (var tj = 0; tj < tr.winners.length; tj++) if (tr.winners[tj].isHuman) myPot += tr.amount;
+  if (!silent) {
+    var won = G.winners.indexOf(me) >= 0;
+    if (!won) G.winStreak = 0;
+    career.best.hands++;
+    /* §4.1.5 统计：本场手数 / 连续未弃牌手数 */
+    G.handCount = (G.handCount || 0) + 1;
+    if (me.folded) G.noFoldStreak = 0; else G.noFoldStreak = (G.noFoldStreak || 0) + 1;
+    checkSessionAch();
+    saveBest();
+    /* §4.1.4 每日任务：手数进度 +1；若本手赢下则计胜场与大池 */
+    Task.ensureDay(todayStr());
+    var taskDone = Task.add('hands', 1);
+    if (won) {
+      taskDone = taskDone.concat(Task.add('wins', 1));
+      var myPot = 0;
+      if (G.lastResults && G.lastResults.length) {
+        for (var ti = 0; ti < G.lastResults.length; ti++) {
+          var tr = G.lastResults[ti];
+          for (var tj = 0; tj < tr.winners.length; tj++) if (tr.winners[tj].isHuman) myPot += tr.amount;
+        }
       }
+      if (myPot > 0) taskDone = taskDone.concat(Task.add('bigPot', myPot));
     }
-    if (myPot > 0) taskDone = taskDone.concat(Task.add('bigPot', myPot));
-  }
-  for (var td = 0; td < taskDone.length; td++) {
-    sfx.badge();
-    toast('任务完成 · ' + taskDone[td].label + ' +' + fmt(taskDone[td].reward), 'good');
+    for (var td = 0; td < taskDone.length; td++) {
+      sfx.badge();
+      toast('任务完成 · ' + taskDone[td].label + ' +' + fmt(taskDone[td].reward), 'good');
+    }
   }
 
   var t = $('#banner-title'), netEl = $('#banner-net'), s = $('#banner-sub');
@@ -3109,7 +3124,9 @@ function showHandBanner() {
       '<div class="rs-row' + (meLed.net > 0 ? ' win' : '') + '"><div class="rs-name">本手净变化</div><div class="rs-hand">获奖 + 返还 − 投入 − 场供</div><div class="rs-gain' + (meLed.net === 0 ? ' zero' : '') + '">' + (meLed.net > 0 ? '+' : '') + fmt(meLed.net) + '</div></div>' +
       (meLed.endStack != null ? '<div class="rs-row"><div class="rs-name">结算后筹码</div><div class="rs-hand">本手开始 ' + fmt(meLed.startStack) + '</div><div class="rs-gain">' + fmt(meLed.endStack) + '</div></div>' : '');
   }
-  if (net > 0) sfx.win(); else if (net < 0) sfx.lose(); else sfxPlay('settle.push');
+  if (!silent) {
+    if (net > 0) sfx.win(); else if (net < 0) sfx.lose(); else sfxPlay('settle.push');
+  }
 
   /* 关键手复盘：最多展示 4 个决策点；矮屏（手机横屏）只留 1~2 条，且省掉独立标题行
      （标题并进第一条的抬头），把横幅压在首屏内 —— 摊牌对比表才是主信息，复盘是次要参考。 */
@@ -3584,7 +3601,7 @@ function showStart() {
 }
 
 function startGame() {
-  if (!CSHPage.requireSave()) return;
+  if (settlementPending || !CSHPage.requireSave()) return;
   if (!canStart()) {
     toast(entryUsed || (Bridge.active && (Bridge.buyIn() | 0) <= 0)
       ? '本次入场的带入已结算 · 请关闭回大厅重新入场'
@@ -3602,65 +3619,34 @@ function startGame() {
 }
 
 function closePage() {
-  alive = false;
-  clearAllTimers();
-  var doClose = function () {
-    if (window.parent && window.parent !== window) {
-      window.parent.postMessage({ __csh: 'texas-close' }, '*');
-    } else if (typeof window.close === 'function') {
-      window.close();
-    }
-    document.body.style.display = 'none';
-  };
-  try {
-    /* ★ 2026-09-29 恶性 BUG 连带修复：关窗前未结算就先结算（幂等，与廿一点同款）。
-       没开过局（还停在开局页）→ chips = 带入 = 全额退款；
-       牌局中途直接关窗 → 按手上筹码结算，绝不让已扣的带入凭空蒸发。
-       结算失败时不再关窗（§审计 B-12）：关了窗提示就没人看见，钱滞留无自救路径。 */
-    if (Bridge.active && !entryUsed && (Bridge.buyIn() | 0) > 0) {
-      var biRef = Bridge.buyIn() | 0;
-      var chipsNow = (G && !G.sessionOver) ? Math.max(0, Math.floor(G.players[0].chips)) : biRef;
-      entryUsed = true;
-      Bridge.settleSession({
-        key: 'texas', buyIn: biRef, chips: chipsNow,
-        seats: (G && !G.sessionOver && G.seats) || [],
-        gamble: !!(G && !G.sessionOver && G.gamble),
-      }, function (ok) {
-        if (ok === false) {
-          entryUsed = false;
-          alive = true;
-          document.body.style.display = '';
-          toast('结算未成功，带入未入账 · 请勿重复开局，稍后再关闭重试', 'bad');
-          return;
-        }
-        doClose();
-      });
-      return;
-    }
-    doClose();
-  } catch (e) {
-    try { document.body.style.display = 'none'; } catch (e2) {}
+  if (settlementPending) return;
+  if (G && G.topUpPending) {
+    toast("补码尚未确认，请稍后关闭");
+    try { window.parent.postMessage({ __csh: "shell-close-cancelled" }, "*"); } catch (e) {}
+    return;
   }
+  clearAllTimers();
+  function doClose() {
+    alive = false;
+    if (window.parent && window.parent !== window) window.parent.postMessage({ __csh: "texas-close" }, "*");
+    else if (typeof window.close === "function") window.close();
+  }
+  if (!Bridge.active || Bridge.isSettled() || !(Bridge.buyIn() > 0)) { doClose(); return; }
+  settlementPending = true;
+  Bridge.settleSession(sessionCashOutData(), function (ok) {
+    settlementPending = false;
+    if (ok) { doClose(); return; }
+    toast("结算尚未确认，筹码已保留，可再次关闭重试", "bad");
+    try { window.parent.postMessage({ __csh: "shell-close-cancelled" }, "*"); } catch (e) {}
+    resumeTable();
+  });
 }
 
-/* 宿主「去结算」按钮（settle-request）：此前全扩展没人接这条消息，
-   按下去毫无反应 —— 现在德州如实响应：
-   · 牌局进行中 → 走正常收工结算（弹结算横幅）；
-   · 还没开局 → 全额退回带入并回到开局页（按钮文字随之变为"回大厅重新入场"）。 */
-window.addEventListener('message', function (ev) {
+window.addEventListener("message", function (ev) {
   var d = ev && ev.data;
-  if (!d || d.__csh !== 'settle-request') return;
-  try {
-    if (G && !G.sessionOver) { endSession('quit'); return; }
-    if (Bridge.active && !entryUsed && (Bridge.buyIn() | 0) > 0) {
-      var biReq = Bridge.buyIn() | 0;
-      entryUsed = true;
-      Bridge.settleSession({ key: 'texas', buyIn: biReq, chips: biReq, seats: [], gamble: false }, function (ok) {
-        toast(ok ? '未开局离场 · 带入 ' + fmt(biReq) + ' CBY 已全额退回' : '退款未成功，请截图反馈', ok ? 'good' : 'bad');
-        syncBankFromWallet(function () { showStart(); });
-      });
-    }
-  } catch (eSR) {}
+  if (ev.source !== window.parent || !d || d.__csh !== "settle-request" || settlementPending) return;
+  if (G && !G.sessionOver) { endSession("quit"); return; }
+  if (Bridge.active && !Bridge.isSettled() && Bridge.buyIn() > 0) closePage();
 }, false);
 
 /* ============================================================
@@ -3725,7 +3711,7 @@ window.__TX = {
   getG: function () { return G; },
   roomShot: roomShot,
   startGame: startGame,
-  getRoomDiag: function () { return { seq: roomSeq, known: roomSeqKnown, bootDone: bootDone }; },
+  getRoomDiag: function () { return Object.assign({ bootDone: bootDone }, roomWriter.state()); },
 };
 if (Bridge.active) {
   /* §4.1.1：先向宿主统一钱包同步本金与带入，再进开局页 */

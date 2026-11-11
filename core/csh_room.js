@@ -243,7 +243,12 @@
     if (d.phase !== 'active') return fail('房间尚未开桌');
     if (expectSeq != null) {
       if (!isSafe(expectSeq)) return fail('快照序号无效');
-      if (expectSeq !== d.saveSeq) return fail('快照已被更新');
+      if (expectSeq !== d.saveSeq) {
+        // 宿主落盘后确认丢失：只允许回放紧邻序号、内容完全一致的凭据。
+        if (d.saveSeq === expectSeq + 1 && !validateShot(shot) && JSON.stringify(shot) === JSON.stringify(d.shot))
+          return { ok: true, saveSeq: d.saveSeq };
+        return fail('快照已被更新');
+      }
     }
     var shotErr = validateShot(shot);
     if (shotErr) return fail('房间快照非法：' + shotErr);

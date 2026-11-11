@@ -133,12 +133,15 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 	function topUpJournalApi(){try{var w=typeof window!=='undefined'?window:null;return w&&w.CSHTopUpJournal?w.CSHTopUpJournal:null;}catch(e){return null;}}
 	function topUpStorage(){try{return typeof localStorage!=='undefined'?localStorage:null;}catch(e){return null;}}
 	var topUpRecovered=false;
-	function recoverTopUp(){
-		if(topUpRecovered)return null;topUpRecovered=true;
+	function recoverTopUp(force){
+		if(topUpRecovered&&!force)return null;topUpRecovered=true;
 		var J=topUpJournalApi(),S=topUpStorage(),W=wallet();
 		if(!J||!S||!W||!W.wallet||typeof W.wallet.add!=='function'||typeof W.wallet.pc!=='function')return null;
 		try{
-			/* E30：入账调用点必须是双引号字面量来源，否则会被 CBY 防护静默丢掉。 */
+			var pending;
+			try { pending=J.read(S); } catch (eRead) { pending=null; }
+			if(pending&&pending.roomId)return recoverRoomTopUp(J,S,W,pending);
+			/* 兼容早期未决凭据：继续走原有余额判定。 */
 			var r=J.recover(S,{pc:function(){return W.wallet.pc();},add:function(n){return W.wallet.add(n,"德州补码未决退款");}});
 			if(r.refunded)toast('已退回一笔未完成的德州补码 '+r.refunded+' CBY');
 			return r;
@@ -149,6 +152,28 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 	   于是局中被杀就只能认栽。现在扣款前先落一份凭据，结算成功后按同一编号清掉。
 	   模块缺失时**拒绝入场**，不静默降级成无凭据扣款（那正是要修的病）。 */
 	var currentRoomId = "";      // 本次入场对应的房间编号（空 = 不走凭据，例如练习/免带入）
+	function recoverRoomTopUp(J,S,W,pending) {
+		var RJ=roomApi(), RS=roomStorage();
+		if(!RJ||!RS||typeof W.wallet.commitTopUp!=="function"||typeof W.wallet.topUpDebitId!=="function")return {ok:false,reason:"补码恢复尚未就绪"};
+		var room=RJ.read(RS);
+		if(room&&room.id===pending.roomId&&room.shot?.s?.topUpTxId===pending.id)return J.commit(S,pending.id);
+		if(W.wallet.topUpDebitId()===pending.id){
+			var refund=W.wallet.commitTopUp(pending.id,pending.amount,true);
+			if(!refund.ok)return refund;
+			toast("已退回一笔未上桌的德州补码 "+pending.amount+" CBY");
+		}
+		return J.abort(S,pending.id);
+	}
+	function roomTopUpReady() {
+		var J=topUpJournalApi(), S=topUpStorage();
+		if(!J||!S)return true;
+		try{
+			var pending=J.read(S);
+			if(!pending||!pending.roomId)return true;
+			var recovered=recoverTopUp(true);
+			return !!(recovered&&recovered.ok);
+		}catch(e){return false;}
+	}
 	var resumeRoom = false;      // 本次是「续上一局」，不是新扣款
 	/* 续局时把快照里的原同桌交回页面：斗地主的结算要拿 TABLE_WORLD.seats 对照阵营，
 	   重新抽人会让「原桌的钱」和「新抽的人」对不上。 */
@@ -181,22 +206,20 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 		currentRoomId="";
 		return true;
 	}
-	/* 无法续局又确实扣过款时的退回：先把凭据推进到 settled（等于「已处理」，
-	   重启后不会再退一次），再按凭据金额入账，成功才清键。金额核对用 add 的返回值，
-	   不用「余额==balanceBefore」—— 若中途补过码，那个等式本来就不成立。 */
+	/* 放弃的房间只有在钱包确认余额和回执后才可清除。 */
 	function refundAbandonedRoom(st, why){
 		var RJ=roomApi(),RS=roomStorage(),W=wallet();
-		if(!RJ||!RS||!W||!W.wallet||typeof W.wallet.add!=='function')return false;
-		if(!st||!st.id||!Number.isSafeInteger(st.amount)||st.amount<=0)return false;
-		var mk;
-		try{ mk=RJ.markSettled(RS,st.id,st.amount); }catch(eM){ return false; }
-		if(!mk||mk.ok===false)return false;
-		var got=0;
-		try{ got=W.wallet.add(st.amount,"未完成的牌桌退回"); }catch(eA){ return false; }
-		if(Number(got)!==st.amount){ logError("牌桌退回金额不符，凭据保留待重试："+(why||"")); return false; }
-		try{ RJ.clear(RS); }catch(eC){}
-		toast("上一局未能恢复，已退回带入 "+fmt(st.amount)+" CBY");
-		return true;
+		if(!RJ||!RS||!W||!W.wallet||typeof W.wallet.settleRun!=="function"||!st||!st.id||
+			!Number.isSafeInteger(st.amount)||st.amount<=0)return false;
+		try{
+			if(W.wallet.roomReceipt().id!==st.id){
+				var result=W.wallet.settleRun(st.table,{buyIn:st.amount,netWin:0,settleId:st.id,roomRefund:true});
+				if(!result?.ok||result.credited!==st.amount){logError("牌桌退回尚未保存："+(why||""));return false;}
+				toast("上一局未能恢复，已退回带入 "+fmt(st.amount)+" CBY");
+			}
+			RJ.clear(RS);
+			return true;
+		}catch(e){return false;}
 	}
 	var paused = false;
 	var pausedAuto = false;   // 本次暂停是否自动触发（失焦/切页）。手动暂停不参与「回前台自动恢复」
@@ -851,6 +874,7 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 
 	function doCharge(key, tk, buyIn) {
 		if (persistenceBlocked()) { toast(persistenceRefused().reason); return false; }
+		if(typeof roomTopUpReady==="function"&&!roomTopUpReady()){toast("有一笔补码尚待恢复，请稍后重试");return false;}
 		var W = wallet();
 		if (!W) { toast("钱包未加载，无法收费"); closeFee(); return false; }
 		if (typeof W.tableResultStatus === "function") {
@@ -875,7 +899,10 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 		if (RJ && RS) {
 			var st = null;
 			try { st = RJ.read(RS); } catch (eR0) { try { RJ.clear(RS); } catch (eR1) {} st = null; }
-			if (st && st.phase === "settled") { try { RJ.clear(RS); } catch (eR2) {} st = null; }
+			var receipt=st&&typeof W.wallet.roomReceipt==="function"?W.wallet.roomReceipt():null;
+			if(st&&(st.phase==="settled"||receipt?.id===st.id||(st.phase==="preparing"&&W.wallet.pc()===st.balanceBefore))){
+				try{RJ.clear(RS);st=null;}catch(eR2){toast("上一局的凭据尚待清理，请稍后重试");return false;}
+			}
 			if (st && st.table === key) {
 				/* 有快照才谈得上续局；只有凭据没有牌面（扣款后、首手前被杀）就退回。 */
 				if (st.shot && st.phase !== "preparing") {
@@ -1441,6 +1468,15 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 		roomResumeSeats = resumeRoom ? roomSeatsOfSnapshot(currentRoomId) : null;
 		/* 新入场重置补码状态：次数是「每桌」而不是「每账号」。 */
 		topUpBaseBuyIn = currentBuyIn; topUpCount = 0; topUpTotal = 0;
+		if(key==="texas"&&resumeRoom){
+			try{
+				var resumed=roomApi().read(roomStorage()), resumedShot=resumed&&resumed.shot&&resumed.shot.s;
+				if(resumed?.id===currentRoomId&&resumedShot&&Number.isSafeInteger(resumedShot.topUps)&&resumedShot.topUps>=0&&resumedShot.topUps<=2&&
+					Number.isSafeInteger(resumedShot.topUpTotal)&&resumedShot.topUpTotal>=0&&currentBuyIn-resumedShot.topUpTotal===resumed.amount){
+					topUpBaseBuyIn=resumed.amount;topUpCount=resumedShot.topUps;topUpTotal=resumedShot.topUpTotal;
+				}
+			}catch(eTopUp){}
+		}
 		ensureStyle();
 		bindMessage(); bindEsc(); bindVisibility();
 		/* 新入场 = 新会话：清空结算守卫（上一局的"已结算"不能带到这一局） */
@@ -1639,42 +1675,51 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 			   读回确认后才回 ACK；页面收到 ACK 才增加桌面筹码。宿主侧独立校验次数与额度，
 			   不信任子页面传来的金额，防止伪造 postMessage 刷钱。 */
 			if (cmd === "shell-topup") {
-				var WT = wallet(), amt = Math.max(0, Math.floor(Number(d && d.amount) || 0));
-				var topUnit = Math.max(1, Math.ceil(topUpBaseBuyIn / 10));
-				if (current !== "texas" || !WT || typeof WT.wallet.spend !== "function" || typeof WT.wallet.pc !== "function") {
-					ackToGame(cmd, false, { ok: false, reason: "补码通道未就绪" }); return;
+				var WT=wallet(), TJ=topUpJournalApi(), TS=topUpStorage(), RJ=roomApi(), RS=roomStorage();
+				var A=window.CSHTexasTopUp, amt=d.amount, entry=null;
+				function refuseTopUp(reason){ackToGame(cmd,false,{ok:false,reason:reason});}
+				if(current!=="texas"||!currentRoomId||!WT||!WT.wallet||typeof WT.wallet.commitTopUp!=="function"||!TJ||!TS||!RJ||!RS||!A){
+					refuseTopUp("补码通道未就绪");return;
 				}
-				if (!Number.isSafeInteger(amt) || amt <= 0 || amt % topUnit !== 0 || amt > topUpBaseBuyIn) {
-					ackToGame(cmd, false, { ok: false, reason: "补码额度无效" }); return;
+				if(!roomTopUpReady()){refuseTopUp("上一笔补码尚待恢复");return;}
+				try{entry=RJ.read(RS);}catch(eRead){}
+				var old=entry?.shot?.s, player=old?.players?.[0];
+				if(entry?.id!==currentRoomId||entry.phase!=="active"||entry.saveSeq!==d.expectSeq||!old||!player?.isHuman||
+					old.buyIn!==currentBuyIn||old.topUps!==topUpCount||old.topUpTotal!==topUpTotal){
+					refuseTopUp("本手进度尚未保存，请稍后重试");return;
 				}
-				if (topUpCount >= 2) { ackToGame(cmd, false, { ok: false, reason: "本桌补码已达 2 次上限" }); return; }
-				var pcBefore = WT.wallet.pc();
-				if (!Number.isSafeInteger(pcBefore) || pcBefore < amt) {
-					ackToGame(cmd, false, { ok: false, reason: "余额不足" }); return;
+				var pcBefore=WT.wallet.pc();
+				var q=A.quote({minBuyIn:topUpBaseBuyIn,tableChips:player.chips,walletBalance:pcBefore,used:topUpCount,
+					handOver:old.over,sessionOver:old.sessionOver,settled:old.ledger?.roundId===old.sessionId+":"+old.handNo,conservationFailed:old.conservationFailed});
+				if(!q.ok||amt!==q.amount){refuseTopUp(q.reason||"补码额度已变化，请重试");return;}
+				var next=A.apply({chips:player.chips,buyIn:old.buyIn,topUpTotal:old.topUpTotal,topUps:old.topUps},amt,topUpBaseBuyIn);
+				if(!next){refuseTopUp("补码额度无效");return;}
+				var txId="tu-"+Date.now().toString(36)+"-"+Math.random().toString(36).slice(2,12);
+				var prep=TJ.prepare(TS,{id:txId,roomId:currentRoomId,amount:amt,balanceBefore:pcBefore,t:Date.now()});
+				if(!prep.ok){refuseTopUp(prep.reason||"补码凭据未写入");return;}
+				var debit=WT.wallet.commitTopUp(txId,amt,false);
+				if(!debit.ok){TJ.abort(TS,txId);refuseTopUp(debit.reason||"扣款未确认");return;}
+				var shot=entry.shot;
+				shot.buyIn=old.buyIn=next.buyIn;player.chips=next.chips;
+				old.topUps=next.topUps;old.topUpTotal=next.topUpTotal;old.topUpTxId=txId;
+				var saved=RJ.save(RS,currentRoomId,shot,entry.saveSeq);
+				if(!saved.ok){
+					roomTopUpReady();refuseTopUp("补码未能保存到牌桌，请稍后重试");return;
 				}
-				/* 扣款前先同步落盘未决凭据；写不进去就不扣、不上桌。 */
-				var TJ = topUpJournalApi(), TS = topUpStorage();
-				if (!TJ || !TS) { ackToGame(cmd, false, { ok: false, reason: "补码事务未就绪，桌面筹码未变" }); return; }
-				var txId = "tu-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 10);
-				var prep = TJ.prepare(TS, { id: txId, amount: amt, balanceBefore: pcBefore, t: Date.now() });
-				if (!prep.ok) { ackToGame(cmd, false, { ok: false, reason: prep.reason || "补码凭据未写入" }); return; }
-				var spent = WT.wallet.spend(amt, "德州补码");
-				if (spent !== true) { TJ.abort(TS, txId); ackToGame(cmd, false, { ok: false, reason: "扣款被拒绝，桌面筹码未变" }); return; }
-				if (WT.wallet.pc() !== pcBefore - amt) {
-					/* 绝不出现「扣了钱没上桌」：读回不一致就回补并如实失败，页面可重试。 */
-					try { WT.wallet.add(amt, "补码读回回补"); } catch (eRb) {}
-					TJ.abort(TS, txId);
-					ackToGame(cmd, false, { ok: false, reason: "扣款读回不一致，已回补，请重试" }); return;
-				}
-				topUpCount++; topUpTotal += amt; currentBuyIn += amt;
-				ackToGame(cmd, true, { ok: true, amount: amt, txId: txId, balance: WT.wallet.pc(), buyIn: currentBuyIn, count: topUpCount, total: topUpTotal });
+				/* 房间已含补码编号。此后即使清理被中断，重启也只清凭据。 */
+				TJ.commit(TS,txId);
+				topUpCount=next.topUps;topUpTotal=next.topUpTotal;currentBuyIn=next.buyIn;
+				ackToGame(cmd,true,{ok:true,amount:amt,txId:txId,balance:WT.wallet.pc(),buyIn:currentBuyIn,count:topUpCount,total:topUpTotal,saveSeq:saved.saveSeq,shot:shot});
 				return;
 			}
-			/* 页面确认筹码已上桌 → 清未决凭据。失败不清也不影响本局，下次启动恢复兜底。 */
+			/* 兼容已打开的旧页确认。新页的凭据只由钱包和已保存房间共同确认。 */
 			if (cmd === "shell-topup-commit") {
-				var CJ = topUpJournalApi(), CS = topUpStorage();
-				var cr = CJ && CS ? CJ.commit(CS, d && d.txId) : { ok: false, reason: "补码事务未就绪" };
-				ackToGame(cmd, !!cr.ok, cr); return;
+				var CJ=topUpJournalApi(), CS=topUpStorage(), cr={ok:false,reason:"补码事务未就绪"};
+				try{if(CJ&&CS){
+					var pending=CJ.read(CS);
+					cr=pending?.roomId?{ok:roomTopUpReady()}:CJ.commit(CS,d&&d.txId);
+				}}catch(eCommit){}
+				ackToGame(cmd,!!cr.ok,cr);return;
 			}
 			/* ★ 账本（v6.2）：池子币的**来源与去处**（作者："就是做账，账本"）。
 			   d.days = 热力格天数（缺省 42 = 6 周，GitHub 贡献图同款口径）。
@@ -1979,6 +2024,9 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 				var sd = (d.data && typeof d.data === "object") ? d.data : d;
 				var gk2 = guardKey();
 				if (GUARD[gk2]) { ackToGame("shell-settle-session", true, GUARD[gk2]); return; }
+				if(current==="texas"&&currentRoomId&&(!roomTopUpReady()||sd.buyIn!==currentBuyIn)){
+					ackToGame(cmd,false,{ok:false,reason:"牌桌本金尚待同步，请重新进入后结算"});return;
+				}
 				var r2 = settleSession(current, sd);
 				/* ★ 2026-09-29 P0：应答必须带 ok —— 德州 endSession 校验 data.ok，
 				   此前恒 undefined ⇒ 每次成功结算都被当成失败（横幅谎报「实得 0」、

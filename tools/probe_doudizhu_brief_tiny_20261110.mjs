@@ -157,10 +157,14 @@ assertControl(s915, '915×412', { briefW: 104, briefH: 33, handW: 781.1, handH: 
 const d1365 = await playDdz({ width: 1365, height: 768 }, 'desk1365');
 assertControl(d1365, '1365×768', { briefW: 112.4, briefH: 34, handW: 1200.8, handH: 109.1, line1H: 16, fs: 12.288 });
 
+const mid800 = await playDdz({ width: 800, height: 600 }, 'mid800');
+check('800×600：身份和剩余牌数完整', !!mid800 && !mid800.missing && fits(mid800), mid800);
+check('800×600：手牌仍为 17 张且未挤出手牌区', !!mid800 && !mid800.missing && mid800.n===17 && mid800.hand.lastR<=mid800.hand.r+1, mid800);
+
 const failures = rows.filter(r => !r.passed);
 fs.writeFileSync(path.join(out, 'results.json'), JSON.stringify({
   scope: 'real games/doudizhu/doudizhu.html in isolated Chromium; 640x286 & 700x350 tiny vs 915x412 & 1365x768 control',
-  rows, tiny: { t640, t700 }, control: { s915, d1365 }
+  rows, tiny: { t640, t700 }, control: { s915, d1365 }, mid800
 }, null, 2));
 console.log(JSON.stringify({ passed: rows.length - failures.length, failed: failures.length, failures, output: out }, null, 2));
 process.exitCode = failures.length ? 1 : 0;

@@ -347,7 +347,11 @@ body.empty .foot{display:none}
 #codex-skin-dialog .skin-body{display:grid;grid-template-columns:1.1fr 1fr;gap:14px;flex:1;min-height:0;margin-top:10px}
 #codex-skin-dialog .skin-preview{display:flex;align-items:center;justify-content:center;min-height:0;overflow:hidden;border-radius:10px;background:#0003}
 #codex-skin-dialog .skin-preview img{display:block;max-height:100%;max-width:100%;object-fit:contain}
-#codex-skin-dialog .skin-options{min-height:0;overflow:auto;display:flex;flex-direction:column;gap:8px}
+#codex-skin-dialog .skin-controls{min-width:0;min-height:0;display:flex;flex-direction:column;gap:8px}
+#codex-skin-dialog .skin-options{flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:6px;overscroll-behavior:contain}
+#codex-skin-dialog .skin-actions{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:6px}
+#codex-skin-dialog .skin-status{margin:0;color:var(--ink,#eee);font:var(--pfs-sm,12px)/1.45 var(--ff-body);overflow-wrap:anywhere}
+#codex-skin-dialog .skin-status:empty{display:none}
 #codex-skin-dialog .skin-options p{font:var(--pfs-sm,12px)/1.65 var(--ff-body);margin:0}
 #codex-skin-dialog button{font:var(--pfs-sm,12px)/1.4 var(--ff-body);min-height:44px;flex:none}
 #codex-skin-dialog .skin-option{text-align:left;padding:10px 12px}
@@ -1389,12 +1393,57 @@ function openSkinDialog(){
   var it=Data.items[Data.cur];if(!it||Data.disposed||!window.CSHSpiritSkins)return;
   closeSkinDialog(false);var view=Data.viewEpoch,selected,readError="";try{selected=CSHSpiritSkins.resolve(it.id,it.img,skinStorage());}catch(e){selected={skin:{id:"classic",portrait:it.img},requested:"classic"};readError="装扮偏好暂未读到，当前显示经典；关闭后可重试。";}
   var layer=el("section");layer.id="codex-skin-dialog";var panel=el("section","skin-panel"),head=el("div","skin-head"),title=el("h2","",it.name+" · 装扮"),back=el("button","affbtn","返回");back.type="button";back.onclick=function(){closeSkinDialog();};head.appendChild(title);head.appendChild(back);panel.appendChild(head);panel.setAttribute("role","dialog");panel.setAttribute("aria-modal","true");panel.setAttribute("aria-label",it.name+"的装扮");
-  var body=el("div","skin-body"),preview=el("div","skin-preview"),image=el("img"),options=el("div","skin-options"),status=el("p","",readError||(selected.unavailable?"原装扮暂不可用，当前显示经典；可恢复经典。":"")),apply=el("button","affbtn gold","使用此装扮"),restore=el("button","affbtn","恢复经典");image.alt=it.name+"装扮预览";preview.appendChild(image);status.setAttribute("role","status");apply.type=restore.type="button";var rows=CSHSpiritSkins.list(it.id,it.img),draft=selected.skin,loadSeq=0,loaded=false;
+  var body=el("div","skin-body"),preview=el("div","skin-preview"),image=el("img");
+  var controls=el("div","skin-controls"),options=el("div","skin-options"),actions=el("div","skin-actions");
+  var status=el("p","skin-status"),apply=el("button","affbtn gold","使用此装扮"),restore=el("button","affbtn","恢复经典");
+  image.alt=it.name+"装扮预览";preview.appendChild(image);status.setAttribute("role","status");
+  options.setAttribute("role","group");options.setAttribute("aria-label","可选装扮");
+  apply.type=restore.type="button";
+  var rows=CSHSpiritSkins.list(it.id,it.img),draft=selected.skin,loadSeq=0,loaded=false;
   function live(){return skinDialog&&skinDialog.layer===layer&&skinCurrent(it.id,view);}
-  function show(row){draft=row;loaded=false;var token=++loadSeq;apply.disabled=true;image.onload=function(){if(!live()||token!==loadSeq)return;loaded=true;apply.disabled=!!readError||draft.id===selected.requested;};image.onerror=function(){if(!live()||token!==loadSeq)return;loaded=false;apply.disabled=true;status.textContent=row.id==="classic"?"经典图片暂不可用，人物档案仍可查看。":"这套装扮图片暂不可用，已显示经典；当前装扮未更改。";if(row.id!=="classic"){image.onload=null;image.onerror=null;image.src=it.img;}};image.src=row.portrait;options.querySelectorAll(".skin-option").forEach(function(n){n.setAttribute("aria-pressed",String(n.dataset.skinId===row.id));});}
-  rows.forEach(function(row){var b=el("button","affbtn skin-option",row.name+(row.id===selected.requested?" · 当前使用":""));b.type="button";b.dataset.skinId=row.id;b.onclick=function(){if(live())show(row);};options.appendChild(b);});options.appendChild(el("p","","全部装扮已开放，可自由切换，无解锁顺序；仅改变外观，不影响战斗与好感。"));options.appendChild(status);options.appendChild(apply);options.appendChild(restore);restore.disabled=!!readError||selected.requested==="classic";
-  function accept(id){if(!live()||readError||!CSHPage.requireSave())return;try{CSHSpiritSkins.select(it.id,id,skinStorage());selected=CSHSpiritSkins.resolve(it.id,it.img,skinStorage());paintSpiritImage(it);var face=document.querySelector(".gitem.on .gface");if(face)paintSpiritFace(face.querySelector("img"),it,face);status.textContent="已使用"+selected.skin.name+"，仅改变外观。";showSkinGreeting(it,selected.skin);apply.disabled=draft.id===selected.requested;restore.disabled=selected.requested==="classic";options.querySelectorAll(".skin-option").forEach(function(n){var row=rows.find(function(r){return r.id===n.dataset.skinId;});n.textContent=row.name+(row.id===selected.requested?" · 当前使用":"");});}catch(e){status.textContent="装扮保存尚未确认，当前画面暂保留；恢复存储后可重试。";}}
-  apply.onclick=function(){if(loaded)accept(draft.id);};restore.onclick=function(){accept("classic");show(rows[0]);};body.appendChild(preview);body.appendChild(options);panel.appendChild(body);layer.appendChild(panel);
+  function updateControls(){
+    apply.disabled=!!readError||!loaded||draft.id===selected.requested;
+    restore.disabled=!!readError||selected.requested==="classic";
+    options.querySelectorAll(".skin-option").forEach(function(n){
+      var row=rows.find(function(r){return r.id===n.dataset.skinId;});
+      n.textContent=row.name+(row.id===selected.requested?" · 当前使用":"");
+      n.setAttribute("aria-pressed",String(row.id===draft.id));
+    });
+  }
+  function show(row,keepStatus){
+    draft=row;loaded=false;var token=++loadSeq;
+    if(!keepStatus)status.textContent=readError||(selected.unavailable?"原装扮暂不可用，当前显示经典。":"");
+    image.onload=function(){if(!live()||token!==loadSeq)return;loaded=true;updateControls();};
+    image.onerror=function(){
+      if(!live()||token!==loadSeq)return;
+      loaded=false;updateControls();
+      status.textContent=row.id==="classic"?"经典图片暂不可用，人物档案仍可查看。":"这套装扮图片暂不可用，已显示经典；当前装扮未更改。";
+      if(row.id!=="classic"){image.onload=null;image.onerror=null;image.src=it.img;}
+    };
+    image.src=row.portrait;updateControls();
+  }
+  rows.forEach(function(row){
+    var b=el("button","affbtn skin-option",row.name);b.type="button";b.dataset.skinId=row.id;
+    b.onclick=function(){if(live())show(row);};options.appendChild(b);
+  });
+  options.appendChild(el("p","","全部装扮已开放，无解锁顺序。"));
+  function accept(id){
+    if(!live()||readError||!CSHPage.requireSave())return false;
+    try{
+      CSHSpiritSkins.select(it.id,id,skinStorage());
+      selected=CSHSpiritSkins.resolve(it.id,it.img,skinStorage());
+      paintSpiritImage(it);
+      var face=document.querySelector(".gitem.on .gface");
+      if(face)paintSpiritFace(face.querySelector("img"),it,face);
+      status.textContent="已使用"+selected.skin.name+"，仅改变外观。";
+      showSkinGreeting(it,selected.skin);updateControls();return true;
+    }catch(e){status.textContent="装扮保存尚未确认，当前画面暂保留；恢复存储后可重试。";return false;}
+  }
+  apply.onclick=function(){if(loaded)accept(draft.id);};
+  restore.onclick=function(){if(accept("classic"))show(rows[0],true);};
+  actions.appendChild(apply);actions.appendChild(restore);
+  controls.appendChild(options);controls.appendChild(status);controls.appendChild(actions);
+  body.appendChild(preview);body.appendChild(controls);panel.appendChild(body);layer.appendChild(panel);
   function key(e){if(!live())return;if(e.key==="Escape"){e.preventDefault();e.stopImmediatePropagation();closeSkinDialog();}else if(e.key==="Tab"){var stops=Array.prototype.filter.call(panel.querySelectorAll("button"),function(n){return !n.disabled&&n.getClientRects().length;});var first=stops[0],last=stops[stops.length-1];if(!panel.contains(document.activeElement)||(e.shiftKey&&document.activeElement===first)||(!e.shiftKey&&document.activeElement===last)){e.preventDefault();(e.shiftKey?last:first).focus();}}else if(e.key==="ArrowLeft"||e.key==="ArrowRight")e.stopImmediatePropagation();}
   skinDialog={layer:layer,opener:$("#codex-skin-open"),key:key};document.addEventListener("keydown",key,true);layer.addEventListener("click",function(e){if(e.target===layer)closeSkinDialog();});document.body.appendChild(layer);show(draft);back.focus({preventScroll:true});
 }

@@ -152,7 +152,11 @@ no text, no letters, no numbers, no watermark, centered, flat lay, orthographic
 | B3 结算三档辉光（neutral / win / lose） | ✅ 已落地（烘进背景层，`:has` 渐进增强，极矮屏保留） |
 | B3 分隔纹样（横 / 纵） | ⬜ 未做（功能页标题落点不统一，收益低于风险） |
 | B1 桌边九宫格 / 筹码 | ⬜ 未做 |
-| S1 音效 8 个静默名 | ✅ 已修（8 条配方 + E95AW 10/0；实听待你） |
+| 皮肤去重（女帝 s1 与经典同图） | ✅ 已剔除（69 套 / 138 文件，旧档回退 classic） |
+| 金鳞市股价放大 + 极端行情 | ✅ 已落地（E95BA 17/0；顺带修长局趋势线无界 BUG） |
+| 人物互动扩写 | 📋 **方案先行**：`AFFECTION_INTERACTION_PLAN_20261111.md`，代码未动，等作者拍板 |
+| 全局 UI/报错巡检 | ✅ E95BB 62/0（15 页真实浏览器） |
+| S1 音效 8 个静默名 | ❌ **误判已纠正**（2026-11-11）：8 个名字在第二版配方表里一直存在、从未静默；删掉误补的 8 条死配方，E95AW 改为运行时 VM 真值口径。产品行为全程未变 |
 | S2 听感体系 | ⬜ 未做 |
 
 美术层文件：`core/csh_art_v2.css`（四桌，head 内最后加载）、`core/csh_bg_v2.css`（功能页）；资产：`image/ui/art-v2/{tables,cards,plates,buttons,bg,panels}/`。

@@ -32,13 +32,14 @@ function harness(src, { recovery = false } = {}) {
   const doc = {
     createElement: () => ({ id: '', setAttribute(k, v) { this[k] = v; }, style: {}, parentNode: null, textContent: '' }),
     getElementById: id => nodes.get(id) || null,
-    body: { appendChild(n) { n.parentNode = doc.body; nodes.set(n.id, n); notices.push(n); } },
+    body: { appendChild(n) { n.parentNode = doc.body; nodes.set(n.id, n); notices.push(n); }, removeChild(n) { n.parentNode = null; nodes.delete(n.id); } },
     documentElement: { appendChild() {} },
   };
   const win = {
     document: doc, localStorage: store, innerHeight: 800,
     addEventListener: (n, f) => { events[n] = f; },
-    setTimeout: (f, t) => { timers.push({ f, t }); return timers.length; }, clearTimeout() {},
+    setTimeout: (f, t) => { const timer = { f, t, at: now + t, cancelled: false }; timers.push(timer); return timer; },
+    clearTimeout(timer) { if (timer) timer.cancelled = true; },
   };
   win.parent = parent; win.window = win;
   const Clock = function () {};
@@ -53,6 +54,8 @@ function harness(src, { recovery = false } = {}) {
     win, ctx, parent, events, sent, notices, nodes, timers,
     T: win.CSHPage.transport({}),
     advance(ms) { now += ms; },
+    blockSaving() { recovery = true; },
+    runDueTimers() { for (const t of timers.filter(t => !t.cancelled && t.at <= now)) { t.cancelled = true; t.f(); } },
     ack(ok, data) {
       const m = sent[sent.length - 1];
       events.message({ source: parent, data: { __csh: m.__csh + '-ack', req: m.req, ok: !!ok, data: data == null ? null : data } });
@@ -82,8 +85,7 @@ const meritTexts = h => texts(h).filter(t => t.indexOf('本局功勋未入账') 
   const h = harness(pageSrc);
   h.T.callMerit(1, 'play');
   h.ack(false, null);
-  check('ack 无 reason（超时/宿主异常）→ 提示「请稍后重试」，不是空白',
-    meritTexts(h).length === 1 && meritTexts(h)[0].indexOf('请稍后重试') >= 0, texts(h));
+  check('无回执原因时只提示尚未确认', meritTexts(h).length === 0 && texts(h)[0].includes('尚未确认'), texts(h));
 }
 {
   const h = harness(pageSrc);
@@ -95,8 +97,8 @@ const meritTexts = h => texts(h).filter(t => t.indexOf('本局功勋未入账') 
   const h = harness(pageSrc);
   h.T.callMerit(1, 'play');
   h.fireTimers();                       // 触发 call 自带的超时回调
-  check('桥超时也如实提示（不是静默丢功勋）',
-    meritTexts(h).length === 1 && meritTexts(h)[0].indexOf('请稍后重试') >= 0, texts(h));
+  h.ack(true, { ok: true, gained: 1 });
+  check('超时后迟到成功不会留下未入账的误报', meritTexts(h).length === 0 && texts(h)[0].includes('尚未确认'), texts(h));
 }
 
 /* ---------- 2. 合并与不重复 ---------- */
@@ -121,6 +123,16 @@ const meritTexts = h => texts(h).filter(t => t.indexOf('本局功勋未入账') 
   check('恢复期桥层本地短路：不重复发消息', h.sent.length === 0, h.sent.length);
   check('恢复期只显示通用存档提示，不额外弹「功勋未入账」',
     texts(h).length === 1 && meritTexts(h).length === 0, texts(h));
+}
+
+{
+  const h = harness(pageSrc);
+  h.T.callMerit(2, 'win'); h.ack(false, { reason: '写入被拒绝' });
+  h.advance(4700); h.blockSaving(); h.T.call('shell-sign', {}, () => {});
+  h.advance(300); h.runDueTimers();
+  check('旧提示到期不移除新的存档提示', h.nodes.get('csh-page-save-notice')?.textContent.includes('存档操作'));
+  h.advance(4700); h.runDueTimers();
+  check('新提示有完整五秒展示期', !h.nodes.has('csh-page-save-notice'));
 }
 
 /* ---------- 3. 静态接线（防「写了没接上」） ---------- */

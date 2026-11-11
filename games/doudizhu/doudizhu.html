@@ -327,6 +327,9 @@
   }
   .my-hand > .pcard + .pcard { margin-left: var(--ov, calc(var(--cw) * -.4)); }
   .csh-player .pl-brief { max-width: min(30%, 300px); }
+  @media (orientation: landscape) and (max-width: 1199px) and (min-height: 500px) {
+    .csh-player .pl-brief { min-width: min(30%, 116px); }
+  }
   .pl-line .num { font-variant-numeric: tabular-nums; }
   .sel-info {
     display: flex; align-items: baseline; gap: 6px; min-width: 0;
@@ -2103,7 +2106,7 @@ function renderAll(dealAnim) {
 var ROOM_KEYS = ['names','personas','seeds','hands','bottom','bottomShown','landlord','turn',
   'phase','lastPlay','centerLast','actions','passCount','plays','bid','redeal','winner','over',
   'auto','stake','mult','multLog','aiStakes','chips','actionEpoch','practice','freeRound'];
-var roomSeq = 0, lastRoomJson = '', roomSeqKnown = false, bootDone = false;
+var roomWriter = CSHPage.roomWriter(Bridge.roomSave), bootDone = false;
 
 function roomShot() {
   var s = {};
@@ -2119,15 +2122,8 @@ function roomShot() {
 }
 
 function saveRoom() {
-  if (!Bridge.active || typeof Bridge.roomSave !== 'function' || !bootDone) return;
-  if (game.over || game.phase === 'idle') return;   // 开局页/已收工不写
-  var shot, text;
-  try { shot = roomShot(); if (!shot) return; text = JSON.stringify(shot); } catch (eS) { return; }
-  if (text === lastRoomJson) return;
-  lastRoomJson = text;
-  Bridge.roomSave(shot, roomSeqKnown ? roomSeq : null, function (ok, d) {
-    if (ok && d && Number.isSafeInteger(d.saveSeq)) { roomSeq = d.saveSeq; roomSeqKnown = true; }
-  });
+  if (!Bridge.active || !bootDone || game.over || game.phase === 'idle') return;
+  roomWriter.push(roomShot());
 }
 
 /* 只接受白名单字段；失败就当没恢复，继续走开局页。 */
@@ -2147,11 +2143,13 @@ function applyRoomShot(shot) {
 function roomResume(cb) {
   if (typeof Bridge.roomState !== 'function') { bootDone = true; cb(false); return; }
   Bridge.roomState(function (ok, d) {
-    if (ok && d && Number.isSafeInteger(d.saveSeq)) { roomSeq = d.saveSeq; roomSeqKnown = true; }
+    if (ok) roomWriter.seed(d);
     if (ok && d && d.mode === 'resume' && d.shot && applyRoomShot(d.shot)) {
       bootDone = true;
       switchView('view-game');
-      renderAll();
+      if (game.phase === 'bid') bidStep();
+      else if (game.phase === 'play') scheduleTurn();
+      else renderAll();
       toast('已恢复上次未打完的牌桌');
       cb(true);
       return;
@@ -2555,7 +2553,7 @@ window.__DDZ = {
   getGame: function () { return game; },
   roomShot: roomShot,
   startGame: startGame,
-  getRoomDiag: function () { return { seq: roomSeq, known: roomSeqKnown, bootDone: bootDone }; },
+  getRoomDiag: function () { return Object.assign({ bootDone: bootDone }, roomWriter.state()); },
 };
 </script>
 </body>

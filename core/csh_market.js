@@ -23,7 +23,21 @@ export const BASE_PRICE = 1000;          /* 初始价（CBY/股） */
 export const TRADE_FEE = 0.02;           /* 买卖手续费各 2% */
 export const DIV_RATE = 0.015;           /* 持仓日分红 1.5%（现价 × 持仓） */
 export const DRIFT_MIN = 0.002, DRIFT_MAX = 0.005;   /* 长期慢牛 0.2%~0.5%/日 */
-export const NOISE_MIN = 0.02, NOISE_MAX = 0.09;     /* 短期噪声 ±2%~9%/日 */
+/* 2026-11-11 波动放大：常规噪声 ±3.5%~16%/日（原 ±2%~9%）；
+   极少数（1.5%/只/日）触发「极端行情」，当日噪声再乘 2.2~3.6 倍。
+   两个上限是硬护栏：单日涨跌截断 ±45%、价格封顶 20× 基准价，
+   防止离线补算 30 天连着极端把价格推到溢出、把 UI 数字撑破或打到 50 地板。
+   买卖/分红公式、手续费、资金守恒一律不动。 */
+export const NOISE_MIN = 0.035, NOISE_MAX = 0.16;
+export const SHOCK_CHANCE = 0.015;
+export const SHOCK_MIN = 2.2, SHOCK_MAX = 3.6;
+export const DAILY_CAP = 0.45;
+export const PRICE_CAP = BASE_PRICE * 20;
+const PRICE_FLOOR = 50;
+/* 趋势线的天数上限：指数慢牛跑几百天就会把价格顶到 PRICE_CAP，
+   之后上涨被封顶、下跌不封顶 → 涨跌分布偏斜、中位波动被压到 2%。
+   封 400 天（约一年游戏时间）后趋势线稳住，价格围绕它波动，长局不失真。 */
+export const TREND_DAYS_CAP = 400;
 export const PULL_BACK = 0.25;           /* 每日向趋势线的回归力度 */
 export const MAX_CATCHUP_DAYS = 30;      /* 离线补算上限（防久未上线一次算爆） */
 export const WELCOME_GIFT = 1000;        /* 首次开市的体验金 */
@@ -1099,12 +1113,25 @@ export function ensureDay() {
 			s.dayNo++;
 			for (const id of LISTED) {
 				const drift = driftOf(id);
-				const noise = (Math.random() * 2 - 1) * noiseOf(id);
-				const trend = BASE_PRICE * Math.pow(1 + drift, s.dayNo) * (1 + heatOf(id));
-				let p = (typeof s.prices[id] === "number" && s.prices[id] > 0) ? s.prices[id] : BASE_PRICE;
-				p = p * (1 + drift + noise);
-				p = p + (trend - p) * PULL_BACK;
-				s.prices[id] = Math.max(50, Math.round(p * 100) / 100);
+				/* 极端行情：极少数日子把当日噪声放大，并减弱回归，让这一跳真的看得见。
+				   固定 Math.random=0.5 的既有持久化探针不会触发 shock（0.5 > 0.015）。 */
+				let shock = 1;
+				if (Math.random() < SHOCK_CHANCE) shock = SHOCK_MIN + Math.random() * (SHOCK_MAX - SHOCK_MIN);
+				let noise = (Math.random() * 2 - 1) * noiseOf(id) * shock;
+				noise = Math.max(-DAILY_CAP, Math.min(DAILY_CAP, noise));
+				/* 与价格同限：dayNo 会一直累加，无上限的指数趋势线在长局里会涨到数十万，
+				   而价格封顶 2 万 → dev 变成 -99% 的假数据。 */
+				const trendDays = Math.min(s.dayNo, TREND_DAYS_CAP);
+				const trend = Math.min(PRICE_CAP, BASE_PRICE * Math.pow(1 + drift, trendDays) * (1 + heatOf(id)));
+				const oldPrice = s.prices[id];
+				const validPrice = Number.isFinite(oldPrice) && oldPrice > 0 ? oldPrice : BASE_PRICE;
+				// 旧版没有价格上限，先把超界旧价归入新价格区间，再计算当日涨跌。
+				const previous = Math.max(PRICE_FLOOR, Math.min(PRICE_CAP, validPrice));
+				let p = previous * (1 + drift + noise);
+				p += (trend - p) * (shock > 1 ? PULL_BACK * 0.35 : PULL_BACK);
+				const lower = Math.max(PRICE_FLOOR * 100, Math.ceil(previous * (100 - DAILY_CAP * 100)));
+				const upper = Math.min(PRICE_CAP * 100, Math.floor(previous * (100 + DAILY_CAP * 100)));
+				s.prices[id] = Math.max(lower, Math.min(upper, Math.round(p * 100))) / 100;
 			}
 			/* 分红（按结算日当天的价格） */
 			for (const id in s.hold) {
@@ -1165,7 +1192,8 @@ export function snapshot() {
 			const price = (typeof s.prices[id] === "number") ? s.prices[id] : BASE_PRICE;
 			const hold = s.hold[id] | 0;
 			const cost = s.cost[id] || 0;
-			const trend = BASE_PRICE * Math.pow(1 + driftOf(id), s.dayNo) * (1 + heatOf(id));
+			const trendDays = Math.min(s.dayNo, TREND_DAYS_CAP);
+			const trend = Math.min(PRICE_CAP, BASE_PRICE * Math.pow(1 + driftOf(id), trendDays) * (1 + heatOf(id)));
 			const chg = trend > 0 ? (price / trend - 1) : 0;   /* 与趋势线的偏离 = 当日短线位置 */
 			/* v6.3 好感度：给页面一份"她的关系正在替你赚钱"的明细 */
 			const ag = affOf(id);

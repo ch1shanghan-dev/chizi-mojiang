@@ -1,4 +1,5 @@
-/* 池子魔将 · 妖灵装扮生产注册表（2026-11-09 首批：18 位妖灵 / 70 套）
+/* 池子魔将 · 妖灵装扮生产注册表（2026-11-09 首批：18 位妖灵 / 70 套；
+ * 2026-11-11 去除女帝与经典同图的 s1；2026-11-12 新增春丽 3 套、蒂法 2 套，合计 20 位 / 74 套）
  * ------------------------------------------------------------------
  * 素材由作者提供，逐张识图后按人像构图单独裁切，统一 1300x1600 webP 立绘
  * + 400x500 webP 头像。资源路径只走 ASCII，桌面原图不入库、不改动。
@@ -22,6 +23,15 @@
   if (!S || typeof S.register !== 'function') return;
 
   var DATA = {
+    'csh_boss_minion_chunli': [
+      { id: 's1', name: '碧浪', portrait: 'image/spirit-skins/chunli/s1.webp', face: 'image/spirit-skins/chunli/s1_face.webp' },
+      { id: 's2', name: '鎏灯舞', portrait: 'image/spirit-skins/chunli/s2.webp', face: 'image/spirit-skins/chunli/s2_face.webp' },
+      { id: 's3', name: '晴海', portrait: 'image/spirit-skins/chunli/s3.webp', face: 'image/spirit-skins/chunli/s3_face.webp' },
+    ],
+    'csh_boss_minion_tifa': [
+      { id: 's1', name: '晴池花影', portrait: 'image/spirit-skins/tifa/s1.webp', face: 'image/spirit-skins/tifa/s1_face.webp' },
+      { id: 's2', name: '街巷日光', portrait: 'image/spirit-skins/tifa/s2.webp', face: 'image/spirit-skins/tifa/s2_face.webp' },
+    ],
     'csh_boss_minion_mai': [
       { id: 's1', name: '红装', portrait: 'image/spirit-skins/mai/s1.webp', face: 'image/spirit-skins/mai/s1_face.webp' },
     ],
@@ -48,7 +58,10 @@
       { id: 's2', name: '晨光', portrait: 'image/spirit-skins/kaguya/s2.webp', face: 'image/spirit-skins/kaguya/s2_face.webp' },
     ],
     'csh_boss_minion_empress': [
-      { id: 's1', name: '绯衣', portrait: 'image/spirit-skins/empress/s1.webp', face: 'image/spirit-skins/empress/s1_face.webp' },
+      /* 2026-11-11 剔除 s1「绯衣」：它与经典基座 image/csh_minion_empress.webp
+         是同一张原图的不同裁切（姿势/红衣白毛领/金耳环/背景花纹完全一致）。
+         经典形象已由基座自动置顶，再挂一套等于重复陈列。
+         已选过 s1 的旧档不必迁移：resolve()/skinOf() 找不到该 ID 会回退 classic。 */
       { id: 's2', name: '白衣', portrait: 'image/spirit-skins/empress/s2.webp', face: 'image/spirit-skins/empress/s2_face.webp' },
       { id: 's3', name: '红装', portrait: 'image/spirit-skins/empress/s3.webp', face: 'image/spirit-skins/empress/s3_face.webp' },
       { id: 's4', name: '正装', portrait: 'image/spirit-skins/empress/s4.webp', face: 'image/spirit-skins/empress/s4_face.webp' },

@@ -787,7 +787,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 		if(!Number.isSafeInteger(charge)||typeof reason!=="string"||!reason.trim()||reason.length>120||charge>PC_CAP||charge< -SINGLE_ADD_CAP)return {ok:false,reason:"付费操作参数无效"};
 		if(charge>0&&wallet.pc<charge)return {ok:false,reason:"poor",balance:wallet.pc};
 		if(charge<0&&wallet.pc-charge>PC_CAP)return {ok:false,reason:"余额空间不足",balance:wallet.pc};
-		var safe;try{safe=field==="affectionSaved"?validateAffectionState(state):field==="cheerState"?validateCheerState(state):field==="dailyTaskSaved"?validateTaskState(state):field==="bossSaved"?validateBossSaved(state):null;if(!safe)throw Error("empty");}catch(e){return {ok:false,reason:"付费操作状态无效"};}
+		var safe;try{safe=field==="affectionSaved"?validateAffectionState(state):field==="cheerState"?validateCheerState(state):field==="dailyTaskSaved"?validateTaskState(state):field==="bossSaved"?validateBossSaved(state):field==="topUpDebitId"&&typeof state==="string"&&/^[a-zA-Z0-9_-]{10,100}$/.test(state)?state:null;if(!safe)throw Error("empty");}catch(e){return {ok:false,reason:"付费操作状态无效"};}
 		try{validateCheckpointLedger(wallet.checkpointPending);if(taskHistory!==undefined){if(field!=="dailyTaskSaved")throw Error("field");taskHistory=validateTaskLifetime(taskHistory);}}catch(e){return {ok:false,reason:"付费操作流水或日课累计记录异常"};}
 		flushCheckpointLedger();
 		if(charge&&Array.isArray(wallet.checkpointPending)&&wallet.checkpointPending.length>=100)return {ok:false,reason:"历史流水正在恢复，请稍后重试"};
@@ -807,6 +807,13 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
         var result=commitCheckpoint("bossSaved",state,cost,"悬赏:"+id);
         return result.ok?{ok:true,id:id,cost:cost,pc:result.balance,ledgerPending:result.ledgerPending}:{ok:false,reason:result.reason==="poor"?"poor":"save"};
     }
+	function commitTopUp(id, amount, refund) {
+		if (typeof id !== "string" || !/^tu-[a-zA-Z0-9_-]{10,90}$/.test(id) ||
+			!Number.isSafeInteger(amount) || amount <= 0 || amount > SINGLE_ADD_CAP) return { ok: false, reason: "补码凭据无效" };
+		if (refund && wallet.topUpDebitId !== id) return { ok: true, already: true };
+		if (!refund && wallet.topUpDebitId === id) return { ok: true, already: true };
+		return commitCheckpoint("topUpDebitId", refund ? "refund-"+id : id, refund ? -amount : amount, refund ? "德州补码未决退款" : "德州补码");
+	}
 	function commitAffection(state,cost,reason){return commitCheckpoint("affectionSaved",state,cost,reason);}
 	function commitCheerState(state,charge,reason){if(!Number.isSafeInteger(charge)||charge<0||charge>1000000)return {ok:false,reason:"应援金额无效"};return commitCheckpoint("cheerState",state,charge,reason);}
 
@@ -1225,6 +1232,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
             if(Array.isArray(wallet.checkpointPending)&&wallet.checkpointPending.length>=100)throw Error('ledger pending');
             wallet=JSON.parse(JSON.stringify(wallet));
             credited=r.payout>SINGLE_ADD_CAP?0:Math.max(0,Math.min(r.payout,PC_CAP-wallet.pc));
+            if(opts.roomRefund===true&&credited!==opts.buyIn)throw Error("余额空间不足，无法全额退回带入");
             wallet.pc+=credited;wallet.pcPeak=Math.max(wallet.pcPeak,wallet.pc);
             if(credited){appendChain(credited);wallet.checkpointSeq=(Number.isSafeInteger(wallet.checkpointSeq)?wallet.checkpointSeq:0)+1;if(!Array.isArray(wallet.checkpointPending))wallet.checkpointPending=[];wallet.checkpointPending.push({t:Date.now(),d:credited,r:'结算/'+gameKey,c:catOf('结算/'+gameKey),b:wallet.pc,checkpointTx:'cp-'+Date.now().toString(36)+'-'+wallet.checkpointSeq+'-'+Math.random().toString(36).slice(2,10)});}
             if(typeof opts.prepareWorldResult==="function"){
@@ -2339,7 +2347,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
             careerUnlocks: careerUnlocks, syncCareerUnlocks: syncCareerUnlocks,
             playerMatches:playerMatches,commitPlayerMatch:commitPlayerMatch,
 			claimPool: claimPool, poolClaimed: poolClaimed, poolPending: function(id) { return !!(wallet.poolClaims && wallet.poolClaims[id] && !poolClaimed(id)); },
-			affectionSaved: affectionSaved, commitAffection: commitAffection, cheerState: cheerState, commitCheerState: commitCheerState, flushCheckpoints: flushCheckpoints,
+			affectionSaved: affectionSaved, commitAffection: commitAffection, commitTopUp: commitTopUp, topUpDebitId: function () { return wallet.topUpDebitId || ""; }, cheerState: cheerState, commitCheerState: commitCheerState, flushCheckpoints: flushCheckpoints,
 			commitMarket: commitMarket, marketPending: marketPending, marketSaved: marketSaved, completeMarket: completeMarket,
 			bossSaved: bossSaved, preserveBoss: preserveBoss, commitBounty: commitBounty, commitBossEvent: commitBossEvent, bossRewardState: bossRewardState, flushBossRewards: flushBossRewards,
 			assistedStats: assistedStats, settleAssisted: settleAssisted,

@@ -95,7 +95,7 @@
 			return true;
 		} catch (eRead) { saveReason = "暂时无法保存，请关闭后重新进入"; return false; }
 	}
-	var saveNoticeAt = 0;
+	var saveNoticeAt = 0, pageNoticeTimer = 0;
 	/* 页内常驻提示条（唯一节点，存档提示与功勋提示共用，避免两条叠在牌桌上）。
 	   节流由各自调用方管：存档 2 秒、功勋 6 秒；显示 5 秒后自动移除。 */
 	function pageNotice(text) {
@@ -107,7 +107,11 @@
 				(doc.body || doc.documentElement).appendChild(node);
 			}
 			node.textContent = text;
-			setTimeout(function () { if (node.parentNode) node.parentNode.removeChild(node); }, 5000);
+			clearTimeout(pageNoticeTimer);
+			pageNoticeTimer = setTimeout(function () {
+				pageNoticeTimer = 0;
+				if (node.parentNode) node.parentNode.removeChild(node);
+			}, 5000);
 			return true;
 		} catch (eNotice) { return false; }
 	}
@@ -119,18 +123,54 @@
 	function requireSave() { if (saveAllowed()) return true; saveNotice(); return false; }
 
 	/* 功勋上报失败提示（2026-11-10 · 手册 §10-2「数据未保存的漏报」）。
-	   shell-merit 是写存档命令：宿主 saveRank 拒写 / 记录超范围 / 桥超时都会让
-	   功勋静默丢失。此前三张牌桌页的 Bridge.merit 直接透传 call 且不传回调，
-	   玩家打完一手一分功勋没入账、界面毫无反应 —— 与 UNO R3-2 修过的
-	   「结算回调不看 ok」是同一类。统一在共享桥层如实提示，三页不再各写一份。
+	   明确拒绝与未收到确认是两种状态。只在宿主明确拒绝时显示未入账。
 	   本地 requireSave() 短路已有 saveNotice()，用 recovery 标记跳过、不重复弹。 */
 	var meritNoticeAt = 0;
 	function meritNotice(data) {
 		if (Date.now() - meritNoticeAt < 6000) return;
 		if (Date.now() - saveNoticeAt < 2000) return;   /* 与通用存档提示错开 */
 		meritNoticeAt = Date.now();
-		var why = data && data.reason ? "：" + data.reason : "，请稍后重试";
-		pageNotice("本局功勋未入账" + why);
+		pageNotice(data && data.reason ? "本局功勋未入账：" + data.reason : "本局功勋入账尚未确认，可稍后查看生涯记录");
+	}
+	/* 一次只发送一份快照，等宿主确认序号后再发送最新状态。 */
+	function roomWriter(send) {
+		var seq = null, saved = "", latest = "", inFlight = false, error = "";
+		function write(text, retry) {
+			inFlight = true;
+			send(JSON.parse(text), seq, function (ok, data) {
+				if (ok && data && Number.isSafeInteger(data.saveSeq)) {
+					seq = data.saveSeq;
+					saved = text;
+					error = "";
+					inFlight = false;
+					flush();
+					return;
+				}
+				if (!ok && !data && !retry) {
+					write(text, true); // 同一序号、同一内容，允许重取丢失的确认。
+					return;
+				}
+				inFlight = false;
+				if (ok || (data && data.recovery)) return;
+				if (!error) pageNotice("最新牌局进度尚未保存，请稍后再退出");
+				error = (data && data.reason) || "宿主未应答";
+			});
+		}
+		function flush() {
+			if (!inFlight && latest && latest !== saved) write(latest, false);
+		}
+		return {
+			seed: function (data) {
+				if (data && Number.isSafeInteger(data.saveSeq)) seq = data.saveSeq;
+				saved = data && data.shot ? JSON.stringify(data.shot) : "";
+			},
+			push: function (shot) {
+				if (!shot) return;
+				try { latest = JSON.stringify(shot); } catch (e) { return; }
+				flush();
+			},
+			state: function () { return { seq: seq, known: seq !== null, error: error }; },
+		};
 	}
 	function rnd(n) { return Math.floor(Math.random() * n); }
 	function rndMs(a, b) { return a + Math.random() * (b - a); }
@@ -211,7 +251,7 @@
 		function writesSave(name, payload) {
 			if (name === "shell-open" && payload && payload.key === "save") return false;
 			return ["shell-settle", "shell-settle-session", "shell-task-add", "shell-merit",
-				"shell-sign", "shell-relief", "shell-career-sync", "shell-ach-claim", "shell-ach-claim-all", "shell-pool-ach-claim", "shell-trade",
+				"shell-sign", "shell-relief", "shell-career-sync", "shell-ach-claim", "shell-ach-claim-all", "shell-pool-ach-claim", "shell-trade", "shell-room-save",
 				"shell-goldfish", "shell-market-new", "shell-aff-do", "shell-cheer", "shell-bounty",
 				"shell-seat", "shell-world-round", "shell-world-result", "shell-open", "shell-results-retry", "shell-pool-ach-claim-all", "shell-cheer-ack", "shell-cheer-import"].indexOf(name) >= 0;
 		}
@@ -467,7 +507,7 @@
 root.CSHPage = {
 		fmt: fmt, lsGet: lsGet, lsSet: lsSet, rnd: rnd, rndMs: rndMs, transport: transport,
 		statusOf: statusOf, say: say, sayThrottled: sayThrottled, QUIPS: QUIPS, seatAnchor: seatAnchor,
-		toastCap: toastCap,
+		toastCap: toastCap, roomWriter: roomWriter,
 		saveAllowed: saveAllowed, requireSave: requireSave,
 	};
 })(typeof window !== "undefined" ? window : this);
