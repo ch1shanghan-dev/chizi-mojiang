@@ -701,6 +701,26 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 		if(x.legacyImported!=null&&(!Array.isArray(x.legacyImported)||x.legacyImported.length>4096||x.legacyImported.some(function(id){return !text(id,120,true)||!/^[A-Za-z0-9_.:-]+$/.test(id);})||new Set(x.legacyImported).size!==x.legacyImported.length))throw Error("旧应援迁入凭据异常");
 		return x;
 	}
+	/* 皮肤解锁与 CBY 必须共用同一次严格写入。v1 旧偏好只在皮肤模块迁为 v2，
+	   钱包只接收已经规整过的 v2 权益，避免未知旧数据参与扣款。 */
+	function validateSpiritSkins(value) {
+		if (value == null) return null;
+		var x = JSON.parse(JSON.stringify(value));
+		if (x.v !== 2 || !x.selected || typeof x.selected !== "object" || Array.isArray(x.selected) ||
+			!x.unlocked || typeof x.unlocked !== "object" || Array.isArray(x.unlocked) ||
+			Object.keys(x.selected).length > 1000 || Object.keys(x.unlocked).length > 1000) throw Error("装扮权益格式异常");
+		var idRE = /^csh_boss_minion_[a-z0-9_]{1,50}$/, skinRE = /^[A-Za-z0-9_-]{1,60}$/;
+		Object.keys(x.unlocked).forEach(function (id) {
+			var rows = x.unlocked[id];
+			if (!idRE.test(id) || !rows || typeof rows !== "object" || Array.isArray(rows) || Object.keys(rows).length > 1000) throw Error("装扮权益条目异常");
+			Object.keys(rows).forEach(function (skin) { if (!skinRE.test(skin) || rows[skin] !== 1) throw Error("装扮权益条目异常"); });
+		});
+		Object.keys(x.selected).forEach(function (id) {
+			var skin = x.selected[id];
+			if (!idRE.test(id) || !skinRE.test(skin) || !(x.unlocked[id] && x.unlocked[id][skin] === 1)) throw Error("装扮选择异常");
+		});
+		return x;
+	}
 	function affectionSaved(){return validateAffectionState(wallet.affectionSaved);}
 	function cheerState(){return validateCheerState(wallet.cheerState);}
     /* Personal native-match facts are independent of all-seat character appearances.
@@ -780,6 +800,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 		if(saveBlocked())return false;
 		var ledgerOK=flushCheckpointLedger(),mirrorOK=true;
 		try {if(wallet.affectionSaved!=null)localStorage.setItem("csh_affection",JSON.stringify(affectionSaved()));}catch(e){mirrorOK=false;}
+		try {if(wallet.spiritSkinsSaved!=null)localStorage.setItem("csh_spirit_skin_v1",JSON.stringify(spiritSkinsSaved()));}catch(eSkin){mirrorOK=false;}
 		return ledgerOK&&mirrorOK;
 	}
 	function commitCheckpoint(field,state,charge,reason,taskHistory) {
@@ -787,7 +808,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 		if(!Number.isSafeInteger(charge)||typeof reason!=="string"||!reason.trim()||reason.length>120||charge>PC_CAP||charge< -SINGLE_ADD_CAP)return {ok:false,reason:"付费操作参数无效"};
 		if(charge>0&&wallet.pc<charge)return {ok:false,reason:"poor",balance:wallet.pc};
 		if(charge<0&&wallet.pc-charge>PC_CAP)return {ok:false,reason:"余额空间不足",balance:wallet.pc};
-		var safe;try{safe=field==="affectionSaved"?validateAffectionState(state):field==="cheerState"?validateCheerState(state):field==="dailyTaskSaved"?validateTaskState(state):field==="bossSaved"?validateBossSaved(state):field==="topUpDebitId"&&typeof state==="string"&&/^[a-zA-Z0-9_-]{10,100}$/.test(state)?state:null;if(!safe)throw Error("empty");}catch(e){return {ok:false,reason:"付费操作状态无效"};}
+		var safe;try{safe=field==="affectionSaved"?validateAffectionState(state):field==="spiritSkinsSaved"?validateSpiritSkins(state):field==="cheerState"?validateCheerState(state):field==="dailyTaskSaved"?validateTaskState(state):field==="bossSaved"?validateBossSaved(state):field==="topUpDebitId"&&typeof state==="string"&&/^[a-zA-Z0-9_-]{10,100}$/.test(state)?state:null;if(!safe)throw Error("empty");}catch(e){return {ok:false,reason:"付费操作状态无效"};}
 		try{validateCheckpointLedger(wallet.checkpointPending);if(taskHistory!==undefined){if(field!=="dailyTaskSaved")throw Error("field");taskHistory=validateTaskLifetime(taskHistory);}}catch(e){return {ok:false,reason:"付费操作流水或日课累计记录异常"};}
 		flushCheckpointLedger();
 		if(charge&&Array.isArray(wallet.checkpointPending)&&wallet.checkpointPending.length>=100)return {ok:false,reason:"历史流水正在恢复，请稍后重试"};
@@ -815,6 +836,8 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
 		return commitCheckpoint("topUpDebitId", refund ? "refund-"+id : id, refund ? -amount : amount, refund ? "德州补码未决退款" : "德州补码");
 	}
 	function commitAffection(state,cost,reason){return commitCheckpoint("affectionSaved",state,cost,reason);}
+	function spiritSkinsSaved(){return validateSpiritSkins(wallet.spiritSkinsSaved);}
+	function commitSpiritSkins(state,cost,reason){return commitCheckpoint("spiritSkinsSaved",state,cost,reason);}
 	function commitCheerState(state,charge,reason){if(!Number.isSafeInteger(charge)||charge<0||charge>1000000)return {ok:false,reason:"应援金额无效"};return commitCheckpoint("cheerState",state,charge,reason);}
 
 	/* 生涯成就：余额和一次性领奖凭据共用一个原子钱包写入。
@@ -2347,7 +2370,7 @@ import { lib, game, ui, get, ai, _status } from "../../../noname.js";
             careerUnlocks: careerUnlocks, syncCareerUnlocks: syncCareerUnlocks,
             playerMatches:playerMatches,commitPlayerMatch:commitPlayerMatch,
 			claimPool: claimPool, poolClaimed: poolClaimed, poolPending: function(id) { return !!(wallet.poolClaims && wallet.poolClaims[id] && !poolClaimed(id)); },
-			affectionSaved: affectionSaved, commitAffection: commitAffection, commitTopUp: commitTopUp, topUpDebitId: function () { return wallet.topUpDebitId || ""; }, cheerState: cheerState, commitCheerState: commitCheerState, flushCheckpoints: flushCheckpoints,
+			affectionSaved: affectionSaved, commitAffection: commitAffection, spiritSkinsSaved: spiritSkinsSaved, commitSpiritSkins: commitSpiritSkins, commitTopUp: commitTopUp, topUpDebitId: function () { return wallet.topUpDebitId || ""; }, cheerState: cheerState, commitCheerState: commitCheerState, flushCheckpoints: flushCheckpoints,
 			commitMarket: commitMarket, marketPending: marketPending, marketSaved: marketSaved, completeMarket: completeMarket,
 			bossSaved: bossSaved, preserveBoss: preserveBoss, commitBounty: commitBounty, commitBossEvent: commitBossEvent, bossRewardState: bossRewardState, flushBossRewards: flushBossRewards,
 			assistedStats: assistedStats, settleAssisted: settleAssisted,

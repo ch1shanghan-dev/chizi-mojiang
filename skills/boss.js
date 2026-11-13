@@ -2024,8 +2024,8 @@ const skill = {
 				if (n > 0) return num - n;
 			},
 		},
-	},	/* ---------- 二十刑 ⑲ 鬼哭（鬼の子）：挑战者被从濒死救回后流失 1（每轮一次） ---------- */
-	/* ---------- 哀鸣（鬼の子）：哭声落地，人人自危 ----------
+	},	/* ---------- 二十刑 ⑲ 鬼哭（纲手）：挑战者被从濒死救回后流失 1（每轮一次） ---------- */
+	/* ---------- 牵挂（纲手）：她倒下后，仍把每个人护在身后 ----------
 	   ★ v6.6 重写原因（白板）：旧【鬼哭】要"挑战者本回合进入过濒死**且被救回**"才触发
 	     ——链路太长，正常对局里根本不出现。
 	     新机制换到"死亡后给全场留一张符"这一无人占的口径（与六式的"死亡段给魔王收拢"
@@ -2046,7 +2046,7 @@ const skill = {
 			for (var i = 0; i < foes.length; i++) {
 				try { foes[i].addJudge(game.createCard("lebu")); } catch (e) {}
 			}
-			if (foes.length) game.log(player, "的【哀鸣】留在了每个人心里");
+			if (foes.length) game.log(player, "的【牵挂】留在了每个人心里");
 		},
 	},
 
@@ -2295,7 +2295,7 @@ const translate = {
 	csh_boss_fengyan: "讽言",
 	csh_boss_yueying: "月影",
 	csh_boss_ranxin: "燃心",
-	csh_boss_guiku: "哀鸣",
+	csh_boss_guiku: "牵挂",   /* 2026-11-13：随 oniko→纲手 更名，旧「哀鸣/鬼哭」是旧角色语义 */
 
 	csh_boss_renwu_info: "锁定技，每轮限一次，魔王使用【杀】后，立即再对随机一名挑战者使用一张【杀】。",
 	csh_boss_yongdong_info: "锁定技，魔王的手牌上限+3。",

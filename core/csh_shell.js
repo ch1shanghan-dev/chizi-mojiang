@@ -1637,7 +1637,7 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 			var mutatesSave = ["shell-settle", "shell-settle-session", "shell-topup", "shell-topup-commit", "shell-task-add", "shell-merit",
 				"shell-room-save",
 				"shell-sign", "shell-relief", "shell-career-sync", "shell-ach-claim", "shell-ach-claim-all", "shell-pool-ach-claim", "shell-pool-ach-claim-all", "shell-trade", "shell-goldfish", "shell-market-new",
-				"shell-aff-do", "shell-cheer", "shell-cheer-ack", "shell-cheer-import", "shell-bounty", "shell-seat", "shell-world-round",
+				"shell-aff-do", "shell-cheer", "shell-cheer-ack", "shell-cheer-import", "shell-bounty", "shell-skin-buy", "shell-seat", "shell-world-round",
 				"shell-world-result", "shell-world-finish"].indexOf(cmd) >= 0 || (cmd === "shell-open" && !(META[d.key] && META[d.key].lobby));
 			// postMessage 可能在导入前发出、导入后才处理；仍须在宿主拒绝旧壳写入。
 			if (mutatesSave && sessionSaveBlocked()) { ackToGame(cmd, false, sessionRefused()); return; }
@@ -2160,6 +2160,11 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 				}
 				return;
 			}
+			if (cmd === "shell-skin-buy") {
+				var boughtSkin = unlockSkin(String(d.id || ""), String(d.skin || ""));
+				paintPc(); ackToGame(cmd, !!(boughtSkin && boughtSkin.ok), boughtSkin || { reason: "save" });
+				return;
+			}
 			/* ⚠ 2026-09-29 删除 shell-sign-state（死通道）：
 			   它只比 shell-wallet 多一个「本次签到可得额度」字段，而没有任何调用点。
 			   该字段已并入 walletSnapshot().signNext（一个快照命令就够，不必两条）。 */
@@ -2638,11 +2643,34 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 		var S = (typeof window !== "undefined" && window.CSHSpiritSkins) || null;
 		if (!S || typeof S.skinOf !== "function") return null;
 		try {
-			var row = S.skinOf(id, window.localStorage);
+			var W = wallet(), saved = W && typeof W.spiritSkinsSaved === "function" ? W.spiritSkinsSaved() : null;
+			var row = S.skinOf(id, window.localStorage, saved);
 			if (!row) return null;
 			function bare(p) { return p ? String(p).replace(/^\.\.\//, "") : ""; }
 			return { id: String(row.id || "classic"), name: String(row.name || ""), portrait: bare(row.portrait), face: bare(row.face) };
 		} catch (e) { return null; }
+	}
+	function skinPrefs() {
+		try { var W = wallet(); return W && typeof W.spiritSkinsSaved === "function" ? W.spiritSkinsSaved() : null; }
+		catch (e) { return null; }
+	}
+	/* 购买仅在宿主进行：权益和 10,000 CBY 在同一钱包检查点保存。
+	   页面只拿应答刷新显示，绝不先写偏好再尝试扣款。 */
+	function unlockSkin(id, skinId) {
+		var S = (typeof window !== "undefined" && window.CSHSpiritSkins) || null, W = wallet();
+		if (!S || typeof S.prepareUnlock !== "function" || typeof S.prepareSelect !== "function" || !W || typeof W.commitSpiritSkins !== "function") return { ok: false, reason: "nomodule" };
+		try {
+			var current = skinPrefs() || S.read(window.localStorage);
+			if (skinId === "classic" || S.isUnlocked(id, skinId, current)) {
+				var selected = S.prepareSelect(id, skinId, current);
+				var saved = W.commitSpiritSkins(selected, 0, "装扮切换");
+				return saved && saved.ok ? { ok: true, already: true, charged: 0, balance: saved.balance, state: selected } : { ok: false, reason: "save" };
+			}
+			var next = S.prepareUnlock(id, skinId, current);
+			var name = (S.list(id, "").find(function (row) { return row.id === skinId; }) || {}).name || "装扮";
+			var result = W.commitSpiritSkins(next.state, next.cost, "装扮解锁:" + name);
+			return result && result.ok ? { ok: true, charged: next.cost, balance: result.balance, state: next.state } : { ok: false, reason: result && result.reason === "poor" ? "poor" : "save" };
+		} catch (e) { logError("unlockSkin", e); return { ok: false, reason: "error" }; }
 	}
 
 	/* ---------- 对外导出 ---------- */
@@ -2679,6 +2707,8 @@ import { MINIONS } from "./csh_bossdata.js";   /* 打榜名单真源（数据-on
 		/* 只读诊断：房间凭据编号。宿主烟测用它区分「页面没发」还是「宿主没接」。 */
 		roomId: function () { return currentRoomId; },
 		skinOf: skinOf,
+		skinPrefs: skinPrefs,
+		unlockSkin: unlockSkin,
 		walletSnapshot: walletSnapshot,
 		stats: buildStats,
 		/* 功勋上报（§G.6.2）：统一入口，签名与 csh_wallet.addMerit 一致 */

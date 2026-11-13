@@ -40,9 +40,13 @@ export const AFF_MAX = BOND.MAX;
 export const AFF_LEVELS = BOND.LEVELS;
 export function resolveBondProgress(total) { return BOND.resolveBondProgress(total); }
 export const AFF_GAIN = { hunt: 40, hold: 20, talk: 5, head: 5, close: 10, play: 5,
-	tea: 3, stars: 8, callname: 12 };   /* ★ 雀魂移植：讨伐=对局 +40；v6.9 三新互动 */
+	tea: 3, stars: 8, callname: 12, dance: 6, walk: 4, share: 6, photo: 4, rest: 7, promise: 10, waist: 8, knee: 8,
+	lantern: 4, bookmark: 4, memo: 6, quiet: 7, seeoff: 10 };
 /* v6.9 三新互动的台词池映射（先复用既存池——"先复用再扩写"）：茶=闲聊 / 看星=私语 / 称呼=羁绊句 */
-const ACT_POOL = { tea: "talk", stars: "close", callname: "top" };
+const ADULT_AFF_SPIRITS = new Set([
+	"csh_boss_minion_oniko", "csh_boss_minion_mai", "csh_boss_minion_valentine",
+	"csh_boss_minion_wonder", "csh_boss_minion_guangxi",
+]);
 
 /* 礼物四档（v6.3 涨价：作者「礼物的价格可以给的更高一些」）——
    金币要有去处，送礼要是**明显的消费决策**而不是顺手一点。
@@ -66,6 +70,23 @@ export const AFF_ACTS = [
 	{ key: "tea", name: "递杯茶", gain: 3, need: "C", needV: 2000, pool: "talk", hint: "相识以上，每天一次 +3。" },
 	{ key: "stars", name: "并肩看星", gain: 8, need: "A", needV: 18000, pool: "close", hint: "信赖以上，每天一次 +8。" },
 	{ key: "callname", name: "专属称呼", gain: 12, need: "S", needV: 38000, pool: "top", hint: "羁绊以上，每天一次 +12。" },
+	{ key: "dance", name: "共舞一曲", gain: 6, need: "B", needV: 8000, reply: "她接过你伸出的手。慢一点，跟着我的步子。", hint: "亲近以上，每天一次 +6。" },
+	/* 每一位妖灵都有的陪伴项。它们不预设身体接触或年龄语境，避免把同一套亲密动作强加给所有角色。 */
+	{ key: "walk", name: "并肩散步", gain: 4, need: "C", needV: 2000, pool: "talk", reply: "她放慢脚步，和你并肩走了一段。路还长，慢慢说。", hint: "相识以上，每天一次 +4。" },
+	{ key: "share", name: "分享心事", gain: 6, need: "B", needV: 8000, pool: "talk", reply: "她安静听完，没有急着评判。现在，换我说一点。", hint: "亲近以上，每天一次 +6。" },
+	{ key: "photo", name: "留张合影", gain: 4, need: "C", needV: 2000, pool: "talk", reply: "她把画面看了又看。嗯，这张留下来。", hint: "相识以上，每天一次 +4。" },
+	{ key: "rest", name: "一起歇会", gain: 7, need: "A", needV: 18000, pool: "close", reply: "她没有说话，只把这一小段安静留给了你。", hint: "信赖以上，每天一次 +7。" },
+	{ key: "promise", name: "约好下次", gain: 10, need: "S", needV: 38000, pool: "top", reply: "她认真地点了点头。下次见，别失约。", hint: "羁绊以上，每天一次 +10。" },
+	{ key: "waist", name: "搂搂腰", gain: 8, need: "A", needV: 18000, adultsOnly: true, reply: "你先问了一声。她点点头，往你身边挪了挪。可以，就这样陪我站一会儿。", hint: "信赖以上，每天一次 +8。" },
+	{ key: "knee", name: "摸摸腿", gain: 8, need: "S", needV: 38000, adultsOnly: true, reply: "她拍了拍自己的膝盖，点头让你把手轻轻搭上去。嗯，你的手很暖。", hint: "羁绊以上，每天一次 +8。" },
+	/* 2026-11-13 第二批全员陪伴项：不预设身体接触或年龄语境，50 位妖灵全部可用。
+	   措辞一律「动作 + 情境」，含蓄；台词不写死在动作表，由 ACT_LINE_KIND 去
+	   csh_aff_lines.js 按角色取 —— 每位都说她自己会说的话。 */
+	{ key: "lantern", name: "同提一盏灯", gain: 4, need: "C", needV: 2000, hint: "相识以上，每天一次 +4。", reply: "灯只够照见两个人的影子。她把步子放慢了些。" },
+	{ key: "bookmark", name: "夹一枚书签", gain: 4, need: "C", needV: 2000, hint: "相识以上，每天一次 +4。", reply: "她把书签收进正在读的那页，没说是哪一页。" },
+	{ key: "memo", name: "记下她随口一句", gain: 6, need: "B", needV: 8000, hint: "亲近以上，每天一次 +6。", reply: "「随口说的你也记？」她别过脸，耳根有点红。" },
+	{ key: "quiet", name: "陪她安静一会儿", gain: 7, need: "A", needV: 18000, hint: "信赖以上，每天一次 +7。", reply: "谁都没开口。这一小段安静，她留给了你。" },
+	{ key: "seeoff", name: "送她到门口", gain: 10, need: "S", needV: 38000, hint: "羁绊以上，每天一次 +10。", reply: "到了门口她停了一下：明天也这个时辰？" },
 ];
 
 /* v6.3 好感回报（四档特权 + 一条连续热度），全部单点定义在这里，金鳞市只读不写。 */
@@ -88,7 +109,8 @@ export const AFF_GIVE = {
 	prob: { D: 0.12, C: 0.25, B: 0.40, A: 0.55, S: 0.75 },   /* ★ 作者："回礼概率做高一些" */
 	mul: { D: 1.0, C: 1.2, B: 1.5, A: 1.9, S: 2.4 },
 	lo: 600, hi: 1800,
-	acts: ["talk", "head", "close", "tea", "stars", "callname"],
+	acts: ["talk", "head", "close", "tea", "stars", "callname", "walk", "share", "photo", "rest", "promise",
+		"lantern", "bookmark", "memo", "quiet", "seeoff"],
 };
 export function giveRoll(levelKey, v) {
 	var p = AFF_GIVE.prob[levelKey];
@@ -101,7 +123,7 @@ export function giveRoll(levelKey, v) {
 
 const COOL_DAYS = 14;
 const KEY = "csh_affection";
-const DAILY_KEYS = ["hunt", "hold", "talk", "head", "close", "gift"];
+const DAILY_KEYS = ["hunt", "hold", "gift", ...AFF_ACTS.filter(action => action.key !== "greet").map(action => action.key)];
 const LEVEL_ORDER = ["D", "C", "B", "A", "S"];
 
 // 同源页面可以直调本模块，不能只依赖壳消息的恢复守卫。
@@ -225,26 +247,14 @@ export function get(id) {
 		mood: moodOf(e),
 		/* v6.5：按钮锁定态（页面直接照这个画，不再"点了才被拒"） */
 		acts: (function () {
-			var lvl = L.key;
-			var canClose = LEVEL_ORDER.indexOf(lvl) >= 2;
-			return {
-				greet: { ok: true, today: false },
-				talk: { ok: dailyOk(e, "talk"), today: !dailyOk(e, "talk") },
-				head: { ok: dailyOk(e, "head"), today: !dailyOk(e, "head") },
-				close: {
-					ok: canClose && dailyOk(e, "close"), today: !dailyOk(e, "close"),
-					need: (AFF_LEVELS.filter(function (x) { return x.key === "B"; })[0] || { min: 45 }).min,
-					locked: !canClose,
-				},
-				gift: { ok: true, today: false },                 /* ★ 礼物不限次数（作者定案） */
-				/* ★ v6.9：三档递进互动（按档位解锁 + 每日冷却） */
-				tea: { ok: LEVEL_ORDER.indexOf(lvl) >= 1 && dailyOk(e, "tea"), today: !dailyOk(e, "tea"),
-					need: 2000, locked: LEVEL_ORDER.indexOf(lvl) < 1 },
-				stars: { ok: LEVEL_ORDER.indexOf(lvl) >= 3 && dailyOk(e, "stars"), today: !dailyOk(e, "stars"),
-					need: 18000, locked: LEVEL_ORDER.indexOf(lvl) < 3 },
-				callname: { ok: LEVEL_ORDER.indexOf(lvl) >= 4 && dailyOk(e, "callname"), today: !dailyOk(e, "callname"),
-					need: 38000, locked: LEVEL_ORDER.indexOf(lvl) < 4 },
-			};
+			const actions = { gift: { ok: true, today: false } };
+			for (const action of AFF_ACTS) {
+				if (action.adultsOnly && !ADULT_AFF_SPIRITS.has(id)) continue;
+				const today = action.key !== "greet" && !dailyOk(e, action.key);
+				const locked = !!action.needV && e.v < action.needV;
+				actions[action.key] = { ok: !locked && !today, today, locked, need: action.needV || 0 };
+			}
+			return actions;
 		})(),
 		pct: progress.percent, progress: progress,
 		perks: perkKeysFor(L.key),                       /* ★ 内联算：perkKeys(id) 会再走 get() → 递归 */
@@ -334,7 +344,26 @@ export function canGain(id, src) {
    ★ 选句策略：**优先说没听过的那几句**，全部听过之后才随机重复
      （作者：台词全列出来会减少新鲜度；这里连"听"都做成收集）。
    ★ 记录粒度：听过的**下标**（数组类台词）/ **键**（礼物四档、升档四档）。 */
-var LINE_KINDS = ["greet", "talk", "head", "close", "give"];
+var LINE_KINDS = ["greet", "talk", "head", "close", "give", "tender"];
+/* 互动 → 台词库类别映射。
+   ★ 2026-11-13 修复：此前新互动把一句通用 `reply` 写死在动作表里，
+     `interact()` 又用 `action.reply || line(...)` 优先取它，导致 50 位妖灵
+     （含替换后的纲手）说同一句话，既有 1600 句人设语料完全没接上 —— 这就是
+     作者说的「台词没跟过来」。现在动作表只声明「去哪一类取词」，台词真源
+     一律回到 csh_aff_lines.js；reply 仅在该角色缺语料时兜底。 */
+var ACT_LINE_KIND = {
+	talk: "talk", head: "head", close: "close", tea: "talk", stars: "close", callname: "top",
+	dance: "close", walk: "talk", share: "talk", photo: "give", rest: "close", promise: "top",
+	waist: "close", knee: "close",
+	lantern: "tender", bookmark: "tender", memo: "tender", quiet: "tender", seeoff: "tender"
+};
+function actLine(id, action, lvl) {
+	var kind = ACT_LINE_KIND[action.key] || action.pool || action.key;
+	var text = line(id, kind);
+	if (text) return text;
+	if (kind === "top" || action.pool === "top") return line(id, "top") || action.reply || "";
+	return action.reply || line(id, "talk") || "";
+}
 
 function heardOfRaw(id) {
 	try {
@@ -402,6 +431,7 @@ export function heardOf(id) {
 	sec("up", "升档", Object.keys(L.up || {}).length, 20);
 	sec("top", "羁绊", 1, 90);
 	sec("cool", "疏远", 1, 0);
+	sec("tender", "轻亲近", 2, 0);
 	return out;
 }
 /* 已听过的原句（收集册展开时按段列出；没听过的留空位） */
@@ -412,7 +442,7 @@ export function heardLines(id) {
 		var all = L[kind] || [], seen = Array.isArray(h[kind]) ? h[kind] : [];
 		return all.map(function (t, i) { return seen.indexOf(i) >= 0 ? t : ""; });
 	}
-	["greet", "talk", "head", "close", "give"].forEach(function (k) { out[k] = arr(k); });
+	["greet", "talk", "head", "close", "give", "tender"].forEach(function (k) { out[k] = arr(k); });
 	out.gift = {};
 	for (const gk in (L.gift || {})) out.gift[gk] = (Array.isArray(h.gift) && h.gift.indexOf(gk) >= 0) ? L.gift[gk] : "";
 	out.up = {};
@@ -525,22 +555,21 @@ export function interact(id, act) {
 				value: cur.v, level: cur.level, levelName: cur.levelName,
 			};
 		}
-		var ACT_REQ = { close: 2, tea: 1, stars: 3, callname: 4 };   /* 档位序门槛（C=1/B=2/A=3/S=4） */
-		if (act !== "talk" && act !== "head" && ACT_REQ[act] === undefined) return { ok: false, reason: "bad-act" };
-		if (ACT_REQ[act] !== undefined && LEVEL_ORDER.indexOf(cur.level) < ACT_REQ[act]) {
-			/* 档位不足：她还不会让你靠那么近——不给台词，只给提示 */
-			var needKey = LEVEL_ORDER[ACT_REQ[act]];
-			var needV = (AFF_LEVELS.filter(function (x) { return x.key === needKey; })[0] || { min: 0 }).min;
-			return { ok: false, reason: "need-level", need: needV, value: cur.v, level: cur.level, levelName: cur.levelName };
+		const action = AFF_ACTS.find(action => action.key === act);
+		const state = cur.acts[act];
+		if (!action || !state) return { ok: false, reason: "bad-act" };
+		if (state.locked) {
+			return { ok: false, reason: "need-level", need: state.need, value: cur.v, level: cur.level, levelName: cur.levelName };
 		}
 		if (cur.mood === "cool") {
 			return { ok: false, reason: "cool", line: line(id, "cool"), value: cur.v, level: cur.level, levelName: cur.levelName };
 		}
-		var lkind = ACT_POOL[act] || act;                /* v6.9：新互动复用既存台词池 */
+		var lkind = action.pool || act;
+		var spoken = actLine(id, action, cur.level);
 		if (!canGain(id, act)) {
 			return {
 				ok: false, reason: "daily",
-				line: cur.level === "S" ? line(id, "top") : line(id, lkind),
+				line: spoken,
 				value: cur.v, level: cur.level, levelName: cur.levelName,
 			};
 		}
@@ -552,17 +581,17 @@ export function interact(id, act) {
 			return {
 				ok: true, act: act, gain: 0, maxed: true, value: cur.v,
 				level: cur.level, levelName: cur.levelName, leveledUp: false,
-				line: line(id, lkind), give: gM.give, giveLine: gM.line,
+				line: spoken, give: gM.give, giveLine: gM.line,
 			};
 		}
-		var r = stAdd(id, (AFF_GAIN[act] != null ? AFF_GAIN[act] : AFF_GAIN.talk), act);
+		var r = stAdd(id, action.gain, act);
 		if (!r) return { ok: false, reason: "fail", value: cur.v, level: cur.level, levelName: cur.levelName };
 		/* v6.5 她的回礼：陪伴类互动有概率给 CBY（送礼不回） */
 		var gv = rollGive(id, r.level.key, r.value, act);
 		var out = {
 			ok: true, act: act, gain: r.gain, value: r.value, level: r.level.key,
 			levelName: r.level.name, leveledUp: r.leveledUp,
-			line: (lkind === "talk" && r.level.key === "S" && Math.random() < 0.45) ? line(id, "top") : line(id, lkind),
+			line: spoken,
 			give: gv.give,
 			giveLine: gv.line,
 		};

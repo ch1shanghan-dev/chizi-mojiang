@@ -1,0 +1,12 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { withChromium } from './lib/chromium_audit.mjs';
+const out=process.argv[process.argv.indexOf('--out')+1];if(!out||/^c:/i.test(path.resolve(out)))throw Error('Use a D: --out PNG path');
+const base='C:/Users/Chishanghan/Desktop/妖灵皮肤';
+const groups=['蝴蝶忍','好运姐','凯瑟琳','塞尔达','妮露','绫濑桃','田山','四枫院夜一','伊什塔尔','加藤惠'];
+const rows=groups.flatMap(group=>fs.readdirSync(path.join(base,group)).filter(n=>/\.jpe?g$/i.test(n)).sort().map(n=>({group,file:path.join(base,group,n)})));
+const cards=rows.map(({group,file})=>`<figure><img src="${pathToFileURL(file).href}"><figcaption>${group}<small>${path.basename(file)}</small></figcaption></figure>`).join('');
+const html=`<!doctype html><meta charset="utf-8"><style>body{margin:0;padding:18px;background:#151311;color:#eee;font:16px sans-serif}.grid{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}figure{margin:0;background:#28221d;border:1px solid #765b34;border-radius:8px;overflow:hidden}img{width:100%;height:310px;display:block;object-fit:contain;background:#080706}figcaption{padding:7px 8px;color:#f0d995}small{display:block;color:#b8ab97;font-size:11px;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}</style><main class="grid">${cards}</main>`;
+const tmp=path.join(path.dirname(out),'skin-contact.html');fs.writeFileSync(tmp,html);
+await withChromium({width:1600,height:900},async send=>{await send('Page.navigate',{url:pathToFileURL(tmp).href});await new Promise(r=>setTimeout(r,700));const h=await send('Runtime.evaluate',{expression:'document.documentElement.scrollHeight',returnByValue:true});const shot=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:true,clip:{x:0,y:0,width:1600,height:h.result.value,scale:1}});fs.writeFileSync(out,Buffer.from(shot.data,'base64'));});

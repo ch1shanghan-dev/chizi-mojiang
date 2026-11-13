@@ -104,7 +104,13 @@ for(const [name,width,height,scale] of cases){
         auditHost.hold=false;
         reset();set('ach-search','向 AI 扔出道具','input');
         const controls=[...document.querySelectorAll('.ach-controls input,.ach-controls select,.ach-controls button')];
-        check('controls remain within viewport',controls.length===3&&controls.every(n=>{const r=n.getBoundingClientRect();return r.left>=-1&&r.right<=innerWidth+1;}),controls.map(n=>n.getBoundingClientRect().toJSON()));
+        /* 2026-11-13：新增「成就回顾」按钮后控件由 3 变 4；判据改为「不少于 3 且全部在视口内」，
+           并单独锁住新增按钮也在视口内，避免把计数变化误报成布局溢出。 */
+        check('controls remain within viewport',controls.length>=3&&controls.every(n=>{const r=n.getBoundingClientRect();return r.left>=-1&&r.right<=innerWidth+1;}),controls.map(n=>n.getBoundingClientRect().toJSON()));
+        const history=$('#ach-feedback-history');
+        check('achievement review button is present and stays within viewport',
+          !!history&&history.getBoundingClientRect().width>0&&history.getBoundingClientRect().right<=innerWidth+1,
+          history?history.getBoundingClientRect().toJSON():null);
         $('#ach-filters-toggle').click();
         const optional=[...document.querySelectorAll('#ach-refinements select,#ach-refinements button')];
         check('expanded filter controls remain reachable and within viewport',!$('#ach-refinements').hidden&&optional.length>2&&optional.every(n=>{const r=n.getBoundingClientRect();return r.width>0&&r.left>=-1&&r.right<=innerWidth+1;}));

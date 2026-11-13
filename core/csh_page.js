@@ -252,7 +252,7 @@
 			if (name === "shell-open" && payload && payload.key === "save") return false;
 			return ["shell-settle", "shell-settle-session", "shell-task-add", "shell-merit",
 				"shell-sign", "shell-relief", "shell-career-sync", "shell-ach-claim", "shell-ach-claim-all", "shell-pool-ach-claim", "shell-trade", "shell-room-save",
-				"shell-goldfish", "shell-market-new", "shell-aff-do", "shell-cheer", "shell-bounty",
+				"shell-goldfish", "shell-market-new", "shell-aff-do", "shell-cheer", "shell-bounty", "shell-skin-buy",
 				"shell-seat", "shell-world-round", "shell-world-result", "shell-open", "shell-results-retry", "shell-pool-ach-claim-all", "shell-cheer-ack", "shell-cheer-import"].indexOf(name) >= 0;
 		}
 		function call(name, payload, cb, timeoutMs) {

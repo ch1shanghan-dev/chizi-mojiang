@@ -340,8 +340,9 @@
     font-family: var(--ff-title, serif); }   /* A1 标题宋 */
   #banner .rs-sub { line-height: 1.65; }
   #banner .rs-sub b { color: var(--text); font-variant-numeric: tabular-nums; }
-  #banner .rs-sub .gain { color: var(--ok); font-weight: 900; }
-  #banner .rs-sub .loss { color: var(--danger); font-weight: 900; }
+  /* 【2026-11-13】净变化只作状态标识，不抢「庄家 vs 你」与最终牌对照的主线 */
+  #banner .rs-sub .gain { color: var(--ok); font-weight: 700; }
+  #banner .rs-sub .loss { color: var(--danger); font-weight: 700; }
   #banner .rs-sub .vs { color: var(--text-dim); font-size: .85em; letter-spacing: 1px; }
   #banner .rs-rows { width: 100%; }
   #banner .rs-row { flex-wrap: nowrap; }

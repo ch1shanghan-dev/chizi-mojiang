@@ -685,11 +685,13 @@
 <link rel="stylesheet" href="../../core/csh_tables.css">
 <link rel="stylesheet" href="../../core/csh_duel_tables.css">
 <style id="texas-result-presentation-20261102">
-/* The accepted net and public cards lead; accounting remains one disclosure away. */
+/* 结算首先说明“这一手已结束”，净额是紧凑状态，不再压过玩家结果与操作。 */
 #banner .rs-panel{overflow:hidden}
-#banner .rs-head{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:baseline;gap:3px 12px;text-align:left}
-#banner .rs-head .rs-title{font-size:var(--pfs-lg,14px);letter-spacing:1px;text-align:left}
-#banner .rs-head .rs-net{font-size:var(--pfs-xl2,22px);letter-spacing:0;text-align:right}
+#banner .rs-head{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:3px 10px;text-align:left}
+#banner .rs-head .rs-title{font-size:var(--pfs-xl,17px);letter-spacing:1px;text-align:left}
+#banner .rs-head .rs-net{padding:4px 8px;border:1px solid var(--gold-line);border-radius:999px;background:rgba(0,0,0,.22);font-size:var(--pfs-sm,12px);font-variant-numeric:tabular-nums;letter-spacing:0;text-align:right}
+#banner .rs-head .rs-net.plus{color:var(--good)}
+#banner .rs-head .rs-net.minus{color:var(--danger)}
 #banner .rs-net:empty{display:none}
 #banner .rs-head .rs-sub{grid-column:1/-1;text-align:left;font-size:var(--pfs-sm,12px);line-height:1.5}
 #banner .rs-foot .btn{min-height:44px}
@@ -701,7 +703,7 @@
 #banner .tx-extra[open] summary::after{content:"收起"}
 #banner .tx-extra summary:focus-visible{outline:2px solid var(--gold);outline-offset:2px;border-radius:3px}
 #banner .rs-row .rs-hand{white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere}
-@media(orientation:landscape) and (max-height:500px){#banner .rs-head .rs-net{font-size:var(--pfs-xl,20px)}#banner .rs-head{gap:2px 10px}#banner .rs-foot .btn{min-height:44px}}
+@media(orientation:landscape) and (max-height:500px){#banner .rs-head .rs-net{padding:3px 7px;font-size:var(--pfs-sm,12px)}#banner .rs-head{gap:2px 10px}#banner .rs-foot .btn{min-height:44px}}
 </style>
 <link rel="stylesheet" href="../../core/csh_art_v2.css">
 </head>
@@ -839,7 +841,7 @@
 
 <!-- ============ 结算层（骨架 .csh-result，规范 §13；结构依《结算方案 v1.0》§11/§15） ============
      三层结构：
-       头部固定 → 「本局结算」+ 本手净变化（全屏唯一大字结论）+ 你的筹码
+       头部固定 → 「本局结算」+ 紧凑净额状态 + 你的筹码
        中段滚动 → 玩家结果 / 摊牌比牌 / 底池明细 / 你的账本 / 关键手复盘
        底部固定 → 「下一手」「收工」永远可见，绝不随内容滚出屏幕
      遮罩只压暗不遮死：玩家必须能对照"我是什么牌 / 对手是什么牌"才算讲清了结果。
@@ -854,7 +856,7 @@
     </div>
     <div class="rs-body">
       <div class="rs-sec">
-        <div class="rs-cap">玩家结果（按本手净变化）</div>
+        <div class="rs-cap">本局各家</div>
         <div class="rs-rows" id="banner-players"></div>
       </div>
       <div class="rs-sec">
@@ -3015,14 +3017,14 @@ function showHandBanner(silent) {
      ① 「本局结算」——禁止写「你赢下底池 / 你赢了 / 你输了」：
         一手牌可能赢主池、输边池、平分边池、或弃牌后失去资格，
         任何一句"结论"都会在某种情况下变成假话。
-     ② 本手净变化 ±X —— 全屏唯一的大字结论，玩家第一眼要看到的就是它。
+     ② 本手 ±X —— 作为紧凑状态，完整口径留在可展开账本。
      ③ 你的筹码 / 第几手 —— 现状参照。
      另外把「守恒校验」的结果如实带出来：不通过时禁止进入下一手。 */
   t.className = 'rs-title';
   t.textContent = '本局结算';
   var net = meLed ? meLed.net : 0;
   netEl.className = 'rs-net ' + (net > 0 ? 'plus' : (net < 0 ? 'minus' : ''));
-  netEl.textContent = '本手净变化 ' + (net > 0 ? '+' : '') + fmt(net);
+  netEl.textContent = '本手 ' + (net > 0 ? '+' : '') + fmt(net);
   s.innerHTML = '你的筹码 <b>' + fmt(me.chips) + '</b> · 本手投入 <b>' + fmt(me.contrib) + '</b>' +
     ' · 带入 <b>' + fmt(G.buyIn) + '</b> · 第 <b>' + G.handNo + '</b> 手';
 

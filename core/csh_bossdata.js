@@ -451,10 +451,10 @@ export const MINIONS = {
 		face: "extension/池子魔将/image/csh_face_anne.webp",
 	},
 	csh_boss_minion_oniko: {
-		name: "鬼の子", sex: "female", hp: 3, maxHp: 3, hujia: 1, group: "devil",
-		skills: ["csh_boss_guiku"],                  /* 鬼哭 */
-		img: "extension/池子魔将/image/csh_minion_oniko.webp",
-		face: "extension/池子魔将/image/csh_face_oniko.webp",
+		name: "纲手", sex: "female", hp: 3, maxHp: 3, hujia: 1, group: "devil",
+		skills: ["csh_boss_guiku"],                  /* 牵挂（原鬼哭）· ID 保留护存档 */
+		img: "extension/池子魔将/image/csh_minion_tsunade.webp",
+		face: "extension/池子魔将/image/csh_face_tsunade.webp",
 	},
 };
 /* ---------- 妖灵名：数据层唯一真源（v6.7 · 2026-10-15） ----------

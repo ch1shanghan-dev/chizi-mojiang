@@ -27,12 +27,24 @@ async function feedbackLifecycleHost(){
  await page.send('Emulation.setDeviceMetricsOverride',{width:915,height:412,deviceScaleFactor:1,mobile:false});
  await page.evaluate('(async()=>{await lib.__cshLoadDebug();lib.cshUI.achievement([{id:"life-normal",title:"生命周期样本",description:"仅测试显示，未达成/领奖",pc:1}]);})()');
  await until('!!document.getElementById("csh-ach-feedback")','feedback card');
- const walletBefore=await page.evaluate('localStorage.getItem("csh_wallet")');
- check('native card begins outside a developer panel',await page.evaluate('document.getElementById("csh-ach-feedback").dataset.compact==="false"'));
+ check('native card has no persistent global inbox',await page.evaluate('!document.getElementById("csh-ach-inbox")'));
  await page.evaluate('lib.cshDebug.openLobby()');await delay(450);
- check('current visible card follows an opened panel into compact header mode',await page.evaluate('document.getElementById("csh-ach-feedback")?.dataset.compact==="true"'));
+ check('opening the actual lobby removes a current card without deleting history',await page.evaluate('!document.getElementById("csh-ach-feedback")&&lib.cshUI.achievementState().history.some(r=>r.id==="life-normal")'));
  await clickElement('document.getElementById("csh-dbg-close")');await delay(450);
- check('current visible card returns to normal mode after panel closes',await page.evaluate('document.getElementById("csh-ach-feedback")?.dataset.compact==="false"'));
+ check('leaving the lobby never replays a suppressed notification',await page.evaluate('!document.getElementById("csh-ach-feedback")&&!document.getElementById("csh-ach-inbox")'));
+ await page.evaluate('lib.cshShell.open("career")');
+ await until('!!document.getElementById("csh-shell-frame")?.contentDocument?.getElementById("ach-feedback-history")','actual career archive control');
+ await page.evaluate('(()=>{const d=document.getElementById("csh-shell-frame").contentDocument;d.querySelector(".tab[data-p=ach]").click();})()');
+ const careerWallet=await page.evaluate('localStorage.getItem("csh_wallet")');
+ await clickElement('document.getElementById("csh-shell-frame").contentDocument.getElementById("ach-feedback-history")',true);
+ check('actual career button opens persistent archive without a global badge',await page.evaluate('document.querySelector("#csh-ach-review [role=dialog]")?.getAttribute("aria-label")==="成就回顾"&&!document.getElementById("csh-ach-inbox")'));
+ await clickElement('document.querySelector("#csh-ach-review .csh-ach-review-back")');
+ check('return restores focus to the actual career archive button',await page.evaluate('document.getElementById("csh-shell-frame").contentDocument.activeElement?.id==="ach-feedback-history"'));
+ check('viewing career archive does not touch wallet bytes',await page.evaluate('localStorage.getItem("csh_wallet")')===careerWallet);
+ await page.evaluate('lib.cshUI.achievementArchive();document.getElementById("csh-shell-close").click()');await delay(450);
+ check('leaving the actual career shell closes its review',await page.evaluate('!document.getElementById("csh-shell-overlay")&&!document.getElementById("csh-ach-review")'));
+ check('active native match and its results archive new feedback without an overlay',await page.evaluate('(()=>{const started=_status.gameStarted,over=_status.over;try{_status.gameStarted=true;return [false,true].every((ended,i)=>{_status.over=ended;const id="life-native-"+i;return lib.cshUI.achievement([{id,title:id}])===1&&!document.getElementById("csh-ach-feedback")&&lib.cshUI.achievementState().history.some(r=>r.id===id);});}finally{_status.gameStarted=started;_status.over=over;}})()'));
+ await page.send('Input.dispatchMouseEvent',{type:'mouseMoved',x:8,y:400});
  // Recovery during a real shared review must not strand the following scope in paused state.
  await page.evaluate('lib.cshUI.achievementHistory()');
  await page.evaluate('localStorage.setItem("csh_migrate_recovery","{}")');await delay(450);
@@ -40,6 +52,7 @@ async function feedbackLifecycleHost(){
  await page.evaluate('localStorage.removeItem("csh_migrate_recovery");lib.cshUI.achievement([{id:"life-after-recovery",title:"恢复后的新反馈",pc:1}])');await delay(100);
  check('new confirmed display resumes after recovery without reopening app',await page.evaluate('!lib.cshUI.achievementState().paused&&!!document.getElementById("csh-ach-feedback")'));
  stage('feedback-after-recovery',{screenshot:await snap('feedback-after-recovery')});await page.evaluate('lib.cshUI.achievementSkip()');
+ const walletBefore=await page.evaluate('localStorage.getItem("csh_wallet")');
  // Separate instance of the same actual module, real DOM, own instrumented timers/listeners.
  const audit=await page.evaluate('('+async function(){
   const module=await import('/extension/池子魔将/core/csh_achievement_feedback.js');
@@ -60,7 +73,7 @@ async function feedbackLifecycleHost(){
    if(listeners.size!==4||timers.size||document.getElementById('csh-ach-feedback')||document.getElementById('csh-ach-review'))throw Error('cycle leak at '+i);
   }
   check('100 real DOM reviews toggles and closes retain bounded listeners timers and nodes',listeners.size===4&&timers.size===0&&maxCards===1&&maxReviews===1&&maxTimers<=2,{listeners:listeners.size,timers:timers.size,maxTimers,maxCards,maxReviews});
-  check('100 toggles leave one preference value and truthful bounded history',store.size===1&&ui.status().history.length===100,{keys:[...store.keys()],history:ui.status().history.length});
+  check('100 toggles only leave preferences, the archive and bounded in-memory history',store.size===2&&store.has(module.ACHIEVEMENT_UI_KEY)&&JSON.parse(store.get(module.ACHIEVEMENT_ARCHIVE_KEY)).rows.length===100&&ui.status().history.length===100,{keys:[...store.keys()],history:ui.status().history.length});
   // Current card metadata should refresh without creating another display or sound.
   ui.show([sample('settings')]);const id=document.getElementById('csh-ach-feedback').__displayId;ui.setPreferences({reduced:true});
   check('changing reduced preference updates same visible card without replacing display',document.getElementById('csh-ach-feedback').dataset.reduced==='true'&&document.getElementById('csh-ach-feedback').__displayId===id);
@@ -104,5 +117,5 @@ async function feedbackLifecycleHost(){
 let s=fs.readFileSync(root+'/tools/probe_host_smoke.mjs','utf8').replace(/const root = path.resolve\(path.dirname\(fileURLToPath\(import.meta.url\)\), '\.\.'\);/,'const root = '+JSON.stringify(root)+';').replace(/from '\.\/([^']+)'/g,(_,f)=>'from '+JSON.stringify(pathToFileURL(path.join(root,'tools',f)).href));
 s=s.replace("if(process.argv.includes('--world-layout-410'))","if(process.argv.includes('--feedback-lifecycle'))await feedbackLifecycleHost();\n    else if(process.argv.includes('--world-layout-410'))");
 if(arg('--source')){const route="    const target = resolveReadOnly(decodeURIComponent(url.pathname === '/' ? '/index.html' : url.pathname));";s=s.replace(route,'    if(decodeURIComponent(url.pathname)==="/extension/池子魔将/core/csh_achievement_feedback.js"){item.status=200;res.writeHead(200,{"Content-Type":"text/javascript; charset=utf-8","Cache-Control":"no-cache"});return res.end(fs.readFileSync('+JSON.stringify(path.resolve(source))+'));}\n'+route);}
-const runner=out+'/runner.mjs';fs.writeFileSync(runner,tests+'\n'+s);const child=spawn(process.execPath,[runner,'--feedback-lifecycle','--out',out],{stdio:'inherit',windowsHide:true});await new Promise((resolve,reject)=>{child.once('error',reject);child.once('exit',code=>{if(code)process.exitCode=code;resolve();});});
+const runner=out+'/runner.mjs';fs.writeFileSync(runner,tests+'\n'+s);const child=spawn(process.execPath,[runner,'--feedback-lifecycle','--out',out,...(arg('--host-root')?['--host',arg('--host-root'),'--extension-source',root]:[])],{stdio:'inherit',windowsHide:true});await new Promise((resolve,reject)=>{child.once('error',reject);child.once('exit',code=>{if(code)process.exitCode=code;resolve();});});
 }

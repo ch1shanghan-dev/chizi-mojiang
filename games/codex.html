@@ -356,6 +356,8 @@ body.empty .foot{display:none}
 #codex-skin-dialog button{font:var(--pfs-sm,12px)/1.4 var(--ff-body);min-height:44px;flex:none}
 #codex-skin-dialog .skin-option{text-align:left;padding:10px 12px}
 #codex-skin-dialog .skin-option[aria-pressed=true]{border-color:var(--gold);background:#d8bd7a20}
+#codex-skin-dialog .skin-option.is-locked{color:var(--ink-dim,#c6c9bc);border-color:var(--line-2,#776c52)}
+#codex-skin-dialog .skin-option .skin-price{float:right;color:var(--gold,#d9bd7d);font-variant-numeric:tabular-nums}
 @media(max-height:330px){#codex-skin-dialog .skin-panel{padding:10px}#codex-skin-dialog .skin-body{margin-top:6px;gap:10px}}
 
 </style>
@@ -682,9 +684,13 @@ var AFF = {
     { key: "stardust", name: "一捧星砂", cost: 680000, add: 12000 }
   ],
   acts: [
-    { key: "greet", name: "打个招呼", gain: 0, hint: "不计好感、不冷却——只是想听她说话" },
-    { key: "talk", name: "说说话", gain: 1, hint: "每天一次 +1" },
-    { key: "head", name: "摸摸头", gain: 1, hint: "每天一次 +1" }
+    { key: "greet", name: "打个招呼", gain: 0 },
+    { key: "talk", name: "说说话", gain: 5 },
+    { key: "head", name: "摸摸头", gain: 5 },
+    { key: "close", name: "贴近一点", gain: 10 },
+    { key: "tea", name: "递杯茶", gain: 3 },
+    { key: "stars", name: "并肩看星", gain: 8 },
+    { key: "callname", name: "专属称呼", gain: 12 }
   ],
   perks: [
     { level: "C", key: "fee1", tag: "相识", name: "挂单折扣", desc: "手续费 −0.3%" },
@@ -915,38 +921,41 @@ function renderAff(it) {
     box.appendChild(lockRow);
   }
   var acts = st.acts || {};
-  function mkAct(key, name, gain, cls) {
-    var a = acts[key] || { ok: true };
-    var b = el("button", "affbtn" + (cls ? (" " + cls) : ""), name);
-    if (!hunted) {
-      b.setAttribute("disabled", "1");
-      b.appendChild(el("i", "lk", "🔒 未讨伐"));
-      b.title = "先在挑战模式击破她，才能开始互动";
-    } else if (a.locked) {
-      b.setAttribute("disabled", "1");
-      b.appendChild(el("i", "lk", "🔒 需好感 " + (a.need || 8000)));
-      b.title = "好感达到 " + (a.need || 8000) + " 后解锁";
-    } else if (!a.ok) {
-      b.setAttribute("disabled", "1");
-      b.appendChild(el("i", "lk", "今日已做"));
-      b.title = "这项每天一次";
-    } else if (gain) {
-      b.appendChild(el("i", "gain", gain));
-    }
-    b.addEventListener("click", function () { doAff(it.id, key, null); }, false);
-    return b;
-  }
+  var actionApi = affApi();
   var ops = el("div", "affops");
-  ops.appendChild(mkAct("greet", "打个招呼", "", "soft"));
-  ops.appendChild(mkAct("talk", "说说话", "+5", ""));
-  ops.appendChild(mkAct("head", "摸摸头", "+5", "soft"));
-  ops.appendChild(mkAct("close", "贴近一点", "+10", "close"));
-  /* ★ v6.9（作者："随好感解锁新互动"）：三档递进互动——锁态由宿主 acts 数据自带 */
-  ops.appendChild(mkAct("tea", "递杯茶", "+3", ""));
-  ops.appendChild(mkAct("stars", "并肩看星", "+8", "close"));
-  ops.appendChild(mkAct("callname", "专属称呼", "+12", "close"));
+  var actionList = actionApi && Array.isArray(actionApi.AFF_ACTS) ? actionApi.AFF_ACTS : AFF.acts;
+  actionList.forEach(function (action) {
+    var a = acts[action.key];
+    if (!a && action.adultsOnly) return;
+    var cls = action.key === "greet" || action.key === "head" ? " soft" : action.needV >= 8000 ? " close" : "";
+    var b = el("button", "affbtn" + cls);
+    b.type = "button";
+    b.appendChild(el("span", "act-name", action.name));
+    var label = "", detail = "";
+    if (!actionApi) {
+      detail = "宿主未连接，仅可查看";
+    } else if (!hunted) {
+      detail = "先在挑战模式击破她，才能开始互动";
+    } else if (a && a.locked) {
+      label = "未解锁";
+      detail = "好感达到 " + a.need + " 后解锁";
+    } else if (a && !a.ok) {
+      label = "已做";
+      detail = "今日已做，明天可再来";
+    }
+    if (detail) {
+      b.disabled = true;
+      b.title = detail;
+      b.setAttribute("aria-label", action.name + "，" + detail);
+      if (label) b.appendChild(el("i", "lk", label));
+    } else {
+      if (action.gain) b.appendChild(el("i", "gain", "+" + action.gain));
+      b.addEventListener("click", function () { doAff(it.id, action.key, null); }, false);
+    }
+    ops.appendChild(b);
+  });
   box.appendChild(ops);
-  box.appendChild(el("div", "affnote", "互动每日各一次 · 送礼不限次数（偏爱 ×1.5）"));
+  box.appendChild(el("div", "affnote", !hunted ? "讨伐后解锁互动" : !actionApi ? "宿主未连接，仅可查看" : "打招呼不限次数，其余互动每日各一次"));
 
   /* ---------- 礼物：数量只占一条紧凑工具行，报价确认就地展开 ---------- */
   var tools=el("div","affgift-tools"),ql=el("label","","送礼数量"),select=document.createElement("select");
@@ -1347,6 +1356,8 @@ function renderEcho(it) {
 
 var skinDialog=null,skinImageSeq=0;
 function skinStorage(){var storage=window.parent&&window.parent!==window?window.parent.localStorage:window.localStorage;if(!storage)throw Error("装扮偏好暂不可读取");return {getItem:function(k){return storage.getItem(k);},setItem:function(k,v){if(!CSHPage.saveAllowed())throw Error("当前存档不可写入");storage.setItem(k,v);}};}
+function skinAuthority(){try{var shell=window.parent&&window.parent.lib&&window.parent.lib.cshShell;return shell&&typeof shell.skinPrefs==="function"?shell.skinPrefs():null;}catch(e){return null;}}
+function skinResolve(it){return CSHSpiritSkins.resolve(it.id,it.img,skinStorage(),skinAuthority());}
 function skinCurrent(id,view){return !Data.disposed&&Data.viewEpoch===view&&Data.items[Data.cur]&&Data.items[Data.cur].id===id;}
 /* ---------- 装扮回应（皮肤互动第 2 层 · 2026-11-10） ----------
    纯展示：只写内存里既有的 AFF.say 回应位，复用 renderAff 的 .affsay 展示；
@@ -1379,19 +1390,19 @@ function showSkinGreeting(it, skin) {
   say.appendChild(el("div", "ln", "\u201C" + line + "\u201D"));
 }
 function paintSpiritFace(img,it,frame){
-  var chosen;try{chosen=CSHSpiritSkins.resolve(it.id,it.img,skinStorage()).skin;}catch(e){chosen={id:"classic"};}
+  var chosen;try{chosen=skinResolve(it).skin;}catch(e){chosen={id:"classic"};}
   var fallback=false;frame.classList.remove("noimg");img.onerror=function(){if(!img.isConnected)return;if(!fallback&&chosen.id!=="classic"){fallback=true;img.src=it.face;}else frame.classList.add("noimg");};img.src=chosen.id==="classic"?it.face:(chosen.face||chosen.portrait);
 }
 function paintSpiritImage(it){
   var stage=$(".dstage"),img=$("#dimg"),view=Data.viewEpoch,seq=++skinImageSeq,chosen;
-  try{chosen=CSHSpiritSkins.resolve(it.id,it.img,skinStorage()).skin;}catch(e){chosen={id:"classic",portrait:it.img};}
+  try{chosen=skinResolve(it).skin;}catch(e){chosen={id:"classic",portrait:it.img};}
   stage.classList.remove("noimg");img.alt=it.name;var fallback=false;
   img.onerror=function(){if(seq!==skinImageSeq||!skinCurrent(it.id,view))return;if(!fallback&&chosen.id!=="classic"){fallback=true;img.src=it.img;}else stage.classList.add("noimg");};img.src=chosen.portrait;
 }
 function closeSkinDialog(restoreFocus){if(!skinDialog)return;var state=skinDialog;skinDialog=null;state.layer.remove();document.removeEventListener("keydown",state.key,true);if(restoreFocus!==false&&state.opener&&state.opener.isConnected)state.opener.focus({preventScroll:true});}
 function openSkinDialog(){
   var it=Data.items[Data.cur];if(!it||Data.disposed||!window.CSHSpiritSkins)return;
-  closeSkinDialog(false);var view=Data.viewEpoch,selected,readError="";try{selected=CSHSpiritSkins.resolve(it.id,it.img,skinStorage());}catch(e){selected={skin:{id:"classic",portrait:it.img},requested:"classic"};readError="装扮偏好暂未读到，当前显示经典；关闭后可重试。";}
+  closeSkinDialog(false);var view=Data.viewEpoch,selected,readError="",busy=false;try{selected=skinResolve(it);}catch(e){selected={skin:{id:"classic",portrait:it.img},requested:"classic",prefs:null};readError="装扮权益暂未读到，当前显示经典；关闭后可重试。";}
   var layer=el("section");layer.id="codex-skin-dialog";var panel=el("section","skin-panel"),head=el("div","skin-head"),title=el("h2","",it.name+" · 装扮"),back=el("button","affbtn","返回");back.type="button";back.onclick=function(){closeSkinDialog();};head.appendChild(title);head.appendChild(back);panel.appendChild(head);panel.setAttribute("role","dialog");panel.setAttribute("aria-modal","true");panel.setAttribute("aria-label",it.name+"的装扮");
   var body=el("div","skin-body"),preview=el("div","skin-preview"),image=el("img");
   var controls=el("div","skin-controls"),options=el("div","skin-options"),actions=el("div","skin-actions");
@@ -1399,14 +1410,17 @@ function openSkinDialog(){
   image.alt=it.name+"装扮预览";preview.appendChild(image);status.setAttribute("role","status");
   options.setAttribute("role","group");options.setAttribute("aria-label","可选装扮");
   apply.type=restore.type="button";
-  var rows=CSHSpiritSkins.list(it.id,it.img),draft=selected.skin,loadSeq=0,loaded=false;
+  var rows=CSHSpiritSkins.list(it.id,it.img),draft=selected.skin,loadSeq=0,loaded=false,price=CSHSpiritSkins.PRICE||10000;
   function live(){return skinDialog&&skinDialog.layer===layer&&skinCurrent(it.id,view);}
+  function unlocked(row){return row.id==="classic"||!!(selected.prefs&&CSHSpiritSkins.isUnlocked(it.id,row.id,selected.prefs));}
   function updateControls(){
-    apply.disabled=!!readError||!loaded||draft.id===selected.requested;
-    restore.disabled=!!readError||selected.requested==="classic";
+    var wants=unlocked(draft)?"使用此装扮":"解锁并使用 · "+price.toLocaleString()+" CBY";
+    apply.textContent=busy?"正在确认…":wants;apply.disabled=!!readError||!loaded||busy||draft.id===selected.requested;
+    restore.disabled=!!readError||busy||selected.requested==="classic";
     options.querySelectorAll(".skin-option").forEach(function(n){
       var row=rows.find(function(r){return r.id===n.dataset.skinId;});
-      n.textContent=row.name+(row.id===selected.requested?" · 当前使用":"");
+      n.textContent=row.name+(row.id===selected.requested?" · 当前使用":unlocked(row)?" · 已解锁":" · 10,000 CBY");
+      n.classList.toggle("is-locked",!unlocked(row));
       n.setAttribute("aria-pressed",String(row.id===draft.id));
     });
   }
@@ -1426,18 +1440,16 @@ function openSkinDialog(){
     var b=el("button","affbtn skin-option",row.name);b.type="button";b.dataset.skinId=row.id;
     b.onclick=function(){if(live())show(row);};options.appendChild(b);
   });
-  options.appendChild(el("p","","全部装扮已开放，无解锁顺序。"));
+  options.appendChild(el("p","","经典形象免费。每套新装扮首次解锁需 10,000 CBY，解锁后可随时换回。"));
   function accept(id){
     if(!live()||readError||!CSHPage.requireSave())return false;
-    try{
-      CSHSpiritSkins.select(it.id,id,skinStorage());
-      selected=CSHSpiritSkins.resolve(it.id,it.img,skinStorage());
-      paintSpiritImage(it);
-      var face=document.querySelector(".gitem.on .gface");
-      if(face)paintSpiritFace(face.querySelector("img"),it,face);
-      status.textContent="已使用"+selected.skin.name+"，仅改变外观。";
-      showSkinGreeting(it,selected.skin);updateControls();return true;
-    }catch(e){status.textContent="装扮保存尚未确认，当前画面暂保留；恢复存储后可重试。";return false;}
+    if(!Bridge.active){status.textContent="需要从池子世界进入，才能安全确认装扮解锁。";return false;}
+    busy=true;updateControls();Bridge.call("shell-skin-buy",{id:it.id,skin:id},function(ok,res){
+      if(!live())return;busy=false;
+      if(ok&&res&&res.state){try{selected=CSHSpiritSkins.resolve(it.id,it.img,skinStorage(),res.state);paintSpiritImage(it);var face=document.querySelector(".gitem.on .gface");if(face)paintSpiritFace(face.querySelector("img"),it,face);status.textContent=res.charged?"已解锁并使用 "+selected.skin.name+" · -"+res.charged.toLocaleString()+" CBY":"已使用 "+selected.skin.name+"。";showSkinGreeting(it,selected.skin);}catch(e){status.textContent="权益已保存，画面将在重新进入后刷新。";}}
+      else status.textContent=res&&res.reason==="poor"?"CBY 不足，解锁需要 "+price.toLocaleString()+" CBY。":"装扮保存尚未确认，当前画面未改变，可稍后重试。";
+      updateControls();
+    });return true;
   }
   apply.onclick=function(){if(loaded)accept(draft.id);};
   restore.onclick=function(){if(accept("classic"))show(rows[0],true);};

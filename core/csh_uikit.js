@@ -1,5 +1,5 @@
 import { createAchievementFeedback } from "./csh_achievement_feedback.js";
-import { lib, game } from "../../../noname.js";
+import { lib, game, _status } from "../../../noname.js";
 /* ============================================================
    池子魔将 · 界面基座（2026-10-18 · 第十八批）
    ------------------------------------------------------------
@@ -437,6 +437,7 @@ function achievementUI() {
         try {
             _achievementUI=createAchievementFeedback({document:document,window:window,storage:localStorage,z:CSH_Z.toast,modal:CSH_Z.modal,
                 scope:function(){var w=lib.cshWallet,m=lib.cshMigrate,blocked=true;try{blocked=!w||typeof w.saveEpoch!=="function"||!w.saveGuard||w.saveGuard.blocked()!==false||localStorage.getItem("csh_migrate_recovery")!==null;if(m){var s=m.recoveryState();blocked=blocked||s.pending!==false||s.busy!==false||!!s.err;}}catch(e){blocked=true;}return {owner:w,epoch:w&&w.saveEpoch?w.saveEpoch():0,blocked:blocked};},
+                isPlaying:function(){return !!_status.gameStarted;},
                 sound:function(){if(lib.cshSfx&&lib.cshSfx.play)lib.cshSfx.play("win");}
             });
         } catch (e) {
@@ -459,6 +460,7 @@ export function installUIKit() {
         confirm: confirmBox,
         achievement: function(items, options){try{return achievementUI().show(items,options);}catch(e){return 0;}},
         achievementHistory: function(){try{return achievementUI().review()===true;}catch(e){return false;}},
+        achievementArchive: function(opener){try{return achievementUI().archive(opener)===true;}catch(e){return false;}},
         achievementState: function(){try{return achievementUI().status();}catch(e){return inertAchievementUI().status();}},
         achievementHold: function(key,value){try{return achievementUI().hold(key,value);}catch(e){return false;}},
         achievementSkip: function(){try{achievementUI().skip();}catch(e){}},

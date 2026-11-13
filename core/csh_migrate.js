@@ -887,7 +887,7 @@ import { lib, game } from "../../../noname.js";
 
 	/* ① 好感度（csh_affection）：{ id: { v, last, saw, giveSum, giveN, day:{}, cnt:{} } }
 	   字段集与 csh_affection.readStore 的清洗口径**逐项对齐**（6 个日键 / 计数表限量）。 */
-	var AFF_DAILY_KEYS = ["hunt", "hold", "talk", "head", "close", "gift", "tea", "stars", "callname"];   /* v6.9 三新互动 */
+	var AFF_DAILY_KEYS = ["hunt", "hold", "talk", "head", "close", "gift", "tea", "stars", "callname", "dance", "walk", "share", "photo", "rest", "promise", "waist", "knee"];
 	function cleanAffection(o) {
 		if (!o || typeof o !== "object" || Array.isArray(o)) return null;
 		var MAXV = affMax(), out = {}, n = 0, keys = Object.keys(o);
@@ -1033,8 +1033,13 @@ import { lib, game } from "../../../noname.js";
 
     function cleanSpiritSkins(value){
         if(value==null)return null;
-        if(!value||value.v!==1||!value.selected||typeof value.selected!=="object"||Array.isArray(value.selected)||Object.keys(value.selected).length>200)throw Error("妖灵装扮选择格式异常");
-        var selected={};Object.keys(value.selected).forEach(function(id){var skin=value.selected[id];if(!/^csh_boss_minion_[a-z0-9_]{1,50}$/.test(id)||typeof skin!=="string"||!/^[A-Za-z0-9_-]{1,60}$/.test(skin)||["__proto__","prototype","constructor"].includes(skin))throw Error("妖灵装扮条目异常");selected[id]=skin;});return {v:1,selected:selected};
+        var idRE=/^csh_boss_minion_[a-z0-9_]{1,50}$/,skinRE=/^[A-Za-z0-9_-]{1,60}$/;
+        if(!value||typeof value!=="object"||Array.isArray(value)||!value.selected||typeof value.selected!=="object"||Array.isArray(value.selected)||Object.keys(value.selected).length>200)throw Error("妖灵装扮选择格式异常");
+        var selected={},unlocked={};
+        if(value.v===1){Object.keys(value.selected).forEach(function(id){var skin=value.selected[id];if(!idRE.test(id)||typeof skin!=="string"||!skinRE.test(skin)||["__proto__","prototype","constructor"].includes(skin))throw Error("妖灵装扮条目异常");if(skin!=="classic"){selected[id]=skin;(unlocked[id]||(unlocked[id]={}))[skin]=1;}});return {v:2,selected:selected,unlocked:unlocked};}
+        if(value.v!==2||!value.unlocked||typeof value.unlocked!=="object"||Array.isArray(value.unlocked)||Object.keys(value.unlocked).length>200)throw Error("妖灵装扮权益格式异常");
+        Object.keys(value.unlocked).forEach(function(id){var rows=value.unlocked[id];if(!idRE.test(id)||!rows||typeof rows!=="object"||Array.isArray(rows)||Object.keys(rows).length>200)throw Error("妖灵装扮权益条目异常");Object.keys(rows).forEach(function(skin){if(!skinRE.test(skin)||rows[skin]!==1)throw Error("妖灵装扮权益条目异常");(unlocked[id]||(unlocked[id]={}))[skin]=1;});});
+        Object.keys(value.selected).forEach(function(id){var skin=value.selected[id];if(!idRE.test(id)||typeof skin!=="string"||!skinRE.test(skin)||!(unlocked[id]&&unlocked[id][skin]===1))throw Error("妖灵装扮选择异常");selected[id]=skin;});return {v:2,selected:selected,unlocked:unlocked};
     }
 	/* ---------- 采集 / 应用 ---------- */
 	/* 键注册表（逻辑名 → localStorage 键 + 清洗器 + 存储类型）。

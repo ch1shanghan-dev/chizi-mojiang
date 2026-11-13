@@ -1,17 +1,14 @@
 /* 池子魔将 · 妖灵装扮生产注册表（2026-11-09 首批：18 位妖灵 / 70 套；
- * 2026-11-11 去除女帝与经典同图的 s1；2026-11-12 新增春丽 3 套、蒂法 2 套，合计 20 位 / 74 套）
+ * 2026-11-11 去除女帝与经典同图的 s1；2026-11-12 新增春丽 3 套、蒂法 2 套，随后接入不知火舞、菲瓦伦汀、神奇女侠、光熙与纲手，合计 24 位 / 87 套；2026-11-13 再接 4 位 / 5 套 = 28 位 / 92 套）
  * ------------------------------------------------------------------
  * 素材由作者提供，逐张识图后按人像构图单独裁切，统一 1300x1600 webP 立绘
  * + 400x500 webP 头像。资源路径只走 ASCII，桌面原图不入库、不改动。
  *
- * 【解锁策略 · 全部开放 all-unlocked】
- * 装扮无顺序、无前置条件、无货币与成就门槛：随扩展一起发布的每一套，
- * 玩家首次打开图鉴装扮弹层即可直接选用，任意切换、随时恢复经典。
- * 依据：装扮是纯外观（cosmetic-only），不写好感 / 次数 / 战斗对象，
- * 选择只落在 csh_spirit_skin_v1 的稳定 ID 上；设门槛只会给本机偏好
- * 增加"锁住内容"的存档状态，不产生任何玩法价值。
- * CSHSpiritSkins.list() 返回 classic + 全部注册项，select() 只校验
- * skinId 是否在注册表中 —— 这两条恰好就是本策略的完整实现。
+ * 【解锁策略 · 每套 10,000 CBY】
+ * 经典形象免费。每套作者提供的新装扮第一次解锁消耗 10,000 CBY，
+ * 解锁后可自由切换并随时恢复经典。扣款与 csh_spirit_skin_v1 的 v2 权益
+ * 由钱包检查点同笔保存，镜像失败不丢权益也不重复扣款。旧 v1 已选装扮
+ * 自动视为已解锁，保证旧玩家不会因升级失去正在使用的外观。
  *
  * 编号（s1/s2...）只是稳定标识，不代表稀有度、顺序或解锁先后；
  * 罗宾的 s1a / s1b 对应作者两张同名但内容不同的 1 号原图。
@@ -34,6 +31,27 @@
     ],
     'csh_boss_minion_mai': [
       { id: 's1', name: '红装', portrait: 'image/spirit-skins/mai/s1.webp', face: 'image/spirit-skins/mai/s1_face.webp' },
+      { id: 's2', name: '焰扇', portrait: 'image/spirit-skins/mai/s2.webp', face: 'image/spirit-skins/mai/s2_face.webp' },
+      { id: 's3', name: '赤绫', portrait: 'image/spirit-skins/mai/s3.webp', face: 'image/spirit-skins/mai/s3_face.webp' },
+      { id: 's4', name: '凝思', portrait: 'image/spirit-skins/mai/s4.webp', face: 'image/spirit-skins/mai/s4_face.webp' },
+      { id: 's5', name: '回焰', portrait: 'image/spirit-skins/mai/s5.webp', face: 'image/spirit-skins/mai/s5_face.webp' },
+    ],
+    'csh_boss_minion_valentine': [
+      { id: 's1', name: '红窗双枪', portrait: 'image/spirit-skins/valentine/s1.webp', face: 'image/spirit-skins/valentine/s1_face.webp' },
+      { id: 's2', name: '荒城旅人', portrait: 'image/spirit-skins/valentine/s2.webp', face: 'image/spirit-skins/valentine/s2_face.webp' },
+      { id: 's3', name: '舱室闲谈', portrait: 'image/spirit-skins/valentine/s3.webp', face: 'image/spirit-skins/valentine/s3_face.webp' },
+      { id: 's4', name: '暗夜金衣', portrait: 'image/spirit-skins/valentine/s4.webp', face: 'image/spirit-skins/valentine/s4_face.webp' },
+    ],
+    'csh_boss_minion_wonder': [
+      { id: 's1', name: '星冠', portrait: 'image/spirit-skins/wonder/s1.webp', face: 'image/spirit-skins/wonder/s1_face.webp' },
+    ],
+    'csh_boss_minion_guangxi': [
+      { id: 's1', name: '白衫', portrait: 'image/spirit-skins/guangxi/s1.webp', face: 'image/spirit-skins/guangxi/s1_face.webp' },
+    ],
+    'csh_boss_minion_oniko': [
+      { id: 's1', name: '倚门', portrait: 'image/spirit-skins/tsunade/s1.webp', face: 'image/spirit-skins/tsunade/s1_face.webp' },
+      { id: 's2', name: '暮光', portrait: 'image/spirit-skins/tsunade/s2.webp', face: 'image/spirit-skins/tsunade/s2_face.webp' },
+      { id: 's3', name: '海岸晴日', portrait: 'image/spirit-skins/tsunade/s3.webp', face: 'image/spirit-skins/tsunade/s3_face.webp' },
     ],
     'csh_boss_minion_eve': [
       { id: 's1', name: '魔女', portrait: 'image/spirit-skins/eve/s1.webp', face: 'image/spirit-skins/eve/s1_face.webp' },
@@ -140,6 +158,22 @@
       { id: 's3', name: '绯红', portrait: 'image/spirit-skins/anne/s3.webp', face: 'image/spirit-skins/anne/s3_face.webp' },
       { id: 's4', name: '怪盗', portrait: 'image/spirit-skins/anne/s4.webp', face: 'image/spirit-skins/anne/s4_face.webp' },
       { id: 's5', name: '校服', portrait: 'image/spirit-skins/anne/s5.webp', face: 'image/spirit-skins/anne/s5_face.webp' },
+    ],
+    /* 2026-11-13 接入：桌面新素材里仅取着装完整、无身体特写的 5 张；
+       其余 20 张为露骨成人向插画，不入库（原图保留在桌面，等作者替换）。
+       一律走 v2 权益：每套 10,000 CBY，经典免费。 */
+    'csh_boss_minion_shinobu': [
+      { id: 's1', name: '晨间轻装', portrait: 'image/spirit-skins/shinobu/s1.webp', face: 'image/spirit-skins/shinobu/s1_face.webp' },
+    ],
+    'csh_boss_minion_catherine': [
+      { id: 's1', name: '正装', portrait: 'image/spirit-skins/catherine/s1.webp', face: 'image/spirit-skins/catherine/s1_face.webp' },
+      { id: 's2', name: '夜班', portrait: 'image/spirit-skins/catherine/s2.webp', face: 'image/spirit-skins/catherine/s2_face.webp' },
+    ],
+    'csh_boss_minion_zelda': [
+      { id: 's1', name: '晴装', portrait: 'image/spirit-skins/zelda/s1.webp', face: 'image/spirit-skins/zelda/s1_face.webp' },
+    ],
+    'csh_boss_minion_megumi': [
+      { id: 's1', name: '常服', portrait: 'image/spirit-skins/megumi/s1.webp', face: 'image/spirit-skins/megumi/s1_face.webp' },
     ]
   };
   var spiritCount = 0, skinCount = 0;
@@ -148,6 +182,6 @@
     spiritCount++;
   });
   root.CSHSpiritSkinCatalog = Object.freeze({
-    version: 1, unlock: 'all', spiritCount: spiritCount, skinCount: skinCount
+    version: 2, unlock: 'cby-10000', price: S.PRICE, spiritCount: spiritCount, skinCount: skinCount
   });
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -40537,7 +40537,7 @@
       "parent": null,
       "file": "skills/boss.js",
       "line": 2068,
-      "name": "哀鸣",
+      "name": "牵挂",
       "description": "锁定技：你死亡后，每名判定区为空的挑战者获得一张【乐不思蜀】。",
       "characters": [
         "csh_boss_minion_oniko"

@@ -162,7 +162,7 @@ import { MINIONS } from "./csh_bossdata.js";
 		csh_boss_minion_yukino: "tight",      /* 雪之下雪乃：不讨好任何人 */
 		csh_boss_minion_luna: "reader",       /* 露娜：立在中，看别人退 */
 		csh_boss_minion_anne: "aggro",        /* 高卷杏：活得张扬 */
-		csh_boss_minion_guiku: "wild",        /* 鬼の子：从鬼门关被拉回来的人 */
+		csh_boss_minion_oniko: "bull",        /* 纲手：敢押，也敢认输 */
 	};
 	/* 牌风归属：妖灵查手工表；武将用**与资金不同的哈希**取 —— 于是
 	   「牌技榜」与「资金榜」的排序被打乱（作者：「把牌技重新打乱设计一下」）。 */

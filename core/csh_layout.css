@@ -304,9 +304,15 @@
   font-family: var(--ff-title, serif); }   /* A1：结算标题走标题宋 */
 .csh-result .rs-title.win { color: var(--csh-gold-hi); }
 .csh-result .rs-title.lose { color: var(--danger, #d66e7c); }
-/* 「本手净变化 ±X」是全屏最大的一行数字：玩家唯一必须先看到的结论（方案 §11/§21） */
-.csh-result .rs-net { font-size: calc(var(--fs-1) * 1.35); font-weight: 900; letter-spacing: 1px; font-variant-numeric: tabular-nums; line-height: 1.2;
-  font-family: var(--ff-num, monospace); }   /* A1：唯一主角数字走等宽档 */
+/* 【2026-11-13】净变化改为**紧凑状态徽记**：此前它是全屏最大的一行加粗红/绿数字，
+   压过结算结果列表，玩家一眼只看到盈亏、看不到牌和下一手。完整会计口径仍留在
+   可展开的「你的账本」，头部只给一个不抢视线的状态标识（结果列表才是阅读主线）。
+   文案不变（探针要读数字），只降视觉层级。 */
+.csh-result .rs-net { display: inline-block; font-size: var(--fs-3); font-weight: 700; letter-spacing: .5px;
+  font-variant-numeric: tabular-nums; line-height: 1.4; padding: 1px 10px; border-radius: 999px;
+  font-family: var(--ff-num, monospace);
+  color: var(--csh-text-dim); border: 1px solid var(--gold-line, rgba(216,180,106,.28));
+  background: var(--gold-fill, rgba(216,180,106,.07)); }
 .csh-result .rs-net.plus { color: var(--ok, #7fd8c4); }
 .csh-result .rs-net.minus { color: var(--danger, #d66e7c); }
 .csh-result .rs-sec { display: flex; flex-direction: column; gap: 4px; }

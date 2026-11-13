@@ -37,5 +37,51 @@ await check('migration failure restores original paired authority and mirror',as
 await check('complete reset clears authority and mirror and survives reload',async()=>{const h=fixture();h.A.gift(id,'wine');const r=await h.M.reset();return r.ok&&h.A.get(id).v===0&&restart(h).A.get(id).v===0&&!h.disk().affectionSaved;});
 await check('cheer checkpoint state and debit share the same strict write',()=>{const h=fixture(),pc=h.W.pc(),state={v:1,freeDate:'',pending:[],acked:[],legacyImported:[]};const r=h.W.commitCheerState(state,500,'isolated cheer');return r.ok&&h.disk().pc===pc-500&&h.disk().cheerState.v===1;});
 await check('cheer wallet quota preserves both balance and previous state',()=>{const h=fixture(),pc=h.W.pc(),state={v:1,freeDate:'',pending:[],acked:[]};h.store.failKey='csh_wallet';const r=h.W.commitCheerState(state,500,'isolated cheer');return !r.ok&&h.W.pc()===pc&&!h.disk().cheerState;});
+await check('skin unlock entitlement and 10,000 CBY share one durable wallet checkpoint',()=>{const h=fixture(),pc=h.W.pc(),state={v:2,selected:{csh_boss_minion_oniko:'s1'},unlocked:{csh_boss_minion_oniko:{s1:1}}},r=h.W.commitSpiritSkins(state,10000,'装扮解锁:倚门');return r.ok&&h.W.pc()===pc-10000&&h.disk().spiritSkinsSaved.selected.csh_boss_minion_oniko==='s1';});
+await check('skin unlock rejection leaves both CBY and entitlement unchanged',()=>{const h=fixture(),pc=h.W.pc(),state={v:2,selected:{csh_boss_minion_oniko:'s1'},unlocked:{csh_boss_minion_oniko:{s1:1}}};h.store.failKey='csh_wallet';const r=h.W.commitSpiritSkins(state,10000,'装扮解锁:倚门');return !r.ok&&h.W.pc()===pc&&!h.disk().spiritSkinsSaved;});
+await check('skin unlock refuses insufficient CBY before writing entitlement',()=>{const h=fixture(),state={v:2,selected:{csh_boss_minion_oniko:'s1'},unlocked:{csh_boss_minion_oniko:{s1:1}}};h.W.spend(h.W.pc(),'isolated spend');h.flush();const r=h.W.commitSpiritSkins(state,10000,'装扮解锁:倚门');return !r.ok&&r.reason==='poor'&&h.W.pc()===0&&!h.disk().spiritSkinsSaved;});
 await check('malformed sidecar and malformed ledger fail closed before debit',()=>{const h=fixture(),pc=h.W.pc();return !h.W.commitCheerState({v:1,pending:[],acked:[]},500,'invalid').ok&&h.W.pc()===pc&&!h.W.commitAffection({bad:{v:90000}},500,'invalid').ok;});
+const tsunade = 'csh_boss_minion_oniko';
+function actionFixture(value) {
+  const h = fixture();
+  h.ctx.lib.cshBossRecord.summary = () => ({minions:{[tsunade]:{n:1},[id]:{n:1}}});
+  h.store.data.set('csh_affection', JSON.stringify({
+    [tsunade]: {v:value,last:Date.now(),saw:vm.runInContext('dayKey()',h.ctx),day:{},cnt:{}},
+    [id]: {v:40000,last:Date.now(),saw:vm.runInContext('dayKey()',h.ctx),day:{},cnt:{}},
+  }));
+  return h;
+}
+await check('Tsunade uses the existing save key and the new action thresholds', () => {
+  const h = actionFixture(17999), state = h.A.get(tsunade);
+  return MINIONS[tsunade].name === '纲手' && state.acts.dance.ok &&
+    state.acts.waist.locked && state.acts.knee.locked &&
+    h.A.interact(tsunade, 'waist').reason === 'need-level' &&
+    !h.A.get(id).acts.waist && h.A.interact(id, 'waist').reason === 'bad-act';
+});
+await check('all spirits receive the new companion actions while intimate actions stay explicitly scoped', () => {
+  const h = actionFixture(40000), other = h.A.get(id);
+  const shared = ['dance','walk','share','photo','rest','promise'];
+  return shared.every(key => other.acts[key] && typeof other.acts[key].ok === 'boolean') &&
+    shared.every(key => h.A.interact(id, key).ok) && !other.acts.waist && !other.acts.knee;
+});
+await check('Tsunade dialogue resolves through the retained ID without old-character fallback', () => {
+  const h = actionFixture(40000), lines = h.A.linesOf(tsunade), greeting = h.A.interact(tsunade, 'greet');
+  return MINIONS[tsunade].name === '纲手' && Array.isArray(lines.talk) && lines.talk.some(x => x.includes('医术')) &&
+    !JSON.stringify(lines).includes('鬼の子') && greeting.ok && greeting.line && !greeting.line.includes('鬼の子');
+});
+await check('new actions are once per day and preserve their flags through restart and backup', async () => {
+  const h = actionFixture(40000), pc = h.W.pc();
+  const results = ['dance','waist','knee'].map(key => h.A.interact(tsunade,key));
+  const next = restart(h), state = next.A.get(tsunade);
+  const archive = await h.M.inspect(await h.M.export());
+  return results.every(r => r.ok && r.line && !r.give) &&
+    results.map(r=>r.gain).join(',') === '6,8,8' && state.v === 40022 &&
+    ['dance','waist','knee'].every(key=>state.acts[key].today && archive.data.affection[tsunade].day[key]) &&
+    h.A.interact(tsunade,'knee').reason === 'daily' && next.W.pc() === pc;
+});
+await check('interaction at full affection records the action but no extra points', () => {
+  const h = actionFixture(88000);
+  const r = h.A.interact(tsunade,'waist');
+  return r.ok && r.maxed && r.gain === 0 && h.A.get(tsunade).acts.waist.today;
+});
 const failed=rows.filter(r=>!r.passed),result={scope:'real wallet/affection/migration in disposable VM backends; no player saves or production network',passed:rows.length-failed.length,failed:failed.length,rows};if(out)fs.writeFileSync(path.join(out,'affection-transactions.json'),JSON.stringify(result,null,2));console.log(JSON.stringify({passed:result.passed,failed:result.failed,failures:failed},null,2));if(failed.length)process.exitCode=1;

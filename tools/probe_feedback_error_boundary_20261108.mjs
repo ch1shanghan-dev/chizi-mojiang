@@ -206,10 +206,11 @@ for (const [name, raw, damaged] of badArchives) {
   try { h.factory(); } catch (e) { threw = e; }
   check('改前基线：DOM 异常会冒到调用方（宿主弹源码的成因）', threw !== null, threw && threw.message);
   const now = harness({ store: [[KEY, raw]], documentElementThrows: true });
-  let nowThrew = null, api = null;
-  try { api = now.factory(); } catch (e) { nowThrew = e; }
-  check('当前实现：同场景不抛且显式降级', nowThrew === null && api && /异常|不可用/.test(api.archiveStatus().error), nowThrew && nowThrew.message);
-  check('当前实现：降级被记录且未弹原生 alert', now.reports.includes('boot') && now.alerts.length === 0, now.reports);
+  let nowThrew = null, api = null, opened = null;
+  try { api = now.factory(); opened = api.archive(); } catch (e) { nowThrew = e; }
+  check('当前实现：启动保留记录，主动打开失败后释放暂停', nowThrew === null && api && opened === false &&
+    api.archiveStatus().rows === 1 && !api.status().paused, nowThrew && nowThrew.message);
+  check('当前实现：打开失败被记录且未弹原生 alert', now.reports.includes('review.open') && now.alerts.length === 0, now.reports);
 }
 
 const result = {

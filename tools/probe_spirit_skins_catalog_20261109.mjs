@@ -27,9 +27,9 @@ vm.runInContext(catalogSrc, ctx, { filename: 'csh_spirit_skins_catalog.js' });
 const S = ctx.window.CSHSpiritSkins;
 const meta = ctx.window.CSHSpiritSkinCatalog;
 
-check('生产注册表已产出汇总', !!meta && meta.version === 1, meta);
-check('解锁策略是全部开放（all）', !!meta && meta.unlock === 'all', meta && meta.unlock);
-check('20 位妖灵 / 74 套装扮', !!meta && meta.spiritCount === 20 && meta.skinCount === 74, meta);
+check('生产注册表已产出 v2 汇总', !!meta && meta.version === 2, meta);
+check('解锁策略是每套 10,000 CBY', !!meta && meta.unlock === 'cby-10000' && meta.price === 10000, meta && meta.unlock);
+check('28 位妖灵 / 92 套装扮（2026-11-13 接 4 位 5 套）', !!meta && meta.spiritCount === 28 && meta.skinCount === 92, meta);
 check('注册表不再含与经典基座同图的 empress/s1', !catalogSrc.includes('empress/s1'), 'empress/s1 仍在注册表里');
 
 /* 从源码里把 DATA 表解析出来，逐项核对 */
@@ -40,14 +40,14 @@ const parsed = entries.map(([, id, body]) => ({
   rows: [...body.matchAll(/\{\s*id:\s*'([A-Za-z0-9_-]+)',\s*name:\s*'([^']+)',\s*portrait:\s*'([^']+)',\s*face:\s*'([^']+)'\s*\}/g)]
     .map(([, sid, name, portrait, face]) => ({ sid, name, portrait, face }))
 }));
-check('数据表可解析且条目数吻合', parsed.length === 20 && parsed.reduce((n, e) => n + e.rows.length, 0) === 74,
+check('数据表可解析且条目数吻合', parsed.length === 28 && parsed.reduce((n, e) => n + e.rows.length, 0) === 92,
   { groups: parsed.length, rows: parsed.reduce((n, e) => n + e.rows.length, 0) });
 
 const all = parsed.flatMap(e => e.rows.map(r => ({ ...r, spirit: e.id })));
 check("春丽 3 套和蒂法 2 套都已登记", ["chunli","tifa"].every((slug,i) => S.list("csh_boss_minion_"+slug,"classic.webp").length === 4-i));
 const ids = parsed.map(e => e.id);
-check('妖灵 ID 全部是 canonical 且互不重复', new Set(ids).size === 20 && ids.every(id => /^csh_boss_minion_[a-z0-9_]{1,50}$/.test(id)), ids);
-check('装扮 ID 全表唯一（含罗宾 s1a/s1b）', new Set(all.map(r => r.spirit + '/' + r.sid)).size === 74);
+check('妖灵 ID 全部是 canonical 且互不重复', new Set(ids).size === 28 && ids.every(id => /^csh_boss_minion_[a-z0-9_]{1,50}$/.test(id)), ids);
+check('装扮 ID 全表唯一（含罗宾 s1a/s1b）', new Set(all.map(r => r.spirit + '/' + r.sid)).size === 92);
 check('装扮 ID 符合基座白名单且不含 classic', all.every(r => /^[A-Za-z0-9_-]{1,60}$/.test(r.sid) && r.sid !== 'classic'));
 check('每个显示名都非空且不超长', all.every(r => r.name.trim().length > 0 && r.name.length <= 40));
 check('同一妖灵内显示名不重复', parsed.every(e => new Set(e.rows.map(r => r.name)).size === e.rows.length));
@@ -76,7 +76,7 @@ for (const a of assets) {
   const expect = a.face ? [400, 500] : [1300, 1600];
   if (dim[0] !== expect[0] || dim[1] !== expect[1]) wrongSize.push({ path: a.path, dim, expect });
 }
-check('148 个资源文件全部存在', missing.length === 0, missing.slice(0, 6));
+check('184 个资源文件全部存在', missing.length === 0, missing.slice(0, 6));
 check('全部是合法 webP', wrongFmt.length === 0, wrongFmt.slice(0, 6));
 check('立绘统一 1300x1600 / 头像统一 400x500', wrongSize.length === 0, wrongSize.slice(0, 6));
 check('资源路径符合基座 asset() 白名单（无中文/上级路径/远程）',
@@ -86,24 +86,28 @@ check('资源路径符合基座 asset() 白名单（无中文/上级路径/远�
 check('codex.html 真的引入了生产注册表（不是只在文本里提到）',
   /<script[^>]+src="[^"]*csh_spirit_skins_catalog\.js"/.test(codex));
 check('基座脚本排在注册表之前', codex.indexOf('csh_spirit_skins.js') < codex.indexOf('csh_spirit_skins_catalog.js'));
-check('弹层文案如实说明全部开放、无解锁顺序', codex.includes('全部装扮已开放') && codex.includes('无解锁顺序'));
+check('弹层文案如实说明经典免费与 10,000 CBY 解锁', codex.includes('经典形象免费') && codex.includes('10,000 CBY'));
 check('不再残留「更多装扮将在后续加入」的旧文案', !codex.includes('更多装扮将在后续加入'));
 check('catalog.js 收录了注册表模块', release.includes('core/csh_spirit_skins_catalog.js'));
 const notInRelease = assets.filter(a => !release.includes('"' + a.path + '"')).map(a => a.path);
-check('发布清单收录全部 148 个资源', notInRelease.length === 0, notInRelease.slice(0, 6));
+check('发布清单收录全部 184 个资源', notInRelease.length === 0, notInRelease.slice(0, 6));
 check('迁移域已覆盖装扮偏好（导入导出不丢选择）', /\["spiritSkins",\s*"csh_spirit_skin_v1"/.test(migrate));
 
-/* ---------- 无顺序解锁：任意装扮第一次打开就能选 ---------- */
+/* ---------- 解锁权益：未购买不能选，付款权益后任意切换 ---------- */
 const store = (() => { const m = new Map(); return { getItem: k => m.has(k) ? m.get(k) : null, setItem: (k, v) => m.set(k, String(v)), removeItem: k => m.delete(k) }; })();
 const list = S.list('csh_boss_minion_robin', 'classic.webp');
+function unlock(id, skin, target = store) { const tx = S.prepareUnlock(id, skin, S.read(target)); S.write(tx.state, target); return tx; }
 check('list 返回经典形象 + 该妖灵全部装扮（无隐藏项）', list.length === 7 && list[0].id === 'classic', list.map(r => r.id));
-check('顺序无关：任意非首套装扮都能直接 select 成功', (() => {
-  try { return S.select('csh_boss_minion_robin', 's5', store) === true && S.resolve('csh_boss_minion_robin', 'classic.webp', store).skin.id === 's5'; }
+check('未解锁非经典装扮不能直接 select', (() => {
+  try { S.select('csh_boss_minion_robin', 's5', store); return false; } catch (e) { return e.message.includes('解锁'); }
+})());
+check('解锁后任意非首套装扮能选中', (() => {
+  try { return unlock('csh_boss_minion_robin', 's5').cost === 10000 && S.select('csh_boss_minion_robin', 's5', store) === true && S.resolve('csh_boss_minion_robin', 'classic.webp', store).skin.id === 's5'; }
   catch (e) { return 'ERR ' + e.message; }
 })() === true);
 check('罗宾 s1a / s1b 都能选中（两张同名原图未合并）', (() => {
-  try { S.select('csh_boss_minion_robin', 's1a', store); const a = S.resolve('csh_boss_minion_robin', 'classic.webp', store).skin.id;
-        S.select('csh_boss_minion_robin', 's1b', store); const b = S.resolve('csh_boss_minion_robin', 'classic.webp', store).skin.id;
+  try { unlock('csh_boss_minion_robin', 's1a'); S.select('csh_boss_minion_robin', 's1a', store); const a = S.resolve('csh_boss_minion_robin', 'classic.webp', store).skin.id;
+        unlock('csh_boss_minion_robin', 's1b'); S.select('csh_boss_minion_robin', 's1b', store); const b = S.resolve('csh_boss_minion_robin', 'classic.webp', store).skin.id;
         return a === 's1a' && b === 's1b'; } catch (e) { return false; }
 })());
 const bufA = fs.readFileSync(path.join(root, 'image/spirit-skins/robin/s1a.webp'));
@@ -111,9 +115,13 @@ const bufB = fs.readFileSync(path.join(root, 'image/spirit-skins/robin/s1b.webp'
 check('s1a 与 s1b 内容确实不同', !bufA.equals(bufB));
 check('可随时恢复经典', (() => { try { return S.select('csh_boss_minion_robin', 'classic', store) === true && S.resolve('csh_boss_minion_robin', 'classic.webp', store).skin.id === 'classic'; } catch (e) { return false; } })());
 
-/* ---------- 取舍边界：空文件夹与「暂时不动」不入库 ---------- */
-check('纲手（暂时不动）没有进注册表', !catalogSrc.includes('tsunade') && !catalogSrc.includes('纲手'));
-check('只有带素材的 20 位妖灵进表，空文件夹不占位', parsed.length === 20 && parsed.every(e => e.rows.length > 0));
+/* ---------- 4.0.17 作者授权新增与旧 ID 兼容 ---------- */
+check('新增装扮全部可选，纲手保留原妖灵 ID', Object.entries({ mai:5, valentine:4, wonder:1, guangxi:1, oniko:3 }).every(([slug, n]) => {
+  const id = 'csh_boss_minion_' + slug;
+  const skins = S.list(id, 'classic.webp');
+  return skins.length === n + 1 && skins.slice(1).every(row => unlock(id, row.id).cost === 10000 && S.select(id, row.id, store) && S.resolve(id, 'classic.webp', store).skin.id === row.id);
+}));
+check('只有带素材的 28 位妖灵进表，空文件夹不占位', parsed.length === 28 && parsed.every(e => e.rows.length > 0));
 check('没有把桌面原图扩展名带进仓库', !catalogSrc.includes('.jfif') && !catalogSrc.includes('.jpg'));
 
 /* ---------- 皮肤互动第 2 层：只读查询口 + 装扮回应 ---------- */
@@ -126,17 +134,18 @@ const skinStore = {
 };
 check('skinOf 未选择时回 classic', S.skinOf('csh_boss_minion_robin', skinStore).id === 'classic');
 check('skinOf 读出当前装扮且带显示名', (() => {
-  S.select('csh_boss_minion_robin', 's1a', skinStore);
+  unlock('csh_boss_minion_robin', 's1a', skinStore); S.select('csh_boss_minion_robin', 's1a', skinStore);
   const r = S.skinOf('csh_boss_minion_robin', skinStore);
   return !!r && r.id === 's1a' && r.name === '花衫';
 })());
+skinWrites.length = 0;
 check('skinOf 归一化助战别名到同一妖灵', S.skinOf('csh_aux_robin', skinStore).id === 's1a');
 check('skinOf 对无效 ID 返回 null 而不抛', S.skinOf('not_a_minion', skinStore) === null);
 check('skinOf 偏好损坏时回 classic，不把异常抛到业务层', (() => {
   try { return S.skinOf('csh_boss_minion_robin', { getItem: () => '{bad json', setItem() {}, removeItem() {} }).id === 'classic'; }
   catch (e) { return false; }
 })());
-check('skinOf 全程零写入（只读查询）', skinWrites.length === 1 && skinWrites[0] === 'csh_spirit_skin_v1', skinWrites);
+check('skinOf 全程零写入（只读查询）', skinWrites.length === 0, skinWrites);
 
 const greetBlock = codex.slice(codex.indexOf('var SKIN_GREETINGS'), codex.indexOf('function showSkinGreeting'));
 const gctx = vm.createContext({ console });
@@ -206,23 +215,26 @@ const hostCtx = vm.createContext({ window: { localStorage: hostStorage }, consol
 hostCtx.globalThis = hostCtx;
 vm.runInContext(baseSrc, hostCtx);
 vm.runInContext(catalogSrc, hostCtx);
-vm.runInContext(extractFn(shellSrc, 'skinOf') + '\nthis.skinOf = skinOf;', hostCtx);
+vm.runInContext('function wallet(){return null;}\n' + extractFn(shellSrc, 'skinOf') + '\nthis.skinOf = skinOf;', hostCtx);
 check('宿主 skinOf 未选装扮时回 classic 空路径',
   hostCtx.skinOf('csh_boss_minion_robin').id === 'classic' && hostCtx.skinOf('csh_boss_minion_robin').portrait === '');
+const hostUnlock = hostCtx.window.CSHSpiritSkins.prepareUnlock('csh_boss_minion_robin', 's1a', hostCtx.window.CSHSpiritSkins.read(hostStorage));
+hostCtx.window.CSHSpiritSkins.write(hostUnlock.state, hostStorage);
 hostCtx.window.CSHSpiritSkins.select('csh_boss_minion_robin', 's1a', hostStorage);
+hostWrites.length = 0;
 const got = hostCtx.skinOf('csh_boss_minion_robin');
 check('宿主 skinOf 返回裸仓库路径（去掉 ../ 前缀）',
   got && got.id === 's1a' && got.portrait === 'image/spirit-skins/robin/s1a.webp' &&
   got.face === 'image/spirit-skins/robin/s1a_face.webp', got);
 check('宿主 skinOf 归一化 csh_aux_ 助战别名', hostCtx.skinOf('csh_aux_robin').id === 's1a');
-check('宿主 skinOf 全程零写入', hostWrites.length === 1 && hostWrites[0] === 'csh_spirit_skin_v1', hostWrites);
+check('宿主 skinOf 全程零写入', hostWrites.length === 0, hostWrites);
 hostMem.set('csh_spirit_skin_v1', '{bad json');
 check('宿主 skinOf 偏好损坏回 classic 且不抛到业务层', (() => {
   try { return hostCtx.skinOf('csh_boss_minion_robin').id === 'classic'; } catch (e) { return false; }
 })());
 const noBase = vm.createContext({ window: { localStorage: hostStorage }, console });
 noBase.globalThis = noBase;
-vm.runInContext(extractFn(shellSrc, 'skinOf') + '\nthis.skinOf = skinOf;', noBase);
+vm.runInContext('function wallet(){return null;}\n' + extractFn(shellSrc, 'skinOf') + '\nthis.skinOf = skinOf;', noBase);
 check('装扮基座未加载时返回 null，不阻塞业务', noBase.skinOf('csh_boss_minion_robin') === null);
 
 /* 金鳞市 skinPath 真实函数体 */
@@ -258,7 +270,7 @@ check('改前基线可判红：移除宿主加载行会被加载图断言检出'
 const stripped = codex.replace(/<script[^>]+src="[^"]*csh_spirit_skins_catalog\.js"[^>]*><\/script>/, '');
 check('改前基线可检出：移除加载行会失去注册表', !/<script[^>]+src="[^"]*csh_spirit_skins_catalog\.js"/.test(stripped));
 
-const result = { scope: 'Production spirit skin catalog: assets, load graph, release manifest, all-unlocked selection.',
+const result = { scope: 'Production spirit skin catalog: assets, load graph, release manifest, wallet-backed unlock selection.',
   passed: rows.filter(r => r.passed).length, failed: rows.filter(r => !r.passed).length, rows };
 const outIdx = process.argv.indexOf('--out');
 if (outIdx > -1 && process.argv[outIdx + 1]) {

@@ -537,12 +537,12 @@
   },
   {
     "id": "csh_boss_minion_oniko",
-    "name": "鬼の子",
+    "name": "纲手",
     "template": "T6_recover_once",
     "unlockLevel": "B",
     "magnitude": 1,
     "perGame": 1,
-    "playerText": "鬼の子的回护·回复：本局首次濒死时，回复 1 点体力",
+    "playerText": "纲手的回护·回复：本局首次濒死时，回复 1 点体力",
     "sourceSkill": "csh_boss_guiku"
   }
 ].map(function (r) { return Object.freeze(r); }));

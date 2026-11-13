@@ -1542,7 +1542,7 @@ async function runBossChecks() {
 	/* E26（v6.3 · 好感台词库守护）：作者「台词越丰富越好，每个角色都要差异化，
 	   目前的重复度还是太高了，争取每个角色各不同」——
 	   ① 覆盖 50 位妖灵，一位不缺
-	   ② 每人结构齐全（2 招呼 / 8 闲聊 / 5 摸头 / 4 贴近 / 3 回礼 / 4 礼物 / 4 升档 / 1 羁绊 / 1 疏远 = 32 句）
+	   ② 每人结构齐全（2 招呼 / 8 闲聊 / 5 摸头 / 4 贴近 / 3 回礼 / 4 礼物 / 4 升档 / 1 羁绊 / 1 疏远 / 2 轻亲近 = 34 句）
 	   ③ 全库 **两两不同**（去重断言：把描述改一改糊弄不过去）
 	   ④ 儿童向角色（结衣/佐良娜/八九寺/月火）不含恋爱语气词 */
 	{
@@ -1566,7 +1566,7 @@ async function runBossChecks() {
 				if (seen[t]) e26.push("台词重复：" + t.slice(0, 14));
 				else seen[t] = 1;
 			}
-			if (lines.length < 1500) e26.push("台词总量偏少：" + lines.length);
+			if (lines.length < 1700) e26.push("台词总量偏少：" + lines.length);
 			if (lines.length !== new Set(lines).size) e26.push("存在重复台词");
 			/* 每角色的结构（逐个键数下来太脆，改断言总键数与 19 的倍数关系 + 关键字段全在） */
 			if ((af.match(/\bgreet: \[/g) || []).length !== 50) e26.push("greet 段不等于 50");
@@ -1593,7 +1593,7 @@ async function runBossChecks() {
 			}
 		}
 		if (e26.length) fail("执行级 E26：好感台词库异常（" + e26.slice(0, 5).join("；") + "）");
-		else ok("执行级 E26：好感台词库完备（50 位 · 每人 32 句 = 1600 句 · 全库两两不同 · 全员同一待遇）");
+		else ok("执行级 E26：好感台词库完备（50 位 · 每人 34 句 = 1700 句 · 全库两两不同 · 全员同一待遇）");
 	}
 
 	/* E27（v6.3 · 好感经济回报守护）：作者「好感度经济回报需要，而且这个功能需要再丰富」。
@@ -3384,7 +3384,7 @@ if (spawnOk && execFileSync && !ONLY_SYNTAX && !ONLY_VERSIONS) {
       /* B12 统一了这两个专项的 stdout 契约（原为文本汇总，JSON.parse 会抛错、长期无法注册）。
          career 是 Chromium 类实测约 54s，必须显式给超时，否则会被 20s 默认值误杀。 */
       ['E95N','probe_first_batch.mjs',[],56,'首批修复回归（双将/身份/观战/重复入账）',20000],
-      ['E95O','probe_career_achievements.mjs',['--out',path.join(tmp95,'career-achievements')],142,'生涯成就浏览器回归（2000条/分页/横屏）',200000],
+      ['E95O','probe_career_achievements.mjs',['--out',path.join(tmp95,'career-achievements')],148,'生涯成就浏览器回归（2000条/分页/横屏）',200000],
       /* S1：妖灵增益数据层。与 MINIONS 和设计草案双向对账，防止运行时表漂移或混入写入路径。 */
       ['E95P','probe_spirit_buffs_20261107.mjs',['--out',path.join(tmp95,'spirit-buffs')],17,'妖灵增益数据层（50条/MINIONS对账/只读红线）',20000],
       /* D1：第四款德州 AI 牌风 trapper + 世界 12 牌风完整映射；内置改前基线自检，防止断言退化。 */
@@ -3414,7 +3414,7 @@ if (spawnOk && execFileSync && !ONLY_SYNTAX && !ONLY_VERSIONS) {
       /* PF-08 第一批：名录搜索 + 关系摘要 + 低频内容收纳，纯 UI 只读。 */
       ['E95AB','probe_codex_hierarchy_20261108.mjs',['--out',path.join(tmp95,'codex-hierarchy')],39,'图鉴信息层级（搜索纯过滤/摘要只读/材质与断点约束，改前自检3红）',20000],
       /* B1 归档探针长期无入口（B13 差集里的孤儿）：实测仅 4.4s，不该塞 >30s 慢速通道，直接进日常门禁。 */
-      ['E95AC','probe_feedback_archive_20261105.mjs',['--out',path.join(tmp95,'feedback-archive')],18,'成就通知归档（跨重启/分页/容量/写失败，Chromium 实测4.4s）',60000],
+      ['E95AC','probe_feedback_archive_20261105.mjs',['--out',path.join(tmp95,'feedback-archive')],31,'成就回顾（跨重启/分页/写失败/触屏/横屏退层与焦点）',60000],
       /* G1：断点逐值收敛的迁移真值。只给依据、零 CSS 改动；完备性/方向/单调/基线对账。 */
       ['E95AD','probe_viewport_migration_20261108.mjs',['--out',path.join(tmp95,'viewport-migration')],44,'断点迁移真值（21种/6档目标，430/340/899已收敛，配对边界）',20000],
       /* H1：CSS 侧 6 档令牌与 JS 真值双向对账，零 @media 改动。 */
@@ -3439,7 +3439,7 @@ if (spawnOk && execFileSync && !ONLY_SYNTAX && !ONLY_VERSIONS) {
       ['E95AM','probe_affection_recovery.mjs',['--out',path.join(tmp95,'affection-recovery')],97,'好感/赠礼恢复事务（拒写回滚/联合检查点/重试，开放巡检时发现未纳管）',20000],
       ['E95AN','probe_texas_ai_autostake_20261109.mjs',['--out',path.join(tmp95,'texas-ai-autostake')],37,'德州AI自主全额带入与打空后补码（人物策略/零和上限/aiStakeTotal同步/退隐保护/豪赌隔离）',20000],
       ['E95AO','audit_career_coverage_20261105.mjs',['--out',path.join(tmp95,'career-coverage')],3,'生涯未路由项四类归因（派生源/组合/设计取舍/待接真实源，不得一律判不可达）',20000],
-      ['E95AP','probe_spirit_skins_catalog_20261109.mjs',['--out',path.join(tmp95,'spirit-skins-catalog')],70,'妖灵装扮注册表与互动1-3层（148图/74套/skinOf只读/装扮回应/宿主加载图/跨页可见性）',20000],
+      ['E95AP','probe_spirit_skins_catalog_20261109.mjs',['--out',path.join(tmp95,'spirit-skins-catalog')],72,'妖灵装扮注册表与互动1-3层（184图/92套/28位/1万CBY权益/skinOf只读/装扮回应/宿主加载图/跨页可见性）',20000],
       ['E95AQ','probe_world_resume_card_20261110.mjs',['--out',path.join(tmp95,'world-resume-card')],26,'世界入口上次未完成卡片（只读判定/不写存档/不碰钱/点击走charge/加载图/改前基线）',20000],
       ['E95AR','probe_merit_failure_notice_20261110.mjs',['--out',path.join(tmp95,'merit-notice')],23,'功勋上报失败提示（真实桥ack/超时/6秒合并/恢复期不重复/三页接线/改前基线）',20000],
       /* P2 牌桌呈现：极矮屏（640×286）结算层纵向预算。加载真实 blackjack.html 打到结算，
@@ -3471,6 +3471,11 @@ if (spawnOk && execFileSync && !ONLY_SYNTAX && !ONLY_VERSIONS) {
       /* 2026-11-11：股价波动放大 + 极端行情，纯计算仿真 20000 天×2 种子，不启浏览器。 */
       ['E95BA','probe_market_volatility_20261111.mjs',['--out',path.join(tmp95,'market-volatility')],17,'金鳞市股价波动（常规放大/极端稀有/单日截断/价格护栏/长局趋势封顶/分布对称）',30000],
       /* 真实浏览器逐页巡检：15 次 Chromium 启动，必须给足超时 */
+      /* 2026-11-13：报错状态的诚实边界。代码层已有异常边界（E95AA 125/0），
+         但作者实机截图的原生 Alert 仍可能来自旧的 4.0.16 构建；安卓横屏未复测前
+         不许把「代码层已修」写成「真机已治愈」。 */
+      ['E95BD','probe_alert_status_20261113.mjs',['--out',path.join(tmp95,'alert-status')],6,'报错状态边界（异常边界在位/真机待验标记未丢/不宣称已治愈）',20000],
+      ['E95BC','probe_aff_lines_truth_20261113.mjs',['--out',path.join(tmp95,'aff-lines-truth')],31,'台词真源与全员互动（50位×2句tender/纲手语料/技能译名/通用reply退场/亲密项限定）',30000],
       ['E95BB','probe_ui_smoke_20261111.mjs',['--out',path.join(tmp95,'ui-smoke')],62,'UI全局巡检（四桌×2视口+七功能页：JS报错/缺图/溢出/44px）',300000],
     ];
     for (const [tag95, script95, args95, min95, label95, timeout95] of reg95) {

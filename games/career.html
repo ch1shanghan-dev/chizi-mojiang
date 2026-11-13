@@ -527,7 +527,7 @@ body{--fs-card-title:16px;--fs-control:14px;--fs-label:13px;--fs-subtitle:18px;-
 #p-ach .ach-header h3{margin:0;padding:0;border:0;font-size:var(--fs-subtitle);line-height:1.4;color:var(--text);white-space:nowrap}
 #p-ach #ach-summary{margin:8px 0 0;padding:0;border:0;background:none;font-size:var(--fs-label);line-height:1.5;color:var(--text-dim)}
 #p-ach #ach-claim-all{position:static;width:auto;max-width:210px;margin:0;min-height:44px;padding:6px 12px;font-size:var(--fs-label);line-height:1.4;flex:0 1 auto;white-space:normal}
-#p-ach .ach-controls{display:grid;grid-template-columns:minmax(120px,1fr) minmax(100px,128px) auto;align-items:center;gap:8px;margin:0 0 4px}
+#p-ach .ach-controls{display:grid;grid-template-columns:minmax(120px,1fr) minmax(100px,128px) auto auto;align-items:center;gap:8px;margin:0 0 4px}
 #p-ach .ach-controls label{min-width:0;font-size:var(--fs-label);display:block}
 #p-ach .ach-controls input,#p-ach .ach-controls select{width:100%;min-height:44px;padding:7px 9px;font-size:var(--fs-control);color:var(--text)}
 #p-ach .ach-controls label>span{position:absolute;width:1px;height:1px;padding:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
@@ -547,7 +547,7 @@ body{--fs-card-title:16px;--fs-control:14px;--fs-label:13px;--fs-subtitle:18px;-
 #p-ach .ach .alab{font-size:var(--fs-label);line-height:1.5}
 #p-ach .agrid{grid-template-columns:repeat(auto-fill,minmax(min(100%,260px),1fr));gap:12px}
 @media(max-height:500px){#tabs{flex-basis:104px;padding:8px 0}#tabs .tab{min-height:44px;padding:8px 9px}#tabs .tab::before{display:none}#app.career-collection #body{padding:8px 12px 12px}#p-ach .ach-header{margin-bottom:6px;gap:8px}#p-ach .ach-header h3{font-size:var(--fs-lead)}#p-ach .ach-controls{gap:6px}#p-ach .ach{padding:12px}#p-ach .agrid{grid-template-columns:repeat(auto-fill,minmax(min(100%,232px),1fr));gap:10px}}
-@media(max-width:760px){#p-ach #ach-claim-all{max-width:180px}#p-ach .ach-controls{grid-template-columns:minmax(0,1fr) auto}#p-ach .ach-search{grid-column:1/-1}}
+@media(max-width:760px){#p-ach #ach-claim-all{max-width:180px}#p-ach .ach-controls{grid-template-columns:minmax(0,1fr) auto auto}#p-ach .ach-search{grid-column:1/-1}}
 
 #p-ach .ach-header>div{display:flex;align-items:center;gap:8px}
 #career-nav-toggle{display:none;min-height:44px;padding:6px 10px;font:inherit;color:var(--text);background:var(--ink-1);border:1px solid var(--line);border-radius:8px;cursor:pointer;flex:none}
@@ -688,9 +688,10 @@ body{--fs-card-title:16px;--fs-control:14px;--fs-label:13px;--fs-subtitle:18px;-
           <label class="ach-search"><span>查找成就</span><input id="ach-search" type="search" placeholder="搜索名称、条件或分类" aria-label="查找成就"></label>
           <label><span>成就状态</span><select id="ach-state"><option value="all">全部状态</option><option value="ready">可领取</option><option value="todo">未完成</option><option value="near">近期目标</option><option value="claimed">已领取</option></select></label>
           <button class="btn ghost" id="ach-filters-toggle" type="button" aria-expanded="false" aria-controls="ach-refinements">筛选与追踪</button>
+          <button class="btn ghost" id="ach-feedback-history" type="button">成就回顾</button>
         </div>
         <div id="ach-refinements" hidden>
-          <div class="ach-options-row"><label>排序<select id="ach-sort"><option value="near">推荐目标</option><option value="catalog">图鉴顺序</option><option value="recent">最近记录</option></select></label><button class="btn ghost" id="ach-reset" type="button">重置筛选</button><button class="btn ghost" id="ach-feedback-history" type="button">成就反馈记录</button></div>
+          <div class="ach-options-row"><label>排序<select id="ach-sort"><option value="near">推荐目标</option><option value="catalog">图鉴顺序</option><option value="recent">最近记录</option></select></label><button class="btn ghost" id="ach-reset" type="button">重置筛选</button></div>
           <div class="catchips" id="ach-cats"></div>
           <div class="diffbox" id="ach-summary">成就统计载入中…</div>
           <section id="career-goal-bar" aria-label="正在追踪的生涯目标"></section>
@@ -2005,7 +2006,7 @@ function foldCareerNav(focus){$("#app").classList.remove("career-nav-open");navT
 navToggle.addEventListener("click",function(){var open=!$("#app").classList.contains("career-nav-open");$("#app").classList.toggle("career-nav-open",open);this.setAttribute("aria-expanded",String(open));if(open){var selected=$("#tabs .tab.on");if(selected)selected.focus({preventScroll:true});}});
 $("#body").addEventListener("click",function(e){if(!navToggle.contains(e.target))foldCareerNav(false);});
 window.addEventListener("resize",function(){if(!navToggle.getClientRects().length)foldCareerNav(false);});
-$("#ach-feedback-history").addEventListener("click",function(){try{if(parent.lib&&parent.lib.cshUI&&parent.lib.cshUI.achievementHistory())return;}catch(e){}toast("请从扩展设置查看成就反馈记录");});
+$("#ach-feedback-history").addEventListener("click",function(){try{if(parent.lib&&parent.lib.cshUI&&parent.lib.cshUI.achievementArchive(this))return;}catch(e){}toast("暂时无法打开成就回顾，请稍后重试");});
 var refineToggle=$("#ach-filters-toggle"),refinePanel=$("#ach-refinements");
 function foldAchRefinements(){refinePanel.hidden=true;refineToggle.setAttribute("aria-expanded","false");refineToggle.focus({preventScroll:true});}
 refineToggle.addEventListener("click",function(){var open=refinePanel.hidden;refinePanel.hidden=!open;this.setAttribute("aria-expanded",String(open));});
