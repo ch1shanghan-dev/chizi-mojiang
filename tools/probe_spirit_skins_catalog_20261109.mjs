@@ -29,7 +29,7 @@ const meta = ctx.window.CSHSpiritSkinCatalog;
 
 check('生产注册表已产出 v2 汇总', !!meta && meta.version === 2, meta);
 check('解锁策略是每套 10,000 CBY', !!meta && meta.unlock === 'cby-10000' && meta.price === 10000, meta && meta.unlock);
-check('28 位妖灵 / 92 套装扮（2026-11-13 接 4 位 5 套）', !!meta && meta.spiritCount === 28 && meta.skinCount === 92, meta);
+check('34 位妖灵 / 112 套装扮（2026-11-13 接 10 组 25 张）', !!meta && meta.spiritCount === 34 && meta.skinCount === 112, meta);
 check('注册表不再含与经典基座同图的 empress/s1', !catalogSrc.includes('empress/s1'), 'empress/s1 仍在注册表里');
 
 /* 从源码里把 DATA 表解析出来，逐项核对 */
@@ -40,14 +40,14 @@ const parsed = entries.map(([, id, body]) => ({
   rows: [...body.matchAll(/\{\s*id:\s*'([A-Za-z0-9_-]+)',\s*name:\s*'([^']+)',\s*portrait:\s*'([^']+)',\s*face:\s*'([^']+)'\s*\}/g)]
     .map(([, sid, name, portrait, face]) => ({ sid, name, portrait, face }))
 }));
-check('数据表可解析且条目数吻合', parsed.length === 28 && parsed.reduce((n, e) => n + e.rows.length, 0) === 92,
+check('数据表可解析且条目数吻合', parsed.length === 34 && parsed.reduce((n, e) => n + e.rows.length, 0) === 112,
   { groups: parsed.length, rows: parsed.reduce((n, e) => n + e.rows.length, 0) });
 
 const all = parsed.flatMap(e => e.rows.map(r => ({ ...r, spirit: e.id })));
 check("春丽 3 套和蒂法 2 套都已登记", ["chunli","tifa"].every((slug,i) => S.list("csh_boss_minion_"+slug,"classic.webp").length === 4-i));
 const ids = parsed.map(e => e.id);
-check('妖灵 ID 全部是 canonical 且互不重复', new Set(ids).size === 28 && ids.every(id => /^csh_boss_minion_[a-z0-9_]{1,50}$/.test(id)), ids);
-check('装扮 ID 全表唯一（含罗宾 s1a/s1b）', new Set(all.map(r => r.spirit + '/' + r.sid)).size === 92);
+check('妖灵 ID 全部是 canonical 且互不重复', new Set(ids).size === 34 && ids.every(id => /^csh_boss_minion_[a-z0-9_]{1,50}$/.test(id)), ids);
+check('装扮 ID 全表唯一（含罗宾 s1a/s1b）', new Set(all.map(r => r.spirit + '/' + r.sid)).size === 112);
 check('装扮 ID 符合基座白名单且不含 classic', all.every(r => /^[A-Za-z0-9_-]{1,60}$/.test(r.sid) && r.sid !== 'classic'));
 check('每个显示名都非空且不超长', all.every(r => r.name.trim().length > 0 && r.name.length <= 40));
 check('同一妖灵内显示名不重复', parsed.every(e => new Set(e.rows.map(r => r.name)).size === e.rows.length));
@@ -76,7 +76,7 @@ for (const a of assets) {
   const expect = a.face ? [400, 500] : [1300, 1600];
   if (dim[0] !== expect[0] || dim[1] !== expect[1]) wrongSize.push({ path: a.path, dim, expect });
 }
-check('184 个资源文件全部存在', missing.length === 0, missing.slice(0, 6));
+check('224 个资源文件全部存在', missing.length === 0, missing.slice(0, 6));
 check('全部是合法 webP', wrongFmt.length === 0, wrongFmt.slice(0, 6));
 check('立绘统一 1300x1600 / 头像统一 400x500', wrongSize.length === 0, wrongSize.slice(0, 6));
 check('资源路径符合基座 asset() 白名单（无中文/上级路径/远程）',
@@ -90,7 +90,7 @@ check('弹层文案如实说明经典免费与 10,000 CBY 解锁', codex.include
 check('不再残留「更多装扮将在后续加入」的旧文案', !codex.includes('更多装扮将在后续加入'));
 check('catalog.js 收录了注册表模块', release.includes('core/csh_spirit_skins_catalog.js'));
 const notInRelease = assets.filter(a => !release.includes('"' + a.path + '"')).map(a => a.path);
-check('发布清单收录全部 184 个资源', notInRelease.length === 0, notInRelease.slice(0, 6));
+check('发布清单收录全部 224 个资源', notInRelease.length === 0, notInRelease.slice(0, 6));
 check('迁移域已覆盖装扮偏好（导入导出不丢选择）', /\["spiritSkins",\s*"csh_spirit_skin_v1"/.test(migrate));
 
 /* ---------- 解锁权益：未购买不能选，付款权益后任意切换 ---------- */
@@ -121,7 +121,7 @@ check('新增装扮全部可选，纲手保留原妖灵 ID', Object.entries({ ma
   const skins = S.list(id, 'classic.webp');
   return skins.length === n + 1 && skins.slice(1).every(row => unlock(id, row.id).cost === 10000 && S.select(id, row.id, store) && S.resolve(id, 'classic.webp', store).skin.id === row.id);
 }));
-check('只有带素材的 28 位妖灵进表，空文件夹不占位', parsed.length === 28 && parsed.every(e => e.rows.length > 0));
+check('只有带素材的 34 位妖灵进表，空文件夹不占位', parsed.length === 34 && parsed.every(e => e.rows.length > 0));
 check('没有把桌面原图扩展名带进仓库', !catalogSrc.includes('.jfif') && !catalogSrc.includes('.jpg'));
 
 /* ---------- 皮肤互动第 2 层：只读查询口 + 装扮回应 ---------- */

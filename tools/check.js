@@ -3439,7 +3439,7 @@ if (spawnOk && execFileSync && !ONLY_SYNTAX && !ONLY_VERSIONS) {
       ['E95AM','probe_affection_recovery.mjs',['--out',path.join(tmp95,'affection-recovery')],97,'好感/赠礼恢复事务（拒写回滚/联合检查点/重试，开放巡检时发现未纳管）',20000],
       ['E95AN','probe_texas_ai_autostake_20261109.mjs',['--out',path.join(tmp95,'texas-ai-autostake')],37,'德州AI自主全额带入与打空后补码（人物策略/零和上限/aiStakeTotal同步/退隐保护/豪赌隔离）',20000],
       ['E95AO','audit_career_coverage_20261105.mjs',['--out',path.join(tmp95,'career-coverage')],3,'生涯未路由项四类归因（派生源/组合/设计取舍/待接真实源，不得一律判不可达）',20000],
-      ['E95AP','probe_spirit_skins_catalog_20261109.mjs',['--out',path.join(tmp95,'spirit-skins-catalog')],72,'妖灵装扮注册表与互动1-3层（184图/92套/28位/1万CBY权益/skinOf只读/装扮回应/宿主加载图/跨页可见性）',20000],
+      ['E95AP','probe_spirit_skins_catalog_20261109.mjs',['--out',path.join(tmp95,'spirit-skins-catalog')],72,'妖灵装扮注册表与互动1-3层（224图/112套/34位/1万CBY权益/skinOf只读/装扮回应/宿主加载图/跨页可见性）',20000],
       ['E95AQ','probe_world_resume_card_20261110.mjs',['--out',path.join(tmp95,'world-resume-card')],26,'世界入口上次未完成卡片（只读判定/不写存档/不碰钱/点击走charge/加载图/改前基线）',20000],
       ['E95AR','probe_merit_failure_notice_20261110.mjs',['--out',path.join(tmp95,'merit-notice')],23,'功勋上报失败提示（真实桥ack/超时/6秒合并/恢复期不重复/三页接线/改前基线）',20000],
       /* P2 牌桌呈现：极矮屏（640×286）结算层纵向预算。加载真实 blackjack.html 打到结算，

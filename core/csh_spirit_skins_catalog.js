@@ -1,5 +1,5 @@
 /* 池子魔将 · 妖灵装扮生产注册表（2026-11-09 首批：18 位妖灵 / 70 套；
- * 2026-11-11 去除女帝与经典同图的 s1；2026-11-12 新增春丽 3 套、蒂法 2 套，随后接入不知火舞、菲瓦伦汀、神奇女侠、光熙与纲手，合计 24 位 / 87 套；2026-11-13 再接 4 位 / 5 套 = 28 位 / 92 套）
+ * 2026-11-11 去除女帝与经典同图的 s1；2026-11-12 新增春丽 3 套、蒂法 2 套，随后接入不知火舞、菲瓦伦汀、神奇女侠、光熙与纲手，合计 24 位 / 87 套；2026-11-13 按作者指令接入桌面 10 组共 25 张（先期 5 张 + 补齐 20 张）= 34 位 / 112 套）
  * ------------------------------------------------------------------
  * 素材由作者提供，逐张识图后按人像构图单独裁切，统一 1300x1600 webP 立绘
  * + 400x500 webP 头像。资源路径只走 ASCII，桌面原图不入库、不改动。
@@ -159,21 +159,53 @@
       { id: 's4', name: '怪盗', portrait: 'image/spirit-skins/anne/s4.webp', face: 'image/spirit-skins/anne/s4_face.webp' },
       { id: 's5', name: '校服', portrait: 'image/spirit-skins/anne/s5.webp', face: 'image/spirit-skins/anne/s5_face.webp' },
     ],
-    /* 2026-11-13 接入：桌面新素材里仅取着装完整、无身体特写的 5 张；
-       其余 20 张为露骨成人向插画，不入库（原图保留在桌面，等作者替换）。
-       一律走 v2 权益：每套 10,000 CBY，经典免费。 */
+    /* 2026-11-13：按作者指令，桌面「妖灵皮肤」10 组共 25 张原图**全部接入**，
+       不做内容筛选、不等替换版。编号 s1/s2 只作稳定标识；新增套名用中性序号，
+       作者可随时改名。一律走 v2 权益：每套 10,000 CBY，经典免费。 */
     'csh_boss_minion_shinobu': [
       { id: 's1', name: '晨间轻装', portrait: 'image/spirit-skins/shinobu/s1.webp', face: 'image/spirit-skins/shinobu/s1_face.webp' },
+      { id: 's2', name: '装束 2', portrait: 'image/spirit-skins/shinobu/s2.webp', face: 'image/spirit-skins/shinobu/s2_face.webp' },
+      { id: 's3', name: '装束 3', portrait: 'image/spirit-skins/shinobu/s3.webp', face: 'image/spirit-skins/shinobu/s3_face.webp' },
+      { id: 's4', name: '装束 4', portrait: 'image/spirit-skins/shinobu/s4.webp', face: 'image/spirit-skins/shinobu/s4_face.webp' },
     ],
     'csh_boss_minion_catherine': [
       { id: 's1', name: '正装', portrait: 'image/spirit-skins/catherine/s1.webp', face: 'image/spirit-skins/catherine/s1_face.webp' },
       { id: 's2', name: '夜班', portrait: 'image/spirit-skins/catherine/s2.webp', face: 'image/spirit-skins/catherine/s2_face.webp' },
+      { id: 's3', name: '装束 3', portrait: 'image/spirit-skins/catherine/s3.webp', face: 'image/spirit-skins/catherine/s3_face.webp' },
     ],
     'csh_boss_minion_zelda': [
       { id: 's1', name: '晴装', portrait: 'image/spirit-skins/zelda/s1.webp', face: 'image/spirit-skins/zelda/s1_face.webp' },
+      { id: 's2', name: '装束 2', portrait: 'image/spirit-skins/zelda/s2.webp', face: 'image/spirit-skins/zelda/s2_face.webp' },
     ],
     'csh_boss_minion_megumi': [
       { id: 's1', name: '常服', portrait: 'image/spirit-skins/megumi/s1.webp', face: 'image/spirit-skins/megumi/s1_face.webp' },
+      { id: 's2', name: '装束 2', portrait: 'image/spirit-skins/megumi/s2.webp', face: 'image/spirit-skins/megumi/s2_face.webp' },
+    ],
+    'csh_boss_minion_yoruichi': [
+      { id: 's1', name: '装束 1', portrait: 'image/spirit-skins/yoruichi/s1.webp', face: 'image/spirit-skins/yoruichi/s1_face.webp' },
+      { id: 's2', name: '装束 2', portrait: 'image/spirit-skins/yoruichi/s2.webp', face: 'image/spirit-skins/yoruichi/s2_face.webp' },
+    ],
+    'csh_boss_minion_fortune': [
+      { id: 's1', name: '装束 1', portrait: 'image/spirit-skins/fortune/s1.webp', face: 'image/spirit-skins/fortune/s1_face.webp' },
+    ],
+    'csh_boss_minion_nilou': [
+      { id: 's1', name: '装束 1', portrait: 'image/spirit-skins/nilou/s1.webp', face: 'image/spirit-skins/nilou/s1_face.webp' },
+    ],
+    'csh_boss_minion_tayama': [
+      { id: 's1', name: '装束 1', portrait: 'image/spirit-skins/tayama/s1.webp', face: 'image/spirit-skins/tayama/s1_face.webp' },
+      { id: 's2', name: '装束 2', portrait: 'image/spirit-skins/tayama/s2.webp', face: 'image/spirit-skins/tayama/s2_face.webp' },
+    ],
+    'csh_boss_minion_momo': [
+      { id: 's1', name: '装束 1', portrait: 'image/spirit-skins/momo/s1.webp', face: 'image/spirit-skins/momo/s1_face.webp' },
+      { id: 's2', name: '装束 2', portrait: 'image/spirit-skins/momo/s2.webp', face: 'image/spirit-skins/momo/s2_face.webp' },
+      { id: 's3', name: '装束 3', portrait: 'image/spirit-skins/momo/s3.webp', face: 'image/spirit-skins/momo/s3_face.webp' },
+      { id: 's4', name: '装束 4', portrait: 'image/spirit-skins/momo/s4.webp', face: 'image/spirit-skins/momo/s4_face.webp' },
+    ],
+    'csh_boss_minion_ishtar': [
+      { id: 's1', name: '装束 1', portrait: 'image/spirit-skins/ishtar/s1.webp', face: 'image/spirit-skins/ishtar/s1_face.webp' },
+      { id: 's2', name: '装束 2', portrait: 'image/spirit-skins/ishtar/s2.webp', face: 'image/spirit-skins/ishtar/s2_face.webp' },
+      { id: 's3', name: '装束 3', portrait: 'image/spirit-skins/ishtar/s3.webp', face: 'image/spirit-skins/ishtar/s3_face.webp' },
+      { id: 's4', name: '装束 4', portrait: 'image/spirit-skins/ishtar/s4.webp', face: 'image/spirit-skins/ishtar/s4_face.webp' },
     ]
   };
   var spiritCount = 0, skinCount = 0;
