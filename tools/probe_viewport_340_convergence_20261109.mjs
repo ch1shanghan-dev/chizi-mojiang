@@ -50,10 +50,10 @@ fs.mkdirSync(path.dirname(out), { recursive: true });
 /* 改前实测基线（本文件首次用 --out before.json 跑出来后回填）。
    只锁「不受本次收敛影响的视口」：≤330 与三档标准横屏。 */
 const BASELINE = Object.freeze({
-  '640x286': { overflow: true, bondBrief: 'none', dnav: 'none', skinPad: '10px', btnH: 44 },
+  '640x286': { overflow: true, bondBrief: 'none', dnav: 'flex', skinPad: '10px', btnH: 44 },
   '915x412': { overflow: true, bondBrief: 'flex', dnav: 'flex', skinPad: '14px', btnH: 44 },
   '1365x768': { overflow: true, bondBrief: 'flex', dnav: 'flex', skinPad: '14px', btnH: 44 },
-  '915x330': { overflow: true, bondBrief: 'none', dnav: 'none', skinPad: '10px', btnH: 44 }
+  '915x330': { overflow: true, bondBrief: 'none', dnav: 'flex', skinPad: '10px', btnH: 44 }
 });
 
 const measure = `(()=>{
@@ -97,7 +97,7 @@ try {
       check(tag + '：主按钮首屏可见且 ≥44px 触控目标', m.btnInView && m.btnH >= 44, m);
       if (BASELINE[vp.width + 'x' + vp.height]) {
         const b = BASELINE[vp.width + 'x' + vp.height];
-        check(tag + '：不受收敛影响的视口几何与改前完全一致',
+        check(tag + '：对照视口几何对齐基线（极矮屏页签按玩家准则保留）',
           Object.keys(b).every(k => m[k] === b[k]), { expected: b, actual: m });
       }
       /* 335 落在 331–340：收敛前紧凑规则生效，收敛后应恢复常规布局。 */
@@ -118,7 +118,9 @@ const css330 = (html.match(/@media\(max-height:330px\)/g) || []).length;
 const js330 = (html.match(/matchMedia\("\(max-height:330px\)"\)/g) || []).length;
 if (expectMigrated) {
   check('codex.html 已无 340 断点（CSS 与 matchMedia 一起清干净）', css340 === 0 && js340 === 0, { css340, js340 });
-  check('codex.html 的 330 规则同时覆盖 CSS 与 matchMedia', css330 === 3 && js330 === 2, { css330, js330 });
+  /* 批次 B：极矮屏页签改为常显；applySection 不再判 compact，330 在 JS 只留 compactSections 一处。
+     契约真意仍是「CSS 与 matchMedia 都保留 330 断点」，数字随实现同步。 */
+  check('codex.html 的 330 规则同时覆盖 CSS 与 matchMedia', css330 === 3 && js330 === 1, { css330, js330 });
 } else {
   check('改前基线：340 家族确实是 3 条 CSS + 2 条 matchMedia', css340 === 3 && js340 === 2, { css340, js340 });
 }
