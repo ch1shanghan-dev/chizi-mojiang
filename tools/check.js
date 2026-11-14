@@ -3433,7 +3433,9 @@ if (spawnOk && execFileSync && !ONLY_SYNTAX && !ONLY_VERSIONS) {
       /* P2：height:340→330 收敛的可复用 Chromium 几何夹具。实测 13s，
          加载 codex.html 真实 <style>，5 个横屏视口含 331–340 变化区间与 330 边界，
          改前基线内嵌，零溢出 / 44px 触控目标 / 不受影响视口几何完全一致。 */
-      ['E95AJ','probe_viewport_340_convergence_20261109.mjs',['--out',path.join(tmp95,'viewport-340'),'--expect-migrated'],17,'横屏340断点收敛（真实CSS/5视口/改前基线几何比对）',60000],
+      /* 2026-11-14 环境适配：本机整仓跑到此处时前序 Chromium 尚未释放，启动排队会超过 60s；
+         单跑本探针 17s / 17/0，放宽超时只影响等待窗口，断言口径与 min 阈值一字未改。 */
+      ['E95AJ','probe_viewport_340_convergence_20261109.mjs',['--out',path.join(tmp95,'viewport-340'),'--expect-migrated'],17,'横屏340断点收敛（真实CSS/5视口/改前基线几何比对）',180000],
       ['E95AK','probe_world_grudge_softsave_20261109.mjs',['--out',path.join(tmp95,'world-grudge')],28,'非牌桌软保存addGrudge严格事务（拒写/静默丢写/读回/基线变化，改前诊断第7条复现）',20000],
       ['E95AL','probe_interact_audit.mjs',['--out',path.join(tmp95,'interact-audit')],124,'人物互动全量审计（回应队列/记忆检索/恩怨方向/终局；addGrudge严格事务桩补齐后纳管）',20000],
       ['E95AM','probe_affection_recovery.mjs',['--out',path.join(tmp95,'affection-recovery')],97,'好感/赠礼恢复事务（拒写回滚/联合检查点/重试，开放巡检时发现未纳管）',20000],
@@ -3466,7 +3468,8 @@ if (spawnOk && execFileSync && !ONLY_SYNTAX && !ONLY_VERSIONS) {
       /* 下面三个是 Chromium 真实页面探针：按钮补板单跑实测 63s，
          旧的 60000ms 阈值在整仓串行环境里必然 ETIMEDOUT（2026-11-11 实跑复现）。 */
       ['E95AX','probe_art_v2_bg_20261110.mjs',['--out',path.join(tmp95,'art-v2-bg')],32,'功能页位图背景（七页链接顺序/冷暖分配/缺图回退/运行时生效）',150000],
-      ['E95AY','probe_art_v2_buttons_20261110.mjs',['--out',path.join(tmp95,'art-v2-buttons')],67,'按钮补板（位图生效/44px红线/文字对比度/既有规则未被覆盖）',150000],
+      /* 2026-11-14 环境适配：同为本机 Chromium 启动排队，150s 两次仍不够；单跑 67/0。 */
+      ['E95AY','probe_art_v2_buttons_20261110.mjs',['--out',path.join(tmp95,'art-v2-buttons')],67,'按钮补板（位图生效/44px红线/文字对比度/既有规则未被覆盖）',300000],
       ['E95AZ','probe_mirror_seam_20261110.mjs',['--out',path.join(tmp95,'mirror-seam')],12,'国内更新镜像接缝（空串零行为变化/配置后入白名单/默认离线与writes不变）',30000],
       /* 2026-11-11：股价波动放大 + 极端行情，纯计算仿真 20000 天×2 种子，不启浏览器。 */
       ['E95BA','probe_market_volatility_20261111.mjs',['--out',path.join(tmp95,'market-volatility')],17,'金鳞市股价波动（常规放大/极端稀有/单日截断/价格护栏/长局趋势封顶/分布对称）',30000],

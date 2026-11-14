@@ -1,10 +1,10 @@
-/* 自动生成于 2026-11-13T07:18:36.636Z by tools/release.js —— hashes 对应 Git 发布字节，发版后 git push 即生效，勿手改 files */
+/* 自动生成于 2026-11-14T08:57:46.444Z by tools/release.js —— hashes 对应 Git 发布字节，发版后 git push 即生效，勿手改 files */
 window.extension = {
 	"池子魔将": {
-		"build": "e8fb58a8e20af35bebeb8d062299a523599db11ac809b9cc1024fb4aba4db182",
+		"build": "07d6cc78b80bc32f7cecdf028696a4ce0ca612fcdeebb191d3967c256d7ead05",
 		"hashes": {
 			"LICENSE": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
-			"README.md": "16c5095cd1a0d089e61759b52101a09f0615dedb1e118430c9512d908606d9d1",
+			"README.md": "3bd8e9a65b6b2359e91553ff10f1147a1ffd327201fe3c8ee52afbfaa718af0c",
 			"audio/card/csh_fangyuan_niliuhushenyin_female.mp3": "0210771697ae9c20c97f3a9336a2e5ae35ae570529e11f48cb914c7a6fe4dc36",
 			"audio/card/csh_fangyuan_niliuhushenyin_male.mp3": "0210771697ae9c20c97f3a9336a2e5ae35ae570529e11f48cb914c7a6fe4dc36",
 			"audio/card/csh_pifeng_male.mp3": "cf3f36b3c0f2c47ee6c9bcdd056d6dcca91f61a04dbf9795005543d646e3dfa1",
@@ -383,7 +383,7 @@ window.extension = {
 			"effect/csh_wenyang_quedi_banner.mp4": "e5b70cf477a353da434c1bbd759b3ad31f9e61b412a7b4da5e7827a0e6a1f119",
 			"effect/csh_zhonghui_paiyi_banner.mp4": "7b8c76be1045b8fe498766957500ded34fb47ef0fc26a7d86ef73f900fb29004",
 			"effect/csh_zhugeke_duwu_banner.mp4": "80d9488be1032a8b59522b0ca6815eb93e44a6c4287deaf261a4717a412dde51",
-			"extension.js": "cb52bb33828ca0dc6c5bde6a793ff2711d8cbad346406eca67c7cd4c7c855b4a",
+			"extension.js": "b78c0c4a1d4735332b43ea80e04823d09fd535523becc6a3a7416ab1c2bfa9cc",
 			"font/OFL-ZhiMangXing.txt": "e9957416b280a765ebd38da979467a5dfe0908382de04c85e9f7c0b34ed8209f",
 			"font/csh_fx_font_1.woff2": "f78752bf5f8639db8a228e2348740c6b52d7f6a33f2880011fefed7e39f58573",
 			"font/csh_fx_font_2.woff2": "ad894385b4e996e5f4b237cc6f5ead035237fb4c0cceaa603081ea63ab2b1da9",
@@ -919,7 +919,7 @@ window.extension = {
 			"image/ui/art-v2/tables/doudizhu.webp": "c7c0c9d064e62690b5fa44045b44ea00d9a7ad7e36485be84dec447332646b1e",
 			"image/ui/art-v2/tables/texas.webp": "83df87c820e8356c7f4d1dd8438373e97b92309fe1d98de98618375e064e9b1b",
 			"image/ui/art-v2/tables/uno.webp": "ee346c7eadc10a8abbcc8afa68d2b7247e382f529e110bdecbac7472be26bc6c",
-			"info.json": "d4b441ea0e0fdfa5e7b11a263c5a48d70b399cfc0cd5b7708327838f036ff2f5",
+			"info.json": "4f52795a982ea9edb920d1d29749cea07d2e7d1a73e435b7d11c1c95e4816844",
 			"main/bootstrap.js": "4e6b861d320121efdeacf7d52c821c488650acb0d84aa1609cd9b1d7bed0896d",
 			"main/bossmode.js": "fb0aee5f744f35e46dce7f79b039f998fa401d32a08c7829b280ddc4e197a8a6",
 			"main/build-flags.js": "60d491a2ac24949d6328faabccb6978d87d0590365ce2f14270f8a4f0d43c0c8",
@@ -1299,16 +1299,16 @@ window.extension = {
 			"mobilefx/wanjun/wushuanghuo_00017.png": "a847d20068a55543b18a8fd0afc5a1cc1349917e3a7e72e4dbc9387cc912ea39",
 			"mobilefx/wanjun/wushuanghuo_00018.png": "06d747bede74a16f0f5a58a0b9233e44b9a25222801dd54a0a35d37829fc20b2",
 			"mobilefx/wanjun/wushuanghuo_00019.png": "a1ec576661147d6d874b607b487f5cdba955fdf441a9c13038f217472ad89528",
-			"package.js": "67e6cabafe085b095a0f41e9cd2a51fc241a00c63459749e3f0c087c66807256",
+			"package.js": "0ebd4ea2c930fe13ca9ba1d1cd7ef87661d7a79a32942cf0aaf4c014f164a36e",
 			"skills/boss.js": "d62b6e1fd7293856139f82933075244b786ca1d7876c6864cdbf3419eceb8163",
 			"skills/index.js": "352e3c6e4c4c9f074d28119bef4dd0eb7ab75f57067cee29d614ca18d21ba16f",
 			"store.json": "372a558d374277a685a94ca8e0f2ebc1abe6be3d90feb0d9053ee71c72eccc47"
 		},
 		"name": "池子魔将",
 		"author": "池上寒",
-		"intro": "<font color=#c9a84c>版本</font> <font color=#00FFFF>4.0.17</font>",
-		"version": "4.0.17",
-		"date": "2026-11-13",
+		"intro": "<font color=#c9a84c>版本</font> <font color=#00FFFF>4.0.18</font>",
+		"version": "4.0.18",
+		"date": "2026-11-14",
 		"size": "162.8MB",
 		"limits": {
 			"textBytes": 524288,
