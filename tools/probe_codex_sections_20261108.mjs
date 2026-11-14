@@ -87,8 +87,8 @@ function harness(compact, override) {
 }
 {
   const h = harness(true);
-  check('极矮横屏：导航隐藏且三个详情全部展开（关键内容仍可达）',
-    h.apply('memory') === 'memory' && h.state().navHidden && !h.state().relationHidden && h.state().hidden.every(v => v === false), h.state());
+  check('极矮横屏：导航仍可见、分区切换照常生效（功能始终可达）',
+    h.apply('memory') === 'memory' && !h.state().navHidden && h.state().relationHidden && JSON.stringify(h.state().hidden) === JSON.stringify([false, false, true]), h.state());
   const wide = harness(false);
   check('回到宽屏后分区重新生效，不残留矮屏状态',
     wide.apply('archive') === 'archive' && JSON.stringify(wide.state().hidden) === JSON.stringify([true, true, false]), wide.state());
@@ -111,9 +111,12 @@ function harness(compact, override) {
     /id="character-echo" data-section="memory"/.test(html) &&
     /id="character-records" data-section="archive"/.test(html));
   check('隐藏态用高优先级规则真实不占位', /\.dinfo details\[hidden\]\{display:none\}/.test(html));
-  check('矮横屏复用既有 330px 断点，不新增 @media 数值',
-    /@media\(max-height:330px\)\{\.dnav\{display:none\}\}/.test(html) &&
-    !/@media\(max-height:3(?!30)\d+px\)\{\.dnav/.test(html));
+  check('页签与滚动容器分层，极矮屏不再隐藏分区入口',
+    !/@media\(max-height:330px\)\{\.dnav\{display:none\}\}/.test(html) &&
+    /\.dnav\{[^}]*position:static/.test(html) &&
+    /\.dinfo-scroll\{[\s\S]*?overflow-y:auto/.test(html) &&
+    /<div class="dinfo-scroll" id="dinfo-scroll">/.test(html) &&
+    !/\.dinfo\{[^}]*overflow-y:auto/.test(html));
   const baseline = new Set(((vpProbe.match(/const BASELINE = new Set\(\[([\s\S]*?)\]\)/) || [])[1] || '')
     .split(',').map(s => Number(s.trim())).filter(Number.isFinite));
   const values = [...html.matchAll(/\(\s*max-(?:height|width)\s*:\s*(\d+)px/g)].map(m => Number(m[1]));
@@ -127,7 +130,7 @@ function harness(compact, override) {
 
 /* ---------- 3. 改前基线 ---------- */
 {
-  const noHide = fn.replace('details[i].hidden=!compact&&details[i].getAttribute("data-section")!==key;',
+  const noHide = fn.replace('details[i].hidden=details[i].getAttribute("data-section")!==key;',
     'details[i].hidden=false;');
   check('改前基线源码确实换了实现', noHide !== fn);
   const h = harness(false, noHide);
@@ -139,7 +142,7 @@ function harness(compact, override) {
 }
 
 const result = {
-  scope: 'AST-extracted codex.html applySection in minimal DOM; static nav / a11y / breakpoint constraints; zero CSS breakpoint changes',
+  scope: 'AST-extracted codex.html applySection in minimal DOM; static nav / a11y / scroll layering; compact viewport keeps nav reachable',
   passed: rows.filter(r => r.passed).length,
   failed: rows.filter(r => !r.passed).length,
   failures: rows.filter(r => !r.passed)

@@ -122,8 +122,13 @@ body{background:
 .dstage.noimg .dph{display:flex}
 .dstage::after{content:"";position:absolute;inset:0;pointer-events:none;
   box-shadow:inset -40px 0 60px -30px rgba(25,21,18,.95)}
+/* 2026-11-14 批次 B：页签与内容必须分层。旧实现把 .dnav 放在 .dinfo 这个滚动容器
+   内部并加 sticky，滚动时页签永久悬浮、盖住关系摘要，上方还漏出被裁的半行文字。
+   现在 .dinfo 只做不滚动的 flex 外壳，滚动全部交给 .dinfo-scroll。 */
 .dinfo{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:8px;
-  padding:14px 16px 12px;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+  padding:14px 16px 12px;overflow:hidden}
+.dinfo-scroll{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;gap:8px;
+  overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
 .dname{font-family:var(--ff-title);font-size:var(--pfs-3xl2);letter-spacing:.12em;color:var(--ink)}
 .dtag{font-size:var(--pfs-md2);color:var(--gold);letter-spacing:.14em;margin-top:3px}
 .dbio{font-size:var(--pfs-lg);line-height:1.85;color:var(--ink-dim);
@@ -445,14 +450,16 @@ body[data-csh-collection="codex"] .dstage .dtag{color:#ead8af}
 #bond-brief .bb-next,#bond-brief .bb-cost{font-variant-numeric:tabular-nums}
 @media(max-height:330px){#bond-brief{display:none}}
 /* 分区切换直接显示当前页；矮横屏沿用一栏滚动。 */
-.dnav{display:flex;gap:6px;flex:none;position:sticky;top:-1px;z-index:3;background:var(--panel2)}
+.dnav{display:flex;gap:6px;flex:none;position:static;background:var(--panel2)}
 .dnav[hidden]{display:none}
+/* 极矮屏仍保留分区入口（44px 触控不缩水），只收紧外壳留白给内容区 */
+@media(max-height:330px){.dinfo{padding:4px 6px;gap:4px}}
 .dnav .dnav-tab{flex:1 1 0;min-height:44px;min-width:44px;padding:6px 4px;font:inherit;font-size:var(--pfs-sm,12px);color:var(--ink-dim,#c6c9bc);border:1px solid var(--line-2,#776c52);border-radius:7px;background:rgba(0,0,0,.22);cursor:pointer}
 .dnav .dnav-tab[aria-pressed="true"]{border-color:var(--gold,#d9bd7d);background:rgba(216,189,122,.16);color:#fff0bd}
 .dnav .dnav-tab:focus-visible{outline:2px solid var(--gold,#d9bd7d);outline-offset:-2px}
 #codex-relationship{display:flex;flex-direction:column;gap:6px}
 #codex-relationship[hidden],.dinfo details[hidden]{display:none}
-@media(max-height:330px){.dnav{display:none}}
+/* 极矮屏不再隐藏分区页签：功能必须始终找得到（批次 B） */
 </style>
 <link rel="stylesheet" href="../core/csh_collection.css">
 <link rel="stylesheet" href="../core/csh_bg_v2.css">
@@ -484,6 +491,8 @@ body[data-csh-collection="codex"] .dstage .dtag{color:#ead8af}
           <button type="button" class="affbtn dnav-tab" data-section="memory" aria-pressed="false" aria-controls="character-story character-echo">记忆</button>
           <button type="button" class="affbtn dnav-tab" data-section="archive" aria-pressed="false" aria-controls="character-records">档案</button>
         </nav>
+        <!-- 批次 B：唯一滚动容器；页签留在容器外，不再随内容滚动或盖住内容 -->
+        <div class="dinfo-scroll" id="dinfo-scroll">
         <section id="codex-relationship" aria-label="当前关系与互动">
           <div class="bond-brief" id="bond-brief"></div>
           <div class="affbox" id="affbox"></div>
@@ -504,7 +513,8 @@ body[data-csh-collection="codex"] .dstage .dtag{color:#ead8af}
           <div class="fact"><div class="k">挂牌状态</div><div class="v" id="fList">—</div></div>
         </div>
         </details>
-      </div>
+        </div><!-- /.dinfo-scroll -->
+      </div><!-- /.dinfo -->
     </div>
   </div>
 
@@ -768,18 +778,17 @@ function renderSpiritBuff(it) {
   body.appendChild(el("div", "sbnote", "仅作展示，不写入存档、不产生池子币；当前好感 " + (st && st.levelName ? st.levelName : level) + "。"));
 }
 
-/* 记忆与档案直接显示在右栏顶部。极矮横屏省去导航，沿用一栏滚动。 */
+/* 记忆与档案按分区显示在右栏。批次 B：极矮横屏同样保留导航，功能始终找得到。 */
 var DNAV_SECTIONS=["relation","memory","archive"],dnavSection="relation";
 function applySection(key){
   if(DNAV_SECTIONS.indexOf(key)<0)key="relation";
   dnavSection=key;
-  var compact=!!(window.matchMedia&&window.matchMedia("(max-height:330px)").matches);
   var nav=$("#dnav");
-  if(nav)nav.hidden=compact;
+  if(nav)nav.hidden=false;
   var relation=$("#codex-relationship");
-  if(relation)relation.hidden=!compact&&key!=="relation";
+  if(relation)relation.hidden=key!=="relation";
   var details=document.querySelectorAll(".dinfo details[data-section]");
-  for(var i=0;i<details.length;i++)details[i].hidden=!compact&&details[i].getAttribute("data-section")!==key;
+  for(var i=0;i<details.length;i++)details[i].hidden=details[i].getAttribute("data-section")!==key;
   if(nav){var tabs=nav.querySelectorAll("[data-section]");
     for(var j=0;j<tabs.length;j++)tabs[j].setAttribute("aria-pressed",String(tabs[j].getAttribute("data-section")===key));}
   return key;
@@ -1512,7 +1521,7 @@ if(dnav)dnav.addEventListener("click",function(e){
   while(n&&n!==dnav&&(!n.getAttribute||!n.getAttribute("data-section")))n=n.parentNode;
   if(n&&n!==dnav){
     applySection(n.getAttribute("data-section"));
-    $(".dinfo").scrollTop=0;
+    $(".dinfo-scroll").scrollTop=0;
   }
 },false);
 var compactSections=window.matchMedia("(max-height:330px)");
@@ -1536,7 +1545,7 @@ function select(idx) {
     rows[i].setAttribute("aria-pressed", i === idx ? "true" : "false");
   }
   renderDossier(Data.items[idx]);
-  $(".dinfo").scrollTop = 0;
+  $(".dinfo-scroll").scrollTop = 0;
   if (window.matchMedia("(max-width:1000px)").matches && document.body.classList.contains("codex-roster-open")) setRosterOpen(false, true);
   /* 淡入：重触发 dossier 入场动画 */
   var d = $("#dossier");
@@ -1601,12 +1610,12 @@ function boot() {
     if (!c) { paintRead("error"); return; }
     try {
       var items = buildItems(c), current = Data.items[Data.cur], id = current && current.id;
-      var scroll = $(".dinfo").scrollTop;
+      var scroll = $(".dinfo-scroll").scrollTop;
       Data.items = items;
       if (c.bounty !== undefined) Data.bountyTarget = String(c.bounty || "");
       Data.cur = id ? items.findIndex(function (x) { return x.id === id; }) : -1;
       renderStats();
-      if (items.length) { renderList(); select(Data.cur >= 0 ? Data.cur : 0); $(".dinfo").scrollTop = scroll; }
+      if (items.length) { renderList(); select(Data.cur >= 0 ? Data.cur : 0); $(".dinfo-scroll").scrollTop = scroll; }
       paintRead("ready");
     } catch (e) { paintRead("error"); }
   }

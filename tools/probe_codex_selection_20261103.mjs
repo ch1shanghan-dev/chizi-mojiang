@@ -10,10 +10,11 @@ await val('window.pick=id=>ct.select(ct.Data.items.findIndex(x=>x.id===id));wind
 await check('initial detail and roster agree','agree()');
 await check('landscape portrait and relationship remain adjacent and skin control is reachable','(()=>{const r=s=>document.querySelector(s).getBoundingClientRect(),p=r(".dstage"),i=r(".dinfo"),b=r("#codex-skin-open");return p.width>130&&i.width>240&&p.right<i.left&&Math.abs(p.top-i.top)<2&&b.width>=44&&b.height>=44&&b.bottom<=innerHeight&&document.documentElement.scrollWidth<=innerWidth})()');
 if(name==="short"){
-  await check('short landscape keeps relationship and archive reachable in one scroller','document.querySelector("#dnav").hidden&&!document.querySelector("#codex-relationship").hidden&&!document.querySelector("#character-records").hidden');
+  /* 批次 B：极矮屏不再隐藏导航（功能必须找得到），改验「导航可见 + 点档案能切到档案」 */
+  await check('short landscape keeps nav reachable and archive switchable','(()=>{const nav=document.querySelector("#dnav");const tab=nav.querySelector("[data-section=archive]");tab.click();const ok=!nav.hidden&&!document.querySelector("#character-records").hidden&&document.querySelector("#codex-relationship").hidden&&tab.getAttribute("aria-pressed")==="true";nav.querySelector("[data-section=relation]").click();return ok})()');
 }else{
   await click('.dnav-tab[data-section="memory"]');
-  await check('native Memory switches right pane immediately','document.querySelector("#codex-relationship").hidden&&!document.querySelector("#character-story").hidden&&document.querySelector("#character-records").hidden&&document.querySelector(".dinfo").scrollTop===0');
+  await check('native Memory switches right pane immediately','document.querySelector("#codex-relationship").hidden&&!document.querySelector("#character-story").hidden&&document.querySelector("#character-records").hidden&&document.querySelector(".dinfo-scroll").scrollTop===0');
   await click('.dnav-tab[data-section="archive"]');
   await check('native Archive has an independent selected state','document.querySelector(".dnav-tab[data-section=archive]").getAttribute("aria-pressed")==="true"&&!document.querySelector("#character-records").hidden&&document.querySelector("#character-story").hidden');
   await click('.dnav-tab[data-section="relation"]');
