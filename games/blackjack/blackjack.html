@@ -1461,7 +1461,7 @@ try { CRD = (typeof window !== 'undefined' && window.CSH && window.CSH.cards) ? 
       var el = document.getElementById(ids[i]);
       if (!el) continue;
       el.textContent = surname;
-      try { if (CRD) el.innerHTML = CRD.avatar(surname, dealerSeat && dealerSeat.persona || 'math', 30, dealerSeat && dealerSeat.seed); } catch (e) {}
+      try { if (CRD) el.innerHTML = CRD.faceHTML(dealerSeat && dealerSeat.id, surname, dealerSeat && dealerSeat.persona || 'math', 30, dealerSeat && dealerSeat.seed); } catch (e) {}
       el.setAttribute('role', 'img'); el.setAttribute('aria-label', name);
     }
     document.getElementById('dealer-table-name').textContent = '庄家 · ' + name;

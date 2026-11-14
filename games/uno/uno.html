@@ -898,6 +898,8 @@ Room.prototype.addBot = function (seat) {
     seat: seat || null,   /* 世界座位（台词与战果回报要用；本地机器人时为 null） */
   };
   this.players.push(player);
+  /* 批次 E：view.players 是精简状态不带 seat，按名字留一份 id 映射供头像取图 */
+  if (seat && seat.id) { window.__unoWorldIds = window.__unoWorldIds || {}; window.__unoWorldIds[name] = seat.id; }
   return { player: player };
 };
 
@@ -1596,7 +1598,8 @@ function renderGame() {
     if (p.out) html += '<span class="out">出局</span>';
     /* §4.7.2 ⑤ 对手头像（§I.4）：UNO 的对手没有 §I 世界档案，
        故用姓名哈希派生性格 → 同名恒定同纹样（personaOf 的用途就在这）。 */
-    if (CRD) html += '<span class="opp-av">' + CRD.avatar(String(p.name || '?').slice(0, 1), CRD.personaOf(p.name), 30) + '</span>';
+    var wid = (window.__unoWorldIds && window.__unoWorldIds[p.name]) || null;
+    if (CRD) html += '<span class="opp-av">' + CRD.faceHTML(wid, String(p.name || '?').slice(0, 1), CRD.personaOf(p.name), 30) + '</span>';
     html += '<span class="oname">' + esc(p.name) + '</span>';
     html += '<span class="ocount"><b>' + p.count + '</b> 张</span>';
     if (p.uno) html += '<span class="uno-flag">UNO!</span>';

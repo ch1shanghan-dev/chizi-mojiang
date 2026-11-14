@@ -1467,6 +1467,7 @@ function newGame() {
   game.multLog = [];
   game.aiStakes = [0, 0];
   game.profiles = [{skill:.9,persona:'math'},null,null];
+  game.worldIds = [null,null,null];   /* 批次 E：世界座位 id，用于取真实人物头像 */
   game.stake = Bridge.active ? Bridge.buyIn() : 0;
   game.chips = game.stake;
   if (Bridge.active) {
@@ -1481,6 +1482,7 @@ function newGame() {
       game.personas[2] = opp[1] ? (opp[1].persona || null) : null;
       game.seeds[1] = (opp[0].seed != null) ? opp[0].seed : null;
       game.seeds[2] = opp[1] ? ((opp[1].seed != null) ? opp[1].seed : null) : null;
+      game.worldIds[1] = opp[0].id || null; game.worldIds[2] = opp[1] ? (opp[1].id || null) : null;
       game.aiStakes[0] = Math.max(0, Math.floor(opp[0].stake || 0));
       if (opp[1]) game.aiStakes[1] = Math.max(0, Math.floor(opp[1].stake || 0));
       for (var q = 0; q < opp.length; q++) game.stake += Math.max(0, Math.floor(opp[q].stake || 0));
@@ -1936,7 +1938,7 @@ function renderSeat(p, el) {
   if (p === 0 || !CRD) {
     h += esc((game.names[p] || '?').slice(0, 1));
   } else {
-    h += CRD.avatar((game.names[p] || '?').slice(0, 1), game.personas[p] || CRD.personaOf(game.names[p]), 38, (game.seeds[p] != null ? game.seeds[p] : undefined));
+    h += CRD.faceHTML(game.worldIds && game.worldIds[p], (game.names[p] || '?').slice(0, 1), game.personas[p] || CRD.personaOf(game.names[p]), 38, (game.seeds[p] != null ? game.seeds[p] : undefined));
   }
   h += '</div>';
   h += '<div class="seat-info">';

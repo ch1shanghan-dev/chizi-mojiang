@@ -84,6 +84,8 @@
 		"/* ⑤ AI 头像容器：SVG 铺满圆形容器，不撑破座位卡 */",
 		".seat-av,.avatar,.opp-av{ overflow:hidden; }",
 		".seat-av svg,.avatar svg,.opp-av svg{ width:100%; height:100%; display:block; border-radius:50%; }",
+		"/* 批次 E：真实人物头像铺满圆形容器，缺图由 error 监听回退 SVG */",
+		".seat-av img.csh-face-img,.avatar img.csh-face-img,.opp-av img.csh-face-img{ width:100%; height:100%; display:block; object-fit:cover; object-position:50% 12%; border-radius:50%; }",
 		".opp-av{",
 		"  width:clamp(22px,3.1vh,34px); height:clamp(22px,3.1vh,34px); border-radius:50%;",
 		"  display:flex; align-items:center; justify-content:center; flex-shrink:0;",
@@ -203,15 +205,63 @@
 		return true;
 	}
 
+	/* ---------- 批次 E：牌桌座位真实人物头像（2026-11-14） ----------
+	   世界名册 = 武将 csh_* + 妖灵 csh_boss_minion_* 两层。100 条武将 img 文件名与 id
+	   完全一致（57 jpg / 43 webp），50 位妖灵全有经典头像，故按 id 拼路径即可：
+	   不派生新资产、不改桥协议、不新增存档键。妖灵跟随宿主装扮只读口。 */
+	var WEBP_WARLORDS = " csh_huangyueying csh_huaman csh_jzh csh_qw csh_jjxs csh_mmhz csh_sx csh_gy csh_bfsm csh_ls csh_vxs csh_msmy csh_mlb csh_yy csh_ae csh_mzj csh_chengpu csh_xushu csh_zhonghui csh_ngwt csh_guansuo csh_yujin csh_caiyan csh_simahui csh_wenyang csh_dengai csh_gaogan csh_lifeng csh_caochun csh_shamoke csh_zhangning csh_lidian csh_lvlingqi csh_dongzhuo csh_lukang csh_xurong csh_zhugeke csh_chengyu csh_realityfanghao csh_zhugeqing csh_zhangxingcai csh_jieluji csh_diaochan ";
+	function escAttr(s) {
+		return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+			return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+		});
+	}
+	function facePath(id) {
+		id = String(id == null ? "" : id);
+		if (id.indexOf("csh_boss_minion_") === 0) {
+			try {
+				var P = root.parent, sh = P && P.lib && P.lib.cshShell;
+				if (sh && typeof sh.skinOf === "function") {
+					var sk = sh.skinOf(id);
+					if (sk && sk.face) return "../" + String(sk.face).replace(/^\.\.\//, "");
+				}
+			} catch (e) {}
+			return "../image/csh_face_" + id.slice(16) + ".webp";
+		}
+		if (id.indexOf("csh_") === 0 && /^[a-z0-9_]+$/.test(id))
+			return "../image/" + id + (WEBP_WARLORDS.indexOf(" " + id + " ") >= 0 ? ".webp" : ".jpg");
+		return "";
+	}
+	function faceHTML(id, surname, persona, px, seed) {
+		var p = facePath(id);
+		if (!p) return avatar(surname, persona, px, seed);
+		return '<img class="csh-face-img" src="' + escAttr(p) + '" alt="" decoding="async" ' +
+			'data-surname="' + escAttr(surname) + '" data-persona="' + escAttr(persona) +
+			'" data-px="' + escAttr(px) + '" data-seed="' + escAttr(seed == null ? "" : seed) + '">';
+	}
+
 	var API = {
 		BEZIER: BEZIER, Z: Z, CSS: CSS, STYLE_ID: STYLE_ID, PERSONAS: PERSONAS,
 		ensureStyle: ensureStyle,
 		rollNum: rollNum, rollEase: rollEase, rollValue: rollValue,
-		avatar: avatar, personaOf: personaOf, hasGenerator: hasGenerator,
+		avatar: avatar, facePath: facePath, faceHTML: faceHTML,
+		personaOf: personaOf, hasGenerator: hasGenerator,
 		anim: anim, potCollect: potCollect,
 	};
 	root.CSH.cards = API;
 
 	/* 一引入就注入：各游戏无需手动调用 */
 	ensureStyle();
+	/* 批次 E：图片 404 / 解码失败时恢复程序化 SVG，绝不空白或破图 */
+	try {
+		if (root.document && root.document.addEventListener) {
+			root.document.addEventListener("error", function (e) {
+				var n = e.target;
+				if (!n || !n.classList || !n.classList.contains("csh-face-img") || n.getAttribute("data-fb")) return;
+				n.setAttribute("data-fb", "1");
+				var box = n.parentNode;
+				if (box) box.innerHTML = avatar(n.getAttribute("data-surname"), n.getAttribute("data-persona"),
+					Number(n.getAttribute("data-px")) || 30, n.getAttribute("data-seed") || null);
+			}, true);
+		}
+	} catch (e) {}
 })(typeof window !== "undefined" ? window : this);

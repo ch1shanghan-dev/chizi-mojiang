@@ -2702,7 +2702,7 @@ function buildSeat(p, xy) {
   /* §4.7.2 ⑤ AI 头像：程序化 SVG（§I.4），姓氏决定色、性格决定纹样 —— 同一角色恒定同图
      【2026-10-01】第 4 参 seed（world.seat() 透传，stableHash 同款）：97 人下同姓 6 人，
      不带 seed 时同姓 + 同性格头像完全一样（撞脸），带上后 seed%72 同姓组内零碰撞。 */
-  if (CRD) { try { av.innerHTML = CRD.avatar(p.surname, p.persona, 34, p.seed); } catch (e) { av.textContent = p.surname; } }
+  if (CRD) { try { av.innerHTML = CRD.faceHTML(p.worldId, p.surname, p.persona, 34, p.seed); } catch (e) { av.textContent = p.surname; } }
   else av.textContent = p.surname;
   av.title = p.name + (p.tag ? ' · ' + p.tag : '');
   av.setAttribute('role', 'img');

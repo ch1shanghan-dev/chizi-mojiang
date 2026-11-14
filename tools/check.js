@@ -3482,6 +3482,10 @@ if (spawnOk && execFileSync && !ONLY_SYNTAX && !ONLY_VERSIONS) {
       ['E95BB','probe_ui_smoke_20261111.mjs',['--out',path.join(tmp95,'ui-smoke')],62,'UI全局巡检（四桌×2视口+七功能页：JS报错/缺图/溢出/44px）',300000],
       /* 2026-11-14 批次 D：真实 Chromium 量几何，补上既有探针只查选中项造成的假绿。 */
       ['E95BE','probe_codex_scroll_20261114.mjs',['--out',path.join(tmp95,'codex-scroll')],36,'图鉴滚动可达性（名录末项/页签与滚动分层/极矮屏分区/详情末项/内置改前判红）',300000],
+      /* 2026-11-14 批次 E：牌桌座位接真实人物图，锁住 id 映射与缺图回退。 */
+      ['E95BF','probe_table_faces_20261114.mjs',['--out',path.join(tmp95,'table-faces')],18,'牌桌人物头像（id→现有立绘/装扮跟随/缺图回退/五处接线/150张实体零错配）',120000],
+      /* 2026-11-14 批次 E：牌桌座位接真实人物图，锁住 id 映射与缺图回退。 */
+      ['E95BF','probe_table_faces_20261114.mjs',['--out',path.join(tmp95,'table-faces')],18,'牌桌人物头像（id→现有立绘/装扮跟随/缺图回退/五处接线/150张实体零错配）',120000],
     ];
     for (const [tag95, script95, args95, min95, label95, timeout95] of reg95) {
       const r95 = runProbeJson(script95, args95, { timeout: timeout95 });
