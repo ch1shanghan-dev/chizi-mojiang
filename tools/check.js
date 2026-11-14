@@ -3480,6 +3480,8 @@ if (spawnOk && execFileSync && !ONLY_SYNTAX && !ONLY_VERSIONS) {
       ['E95BD','probe_alert_status_20261113.mjs',['--out',path.join(tmp95,'alert-status')],6,'报错状态边界（异常边界在位/真机待验标记未丢/不宣称已治愈）',20000],
       ['E95BC','probe_aff_lines_truth_20261113.mjs',['--out',path.join(tmp95,'aff-lines-truth')],31,'台词真源与全员互动（50位×2句tender/纲手语料/技能译名/通用reply退场/亲密项限定）',30000],
       ['E95BB','probe_ui_smoke_20261111.mjs',['--out',path.join(tmp95,'ui-smoke')],62,'UI全局巡检（四桌×2视口+七功能页：JS报错/缺图/溢出/44px）',300000],
+      /* 2026-11-14 批次 D：真实 Chromium 量几何，补上既有探针只查选中项造成的假绿。 */
+      ['E95BE','probe_codex_scroll_20261114.mjs',['--out',path.join(tmp95,'codex-scroll')],36,'图鉴滚动可达性（名录末项/页签与滚动分层/极矮屏分区/详情末项/内置改前判红）',300000],
     ];
     for (const [tag95, script95, args95, min95, label95, timeout95] of reg95) {
       const r95 = runProbeJson(script95, args95, { timeout: timeout95 });
