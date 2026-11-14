@@ -7144,7 +7144,7 @@ function onlineLocalFetch(url,options){return window.CSHOnline.local(url,options
             }
 
             function installEntry(entry, btn, prog) {
-                if(_status.gameStarted&&!_status.over){toast("请在本局结束后安装扩展，避免重启打断结算");return;}
+                /* 批次 C（定案 B）：局中同样允许安装，不再以整场结束为前置。 */
                 if (storeTask && storeTask.running) {
                     toast("正在安装「" + storeTask.name + "」，等它结束再装别的");
                     return;
@@ -7204,7 +7204,7 @@ function onlineLocalFetch(url,options){return window.CSHOnline.local(url,options
                         storeTask.total = total;
                         prog.textContent = "下载中 " + done + " / " + total + " · " + rel;
                     }, ctrl).then(function (data) {
-                        if(_status.gameStarted&&!_status.over)throw Error("新对局已开始，请结束后再继续安装；已下载内容保留");prog.textContent = "正在写入扩展目录…（共 " + man.blobs.length + " 个文件）";
+                        prog.textContent = "正在写入扩展目录…（共 " + man.blobs.length + " 个文件）";
                         btn.textContent = "安装中…";
                         return new Promise(function (res, rej) {
                             Promise.resolve(game.importExtension(data, function () { finish(); res(); })).catch(rej);
@@ -7837,7 +7837,7 @@ function onlineLocalFetch(url,options){return window.CSHOnline.local(url,options
                tools/probe_update_transaction.mjs 会把 startUpdate 单独抽出来在 vm 里跑，
                那里没有外层闭包；挂在 window 上两边都能取到。
                先看事务阶段：提交/恢复中拒绝取消（那时文件已经在换，取消只会让状态更糟）；
-               确认可取消后立刻清掉待安装凭据，局后自动安装的轮询读到空就停，
+               确认可取消后立刻清掉待安装凭据，恢复链路读到空就停，
                再去清暂存；清理失败不影响「已取消」这个事实，下次启动的恢复会收尾。 */
             if (!window.CSHUpdate.__cshCancelPending) window.CSHUpdate.__cshCancelPending = function () {
                 var st2 = window.CSHUpdate, pending2 = st2.__cshPendingInstall;
@@ -7848,7 +7848,7 @@ function onlineLocalFetch(url,options){return window.CSHOnline.local(url,options
                 try { tx2 = st2.create(st2.hostIO({ lib: lib, game: game })); }
                 catch (eC0) { st2.__cshCancelInFlight = false; return Promise.resolve({ cancelled: false, error: eC0 }); }
                 /* 只有 abortPrepared 真的成功才清掉待安装凭据。
-                   失败（例如已经进入提交阶段）时保持原样：本局结束后照常安装，
+                   失败（例如已经进入提交阶段）时保持原样：恢复链路照常收尾，
                    并如实告诉玩家「没取消失败了」——绝不出现「界面说取消了、文件却仍在换」。 */
                 return tx2.abortPrepared().then(function () {
                     st2.__cshPendingInstall = null; st2.__cshCancelInFlight = false;
@@ -7883,48 +7883,21 @@ function onlineLocalFetch(url,options){return window.CSHOnline.local(url,options
                 var ctrl = task.controller;
                 closeBtn.disabled=false; closeBtn.textContent='取消下载'; setState('cancellable','取消下载');
                 if (typeof errorDetails!=='undefined' && errorDetails) { errorDetails.hidden=true; errorDetails.open=false; }
-                /* 局中 prepare 后由这里接手：本局结束、结算留出时间后再提交并重启。
-                   轮询独立于任务锁，关闭弹窗不会取消已下载内容。 */
-                function scheduleDeferredInstall(){
-                    /* 结算完成判定：局已结束 + 钱包无待保存结果 + 迁移无未决；连续两次稳定才装，
-                       避免结算动画/战绩写入刚开始就替换文件。 */
-                    function settledNow(){
+                /* 批次 C（定案 B）：不再等整场结束，但要等「这一次」存档写入完成。
+                   钱包 outbox / 迁移恢复仍有未决项时短等，避免替换文件时带入或补码凭据半写；
+                   无未决项时立即返回（不调用 setTimeout，VM 探针也不会挂住）。 */
+                async function waitPendingWrites(){
+                    for (var i=0;i<40;i++){
+                        var busy=false;
                         try{
-                            if(_status.gameStarted&&!_status.over)return false;
                             var q=lib.cshWallet&&lib.cshWallet.pending;
-                            if(q&&typeof q.status==='function'){var s=q.status();if(s&&(s.count||s.error))return false;}
-                            var M=lib.cshMigrate,st=M&&M.recoveryState?M.recoveryState():null;
-                            if(st&&(st.pending||st.busy))return false;
-                        }catch(e){return false;}
-                        return true;
+                            if(q&&typeof q.status==='function'){var qs=q.status();if(qs&&(qs.count||qs.error))busy=true;}
+                            var M=lib.cshMigrate,rs=M&&M.recoveryState?M.recoveryState():null;
+                            if(rs&&(rs.pending||rs.busy))busy=true;
+                        }catch(e){}
+                        if(!busy)return;
+                        await new Promise(function(r){setTimeout(r,100);});
                     }
-                    var stable=0;
-                    var tick=function(){
-                        var pending=window.CSHUpdate&&window.CSHUpdate.__cshPendingInstall;
-                        if(!pending)return;
-                        if(window.CSHUpdate.__cshCancelInFlight){setTimeout(tick,1500);return;}   /* 正在取消：推迟自动安装，不抢 */
-                        if(!settledNow()){stable=0;setTimeout(tick,1500);return;}
-                        if(++stable<2){setTimeout(tick,1500);return;}
-                        setTimeout(function(){
-                            var again=window.CSHUpdate&&window.CSHUpdate.__cshPendingInstall;
-                            if(!again||again!==pending)return;
-                            if(window.CSHUpdate.__cshCancelInFlight)return;
-                            var engine=window.CSHUpdate, tx=task.tx;   /* commit 是事务实例方法，不是模块导出 */
-                            tx.commit(pending.prepared).then(function(){
-                                window.CSHUpdate.__cshPendingInstall=null;
-                                try{if(pending.build)game.saveConfig('extension_池子魔将_build',pending.build);game.saveConfig('extension_池子魔将_version',pending.remoteVer);}catch(eS){}
-                                if(current())status.textContent='更新已安装，正在重启…';
-                                try{game.reload();}catch(eR){location.reload();}
-                            }).catch(function(eC){
-                                try{console.warn('[池子魔将] 局后自动安装失败',eC);}catch(_e){}
-                                /* 保留待安装凭据：玩家可以重新点更新，或下次启动恢复时核对。 */
-                                var why=engine.errorText?engine.errorText(eC):(eC&&eC.message||'请重新检查更新');
-                                try{window.CSHUpdate.__cshDeferredError=String(why);}catch(_e2){}
-                                if(current())status.textContent='自动安装未完成：'+why;
-                            });
-                        },4000);
-                    };
-                    setTimeout(tick,1500);
                 }
                 try {
                     var engine=window.CSHUpdate,io=engine.hostIO({lib:lib,game:game});
@@ -7972,52 +7945,9 @@ function onlineLocalFetch(url,options){return window.CSHOnline.local(url,options
                         }
                         throw Error('文件 '+rel+' 下载未能完成（已按目录摘要核对全部 '+bases.length+' 个更新源）：'+attempts.join('；'));
                     }
-                    var inGame = _status.gameStarted && !_status.over;
-                    if (needed.length && inGame) {
-                        var prepared = await task.tx.prepare(needed,fetchFile,{
-                            hashes:hashes,
-                            fromVersion:typeof localVer==='string'?localVer:'',
-                            toVersion:remoteVer,
-                            signal:ctrl.signal,
-                            progress:function(p){
-                                task.phase=p.phase;
-                                var locked=p.phase==='committing'||p.phase==='recovering';
-                                setState(locked?'busy':'cancellable',locked?'正在提交并核验…':'取消下载');
-                                if (!current()) return;
-                                var names={'downloading':'下载并核验','backing-up':'备份原文件','committing':'提交并核验','recovering':'恢复原文件'};
-                                status.textContent=(names[p.phase]||p.phase)+' '+p.done+' / '+p.total;
-                                closeBtn.disabled=locked;
-                                closeBtn.textContent=locked?'正在提交并核验…':'取消下载';
-                            }
-                        });
-                        window.CSHUpdate.__cshPendingInstall={prepared:prepared,remoteVer:remoteVer,build:info.build||'',at:Date.now()};
-                        if (current()) { status.textContent='更新已下载并核验，本局结束后自动安装；当前文件未改动。'; goBtn.disabled=true; closeBtn.disabled=false; closeBtn.textContent='关闭'; setState('idle','关闭');
-                            /* 单抽 startUpdate 的 vm 探针（probe_update_transaction）里没有 document：
-                               取消失败入口在这里降级掉，绝不能因为建不出按钮就让「已就绪」变成异常。 */
-                            var cancelNow=null;
-                            try{
-                            cancelNow=document.createElement('button'); cancelNow.type='button'; cancelNow.className='csh-ext-btn ghost'; cancelNow.textContent='取消待安装';
-                            cancelNow.addEventListener('click',function(){
-                                if(!current())return;
-                                cancelNow.disabled=true;
-                                window.CSHUpdate.__cshCancelPending().then(function(rC){
-                                    if(!current())return;
-                                    if(rC&&rC.refused){cancelNow.disabled=false;status.textContent=rC.refused;return;}
-                                    try{cancelNow.remove();}catch(eRm){}
-                                    goBtn.disabled=false; goBtn.textContent='立即更新';
-                                    status.textContent=(rC&&rC.cleanupError)?'已取消待安装；暂存内容会在下次启动时清理。':'已取消待安装，已下载内容已清理。';
-                                },function(eCx){
-                                    if(!current())return;
-                                    cancelNow.disabled=false;
-                                    status.textContent='取消失败：'+((window.CSHUpdate.errorText&&window.CSHUpdate.errorText(eCx))||'请重新检查更新');
-                                });
-                            },false);
-                            try{ goBtn.parentNode.insertBefore(cancelNow, goBtn); }catch(eIns){}
-                            }catch(eNoDom){}
-                        }
-                        scheduleDeferredInstall();
-                        return;
-                    }
+                    /* 批次 C（定案 B）：局内、局外、商城三条入口一律直接提交，
+                       不再以「整场对局结束」为前置，也不弹确认；只沿用事务原子性与进度显示。 */
+                    await waitPendingWrites();
                     if (needed.length) await task.tx.apply(needed,fetchFile,{
                         hashes:hashes,
                         fromVersion:typeof localVer==='string'?localVer:'',
@@ -8025,7 +7955,6 @@ function onlineLocalFetch(url,options){return window.CSHOnline.local(url,options
                         signal:ctrl.signal,
                         progress:function(p){
                             task.phase=p.phase;
-                            if (p.phase==='backing-up' && !inGame && _status.gameStarted && !_status.over) throw Error('检测到新对局，安装已取消，原文件未改动');
                             var locked=p.phase==='committing'||p.phase==='recovering';
                             setState(locked?'busy':'cancellable',locked?'正在提交并核验…':'取消下载');
                             if (!current()) return;   /* 旧任务的进度回包不写新弹窗 */
@@ -8038,8 +7967,7 @@ function onlineLocalFetch(url,options){return window.CSHOnline.local(url,options
                     if (info.build) game.saveConfig('extension_池子魔将_build',info.build);
                     game.saveConfig('extension_池子魔将_version',remoteVer);
                     if (current()) status.textContent='文件已核验并更新完成，正在重启…';
-                    setTimeout(function restart(){
-                        if (_status.gameStarted && !_status.over) { if (current()) status.textContent='更新已完成，本局结束后自动重启。'; setTimeout(restart,1000); return; }
+                    setTimeout(function(){
                         try { game.reload(); } catch(e) { location.reload(); }
                     },1200);
                 } catch(e) {
@@ -8125,12 +8053,11 @@ function onlineLocalFetch(url,options){return window.CSHOnline.local(url,options
                 }, false);
                 if (st.task && !st.task.settled) goBtn.disabled=true;
                 row.insertBefore(goBtn, row.firstChild);
-                /* 已经有「下好了、等本局结束就装」的更新：这里说清楚，并给一个取消入口。
-                   否则玩家只看到按钮变灰，不知道什么时候会动他的文件。 */
+                /* 上次更新若留下未完成凭据（断电恢复场景）：允许直接点「立即更新」继续，
+                   不再把按钮变灰、也不再让玩家等对局结束。 */
                 var pendingNow = window.CSHUpdate && window.CSHUpdate.__cshPendingInstall;
                 if (pendingNow) {
-                    status.textContent = '已下载并核验 ' + pendingNow.remoteVer + '，本局结束后自动安装；当前文件未改动。';
-                    goBtn.disabled = true;
+                    status.textContent = '检测到上次未完成的更新 ' + pendingNow.remoteVer + '，点「立即更新」即可继续。';
                     var cancelBtn = document.createElement("button");
                     cancelBtn.type = "button";
                     cancelBtn.className = "csh-ext-btn ghost";

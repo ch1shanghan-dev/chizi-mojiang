@@ -3484,8 +3484,8 @@ if (spawnOk && execFileSync && !ONLY_SYNTAX && !ONLY_VERSIONS) {
       ['E95BE','probe_codex_scroll_20261114.mjs',['--out',path.join(tmp95,'codex-scroll')],36,'图鉴滚动可达性（名录末项/页签与滚动分层/极矮屏分区/详情末项/内置改前判红）',300000],
       /* 2026-11-14 批次 E：牌桌座位接真实人物图，锁住 id 映射与缺图回退。 */
       ['E95BF','probe_table_faces_20261114.mjs',['--out',path.join(tmp95,'table-faces')],18,'牌桌人物头像（id→现有立绘/装扮跟随/缺图回退/五处接线/150张实体零错配）',120000],
-      /* 2026-11-14 批次 E：牌桌座位接真实人物图，锁住 id 映射与缺图回退。 */
-      ['E95BF','probe_table_faces_20261114.mjs',['--out',path.join(tmp95,'table-faces')],18,'牌桌人物头像（id→现有立绘/装扮跟随/缺图回退/五处接线/150张实体零错配）',120000],
+      /* 2026-11-14 批次 C：定案 B，局中直接更新；含资金落盘护栏与旧延迟清零。 */
+      ['E95BG','probe_update_ingame_funds_20261114.mjs',['--out',path.join(tmp95,'update-ingame')],18,'局中直接更新B（旧延迟清零/资金落盘护栏/立即提交与重启/断电恢复）',30000],
     ];
     for (const [tag95, script95, args95, min95, label95, timeout95] of reg95) {
       const r95 = runProbeJson(script95, args95, { timeout: timeout95 });
