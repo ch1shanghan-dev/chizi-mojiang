@@ -3486,6 +3486,8 @@ if (spawnOk && execFileSync && !ONLY_SYNTAX && !ONLY_VERSIONS) {
       ['E95BF','probe_table_faces_20261114.mjs',['--out',path.join(tmp95,'table-faces')],20,'牌桌人物头像（id→现有立绘/装扮跟随/缺图回退/五处接线/150张实体/真实解码naturalWidth>0）',120000],
       /* 2026-11-14 批次 C：定案 B，局中直接更新；含资金落盘护栏与旧延迟清零。 */
       ['E95BG','probe_update_ingame_funds_20261114.mjs',['--out',path.join(tmp95,'update-ingame')],18,'局中直接更新B（旧延迟清零/资金落盘护栏/立即提交与重启/断电恢复）',30000],
+      /* 2026-11-16 批次 F2：皮肤「恢复经典」桥链路与失败提示真因。 */
+      ['E95BH','probe_skin_restore_bridge_20261116.mjs',['--out',path.join(tmp95,'skin-restore-bridge')],11,'皮肤恢复经典桥链路（零扣款/state应答/skinOf回经典/失败提示显示真实reason）',30000],
     ];
     for (const [tag95, script95, args95, min95, label95, timeout95] of reg95) {
       const r95 = runProbeJson(script95, args95, { timeout: timeout95 });

@@ -1459,7 +1459,12 @@ function openSkinDialog(){
     busy=true;updateControls();Bridge.call("shell-skin-buy",{id:it.id,skin:id},function(ok,res){
       if(!live())return;busy=false;
       if(ok&&res&&res.state){try{selected=CSHSpiritSkins.resolve(it.id,it.img,skinStorage(),res.state);paintSpiritImage(it);var face=document.querySelector(".gitem.on .gface");if(face)paintSpiritFace(face.querySelector("img"),it,face);status.textContent=res.charged?"已解锁并使用 "+selected.skin.name+" · -"+res.charged.toLocaleString()+" CBY":"已使用 "+selected.skin.name+"。";showSkinGreeting(it,selected.skin);}catch(e){status.textContent="权益已保存，画面将在重新进入后刷新。";}}
-      else status.textContent=res&&res.reason==="poor"?"CBY 不足，解锁需要 "+price.toLocaleString()+" CBY。":"装扮保存尚未确认，当前画面未改变，可稍后重试。";
+      /* 【2026-11-16 F2】旧版把「存档未就绪 / 写入失败 / 无桥」全折叠成一句「尚未确认」，
+         玩家既不知道原因也不知道下一步。宿主拒绝时就带 recovery:true 与可操作中文 reason，
+         如实显示；未知失败才保留兜底文案。 */
+      else if(res&&res.reason==="poor")status.textContent="CBY 不足，解锁需要 "+price.toLocaleString()+" CBY。";
+      else if(res&&res.reason)status.textContent=(res.recovery?"存档未就绪，当前画面未改变：":"装扮保存失败：")+res.reason+(res.recovery?"（可在行囊恢复后重试）":"");
+      else status.textContent="装扮保存尚未确认，当前画面未改变，可稍后重试。";
       updateControls();
     });return true;
   }
