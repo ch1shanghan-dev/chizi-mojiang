@@ -1,4 +1,4 @@
-/* 自动生成于 2026-11-16T06:25:41.820Z by tools/release.js —— hashes 对应 Git 发布字节，发版后 git push 即生效，勿手改 files */
+/* 自动生成于 2026-11-16T06:49:46.970Z by tools/release.js —— hashes 对应 Git 发布字节，发版后 git push 即生效，勿手改 files */
 window.extension = {
 	"池子魔将": {
 		"build": "c7a66ba17b134df94e959f127b4b6441f40bbe989f4192e4f64b63cd9e253348",
