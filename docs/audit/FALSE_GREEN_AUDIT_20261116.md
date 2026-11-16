@@ -136,4 +136,4 @@ E95BD 专门锁住「代码层已修 ≠ 真机已治愈」。已如实标注。
 
 `node tools/check.js` 本次 **209 OK / 1 FAIL**，唯一红仍是 E95 区 `spawnSync ETIMEDOUT`（本机 safe-delete/trash 保护致 Chromium 进程排队，卡在 E95BB）。按注册参数逐个单跑未走到的九项：**E95BB 62/0 · E95BE 36/0 · E95BF 20/0 · E95BG 18/0 · E95BH 11/0 · E95BI 8/0 · E95BJ 9/0 · E95BK 9/0 · E95BL 7/0**，全过。不宣称整仓通过，也不靠无限放宽超时掩盖。
 
-**状态**：版本 4.0.19、本地 ahead 11、工作区干净、`origin/main` 仍 4.0.18，**未推送**。
+**状态**：版本 4.0.19、本地 HEAD `6fc6dd4`、ahead 10、工作区干净、`origin/main` 仍 4.0.18 `837528b`，**未推送**。
