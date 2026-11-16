@@ -1,10 +1,10 @@
-/* 自动生成于 2026-11-16T09:49:43.228Z by tools/release.js —— hashes 对应 Git 发布字节，发版后 git push 即生效，勿手改 files */
+/* 自动生成于 2026-11-16T14:00:47.740Z by tools/release.js —— hashes 对应 Git 发布字节，发版后 git push 即生效，勿手改 files */
 window.extension = {
 	"池子魔将": {
-		"build": "47c92819bc41ee7e8cd5e98bead44357f57896cd08792683af331b5d44fe15f1",
+		"build": "056e7c95477b48517a85cace993b7ca7e767400dca3fe7766637b68b981f2a58",
 		"hashes": {
 			"LICENSE": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
-			"README.md": "85114aedd6c66a3e7a0492964f893db6e770927cfa822926a6bee8352d641f1d",
+			"README.md": "f3df0b4597dae5dcb3075ec97af9de2811a30a06461d4b0cbacf32f6d8b85a1f",
 			"audio/card/csh_fangyuan_niliuhushenyin_female.mp3": "0210771697ae9c20c97f3a9336a2e5ae35ae570529e11f48cb914c7a6fe4dc36",
 			"audio/card/csh_fangyuan_niliuhushenyin_male.mp3": "0210771697ae9c20c97f3a9336a2e5ae35ae570529e11f48cb914c7a6fe4dc36",
 			"audio/card/csh_pifeng_male.mp3": "cf3f36b3c0f2c47ee6c9bcdd056d6dcca91f61a04dbf9795005543d646e3dfa1",
