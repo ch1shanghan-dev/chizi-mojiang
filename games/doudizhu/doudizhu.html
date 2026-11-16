@@ -290,8 +290,9 @@
   }
   .pcard .r { position: absolute; top: calc(var(--cw) * .04); left: calc(var(--cw) * .09); font-size: calc(var(--cw) * .32); font-weight: 900; line-height: 1; }
   .pcard .r.ten { font-size: calc(var(--cw) * .26); letter-spacing: -1px; }
+  /* F4：点数下方的小花色角标；右下角不再摆第二枚花色，避免与中央重复 */
+  .pcard .r .rs { display: block; font-style: normal; font-size: calc(var(--cw) * .24); line-height: 1; margin-top: calc(var(--cw) * .02); }
   .pcard .mid { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: calc(var(--cw) * .46); line-height: 1; }
-  .pcard .s { position: absolute; right: calc(var(--cw) * .09); bottom: calc(var(--cw) * .03); font-size: calc(var(--cw) * .28); line-height: 1; }
   .pcard.red { color: #c0392b; }
   .pcard.joker .mid { font-size: calc(var(--cw) * .36); font-weight: 900; }
   .pcard.joker.black { color: #1c1712; }
@@ -497,7 +498,7 @@
       </span>
     </label>
 
-    <div class="trick-start-actions"><button class="btn" id="btn-start-game" type="button">开始游戏</button><details class="trick-reference"><summary>操作说明</summary><div class="tip">点牌选中 · 再点取消；「提示」循环给出建议。当前身份、倍数和剩余张数会在牌桌上显示。</div></details></div>
+    <div class="trick-start-actions"><button class="btn" id="btn-start-game" type="button">开始游戏</button><details class="trick-reference"><summary>操作说明</summary><div class="tip">点牌选中 · 再点取消；也可按住手牌拖动一次选多张，或用「全选/清空」。「提示」循环给出建议。当前身份、倍数和剩余张数会在牌桌上显示。</div></details></div>
     <div class="tip" id="econ-tip" style="display:none"></div>
     <!-- 【2026-10-03 精简】原为三行规则（牌数 / 叫分 / 选牌方式）。牌数属于背景资料，
          叫分与选牌在局内都有明确提示（选中的牌会浮起、按钮上写着"叫 3 分"），
@@ -555,7 +556,7 @@
         <div class="pl-line" id="my-line1">
           <b id="my-role">身份待定</b><em>·</em><em>剩</em><b class="num" id="my-count">0</b><em>张</em>
         </div>
-        <div class="sel-info" id="sel-info"><span id="sel-text">点牌选中 · 再点取消</span></div>
+        <div class="sel-info" id="sel-info"><span id="sel-text">点牌选中 · 可拖动连选 · 再点取消</span></div>
       </div>
     </div>
   </div>
@@ -570,6 +571,8 @@
       <button class="btn small" type="button" data-v="3">叫地主 3 分</button>
     </div>
     <div class="act-group hidden" id="play-actions">
+      <button class="btn ghost" id="btn-sel-all" type="button" title="一次选中全部手牌（可按住手牌拖动扫选）">全选</button>
+      <button class="btn ghost" id="btn-sel-none" type="button" title="清空已选">清空</button>
       <button class="btn ghost" id="btn-pass" type="button">不出</button>
       <button class="btn ghost" id="btn-hint" type="button">提示</button>
       <button class="btn" id="btn-play" type="button">出牌</button>
@@ -1879,9 +1882,12 @@ function cardHTML(card, cls) {
   } else {
     if (card.suit === 1 || card.suit === 3) c += ' red';
     var lab = RANK_LABEL[card.rank];
-    inner = '<span class="r' + (lab === '10' ? ' ten' : '') + '">' + lab + '</span>' +
-      '<span class="mid">' + SUITS[card.suit] + '</span>' +
-      '<span class="s">' + SUITS[card.suit] + '</span>';
+    /* 【2026-11-16 F4】旧版左上角只有点数、右下角又摆一枚大花色，配上中央大花色
+       形成「同一花色画两遍」（作者截图「右下角花色重复」）。改为标准扑克角标：
+       左上角点数 + 紧贴其下的小花色，中央保留一枚大花色，删掉右下角那枚。 */
+    inner = '<span class="r' + (lab === '10' ? ' ten' : '') + '">' + lab +
+      '<i class="rs">' + SUITS[card.suit] + '</i></span>' +
+      '<span class="mid">' + SUITS[card.suit] + '</span>';
   }
   return '<div class="' + c + '" data-id="' + card.id + '">' + inner + '</div>';
 }
@@ -2186,7 +2192,7 @@ function updateSelInfo() {
   var legal = !!(cls && (!lead || beats(cls, lead)));
   if (!cards.length) {
     el.className = 'sel-info';
-    txt.textContent = mine ? '点牌选中 · 再点取消' : '我的状态';
+    txt.textContent = mine ? '点牌选中 · 可拖动连选 · 再点取消' : '我的状态';
   } else if (!cls) {
     el.className = 'sel-info bad';
     txt.textContent = '已选 ' + cards.length + ' 张 · 牌型不合法：' + whyInvalid(cards);
@@ -2441,6 +2447,9 @@ $$('#bid-actions .btn').forEach(function (b) {
 
 $('#btn-play').addEventListener('click', tryPlay);
 $('#btn-hint').addEventListener('click', doHint);
+/* F4：全选 / 清空快捷，与按住扫选互补（均不碰牌型判定与结算） */
+$('#btn-sel-all').addEventListener('click', function () { ddzSelectAll(true); });
+$('#btn-sel-none').addEventListener('click', function () { ddzSelectAll(false); });
 $('#btn-auto').addEventListener('click', function () { setAuto(!game.auto); });
 $('#btn-pass').addEventListener('click', function () {
   if (game.phase !== 'play' || game.turn !== 0 || !game.lastPlay) return;
@@ -2455,9 +2464,10 @@ $('#btn-pass').addEventListener('click', function () {
    双通道：鼠标/笔 → pointerdown 立即响应；触屏 → 合成 click（不阻止默认行为）。
    【2026-10-03】手牌不再需要横滑看牌（§9.2：单行绝不换行、牌多时靠重叠收进一屏，
    见 fitHand），所以触屏路径只剩"点选"这一件事。 */
-function toggleCardAt(x) {
-  var cards = $('#hand').querySelectorAll('.pcard');
-  if (!cards.length) return;
+function handCards() { return $('#hand').querySelectorAll('.pcard'); }
+function cardIndexAt(x) {
+  var cards = handCards();
+  if (!cards.length) return -1;
   var r0 = cards[0].getBoundingClientRect();
   var step;
   if (cards.length > 1) {
@@ -2466,35 +2476,78 @@ function toggleCardAt(x) {
   }
   if (!step || step <= 0) step = r0.width * 0.6;   /* 兜底：-40% 重叠 → 步长 0.6cw */
   var idx = Math.floor((x - r0.left) / step);
-  if (idx < 0) idx = 0;
-  if (idx > cards.length - 1) idx = cards.length - 1;
-  var el = cards[idx];
-  if (!el || !el.dataset) return;
-  var id = Number(el.dataset.id);
-  var k = selIds.indexOf(id);
-  if (k >= 0) selIds.splice(k, 1); else selIds.push(id);
-  applySelClasses();
-  updateSelInfo();
+  return idx < 0 ? 0 : (idx > cards.length - 1 ? cards.length - 1 : idx);
 }
-var ddzSuppressClick = false;
-$('#hand').addEventListener('pointerdown', function (e) {
-  ddzSuppressClick=false;
-  if(e.button!==0||e.isPrimary===false)return;
-  if (game.phase !== 'play') return;
-  if (game.auto) { toast('托管中，将自动出牌'); return; }
-  if (e.pointerType === 'touch') return;   /* 触屏走 click，保住横滑手势 */
+/* 把某张牌设为指定态（true=选中 / false=取消）；哑操作不刷新，避免扫选时反复重排。 */
+function setCardAt(idx, want) {
+  var cards = handCards(), el = cards[idx];
+  if (!el || !el.dataset) return false;
+  var id = Number(el.dataset.id), k = selIds.indexOf(id), on = k >= 0;
+  if (on === want) return false;
+  if (want) selIds.push(id); else selIds.splice(k, 1);
+  return true;
+}
+function commitSel() { applySelClasses(); updateSelInfo(); }
+function toggleCardAt(x) {
+  var idx = cardIndexAt(x);
+  if (idx < 0) return;
+  var cards = handCards(), el = cards[idx];
+  if (!el || !el.dataset) return;
+  setCardAt(idx, selIds.indexOf(Number(el.dataset.id)) < 0);
+  commitSel();
+}
+/* 【2026-11-16 F4】按住扫选：对齐欢乐斗地主「一次选很多牌」手感。
+   按下那一刻就锁定目标态（点未选牌=整段选中，点已选牌=整段取消），拖动过程中
+   只把路过的牌「设为该态」，不是逐张 toggle —— 否则来回横扫会反复翻转。
+   位移超过阈值(6px)才进入扫选；单击仍走原 toggle，互不干扰。 */
+var ddzDrag = null;               /* { pointerId, want, startX, startIdx, moved } */
+var DDZ_DRAG_PX = 6;
+function canSelect() { return game.phase === 'play' && !game.auto; }
+var hand = $('#hand');
+hand.addEventListener('pointerdown', function (e) {
+  if (e.button !== 0 || e.isPrimary === false || !canSelect()) return;
+  var idx = cardIndexAt(e.clientX), cards = handCards(), el = cards[idx];
+  if (!el || !el.dataset) return;
+  ddzDrag = { pointerId: e.pointerId, want: selIds.indexOf(Number(el.dataset.id)) < 0,
+              startX: e.clientX, startIdx: idx, moved: false };
   ddzSuppressClick = true;
-  toggleCardAt(e.clientX);
+  try { hand.setPointerCapture(e.pointerId); } catch (err) {}
+  /* 先按单击处理：按下即切第一张；真正开始拖动后由扫选接管（目标态不变） */
+  setCardAt(idx, ddzDrag.want); commitSel();
 });
-$('#hand').addEventListener('pointercancel',function(){ddzSuppressClick=false;});
-window.addEventListener('blur',function(){ddzSuppressClick=false;});
-$('#hand').addEventListener('click', function (e) {
-  if(e.button!==0)return;
+hand.addEventListener('pointermove', function (e) {
+  if (!ddzDrag || e.pointerId !== ddzDrag.pointerId || !canSelect()) return;
+  if (!ddzDrag.moved && Math.abs(e.clientX - ddzDrag.startX) < DDZ_DRAG_PX) return;
+  ddzDrag.moved = true;
+  if (setCardAt(cardIndexAt(e.clientX), ddzDrag.want)) commitSel();
+});
+function endDrag(e) {
+  if (!ddzDrag || (e && e.pointerId !== ddzDrag.pointerId)) return;
+  var wasMoved = ddzDrag.moved;
+  ddzDrag = null;
+  if (wasMoved) ddzSuppressClick = true;   /* 扫选结束不触发 click 的二次 toggle */
+}
+hand.addEventListener('pointerup', endDrag);
+hand.addEventListener('pointercancel', function (e) { endDrag(e); ddzSuppressClick = false; });
+window.addEventListener('blur', function () { ddzDrag = null; ddzSuppressClick = false; });
+var ddzSuppressClick = false;
+hand.addEventListener('click', function (e) {
+  if (e.button !== 0) return;
   if (ddzSuppressClick) { ddzSuppressClick = false; return; }
-  if (game.phase !== 'play') return;
-  if (game.auto) { toast('托管中，将自动出牌'); return; }
+  if (!canSelect()) return;
   toggleCardAt(e.clientX);
 });
+/* 全选 / 清空：与扫选互补的键盘与按钮快捷（按钮在 renderActions 中按回合显示） */
+function ddzSelectAll(on) {
+  if (!canSelect()) return;
+  var cards = handCards();
+  selIds.length = 0;
+  if (on) for (var i = 0; i < cards.length; i++) {
+    var id = Number(cards[i].dataset.id);
+    if (!isNaN(id)) selIds.push(id);
+  }
+  commitSel();
+}
 
 /* Esc：先关模态/横幅，否则关页面 */
 document.addEventListener('keydown', function (e) {

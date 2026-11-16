@@ -3490,6 +3490,8 @@ if (spawnOk && execFileSync && !ONLY_SYNTAX && !ONLY_VERSIONS) {
       ['E95BH','probe_skin_restore_bridge_20261116.mjs',['--out',path.join(tmp95,'skin-restore-bridge')],11,'皮肤恢复经典桥链路（零扣款/state应答/skinOf回经典/失败提示显示真实reason）',30000],
       /* 2026-11-16 批次 F3：好感徽章挂名帖，不遮人物脸。 */
       ['E95BI','probe_market_aff_placement_20261116.mjs',['--out',path.join(tmp95,'market-aff-placement')],8,'金鳞市好感徽章位置（挂名帖不遮脸/窄屏不溢出/S档动效/真实几何）',180000],
+      /* 2026-11-16 批次 F4：卡面去重复花色 + 按住扫选批量选牌。 */
+      ['E95BJ','probe_doudizhu_selection_feel_20261116.mjs',['--out',path.join(tmp95,'ddz-selection-feel')],9,'斗地主卡面与选牌手感（无重复花色/扫选目标态锁定/6px阈值/全选清空/真实cardHTML DOM）',180000],
     ];
     for (const [tag95, script95, args95, min95, label95, timeout95] of reg95) {
       const r95 = runProbeJson(script95, args95, { timeout: timeout95 });
