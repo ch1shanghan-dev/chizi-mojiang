@@ -1,7 +1,7 @@
-/* 自动生成于 2026-11-16T07:09:33.058Z by tools/release.js —— hashes 对应 Git 发布字节，发版后 git push 即生效，勿手改 files */
+/* 自动生成于 2026-11-16T09:49:43.228Z by tools/release.js —— hashes 对应 Git 发布字节，发版后 git push 即生效，勿手改 files */
 window.extension = {
 	"池子魔将": {
-		"build": "c7a66ba17b134df94e959f127b4b6441f40bbe989f4192e4f64b63cd9e253348",
+		"build": "47c92819bc41ee7e8cd5e98bead44357f57896cd08792683af331b5d44fe15f1",
 		"hashes": {
 			"LICENSE": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
 			"README.md": "85114aedd6c66a3e7a0492964f893db6e770927cfa822926a6bee8352d641f1d",
@@ -308,7 +308,7 @@ window.extension = {
 			"core/csh_achievement_feedback.js": "3c0b5561f82d5f19eb6431d9d1de402496c49f52cb69750f81bc86320666844d",
 			"core/csh_achv.js": "acbb19a210f1c93e0d8ac5de773c99a9a6836abaed6d4eea15463e9473c7e229",
 			"core/csh_aff_lines.js": "8d32fa2c1cfdc3c8c3187669c203696550d33dca7e8a0785c5b0f08182284fe9",
-			"core/csh_affection.js": "21b37482126db938810a665370614f1b641a94f1f95be9bd60b892e4fff39a5d",
+			"core/csh_affection.js": "3b0be7dcc7982a91b7eef08d0d0d041f7f3149aac698687e0a7fc86d04d381fc",
 			"core/csh_art.js": "0618ccdeb6e9a78b688ec9369908b43c22e4378e82ac93de4dc62e991b081520",
 			"core/csh_art_v2.css": "844019a49c09b607b7f5fde763e7a76894dbc819fd2477afc052d12b3c99a36f",
 			"core/csh_aux_spirit.js": "6c5c59082b83c167db8d2d4635cc85b22bb6945af44bdc8c85c8f4e24206d4c1",
@@ -335,7 +335,7 @@ window.extension = {
 			"core/csh_layout.css": "1b59d4239614328304c8ad648292eaa8a516f7b8809e418737f66458f829a7cc",
 			"core/csh_market.js": "7fbad341ee141bff5bfa95d0c442f76446b96c950fc2a5137517faeb2215cffc",
 			"core/csh_match_reward.js": "af18572aff53049e3c95b6275a7a672b6ced1a815c7966e41b05b76977354b47",
-			"core/csh_migrate.js": "b43c990d13553d4726af451fce3e1383c76025ebe1315b6ed1ff25a6d178b029",
+			"core/csh_migrate.js": "c1e6a62e66611e4be54b8c24ae28ddddd1ea58264f81417ff20dcfe169033d9b",
 			"core/csh_net.js": "a278fa9e7137b87a669c336bdfb19e5a7a720dc82523090a07fe20c076846384",
 			"core/csh_online.js": "aa92c3de38310e4ad4bf4d284f10559db766c8ce86c37c135e7a9b6838c66c18",
 			"core/csh_page.js": "4b64c9009214cb6e324668750538a6b1f2c003e3e413b00a7319ccf6d07fd92c",
@@ -392,7 +392,7 @@ window.extension = {
 			"games/blackjack/blackjack.html": "43fdd354042e56b18c2b87c4e4ba3d7b147d490ba76483dd5a44817895ea74bb",
 			"games/bossbook.html": "572daee69c6403fdaa8674b9ead0446ff4281815b669770b7b49dd3ce3103086",
 			"games/career.html": "a973f7aef32b58384a330de87d84351598d63a8f0908be1859ee352aa5e92509",
-			"games/codex.html": "ce49ffd9edbe7635952f3fdc7431d1062e832dbbe9b38cc5b321167084104bee",
+			"games/codex.html": "bd7d7967b84cdb5a06202382831d5e2038b707ff714a48e713956233195d9461",
 			"games/doudizhu/doudizhu.html": "75756cf75d136039814076e908f3e578ee7a7aeed98e739b16b945787d463cf1",
 			"games/goldfish.html": "6b29826b526e09c9bc2ee62d40b146e86a48ccc6a8eac0c0b171ad1600e53812",
 			"games/rank.html": "6e00827124b742024ddcc6c2422d3313018b2fc1473d8ab678d42eb06b8abb0e",
@@ -1299,7 +1299,7 @@ window.extension = {
 			"mobilefx/wanjun/wushuanghuo_00017.png": "a847d20068a55543b18a8fd0afc5a1cc1349917e3a7e72e4dbc9387cc912ea39",
 			"mobilefx/wanjun/wushuanghuo_00018.png": "06d747bede74a16f0f5a58a0b9233e44b9a25222801dd54a0a35d37829fc20b2",
 			"mobilefx/wanjun/wushuanghuo_00019.png": "a1ec576661147d6d874b607b487f5cdba955fdf441a9c13038f217472ad89528",
-			"package.js": "f5c57188839d9ea64a5dc6b82966cd3b27ddf4b8a1e083afaaa8d6b84393827c",
+			"package.js": "f42dd9963d6c237b9365acff579c79f42005dba763bfad1e3d39a1cd504519f7",
 			"skills/boss.js": "d62b6e1fd7293856139f82933075244b786ca1d7876c6864cdbf3419eceb8163",
 			"skills/index.js": "352e3c6e4c4c9f074d28119bef4dd0eb7ab75f57067cee29d614ca18d21ba16f",
 			"store.json": "372a558d374277a685a94ca8e0f2ebc1abe6be3d90feb0d9053ee71c72eccc47"
@@ -1309,7 +1309,7 @@ window.extension = {
 		"intro": "<font color=#c9a84c>版本</font> <font color=#00FFFF>4.0.19</font>",
 		"version": "4.0.19",
 		"date": "2026-11-16",
-		"size": "162.8MB",
+		"size": "162.9MB",
 		"limits": {
 			"textBytes": 524288,
 			"fileBytes": 16777216,

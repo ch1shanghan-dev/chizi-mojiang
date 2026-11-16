@@ -782,7 +782,7 @@ export function installAffection() {
 		if (lib.cshAffection) return;
 		lib.cshAffection = {
 			AFF_MAX: AFF_MAX, AFF_LEVELS: AFF_LEVELS, AFF_GAIN: AFF_GAIN,
-			AFF_GIFTS: AFF_GIFTS, AFF_ACTS: AFF_ACTS, AFF_PERKS: AFF_PERKS, AFF_ECON: AFF_ECON, AFF_GIVE: AFF_GIVE,
+			AFF_GIFTS: AFF_GIFTS, AFF_ACTS: AFF_ACTS, DAILY_KEYS: DAILY_KEYS, AFF_PERKS: AFF_PERKS, AFF_ECON: AFF_ECON, AFF_GIVE: AFF_GIVE,
 			giveRoll: giveRoll,
 			levelOf: levelOf, toNext: toNext, nextLevelOf: nextLevelOf, resolveBondProgress: resolveBondProgress,
 			get: get, list: list, summary: summary,

@@ -3492,6 +3492,12 @@ if (spawnOk && execFileSync && !ONLY_SYNTAX && !ONLY_VERSIONS) {
       ['E95BI','probe_market_aff_placement_20261116.mjs',['--out',path.join(tmp95,'market-aff-placement')],8,'金鳞市好感徽章位置（挂名帖不遮脸/窄屏不溢出/S档动效/真实几何）',180000],
       /* 2026-11-16 批次 F4：卡面去重复花色 + 按住扫选批量选牌。 */
       ['E95BJ','probe_doudizhu_selection_feel_20261116.mjs',['--out',path.join(tmp95,'ddz-selection-feel')],9,'斗地主卡面与选牌手感（无重复花色/扫选目标态锁定/6px阈值/全选清空/真实cardHTML DOM）',180000],
+      /* 2026-11-16 假绿审计修复：迁移器好感日键全集，防重复刷好感与回礼钱。 */
+      ['E95BK','probe_aff_daily_keys_migration_20261116.mjs',['--out',path.join(tmp95,'aff-daily-keys')],9,'迁移好感日键22键round-trip（核心派生取真值/5新键不丢/改前判红）',30000],
+      /* 2026-11-16 假绿审计修复：图鉴降级互动表与核心 AFF_ACTS 一致性。 */
+      ['E95BL','probe_codex_acts_parity_20261116.mjs',['--out',path.join(tmp95,'codex-acts-parity')],7,'图鉴降级互动表一致性（20项key集合/adultsOnly与档位/独立页真实渲染/改前判红）',180000],
+      /* 2026-11-16 假绿审计修复：图鉴降级互动表与核心 AFF_ACTS 一致性。 */
+      ['E95BL','probe_codex_acts_parity_20261116.mjs',['--out',path.join(tmp95,'codex-acts-parity')],7,'图鉴降级互动表一致性（20项key集合/adultsOnly与档位/独立页真实渲染/改前判红）',180000],
     ];
     for (const [tag95, script95, args95, min95, label95, timeout95] of reg95) {
       const r95 = runProbeJson(script95, args95, { timeout: timeout95 });

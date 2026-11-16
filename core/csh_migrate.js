@@ -887,7 +887,18 @@ import { lib, game } from "../../../noname.js";
 
 	/* ① 好感度（csh_affection）：{ id: { v, last, saw, giveSum, giveN, day:{}, cnt:{} } }
 	   字段集与 csh_affection.readStore 的清洗口径**逐项对齐**（6 个日键 / 计数表限量）。 */
-	var AFF_DAILY_KEYS = ["hunt", "hold", "talk", "head", "close", "gift", "tea", "stars", "callname", "dance", "walk", "share", "photo", "rest", "promise", "waist", "knee"];
+	/* 【2026-11-16 假绿审计修复】此表曾硬编码 17 键，漏掉 11-13 新增的
+	   lantern/bookmark/memo/quiet/seeoff —— 玩家导出再导入后这 5 项的"今日已做"
+	   被清洗掉，当天可重复刷好感与回礼钱。改为与 affMax() 同样的范式：
+	   真值取 csh_affection.DAILY_KEYS（它从 AFF_ACTS 派生，永不漂移），
+	   仅模块未就绪时用含全部键的兜底。 */
+	function affDailyKeys() {
+		try {
+			var K = (lib && lib.cshAffection && lib.cshAffection.DAILY_KEYS);
+			if (Array.isArray(K) && K.length >= 20 && K.every(function (x) { return typeof x === "string" && /^[a-z0-9_]{1,40}$/.test(x); })) return K.slice();
+		} catch (e) {}
+		return ["hunt", "hold", "gift", "talk", "head", "close", "tea", "stars", "callname", "dance", "walk", "share", "photo", "rest", "promise", "waist", "knee", "lantern", "bookmark", "memo", "quiet", "seeoff"];
+	}
 	function cleanAffection(o) {
 		if (!o || typeof o !== "object" || Array.isArray(o)) return null;
 		var MAXV = affMax(), out = {}, n = 0, keys = Object.keys(o);
@@ -906,8 +917,11 @@ import { lib, game } from "../../../noname.js";
             if(e.giftTxn!=null){var checked=lib.cshWallet.validateAffectionState({[id]:e});rec.giftTxn=checked[id].giftTxn;}
 			var day = {}, dn = 0;
 			if (e.day && typeof e.day === "object") {
-				for (var j = 0; j < AFF_DAILY_KEYS.length; j++) {
-					var dk = AFF_DAILY_KEYS[j];
+				/* 运行时取真值：核心模块可能在迁移器之后才 install，
+				   每次清洗都问一次，确保新互动键上线后立即被带上。 */
+				var dayKeys = affDailyKeys();
+				for (var j = 0; j < dayKeys.length; j++) {
+					var dk = dayKeys[j];
 					if (typeof e.day[dk] === "string" && e.day[dk]) { day[dk] = clampStr(e.day[dk], 20); dn++; }
 				}
 			}

@@ -108,3 +108,32 @@ E95BD 专门锁住「代码层已修 ≠ 真机已治愈」。已如实标注。
 4. 其余真机项按既有待验清单走，不因为整仓 exit=0 就宣称治愈。
 
 **红线**：本轮未改任何产品代码、未推版本、未推送；HEAD 仍 `1e54e85`。
+
+---
+
+## 7. 修复结果（2026-11-16 17:10，作者「修复，并且再检查」）
+
+按字面只修 §1 的两项确凿问题；深度复查没有发现新的确凿"功能未实现"。
+
+| 项 | 修复 | 门禁 |
+|---|---|---|
+| 1.1 迁移漏 5 日键 | `csh_affection.js` API 增导出 `DAILY_KEYS`；`csh_migrate.js` 删硬编码 17 键表，改 `affDailyKeys()` 运行时从 `lib.cshAffection.DAILY_KEYS` 取真值（22 键 + 兜底），`cleanAffection` 每次调用都取（避免加载顺序） | **E95BK 9/0**（22 键 round-trip 全保留 + 改前判红） |
+| 1.2 图鉴降级表 | `codex.html` 本地 acts 7 → **20 项**（从核心 AFF_ACTS 逐项生成，含 need/needV/adultsOnly），保持 affApi 为空时全 disabled，不改写入语义 | **E95BL 7/0**（key 集合/adultsOnly/独立页真实渲染 + 改前判红） |
+
+**回归**：好感 transactions 41/0、recovery 97/0、player_match_capacity 18/0、aff_lines 31/0；图鉴 selection/sections/scroll 三探针全 exit=0。`--versions`/`--syntax` 通过，`size` 162.8→162.9MB 对齐，`catalog_git_bytes --rev HEAD` ok / mismatch 0 / 1300 文件。
+
+### 7.1 深度复查未实现功能（本轮新增，未发现新确凿项）
+
+按六个维度扫了一遍，结论如下：
+- **死 API**：164 个核心导出中 16 个"零外部引用"，逐个核实全是 `install*`（由 `extension.js` 统一调用，扫描器没纳入）或内部常量，**无死功能**。
+- **死按钮 / 空 handler**：0 个；`暂不支持/待实现` 类文案只有一处运行时模式守卫（牌友邀约），属正确降级。
+- **方案完成标记**：`UI_ART_SFX_PLAN` 里所有 `✅` 项都能在实现中找到；`⬜ 未做` 项（桌边九宫格、分隔纹样、音效 S2）文档如实标注，无"假称完成"。
+- **硬编码数值 vs 核心常量**：全局数值扫描命中大量 CSS 像素巧合（200px/0.45/1000 等），**零有效漂移**；关键数值（悬赏 1000 CBY、手续费 2%、分红 1.5%、折扣 0.3%/0.4%/0.5%、1 万 CBY 装扮）逐项核对一致。
+- **Object.assign 覆盖**：60 处逐个看形态，`csh_wallet.js:774` 的 `previous.entries` 覆盖 `additions.entries` 是"已确认达成时刻优先于推算值"的有意语义，非 bug；音效 S1 的覆盖已用运行时真值钉死。
+- **真机项**：24px 头像辨识度、局中重启资金恢复、成就 Alert 安卓复测 —— 需设备，不因门禁绿就宣称治愈。
+
+### 7.2 整仓验证
+
+`node tools/check.js` 本次 **209 OK / 1 FAIL**，唯一红仍是 E95 区 `spawnSync ETIMEDOUT`（本机 safe-delete/trash 保护致 Chromium 进程排队，卡在 E95BB）。按注册参数逐个单跑未走到的九项：**E95BB 62/0 · E95BE 36/0 · E95BF 20/0 · E95BG 18/0 · E95BH 11/0 · E95BI 8/0 · E95BJ 9/0 · E95BK 9/0 · E95BL 7/0**，全过。不宣称整仓通过，也不靠无限放宽超时掩盖。
+
+**状态**：版本 4.0.19、本地 ahead 11、工作区干净、`origin/main` 仍 4.0.18，**未推送**。

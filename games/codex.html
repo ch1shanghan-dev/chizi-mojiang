@@ -696,14 +696,30 @@ var AFF = {
     { key: "relic", name: "一枚旧徽章", cost: 120000, add: 5000 },
     { key: "stardust", name: "一捧星砂", cost: 680000, add: 12000 }
   ],
+  /* 【2026-11-16 假绿审计修复】此表曾只有 7 项，核心 csh_affection.AFF_ACTS 已有 20 项；
+     桥未就绪时玩家只看到 7 项，13 项互动凭空消失。下面与核心逐项对齐（含解锁档位与
+     adultsOnly），只作显示兜底：affApi() 为空时按钮仍全部 disabled，不改变写入语义。 */
   acts: [
     { key: "greet", name: "打个招呼", gain: 0 },
     { key: "talk", name: "说说话", gain: 5 },
     { key: "head", name: "摸摸头", gain: 5 },
-    { key: "close", name: "贴近一点", gain: 10 },
-    { key: "tea", name: "递杯茶", gain: 3 },
-    { key: "stars", name: "并肩看星", gain: 8 },
-    { key: "callname", name: "专属称呼", gain: 12 }
+    { key: "close", name: "贴近一点", gain: 10, need: "B", needV: 8000 },
+    { key: "tea", name: "递杯茶", gain: 3, need: "C", needV: 2000 },
+    { key: "stars", name: "并肩看星", gain: 8, need: "A", needV: 18000 },
+    { key: "callname", name: "专属称呼", gain: 12, need: "S", needV: 38000 },
+    { key: "dance", name: "共舞一曲", gain: 6, need: "B", needV: 8000 },
+    { key: "walk", name: "并肩散步", gain: 4, need: "C", needV: 2000 },
+    { key: "share", name: "分享心事", gain: 6, need: "B", needV: 8000 },
+    { key: "photo", name: "留张合影", gain: 4, need: "C", needV: 2000 },
+    { key: "rest", name: "一起歇会", gain: 7, need: "A", needV: 18000 },
+    { key: "promise", name: "约好下次", gain: 10, need: "S", needV: 38000 },
+    { key: "waist", name: "搂搂腰", gain: 8, need: "A", needV: 18000, adultsOnly: true },
+    { key: "knee", name: "摸摸腿", gain: 8, need: "S", needV: 38000, adultsOnly: true },
+    { key: "lantern", name: "同提一盏灯", gain: 4, need: "C", needV: 2000 },
+    { key: "bookmark", name: "夹一枚书签", gain: 4, need: "C", needV: 2000 },
+    { key: "memo", name: "记下她随口一句", gain: 6, need: "B", needV: 8000 },
+    { key: "quiet", name: "陪她安静一会儿", gain: 7, need: "A", needV: 18000 },
+    { key: "seeoff", name: "送她到门口", gain: 10, need: "S", needV: 38000 }
   ],
   perks: [
     { level: "C", key: "fee1", tag: "相识", name: "挂单折扣", desc: "手续费 −0.3%" },
