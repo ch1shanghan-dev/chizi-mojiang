@@ -1,10 +1,9 @@
-/* 自动生成于 2026-11-16T14:00:47.740Z by tools/release.js —— hashes 对应 Git 发布字节，发版后 git push 即生效，勿手改 files */
+/* 自动生成于 2026-11-16T14:13:05.294Z by tools/release.js —— hashes 对应 Git 发布字节，发版后 git push 即生效，勿手改 files */
 window.extension = {
 	"池子魔将": {
-		"build": "056e7c95477b48517a85cace993b7ca7e767400dca3fe7766637b68b981f2a58",
+		"build": "31d8e9ef6ff42673c0e8bc1aa1997fc7e344cd5a30e2d55ad2fd0c3c5a02e493",
 		"hashes": {
 			"LICENSE": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
-			"README.md": "f3df0b4597dae5dcb3075ec97af9de2811a30a06461d4b0cbacf32f6d8b85a1f",
 			"audio/card/csh_fangyuan_niliuhushenyin_female.mp3": "0210771697ae9c20c97f3a9336a2e5ae35ae570529e11f48cb914c7a6fe4dc36",
 			"audio/card/csh_fangyuan_niliuhushenyin_male.mp3": "0210771697ae9c20c97f3a9336a2e5ae35ae570529e11f48cb914c7a6fe4dc36",
 			"audio/card/csh_pifeng_male.mp3": "cf3f36b3c0f2c47ee6c9bcdd056d6dcca91f61a04dbf9795005543d646e3dfa1",
@@ -1309,7 +1308,7 @@ window.extension = {
 		"intro": "<font color=#c9a84c>版本</font> <font color=#00FFFF>4.0.19</font>",
 		"version": "4.0.19",
 		"date": "2026-11-16",
-		"size": "162.9MB",
+		"size": "162.8MB",
 		"limits": {
 			"textBytes": 524288,
 			"fileBytes": 16777216,
@@ -1319,7 +1318,6 @@ window.extension = {
 		"netdisk": "",
 		"files": [
 			"LICENSE",
-			"README.md",
 			"audio/card/csh_fangyuan_niliuhushenyin_female.mp3",
 			"audio/card/csh_fangyuan_niliuhushenyin_male.mp3",
 			"audio/card/csh_pifeng_male.mp3",

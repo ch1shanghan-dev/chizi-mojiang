@@ -118,23 +118,32 @@ function walk(rel) {
 for (const e of entries) walk(e);
 files.sort();
 
+/* ---------- 在线更新清单的文档排除 ----------
+   README.md 仍在 package.js / 完整安装包里，但不进了 catalog.files：
+   它是说明文档，不参与运行；而 jsDelivr / ghproxy 这类 CDN 对 README.md
+   与 catalog.js 的缓存时间不同，曾出现「目录已新、README 仍是旧字节」导致
+   玩家更新被摘要门禁拦死（2026-11-16 两次）。把它从在线更新清单里排除，
+   旧版客户端也能直接装完 4.0.19；文档以仓库/GitHub 为准。 */
+const UPDATE_EXCLUDED = new Set(["README.md"]);
+const manifestFiles = files.filter((f) => !UPDATE_EXCLUDED.has(f));
+
 /* ---------- 精确发布字节：隔离索引应用 .gitattributes clean filter ---------- */
-const blob = worktreeBlobHashes(files);
-const missing = files.filter((f) => !blob.get(f) || blob.get(f).error || !blob.get(f).hash);
+const blob = worktreeBlobHashes(manifestFiles);
+const missing = manifestFiles.filter((f) => !blob.get(f) || blob.get(f).error || !blob.get(f).hash);
 if (missing.length) {
 	throw new Error("以下文件无法取得 Git 发布字节，停止生成：" + missing.slice(0, 5).join("、") + (missing.length > 5 ? " …" : ""));
 }
-const hashes = Object.fromEntries(files.map((f) => [f, blob.get(f).hash]));
-const build = crypto.createHash("sha256").update(files.map((f) => f + ":" + hashes[f]).join("\n")).digest("hex");
+const hashes = Object.fromEntries(manifestFiles.map((f) => [f, blob.get(f).hash]));
+const build = crypto.createHash("sha256").update(manifestFiles.map((f) => f + ":" + hashes[f]).join("\n")).digest("hex");
 let total = 0;
-for (const f of files) total += blob.get(f).size;               // 展示体积按实际下载字节
+for (const f of manifestFiles) total += blob.get(f).size;               // 展示体积按实际下载字节
 const size = (total / 1024 / 1024).toFixed(1) + "MB";
 
 /* ---------- U4 发布预检：读取上限必须在发布前拦住 ----------
    逐文件下载器 fetchFile 走 CSHOnline.external().arrayBuffer()（16MiB）；
    cshFetchText 拉 catalog.js 走 .text()（512KiB）。
    超限就拒绝生成，不把已知不支持的文件留到玩家下载途中。 */
-const sizes = files.map((f) => ({ path: f, size: blob.get(f).size }));
+const sizes = manifestFiles.map((f) => ({ path: f, size: blob.get(f).size }));
 const preflight = checkLimits(sizes);
 if (!preflight.ok) {
 	const detail = preflight.violations.slice(0, 8)
@@ -142,7 +151,7 @@ if (!preflight.ok) {
 		.join("；");
 	throw new Error(`发布预检未通过：${preflight.violations.length} 个文件超出在线读取上限（${detail}）。${REMEDY}`);
 }
-console.log(`[release] 发布预检：${files.length} 文件，最大 ${(preflight.maxFileBytes / 1024 / 1024).toFixed(2)}MB ≤ ${(FILE_LIMIT / 1024 / 1024).toFixed(0)}MiB`);
+console.log(`[release] 发布预检：${manifestFiles.length} 文件（README.md 仅随完整包，不进在线更新），最大 ${(preflight.maxFileBytes / 1024 / 1024).toFixed(2)}MB ≤ ${(FILE_LIMIT / 1024 / 1024).toFixed(0)}MiB`);
 
 /* ---------- --check：只读核对，不写 catalog.js / 不改版本 ---------- */
 if (checkMode) {
@@ -151,7 +160,7 @@ if (checkMode) {
 	/* 磁盘上存在、但清单里没有的文件，比哈希不符更危险：玩家在线更新不会下载它，
 	   代码一旦引用就是缺文件。verifyCatalog 只遍历 cat.files，看不见这种漏登记。 */
 	const catSet = new Set(cat.files);
-	const extraOnDisk = files.filter((f) => !catSet.has(f));
+	const extraOnDisk = files.filter((f) => !catSet.has(f) && !UPDATE_EXCLUDED.has(f));
 	const versionOk = cat.version === version;
 	const issues = v.mismatches.length + v.extraKeys.length + v.missingKeys.length +
 		(v.buildOk ? 0 : 1) + extraOnDisk.length + (versionOk ? 0 : 1);
@@ -195,7 +204,7 @@ const catalog = {
 	limits: limitsBlock(sizes),
 	forum: REPO_PAGE,
 	netdisk: "",
-	files,
+	files: manifestFiles,
 };
 const header = `/* 自动生成于 ${new Date().toISOString()} by tools/release.js —— hashes 对应 Git 发布字节，发版后 git push 即生效，勿手改 files */\n`;
 const text = header + "window.extension = " + JSON.stringify({ "池子魔将": catalog }, null, "\t") + ";\n";
@@ -213,8 +222,8 @@ if (selfCheck.mismatches.length || selfCheck.extraKeys.length || selfCheck.missi
 }
 fs.writeFileSync(path.join(root, "catalog.js"), text, "utf8");
 
-console.log(`[release] catalog.js 已生成：版本 ${version}，${files.length} 个文件，${size}（按 Git 发布字节）`);
-console.log("[release] 生成自检：" + files.length + " 文件哈希全匹配、build 一致");
+console.log(`[release] catalog.js 已生成：版本 ${version}，${manifestFiles.length} 个文件（不含 README.md），${size}（按 Git 发布字节）`);
+console.log("[release] 生成自检：" + manifestFiles.length + " 文件哈希全匹配、build 一致");
 if (warnNonAscii.length) {
 	console.warn("[release] ⚠ 以下文件名含非 ASCII 字符，raw 下载可能失败，建议改名：");
 	for (const f of warnNonAscii) console.warn("  - " + f);
@@ -227,7 +236,7 @@ if (pushMode) {
 		run(["add", "-A"]);
 		run(["commit", "-m", "release " + version]);
 		/* 提交后核对玩家下载到的字节和版本。 */
-		const final = revBlobHashes("HEAD", files);
+		const final = revBlobHashes("HEAD", manifestFiles);
 		const candidate = readCatalogAtRev(final.commit);
 		const v = verifyCatalog(candidate, final.byPath);
 		const { versionOk } = releaseVersions(candidate, final.commit);
@@ -236,7 +245,7 @@ if (pushMode) {
 		if (issues) {
 			throw new Error(`最终提交 ${final.commit} 发布字节核对失败（${v.mismatches.length} 个文件不符 / buildOk=${v.buildOk} / versionOk=${versionOk}），已阻止 push`);
 		}
-		console.log(`[release] 提交字节核对通过：${files.length}/${files.length} 文件哈希一致`);
+		console.log(`[release] 提交字节核对通过：${manifestFiles.length}/${manifestFiles.length} 文件哈希一致`);
 		run(["push", "origin", final.commit + ":refs/heads/main"]);
 		console.log(`[release] ✅ 已提交并推送 ${version} —— 玩家在线扩展页稍后即可见「更新扩展」`);
 	} catch (e) {
