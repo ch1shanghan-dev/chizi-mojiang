@@ -137,3 +137,23 @@ E95BD 专门锁住「代码层已修 ≠ 真机已治愈」。已如实标注。
 `node tools/check.js` 本次 **209 OK / 1 FAIL**，唯一红仍是 E95 区 `spawnSync ETIMEDOUT`（本机 safe-delete/trash 保护致 Chromium 进程排队，卡在 E95BB）。按注册参数逐个单跑未走到的九项：**E95BB 62/0 · E95BE 36/0 · E95BF 20/0 · E95BG 18/0 · E95BH 11/0 · E95BI 8/0 · E95BJ 9/0 · E95BK 9/0 · E95BL 7/0**，全过。不宣称整仓通过，也不靠无限放宽超时掩盖。
 
 **状态**：版本 4.0.19、本地 HEAD `6fc6dd4`、ahead 10、工作区干净、`origin/main` 仍 4.0.18 `837528b`，**未推送**。
+
+---
+
+## 8. 第二轮检查（2026-11-16 晚，换角度）
+
+作者「继续检查一下看看哪里有问题的」。为避免重复 §1 的静态断言审计，本轮换**改动副作用 / 边界数据 / 真实观感**三个角度，仍只查证不改产品代码。
+
+| 角度 | 方法 | 结论 |
+|---|---|---|
+| 真实页面烟测 | `probe_ui_smoke` 全页四桌×2视口+七功能页 | **62/0**，无 JS 报错 / 缺图 / 溢出 / <44px 按钮 |
+| 截图目视 | CDP 截 4 页×2 视口 + 斗地主进局截图 | 斗地主手牌卡面确认「左上点数+小花色、中央大花色、右下无重复」（F4 生效）；手牌排列无裁切挤压；独立页金鳞市空态与牌桌姓氏首字头像是**无桥时的预期兜底**，非 F1/F3 回归 |
+| 跨局状态残留 | 追 `selIds` 全部 6 个清空点 + 牌 id 递增不复用 | 无残留；F4 扫选不会把上局选中带到新局 |
+| 越界/XSS | 超长名字 `text-overflow:ellipsis`、好感台词 `textContent`、无 `innerHTML` 拼接用户数据 | 防护到位 |
+| 边界数值 | 六类核心模块 `Number.isSafeInteger/isFinite/clamp` 密度 + 市场 trade 入参校验 | 防护密集；损坏存档另有 `probe_migration_failures` / `probe_migrate_compat` 专测 |
+| 需求手册未覆盖项 | `REQUIREMENTS_COMPLETENESS` / `CURRENT_WORK` 的「未覆盖条件」 | 全是需环境/授权/真机（网络写入、宿主矩阵、自然长局），不属代码缺陷 |
+| 头像桥 id 格式 | 追 `world.seat().id → shell-seat → Bridge.opponents → facePath` 全链 | id 为 `csh_*` / `csh_boss_minion_*`，与 `facePath` 白名单格式一致；真机应显示真人图 |
+
+**本轮结论**：未发现新的确凿 bug 或功能未实现。需要玩家在真机确认的仍是老三样——24px 头像辨识度、局中重启资金恢复、成就 Alert 安卓复测；这些不因门禁全绿就宣称治愈。
+
+**状态**：产品代码未动，HEAD 仍 `9b64e24`，版本 4.0.19、ahead 11、未推送。
