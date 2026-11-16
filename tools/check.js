@@ -3398,9 +3398,9 @@ if (spawnOk && execFileSync && !ONLY_SYNTAX && !ONLY_VERSIONS) {
       /* 方案 3.2 纠偏：只做同角色跨桌冷却；分档、降级、不改公平性由纯函数反例锁住。 */
       ['E95T','probe_seat_cooldown_20261107.mjs',['--out',path.join(tmp95,'seat-cooldown')],42,'世界同桌跨桌冷却（分档/候选降级/不改数值，改前自检2红）',20000],
       /* 方案 3.1：德州真实补码。头号红线是桌面筹码与 G.buyIn 同步累加，改前基线能判红。 */
-      ['E95U','probe_texas_topup_20261107.mjs',['--out',path.join(tmp95,'texas-topup')],59,'德州真实补码（额度/守恒/迟到回调/事务编号，改前自检2红）',20000],
+      ['E95U','probe_texas_topup_20261107.mjs',['--out',path.join(tmp95,'texas-topup')],60,'德州真实补码（额度/守恒/迟到回调/事务编号，改前自检2红）',20000],
       /* D2 后续：补码未决事务。头号不变量是钱包没扣款时绝不退款，改前基线能判红。 */
-      ['E95V','probe_topup_journal_20261107.mjs',['--out',path.join(tmp95,'topup-journal')],48,'补码未决事务（prepare/commit/幂等退款/不白送钱，改前自检1红）',20000],
+      ['E95V','probe_topup_journal_20261107.mjs',['--out',path.join(tmp95,'topup-journal')],49,'补码未决事务（prepare/commit/幂等退款/不白送钱，改前自检1红）',20000],
       /* S4：六类特色增益接线。一次性 consume / 持续型 activate 分路，改前基线能判红。 */
       ['E95W','probe_spirit_buffs_wired_20261107.mjs',['--out',path.join(tmp95,'spirit-wired')],44,'妖灵六类增益接线（宿主加载/有效伤害/安全响应）',20000],
       /* 方案 4.1 纠偏：四档视口分类 + 断点基线锁定，禁止新增随意数值。 */
@@ -3425,7 +3425,7 @@ if (spawnOk && execFileSync && !ONLY_SYNTAX && !ONLY_VERSIONS) {
       ['E95AG','probe_codex_sections_20261108.mjs',['--out',path.join(tmp95,'codex-sections')],22,'图鉴分区导航（相处/记忆/档案/矮屏降级，改前自检1红）',20000],
       /* 工作包 B：房间跨进程恢复的事务骨架。头号不变量是「只有余额与扣款前完全一致才可判
          扣款未落盘」，其余一律不许当没扣过 —— 改前基线（无条件丢弃）能判红。 */
-      ['E95AH','probe_room_journal_20261109.mjs',['--out',path.join(tmp95,'room-journal')],130,'房间凭据与快照（四态机/乐观锁/恢复判定/加载图接线，改前自检2红）',20000],
+      ['E95AH','probe_room_journal_20261109.mjs',['--out',path.join(tmp95,'room-journal')],137,'房间凭据与快照（四态机/乐观锁/恢复判定/加载图接线，改前自检2红）',20000],
       /* 孤儿探针归位：probe_minigame_ai 长期没有门禁入口，里面一条「多人局应选反转」
          的断言停留在 2026-11-04 反转修复之前，实跑 22/1 却没人看见。按现行语义改成
          「避开前一席一张牌 / 绕开下家一张牌」两条，再挂进日常门禁防复发。 */
@@ -3443,7 +3443,7 @@ if (spawnOk && execFileSync && !ONLY_SYNTAX && !ONLY_VERSIONS) {
       ['E95AO','audit_career_coverage_20261105.mjs',['--out',path.join(tmp95,'career-coverage')],3,'生涯未路由项四类归因（派生源/组合/设计取舍/待接真实源，不得一律判不可达）',20000],
       ['E95AP','probe_spirit_skins_catalog_20261109.mjs',['--out',path.join(tmp95,'spirit-skins-catalog')],72,'妖灵装扮注册表与互动1-3层（224图/112套/34位/1万CBY权益/skinOf只读/装扮回应/宿主加载图/跨页可见性）',20000],
       ['E95AQ','probe_world_resume_card_20261110.mjs',['--out',path.join(tmp95,'world-resume-card')],26,'世界入口上次未完成卡片（只读判定/不写存档/不碰钱/点击走charge/加载图/改前基线）',20000],
-      ['E95AR','probe_merit_failure_notice_20261110.mjs',['--out',path.join(tmp95,'merit-notice')],23,'功勋上报失败提示（真实桥ack/超时/6秒合并/恢复期不重复/三页接线/改前基线）',20000],
+      ['E95AR','probe_merit_failure_notice_20261110.mjs',['--out',path.join(tmp95,'merit-notice')],25,'功勋上报失败提示（真实桥ack/超时/6秒合并/恢复期不重复/三页接线/改前基线）',20000],
       /* P2 牌桌呈现：极矮屏（640×286）结算层纵向预算。加载真实 blackjack.html 打到结算，
          锁「中段不再内部滚动 / 你那一行完整可见 / 按钮仍在视口内」，并对 915×412 做对照
          （88% 上限、9px 内边距、小标题仍显示）。改前基线跑同一夹具是 12/6。 */
@@ -3454,7 +3454,7 @@ if (spawnOk && execFileSync && !ONLY_SYNTAX && !ONLY_VERSIONS) {
       /* P2 牌桌呈现续：极矮屏斗地主「身份 + 剩余张数」被省略号吞掉（身份待…/剩 1…）。
          给 .pl-brief 确定宽度 + 允许状态行换行兜底，手牌让位由 fitHand() 重算。
          改前基线同一夹具 48/6；亚像素判据（盒宽 ≥ 字形宽）是这次的关键，整数 scrollWidth 会假绿。 */
-      ['E95AU','probe_doudizhu_brief_tiny_20261110.mjs',['--out',path.join(tmp95,'ddz-brief-tiny')],54,'极矮屏斗地主身份与剩张可读（亚像素/手牌让位/按钮44px/对照视口几何不变）',150000],
+      ['E95AU','probe_doudizhu_brief_tiny_20261110.mjs',['--out',path.join(tmp95,'ddz-brief-tiny')],56,'极矮屏斗地主身份与剩张可读（亚像素/手牌让位/按钮44px/对照视口几何不变）',150000],
       /* UI 美术层 v2 首批（B1）：四桌毡面 + 牌背 + 座位板材质全部是生成的位图。
          夹具管三件事：美术层必须是 head 内最后一个样式表（trick/duel 两次把它盖回去的先例）、
          资产体积、以及四桌运行时实际生效的 background-image 就是 art-v2 那张。
@@ -3472,7 +3472,7 @@ if (spawnOk && execFileSync && !ONLY_SYNTAX && !ONLY_VERSIONS) {
       ['E95AY','probe_art_v2_buttons_20261110.mjs',['--out',path.join(tmp95,'art-v2-buttons')],67,'按钮补板（位图生效/44px红线/文字对比度/既有规则未被覆盖）',300000],
       ['E95AZ','probe_mirror_seam_20261110.mjs',['--out',path.join(tmp95,'mirror-seam')],12,'国内更新镜像接缝（空串零行为变化/配置后入白名单/默认离线与writes不变）',30000],
       /* 2026-11-11：股价波动放大 + 极端行情，纯计算仿真 20000 天×2 种子，不启浏览器。 */
-      ['E95BA','probe_market_volatility_20261111.mjs',['--out',path.join(tmp95,'market-volatility')],17,'金鳞市股价波动（常规放大/极端稀有/单日截断/价格护栏/长局趋势封顶/分布对称）',30000],
+      ['E95BA','probe_market_volatility_20261111.mjs',['--out',path.join(tmp95,'market-volatility')],21,'金鳞市股价波动（常规放大/极端稀有/单日截断/价格护栏/长局趋势封顶/分布对称）',30000],
       /* 真实浏览器逐页巡检：15 次 Chromium 启动，必须给足超时 */
       /* 2026-11-13：报错状态的诚实边界。代码层已有异常边界（E95AA 125/0），
          但作者实机截图的原生 Alert 仍可能来自旧的 4.0.16 构建；安卓横屏未复测前
@@ -3494,8 +3494,6 @@ if (spawnOk && execFileSync && !ONLY_SYNTAX && !ONLY_VERSIONS) {
       ['E95BJ','probe_doudizhu_selection_feel_20261116.mjs',['--out',path.join(tmp95,'ddz-selection-feel')],9,'斗地主卡面与选牌手感（无重复花色/扫选目标态锁定/6px阈值/全选清空/真实cardHTML DOM）',180000],
       /* 2026-11-16 假绿审计修复：迁移器好感日键全集，防重复刷好感与回礼钱。 */
       ['E95BK','probe_aff_daily_keys_migration_20261116.mjs',['--out',path.join(tmp95,'aff-daily-keys')],9,'迁移好感日键22键round-trip（核心派生取真值/5新键不丢/改前判红）',30000],
-      /* 2026-11-16 假绿审计修复：图鉴降级互动表与核心 AFF_ACTS 一致性。 */
-      ['E95BL','probe_codex_acts_parity_20261116.mjs',['--out',path.join(tmp95,'codex-acts-parity')],7,'图鉴降级互动表一致性（20项key集合/adultsOnly与档位/独立页真实渲染/改前判红）',180000],
       /* 2026-11-16 假绿审计修复：图鉴降级互动表与核心 AFF_ACTS 一致性。 */
       ['E95BL','probe_codex_acts_parity_20261116.mjs',['--out',path.join(tmp95,'codex-acts-parity')],7,'图鉴降级互动表一致性（20项key集合/adultsOnly与档位/独立页真实渲染/改前判红）',180000],
     ];
