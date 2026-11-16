@@ -215,6 +215,10 @@
 			return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
 		});
 	}
+	/* 【2026-11-16 真 BUG 修复】牌桌页在 games/<桌>/，浏览器按**文档 URL** 解析 img.src，
+	   根 image/ 必须是 ../../image/。旧值 ../image/ 解析成 games/image/（不存在）→ 404
+	   → error 监听回退 SVG ⇒ 玩家从头到尾都没看到真人头像，静态断言还以为是绿的。 */
+	var FACE_ROOT = "../../image/";
 	function facePath(id) {
 		id = String(id == null ? "" : id);
 		if (id.indexOf("csh_boss_minion_") === 0) {
@@ -222,18 +226,20 @@
 				var P = root.parent, sh = P && P.lib && P.lib.cshShell;
 				if (sh && typeof sh.skinOf === "function") {
 					var sk = sh.skinOf(id);
-					if (sk && sk.face) return "../" + String(sk.face).replace(/^\.\.\//, "");
+					/* skinOf().face 是 image/xxx 裸路径，统一剥掉可能的前导 ../ 后加根 */
+					if (sk && sk.face) return FACE_ROOT + String(sk.face).replace(/^(\.\.\/)+/, "").replace(/^image\//, "");
 				}
 			} catch (e) {}
-			return "../image/csh_face_" + id.slice(16) + ".webp";
+			return FACE_ROOT + "csh_face_" + id.slice(16) + ".webp";
 		}
 		if (id.indexOf("csh_") === 0 && /^[a-z0-9_]+$/.test(id))
-			return "../image/" + id + (WEBP_WARLORDS.indexOf(" " + id + " ") >= 0 ? ".webp" : ".jpg");
+			return FACE_ROOT + id + (WEBP_WARLORDS.indexOf(" " + id + " ") >= 0 ? ".webp" : ".jpg");
 		return "";
 	}
 	function faceHTML(id, surname, persona, px, seed) {
 		var p = facePath(id);
 		if (!p) return avatar(surname, persona, px, seed);
+		/* data-loaded 仅由 load 事件写入，供门禁区分「真的解码成功」与「404 后回退 SVG」 */
 		return '<img class="csh-face-img" src="' + escAttr(p) + '" alt="" decoding="async" ' +
 			'data-surname="' + escAttr(surname) + '" data-persona="' + escAttr(persona) +
 			'" data-px="' + escAttr(px) + '" data-seed="' + escAttr(seed == null ? "" : seed) + '">';
@@ -254,6 +260,11 @@
 	/* 批次 E：图片 404 / 解码失败时恢复程序化 SVG，绝不空白或破图 */
 	try {
 		if (root.document && root.document.addEventListener) {
+			/* 解码成功标记：门禁据此区分「真人图真显示」与「404 回退后的 SVG」 */
+			root.document.addEventListener("load", function (e) {
+				var n = e.target;
+				if (n && n.classList && n.classList.contains("csh-face-img")) n.setAttribute("data-loaded", "1");
+			}, true);
 			root.document.addEventListener("error", function (e) {
 				var n = e.target;
 				if (!n || !n.classList || !n.classList.contains("csh-face-img") || n.getAttribute("data-fb")) return;

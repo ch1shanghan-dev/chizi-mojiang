@@ -1,7 +1,7 @@
-/* 自动生成于 2026-11-15T11:32:51.933Z by tools/release.js —— hashes 对应 Git 发布字节，发版后 git push 即生效，勿手改 files */
+/* 自动生成于 2026-11-16T05:57:49.582Z by tools/release.js —— hashes 对应 Git 发布字节，发版后 git push 即生效，勿手改 files */
 window.extension = {
 	"池子魔将": {
-		"build": "54f7f605f13fde767e8c78d49abb618b9da26ae654632490db2b27652272a5dd",
+		"build": "c250c7ab73a66b5ea2fb07318a23d7ab641f92977dbf375d0f4a3ab443acc496",
 		"hashes": {
 			"LICENSE": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
 			"README.md": "85114aedd6c66a3e7a0492964f893db6e770927cfa822926a6bee8352d641f1d",
@@ -318,7 +318,7 @@ window.extension = {
 			"core/csh_bond.js": "250104a172023dae2e51e6f46d8af381fd413cdc44f30a288c011b4baac0e6ab",
 			"core/csh_bossdata.js": "489641395fc304462111169e3e53210e7629ef1801729b033aab70f64ae591a0",
 			"core/csh_bossrecord.js": "4e1409bcb3d9107086aff60814666ea13927a5ae281950f340f26122512fe68d",
-			"core/csh_cards.js": "ada2622ff96a02e6465a848d1cf31829d38eccfa1edb6e2345093c4fc5a2aedb",
+			"core/csh_cards.js": "f2dc08f8561729c526201d431eed9201070dcf84e28f60dadf505ba907c201ae",
 			"core/csh_career_observer.js": "928d39ff9c553386becb7dcd9937caa81db78ce9aee6ff120048504b00044565",
 			"core/csh_challenge.js": "c3af4da3b81a7f965e29f3dd09a0bc151b7ab80afe026a5254d5773efeed027a",
 			"core/csh_cheer.js": "045d407326d29d2b052b4c26609094c23e6d9a6c76f0b2311003b3163ed54340",
@@ -1308,7 +1308,7 @@ window.extension = {
 		"author": "池上寒",
 		"intro": "<font color=#c9a84c>版本</font> <font color=#00FFFF>4.0.19</font>",
 		"version": "4.0.19",
-		"date": "2026-11-15",
+		"date": "2026-11-16",
 		"size": "162.8MB",
 		"limits": {
 			"textBytes": 524288,

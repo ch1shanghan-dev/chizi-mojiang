@@ -56,10 +56,13 @@ const missingFiles = [
 check('推导出的 150 张人物图实体全部存在', missingFiles.length === 0, missingFiles.slice(0, 8));
 
 /* ---------- 运行时：真实页面问 facePath / faceHTML ---------- */
+/* 2026-11-16：牌桌页在 games/<桌>/，浏览器按文档 URL 解析图片 src，
+   根 image/ 必须是 ../../image/。旧值 ../image/ 会解析成 games/image/（不存在）→ 404
+   → error 监听回退 SVG，玩家实际看不到真人头像。期望值同步为真实可解码路径。 */
 const CASES = [
-  ['csh_dz', '../image/csh_dz.jpg'],
-  ['csh_diaochan', '../image/csh_diaochan.webp'],
-  ['csh_boss_minion_ada', '../image/csh_face_ada.webp'],
+  ['csh_dz', '../../image/csh_dz.jpg'],
+  ['csh_diaochan', '../../image/csh_diaochan.webp'],
+  ['csh_boss_minion_ada', '../../image/csh_face_ada.webp'],
 ];
 const RUNTIME = `(() => {
   const C = window.CSH && window.CSH.cards;
@@ -97,7 +100,23 @@ try {
     const a = await val(RUNTIME);
     await new Promise(r => setTimeout(r, 500));
     const recovered = await val(`(()=>{const b=[...document.querySelectorAll('.seat-av')].pop();return b?{hasImg:!!b.querySelector('img.csh-face-img'),html:b.innerHTML.slice(0,90)}:null;})()`);
-    return { a, recovered };
+    /* 2026-11-16：真实解码断言。静态路径字符串曾把错误的 ../image/ 锁成"正确"，
+       浏览器按文档(games/<桌>/)解析成 games/image/ → 404 → 回退 SVG，玩家根本看不到图。
+       这里在真实页面按 facePath 的结果 <img> 加载，问 naturalWidth 真值。 */
+    const realLoad = await val(`(async () => {
+      const C = window.CSH && window.CSH.cards;
+      if (!C) return { ready:false };
+      const p = C.facePath('csh_diaochan');
+      const img = new Image();
+      img.className = 'csh-face-img';
+      let done = false;
+      const finish = () => { done = true; };
+      img.onload = finish; img.onerror = finish;
+      img.src = p;
+      await new Promise(r => { img.onload = () => { finish(); r(); }; img.onerror = () => { finish(); r(); }; setTimeout(r, 1500); });
+      return { ready:true, path:p, naturalWidth:img.naturalWidth, naturalHeight:img.naturalHeight, baseURI:document.baseURI };
+    })()`);
+    return { a, recovered, realLoad };
   });
 } catch (e) {
   check('真实页面可加载并取图', false, String(e));
@@ -110,8 +129,13 @@ if (m) {
   check('faceHTML 输出真实 <img> 且携带回退数据', /<img class="csh-face-img"/.test(a.html) && /data-surname=/.test(a.html), a.html);
   check('无 id 时回退程序化 SVG（不空白）', /svg|csh-av-fallback/.test(a.fallback), a.fallback);
   check('非法 id 不会拼出越界路径', a.badId === '', a.badId);
-  check('妖灵同桌跟随宿主已选装扮', a.follow === '../image/spirit-skins/ada/s1_face.webp', a.follow);
+  check('妖灵同桌跟随宿主已选装扮', a.follow === '../../image/spirit-skins/ada/s1_face.webp', a.follow);
   check('坏图自动回退为程序化头像、不留破图', m.recovered && m.recovered.hasImg === false && /svg|csh-av-fallback/.test(m.recovered.html), m.recovered);
+  /* 2026-11-16 真值：路径必须真的能解码，静态字符串对了但图片 404 仍算失败 */
+  check('真实 <img> 能解码加载（naturalWidth>0，非 games/image 404）',
+    m.realLoad && m.realLoad.ready === true && m.realLoad.naturalWidth > 0, m.realLoad);
+  check('头像是真实图片而非回退 SVG（走根 image/ 且已解码）',
+    m.realLoad && /image\/csh_diaochan/.test(m.realLoad.path || '') && m.realLoad.naturalWidth > 0, m.realLoad);
 }
 
 const result = { scope: 'Table seat real portraits: id->file mapping, skin follow, broken-image fallback, 5 call sites', passed: rows.filter(r => r.passed).length, failed: rows.filter(r => !r.passed).length, rows };
