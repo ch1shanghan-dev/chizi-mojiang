@@ -172,7 +172,10 @@ body{background:
 }
 
 /* ---------- 好感度（v6.2）—— 卡面角标 + 面板整条 ---------- */
-.affbadge{position:absolute;right:7px;bottom:30px;display:flex;align-items:center;gap:3px;
+/* 【2026-11-16 F3】旧版 absolute;right:7px;bottom:30px 挂在 .face 上，徽章落在人物脸颊旁
+   （作者截图「好感度位置不是最适合的地方」）。改为挂在名帖 .cinfo 行内、排在名字前面：
+   不遮脸、不与左上「持」/右上「热度」冲突、不压下方涨跌行。 */
+.affbadge{position:relative;flex:0 0 auto;display:flex;align-items:center;gap:3px;white-space:nowrap;
   font-family:var(--ff-num);font-size:var(--pfs-cap2);padding:1px 7px 1px 5px;border-radius:999px;
   background:rgba(25,21,18,.82);border:1px solid rgba(240,112,156,.34);color:#ffb9d2;
   text-shadow:0 0 8px rgba(240,112,156,.55)}
@@ -645,7 +648,9 @@ function renderCardAff(card, it) {
   b.appendChild(heartEl(true));
   b.appendChild(document.createTextNode(String(st.v)));
   b.title = "好感 " + st.v + " · " + lv.name;
-  card.querySelector(".face").appendChild(b);
+  /* F3：挂进名帖行（.cinfo），排在名字前面；不再浮在人物脸上。 */
+  var nameRow = card.querySelector(".cinfo");
+  (nameRow || card.querySelector(".face")).appendChild(b);
   /* v6.3：亲近(B)及以上，她的消息会以一枚倾向角标挂在卡面 */
   if (it && it.tip) {
     var t = el("div", "tipdot " + it.tip);

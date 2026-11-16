@@ -1,7 +1,7 @@
-/* 自动生成于 2026-11-16T06:10:11.136Z by tools/release.js —— hashes 对应 Git 发布字节，发版后 git push 即生效，勿手改 files */
+/* 自动生成于 2026-11-16T06:15:22.321Z by tools/release.js —— hashes 对应 Git 发布字节，发版后 git push 即生效，勿手改 files */
 window.extension = {
 	"池子魔将": {
-		"build": "b8659cb2817df3f163ffe15eacdf2d8ebc0870563d67f8d5a00663cfe6862ead",
+		"build": "0038213a7c162c8fd2417cde46f732834b085a2af4bcb7186b8d8c7f7aac3876",
 		"hashes": {
 			"LICENSE": "8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903",
 			"README.md": "85114aedd6c66a3e7a0492964f893db6e770927cfa822926a6bee8352d641f1d",
@@ -394,7 +394,7 @@ window.extension = {
 			"games/career.html": "a973f7aef32b58384a330de87d84351598d63a8f0908be1859ee352aa5e92509",
 			"games/codex.html": "ce49ffd9edbe7635952f3fdc7431d1062e832dbbe9b38cc5b321167084104bee",
 			"games/doudizhu/doudizhu.html": "e2a08dba13c1de932bc8ec08bbcb15dfc1632c0fed83033b18c44729e8883739",
-			"games/goldfish.html": "15ea80697128e51bab2b0f85d0b0628355a8d8cb6360b1a0fb487bc883c05713",
+			"games/goldfish.html": "6b29826b526e09c9bc2ee62d40b146e86a48ccc6a8eac0c0b171ad1600e53812",
 			"games/rank.html": "6e00827124b742024ddcc6c2422d3313018b2fc1473d8ab678d42eb06b8abb0e",
 			"games/save.html": "27526b96ffe03b0b3339e6bdb2ed4e08928694069e4c4a2dee3225d21b2ff0e5",
 			"games/texas/texas.html": "49b69a6d00f9146a0f5c39dc81886fda32ab2ee7b1df5cf0d0927b948610567b",

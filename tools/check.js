@@ -3488,6 +3488,8 @@ if (spawnOk && execFileSync && !ONLY_SYNTAX && !ONLY_VERSIONS) {
       ['E95BG','probe_update_ingame_funds_20261114.mjs',['--out',path.join(tmp95,'update-ingame')],18,'局中直接更新B（旧延迟清零/资金落盘护栏/立即提交与重启/断电恢复）',30000],
       /* 2026-11-16 批次 F2：皮肤「恢复经典」桥链路与失败提示真因。 */
       ['E95BH','probe_skin_restore_bridge_20261116.mjs',['--out',path.join(tmp95,'skin-restore-bridge')],11,'皮肤恢复经典桥链路（零扣款/state应答/skinOf回经典/失败提示显示真实reason）',30000],
+      /* 2026-11-16 批次 F3：好感徽章挂名帖，不遮人物脸。 */
+      ['E95BI','probe_market_aff_placement_20261116.mjs',['--out',path.join(tmp95,'market-aff-placement')],8,'金鳞市好感徽章位置（挂名帖不遮脸/窄屏不溢出/S档动效/真实几何）',180000],
     ];
     for (const [tag95, script95, args95, min95, label95, timeout95] of reg95) {
       const r95 = runProbeJson(script95, args95, { timeout: timeout95 });
