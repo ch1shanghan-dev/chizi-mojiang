@@ -31956,7 +31956,7 @@ const cshSkillPack = {
             "csh_tuntian_dist_info": "",
             "csh_daorui_info": "锁定技。你的手牌上限等同于你已损失的<span style='color:#eb7a33'>体力</span>值；当一名角色进入濒死状态时，你增加1点<span style='color:#c27a30'>体力上限</span>。<br>当你进入濒死状态时和脱离濒死状态后，你进行一次判定：红色，你<span style='color:#34d17b'>回复</span>1点<span style='color:#eb7a33'>体力</span>；黑色，你摸两张牌。<br>当你脱离濒死状态后，令使你进入濒死状态的角色失去1点<span style='color:#eb7a33'>体力</span>，你获得1点<span style='color:#16b8b8'>护甲</span>，摸两张牌。",
             "csh_lvbu_baonu": "暴怒",
-            "csh_lvbu_baonu_info": "①锁定技，游戏开始时，你获得2枚“暴怒”标记；当你受到<span style='color:#e74c3c'>伤害</span>后，你获得等量的“暴怒”标记。<br>②<b>魔愤</b>·限定技。出牌阶段，你可以移去5枚“暴怒”标记，令所有其他角色各<span style='color:#e06055'>流失</span>1点<span style='color:#eb7a33'>体力</span>，先依次<span style='color:#bd7ce0'>弃置</span>其装备区里的牌，再依次<span style='color:#bd7ce0'>弃置</span>两张手牌。<br>最后你失去1点<span style='color:#c27a30'>体力上限</span>并获得<noname-poptip poptip = csh_lvbu_beixi></noname-poptip>。",
+            "csh_lvbu_baonu_info": "①锁定技，游戏开始时，你获得2枚“暴怒”标记；当你受到<span style='color:#e74c3c'>伤害</span>后，你获得等量的“暴怒”标记。<br>②<b>魔愤</b>。出牌阶段，你可以移去5枚“暴怒”标记，令所有其他角色各<span style='color:#e06055'>流失</span>1点<span style='color:#eb7a33'>体力</span>，先依次<span style='color:#bd7ce0'>弃置</span>其装备区里的牌，再依次<span style='color:#bd7ce0'>弃置</span>两张手牌。<br>最后你失去1点<span style='color:#c27a30'>体力上限</span>并获得<noname-poptip poptip = csh_lvbu_beixi></noname-poptip>。",
             "csh_lvbu_baonu_mofen": "魔愤",
             "csh_chitu": "赤兔",
             "csh_chitu_info": "锁定技，你计算与其他角色的距离时-2。",

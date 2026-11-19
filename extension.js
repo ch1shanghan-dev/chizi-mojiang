@@ -3,11 +3,11 @@ import { cshRecoveryPending, cshProtectedPackage, cshRecoverAtStartup } from "./
 
 export const type = "extension";
 const metadata = {
-    intro: "<font color=#c9a84c>版本</font> <font color=#00FFFF>4.0.19</font>",
+    intro: "<font color=#c9a84c>版本</font> <font color=#00FFFF>4.1.0</font>",
     author: "池上寒",
     diskURL: "",
     forumURL: "",
-    version: "4.0.19"
+    version: "4.1.0"
 };
 let protectedUntilRestart = false;
 
